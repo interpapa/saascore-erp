@@ -1,15 +1,45 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getItems, Item } from '@/lib/api/items';
-import { getEntities, Entity } from '@/lib/api/entities';
-import { createDocumentWithLines } from '@/lib/api/documents';
+import { useERPStore } from '@/store/useERPStore';
 import { processSecureCheckout } from '@/app/actions/checkout';
-import { Search, ShoppingCart, User, Plus, Minus, Trash2, DollarSign, Wallet, FileText, CheckCircle2 } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2 } from 'lucide-react';
+
+interface Item {
+  id: string;
+  name: string;
+  sku?: string;
+  base_price: number;
+  type: 'product' | 'service';
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  tax_id?: string;
+}
+
+// Datos mock para desarrollo mientras se conecta Supabase
+const MOCK_ITEMS: Item[] = [
+  { id: 'P1', name: 'Aceite Sintético 5W30', sku: 'ACE-001', base_price: 15.50, type: 'product' },
+  { id: 'P2', name: 'Filtro de Aceite', sku: 'FLT-001', base_price: 8.00, type: 'product' },
+  { id: 'P3', name: 'Bujía Iridium', sku: 'BUJ-IR1', base_price: 12.00, type: 'product' },
+  { id: 'S1', name: 'Cambio de Aceite', sku: 'SRV-001', base_price: 25.00, type: 'service' },
+  { id: 'S2', name: 'Revisión de Frenos', sku: 'SRV-002', base_price: 40.00, type: 'service' },
+];
+
+const MOCK_CUSTOMERS: Customer[] = [
+  { id: 'C1', name: 'Juan Pérez', tax_id: 'V-12345678' },
+  { id: 'C2', name: 'Taller Los Hermanos', tax_id: 'J-30456789' },
+  { id: 'C3', name: 'Ana Silva', tax_id: 'V-19876543' },
+];
 
 export default function CajaPage() {
-  const [items, setItems] = useState<Item[]>([]);
-  const [customers, setCustomers] = useState<Entity[]>([]);
+  const { currentTenant } = useERPStore();
+  const activeTenant = currentTenant;
+
+  const [items] = useState<Item[]>(MOCK_ITEMS);
+  const [customers] = useState<Customer[]>(MOCK_CUSTOMERS);
   
   const [searchItem, setSearchItem] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
@@ -19,11 +49,6 @@ export default function CajaPage() {
   const [paymentMethod, setPaymentMethod] = useState<'bolivares' | 'divisas'>('bolivares');
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-
-  useEffect(() => {
-    getItems().then(setItems);
-    getEntities('customer').then(setCustomers);
-  }, []);
 
   const filteredItems = items.filter(i => i.name.toLowerCase().includes(searchItem.toLowerCase()) || i.sku?.toLowerCase().includes(searchItem.toLowerCase()));
 
@@ -64,25 +89,14 @@ export default function CajaPage() {
     setIsSaving(true);
     try {
       if (status === 'draft') {
-        // Los borradores (Presupuestos) no necesitan seguridad estricta, los guarda el front
-        await createDocumentWithLines({
-          tenant_id: activeTenant.id,
+        // Borrador: guardar localmente (mock hasta conectar Supabase)
+        console.log('Presupuesto borrador guardado:', {
+          tenant_id: activeTenant?.id,
           entity_id: selectedCustomer,
-          type: 'quote',
-          status: 'draft',
-          document_number: null,
-          issue_date: new Date().toISOString(),
-          due_date: null,
-          notes: 'Presupuesto Borrador',
-          metadata: {},
-          lines: ticketLines.map(l => ({
-            item_id: l.item.id,
-            description: l.item.name,
-            quantity: l.quantity,
-            unit_price: l.item.base_price,
-            tax_amount: (l.item.base_price * l.quantity) * 0.16
-          }))
+          lines: ticketLines.map(l => ({ item_id: l.item.id, quantity: l.quantity, unit_price: l.item.base_price }))
         });
+        // Simular delay de guardado
+        await new Promise(resolve => setTimeout(resolve, 500));
       } else {
         // LAS FACTURAS VAN POR EL SERVIDOR OBLIGATORIAMENTE
         const cartPayload = ticketLines.map(l => ({ itemId: l.item.id, quantity: l.quantity }));

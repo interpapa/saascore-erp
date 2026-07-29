@@ -15,7 +15,7 @@ export interface Entity {
   updated_at: string;
 }
 
-export type CreateEntityInput = Omit<Entity, 'id' | 'created_at' | 'updated_at'> & { tenant_id?: string };
+export type CreateEntityInput = Omit<Entity, 'id' | 'created_at' | 'updated_at' | 'tenant_id'> & { tenant_id?: string | null };
 
 export async function getEntities(type?: Entity['type']) {
   let query = supabase

@@ -17,7 +17,7 @@ export interface Item {
   updated_at: string;
 }
 
-export type CreateItemInput = Omit<Item, 'id' | 'created_at' | 'updated_at'> & { tenant_id?: string };
+export type CreateItemInput = Omit<Item, 'id' | 'created_at' | 'updated_at' | 'tenant_id'> & { tenant_id?: string | null };
 
 export async function getItems(type?: Item['type']) {
   let query = supabase

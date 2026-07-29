@@ -213,7 +213,7 @@ export function LegoStudio({ initialLayout, onSave, onClose }: LegoStudioProps) 
                     
                     {/* VISTA PREVIA REAL (El Motor Lego de verdad) */}
                     <div className="pointer-events-none">
-                      <LegoEngine dna={[piece]} customData={{}} />
+                      <LegoEngine dna={{ moduleId: piece.id, name: '', layout: [piece] }} customData={{}} />
                     </div>
 
                     {/* DRAG HANDLE VISUAL */}

@@ -82,7 +82,7 @@ export const useERPStore = create<ERPState>((set, get) => ({
     const { products, clients, journal } = get();
     
     const product = products.find(p => p.id === productId);
-    const client = clients.find(c => p.id === clientId);
+    const client = clients.find(c => c.id === clientId);
     if (!product || product.stock < qty) throw new Error("Stock insuficiente");
 
     const totalSale = product.price * qty;
