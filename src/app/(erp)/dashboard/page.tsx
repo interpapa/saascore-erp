@@ -19,15 +19,11 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/core/AuthProvider';
-import { useState } from 'react';
-import { LegoEngine } from '@/components/lego/LegoEngine';
-import { LegoPieceDNA } from '@/types/lego';
-import { LegoStudio } from '@/components/studio/LegoStudio';
+import { useERPStore } from '@/store/useERPStore';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
-  const [isEditing, setIsEditing] = useState(false);
-  const [dna, setDna] = useState<LegoPieceDNA[]>([]);
+  const { currentTenant } = useERPStore();
   
   const apps = [
     { id: 'caja', name: 'Caja', icon: Wrench, gradient: 'from-emerald-500 to-teal-600', href: '/caja' },
@@ -57,7 +53,9 @@ export default function LauncherPage() {
             </div>
             SaaSCore OS
           </h1>
-          <p className="text-slate-600 dark:text-slate-400">Bienvenido, Taller Central S.A.</p>
+          <p className="text-slate-600 dark:text-slate-400">
+            Bienvenido, {currentTenant?.name || 'Configurando tu empresa...'}
+          </p>
         </div>
         
         <button onClick={signOut} className="flex items-center gap-2 bg-black/5 dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-500/10 border border-border hover:border-red-200 dark:hover:border-red-500/30 hover:text-red-600 dark:hover:text-red-400 px-4 py-2 rounded-xl transition-colors btn-haptic group">

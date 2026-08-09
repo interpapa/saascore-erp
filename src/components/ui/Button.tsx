@@ -11,10 +11,10 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ children, variant = 'primary', size = 'md', isLoading = false, icon, className = '', disabled, ...props }, ref) => {
     
-    const baseStyles = "inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98]";
+    const baseStyles = "inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none active:scale-[0.98] btn-haptic";
     
     const variants = {
-      primary: "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-600/20 hover:shadow-md hover:shadow-indigo-600/30",
+      primary: "bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm shadow-primary/20 hover:shadow-md hover:shadow-primary/30",
       secondary: "bg-slate-800 text-white hover:bg-slate-900 shadow-sm",
       outline: "border border-slate-300 bg-white text-slate-700 hover:bg-background hover:text-slate-900",
       ghost: "bg-transparent text-foreground hover:bg-slate-100 hover:text-slate-900"

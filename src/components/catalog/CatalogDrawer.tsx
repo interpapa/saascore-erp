@@ -22,13 +22,13 @@ export function CatalogDrawer({ item, isOpen, onClose }: CatalogDrawerProps) {
     <>
       {/* Backdrop */}
       <div 
-        className={`fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-[60] transition-opacity duration-500 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/20 dark:bg-black/40 backdrop-blur-sm z-50 transition-opacity duration-500 ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
       {/* Drawer (Floating Sheet) */}
       <div 
-        className={`fixed top-4 bottom-4 right-4 w-[calc(100%-2rem)] sm:w-full max-w-md bg-white/85 dark:bg-slate-900/85 backdrop-blur-3xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-white/10 z-[70] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col overflow-hidden ${isOpen ? 'translate-x-0' : 'translate-x-[120%]'}`}
+        className={`fixed top-4 bottom-4 right-4 w-[calc(100%-2rem)] sm:w-full max-w-md bg-white/85 dark:bg-slate-900/85 backdrop-blur-3xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-white/10 z-50 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col overflow-hidden ${isOpen ? 'translate-x-0' : 'translate-x-[120%]'}`}
       >
         <button 
           onClick={onClose}

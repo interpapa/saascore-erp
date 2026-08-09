@@ -128,7 +128,7 @@ export function LegoStudio({ initialLayout, onSave, onClose }: LegoStudioProps) 
   const selectedPiece = selectedIndex !== null ? layout[selectedIndex] : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-100 dark:bg-slate-950 flex flex-col animate-in fade-in zoom-in-95 duration-300">
+    <div className="fixed inset-0 z-60 bg-slate-100 dark:bg-slate-950 flex flex-col animate-in fade-in zoom-in-95 duration-300">
       
       {/* HEADER */}
       <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 shrink-0">

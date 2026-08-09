@@ -4,7 +4,7 @@ import { createContext, useContext } from 'react';
 import { useERPStore } from '@/store/useERPStore';
 
 interface TenantContextType {
-  activeTenant: { id: string; businessName: string; blocked: boolean } | null;
+  activeTenant: { id: string; name: string; blocked: boolean } | null;
   isLoadingTenant: boolean;
 }
 

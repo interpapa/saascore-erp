@@ -58,7 +58,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
@@ -109,9 +109,9 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             <div className="col-span-2">
               <Input
                 name="name"
-                label="Nombre del Ítem"
-                placeholder="Ej. Filtro de Aceite V8"
-                icon={<Tag size={18} />}
+                label="Nombre del Producto / Servicio *"
+                placeholder="Ej: Producto A o Servicio B"
+                icon={<Package size={18} />}
                 required
                 autoFocus
               />

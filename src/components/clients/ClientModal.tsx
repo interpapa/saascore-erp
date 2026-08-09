@@ -9,9 +9,10 @@ interface ClientModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (client: any) => Promise<void>;
+  initialData?: any;
 }
 
-export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
+export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,11 +25,11 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
 
     const formData = new FormData(e.currentTarget);
     const clientData = {
-      full_name: formData.get('full_name') as string,
+      full_name: (formData.get('full_name') as string) || (formData.get('name') as string),
       phone: (formData.get('phone') as string) || null,
       email: (formData.get('email') as string) || null,
       address: (formData.get('address') as string) || null,
-      total_debt: 0
+      total_debt: initialData ? initialData.metadata?.total_debt : 0
     };
 
     try {
@@ -42,7 +43,7 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200"
@@ -56,7 +57,7 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
               <User size={18} />
             </div>
-            Nuevo Cliente
+            {initialData ? 'Editar Cliente' : 'Nuevo Cliente'}
           </h2>
           <button 
             onClick={onClose}
@@ -80,6 +81,7 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
             icon={<User size={18} />}
             required
             autoFocus
+            defaultValue={initialData?.name}
           />
 
           <Input
@@ -88,6 +90,7 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
             type="tel"
             placeholder="+52 123 456 7890"
             icon={<Phone size={18} />}
+            defaultValue={initialData?.phone}
           />
 
           <Input
@@ -96,6 +99,7 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
             type="email"
             placeholder="correo@empresa.com"
             icon={<Mail size={18} />}
+            defaultValue={initialData?.email}
           />
 
           <Input
@@ -103,6 +107,7 @@ export function ClientModal({ isOpen, onClose, onSave }: ClientModalProps) {
             label="Dirección"
             placeholder="Av. Principal 123..."
             icon={<MapPin size={18} />}
+            defaultValue={initialData?.address}
           />
 
           <div className="pt-4 flex gap-3">

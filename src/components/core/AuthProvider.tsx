@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useERPStore } from '@/store/useERPStore';
+import { useERPStore, SessionData, Tenant } from '@/store/useERPStore';
 import { useRouter, usePathname } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 interface AuthContextType {
   isLoading: boolean;
@@ -15,16 +16,90 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const PUBLIC_ROUTES = ['/login'];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { session } = useERPStore();
+  const { session, setSession, setCurrentTenant } = useERPStore();
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    // Simula un tick de inicialización para que el store hidrate
-    const timer = setTimeout(() => setIsLoading(false), 100);
-    return () => clearTimeout(timer);
-  }, []);
+    let mounted = true;
+
+    async function getInitialSession() {
+      try {
+        const { data: { session: supabaseSession } } = await supabase.auth.getSession();
+        
+        if (supabaseSession) {
+          await handleSessionSync(supabaseSession.user);
+        } else {
+          setSession(null);
+          setCurrentTenant(null);
+        }
+      } catch (err) {
+        console.error("Error getting session:", err);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    }
+
+    getInitialSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, supabaseSession) => {
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setCurrentTenant(null);
+          router.push('/login');
+        } else if (supabaseSession) {
+          await handleSessionSync(supabaseSession.user);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [setSession, setCurrentTenant, router]);
+
+  const handleSessionSync = async (user: any) => {
+    // Buscar si el usuario tiene un tenant asignado
+    const { data: userTenants } = await supabase
+      .from('user_tenants')
+      .select('tenant_id, role')
+      .eq('user_id', user.id)
+      .single();
+
+    if (userTenants) {
+      // Buscar la información del tenant
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', userTenants.tenant_id)
+        .single();
+
+      if (tenantData) {
+        setCurrentTenant({
+          id: tenantData.id,
+          name: tenantData.name,
+          blocked: tenantData.status !== 'active',
+          metadata: tenantData.metadata
+        });
+        setSession({
+          userEmail: user.email,
+          role: userTenants.role as any,
+          tenantId: tenantData.id
+        });
+      }
+    } else {
+      // Usuario sin empresa, va al onboarding
+      setSession({
+        userEmail: user.email,
+        role: 'technician', // rol temporal
+        tenantId: ''
+      });
+      setCurrentTenant(null);
+    }
+  };
 
   useEffect(() => {
     if (isLoading) return;
@@ -33,14 +108,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (!session && !isPublic) {
       router.push('/login');
-    } else if (session && isPublic) {
+    } else if (session && !session.tenantId && pathname !== '/onboarding') {
+      // Si está logueado pero no tiene tenant, mandarlo al onboarding (a menos que ya esté ahí)
+      router.push('/onboarding');
+    } else if (session && session.tenantId && (isPublic || pathname === '/onboarding')) {
+      // Si está logueado y tiene tenant, mandarlo al dashboard si intenta entrar a login u onboarding
       router.push('/dashboard');
     }
   }, [session, isLoading, pathname, router]);
 
-  const signOut = () => {
-    // En producción: await supabase.auth.signOut()
-    // Por ahora limpiamos el store y redirigimos
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setCurrentTenant(null);
     router.push('/login');
   };
 

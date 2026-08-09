@@ -1,36 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, Ban, CheckCircle2, MoreVertical, CreditCard } from 'lucide-react';
-
-// Mock Data (En producción viene de supabase.from('tenants'))
-const MOCK_TENANTS = [
-  { id: '1', name: 'Taller Central S.A.', status: 'active', plan: 'pro', active_modules: ['caja', 'crm', 'catalogo'], last_payment: 'Hace 2 días' },
-  { id: '2', name: 'AutoFrenos El Rápido', status: 'active', plan: 'basic', active_modules: ['caja', 'catalogo'], last_payment: 'Hace 15 días' },
-  { id: '3', name: 'Lubricantes y Filtros', status: 'suspended', plan: 'basic', active_modules: ['caja'], last_payment: 'Hace 45 días (Deuda)' },
-];
+import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
+import { useToast } from '@/components/core/ToastProvider';
+import { EmptyState } from '@/components/core/EmptyState';
 
 export default function AdminTenantsPage() {
-  const [tenants, setTenants] = useState(MOCK_TENANTS);
+  const { toast } = useToast();
+  const [tenants, setTenants] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const toggleStatus = (id: string) => {
-    setTenants(tenants.map(t => {
-      if (t.id === id) {
-        return { ...t, status: t.status === 'active' ? 'suspended' : 'active' };
-      }
-      return t;
-    }));
-    // Aquí haríamos supabase.from('tenants').update({ status: 'suspended' }).eq('id', id);
+  const fetchTenants = async () => {
+    setIsLoading(true);
+    const result = await getAllTenants();
+    if (result.success && result.tenants) {
+      setTenants(result.tenants);
+    }
+    setIsLoading(false);
+  };
+
+  useEffect(() => {
+    fetchTenants();
+  }, []);
+
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    // Optimistic UI
+    setTenants(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+    
+    const result = await toggleTenantStatus(id, newStatus);
+    if (!result.success) {
+      // Revert if failed
+      toast({ variant: 'error', title: 'Error', description: result.error });
+      fetchTenants();
+    }
   };
 
   return (
-    <div className="max-w-6xl mx-auto animate-in fade-in zoom-in-95 duration-300">
-      <div className="mb-8 flex justify-between items-end">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight mb-2">Gestión de Inquilinos</h1>
-          <p className="text-slate-400">Control maestro de acceso y facturación de tus clientes SaaS.</p>
+          <h1 className="text-3xl font-black text-white tracking-tight mb-1">Gestión de Inquilinos</h1>
+          <p className="text-slate-400 font-medium">Control maestro de acceso y facturación de tus clientes SaaS.</p>
         </div>
-        <button className="bg-rose-500 hover:bg-rose-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-rose-500/20">
+        <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic">
           <Shield size={18} /> Nuevo Cliente (Tenant)
         </button>
       </div>
@@ -47,7 +61,26 @@ export default function AdminTenantsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {tenants.map(tenant => (
+            {isLoading ? (
+              <tr>
+                <td colSpan={5} className="p-8 text-center text-slate-400">
+                  <div className="flex justify-center mb-2">
+                    <div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                  Cargando inquilinos...
+                </td>
+              </tr>
+            ) : tenants.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="p-8">
+                  <EmptyState
+                    icon={<Shield size={40} />}
+                    title="No hay inquilinos registrados"
+                    description="Crea un nuevo inquilino para comenzar a gestionar clientes SaaS"
+                  />
+                </td>
+              </tr>
+            ) : tenants.map(tenant => (
               <tr key={tenant.id} className="hover:bg-white/[0.02] transition-colors">
                 <td className="p-4 pl-6">
                   <div className="font-bold text-white text-base">{tenant.name}</div>
@@ -65,9 +98,11 @@ export default function AdminTenantsPage() {
                   )}
                 </td>
                 <td className="p-4">
-                  <div className="text-sm text-slate-300 mb-1"><span className="uppercase font-bold text-indigo-400 text-xs">{tenant.plan}</span></div>
-                  <div className="flex gap-1">
-                    {tenant.active_modules.map(mod => (
+                  <div className="text-sm text-slate-300 mb-1">
+                    <span className="uppercase font-bold text-indigo-400 text-xs">{tenant.subscription_plan || 'basic'}</span>
+                  </div>
+                  <div className="flex gap-1 flex-wrap max-w-[200px]">
+                    {(tenant.active_modules || []).map((mod: string) => (
                       <span key={mod} className="bg-white/10 text-slate-300 text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-white/5">
                         {mod}
                       </span>
@@ -77,14 +112,14 @@ export default function AdminTenantsPage() {
                 <td className="p-4">
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <CreditCard size={14} className={tenant.status === 'suspended' ? 'text-rose-500' : 'text-slate-500'} />
-                    {tenant.last_payment}
+                    {new Date(tenant.created_at).toLocaleDateString()}
                   </div>
                 </td>
                 <td className="p-4 pr-6 text-right">
                   <div className="flex items-center justify-end gap-2">
                     <button 
-                      onClick={() => toggleStatus(tenant.id)}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border ${
+                      onClick={() => handleToggleStatus(tenant.id, tenant.status)}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border btn-haptic ${
                         tenant.status === 'active' 
                           ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' 
                           : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-white'

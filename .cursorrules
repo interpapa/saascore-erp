@@ -1,0 +1,21 @@
+# SaaSCore ERP — Token & Execution Optimization Rules
+
+These rules are designed to prevent excessive token consumption, minimize cost, and prevent automated error loops. All agents and subagents must adhere strictly to these guidelines:
+
+## 1. Scope Isolation (No Unrelated Reads)
+- **Do not read or scan files outside the task's functional module.**
+- If you are editing `/contabilidad`, do not read code or configurations for `/whatsapp`, `/caja`, or `/equipo`.
+- Limit directory listings and search queries strictly to the target component path.
+
+## 2. Precise Edits (No Full File Overwrites)
+- **Never rewrite entire files** unless creating a brand-new file.
+- Use `replace_file_content` or `multi_replace_file_content` to perform small, targeted modifications.
+- Do not duplicate entire blocks of code to change a few lines.
+
+## 3. Concise Communication (No Conversational Bloat)
+- Avoid decorating files with verbose markdown comments, extensive docstrings, or system descriptions unless explicitly requested.
+- Keep agent outputs, summaries, and plan descriptions short, concise, and focused on the facts.
+
+## 4. Loop Prevention & Early Exit
+- **Maximum 3 consecutive failures**: If a build fails, a typescript error persists, or a tool execution errors 3 times in a row, **STOP immediately** and ask the user for human intervention.
+- Do not run continuous trial-and-error loops trying to fix the same compilation or runtime issue.

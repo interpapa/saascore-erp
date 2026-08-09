@@ -3,27 +3,39 @@
 import React from 'react';
 import { X, User, Phone, Mail, MapPin, DollarSign, Calendar, Edit3, Trash2, Clock, CreditCard, ChevronRight } from 'lucide-react';
 import { Entity } from '@/lib/api/entities';
+import { UISlot } from '@/components/core/UISlot';
+
 
 interface ClientDrawerProps {
   client: Entity | null;
   isOpen: boolean;
   onClose: () => void;
+  onEdit?: (client: Entity) => void;
+  onDelete?: (id: string) => void;
 }
 
-export function ClientDrawer({ client, isOpen, onClose }: ClientDrawerProps) {
+export function ClientDrawer({ client, isOpen, onClose, onEdit, onDelete }: ClientDrawerProps) {
+  const [confirmDelete, setConfirmDelete] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setConfirmDelete(false);
+    }
+  }, [isOpen]);
+
   if (!client) return null;
 
   return (
     <>
       {/* Backdrop */}
       <div 
-        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         onClick={onClose}
       />
 
       {/* Drawer (Floating Sheet) */}
       <div 
-        className={`fixed top-4 bottom-4 right-4 w-[calc(100%-2rem)] sm:w-full max-w-md bg-white/85 dark:bg-slate-900/85 backdrop-blur-3xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-white/10 z-[70] transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col overflow-hidden ${isOpen ? 'translate-x-0' : 'translate-x-[120%]'}`}
+        className={`fixed top-4 bottom-4 right-4 w-[calc(100%-2rem)] sm:w-full max-w-md bg-white/85 dark:bg-slate-900/85 backdrop-blur-3xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-white/10 z-50 transition-transform duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] flex flex-col overflow-hidden ${isOpen ? 'translate-x-0' : 'translate-x-[120%]'}`}
       >
         <button 
           onClick={onClose}
@@ -52,14 +64,41 @@ export function ClientDrawer({ client, isOpen, onClose }: ClientDrawerProps) {
 
           {/* Acciones Rápidas */}
           <div className="flex gap-3">
-            <button className="flex-1 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 btn-haptic">
+            <button 
+              onClick={() => onEdit?.(client)}
+              className="flex-1 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 btn-haptic"
+            >
               <Edit3 size={16} />
               Editar Datos
             </button>
-            <button className="flex-1 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 btn-haptic">
-              <Trash2 size={16} />
-              Eliminar
-            </button>
+            {confirmDelete ? (
+              <div className="flex-1 flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    onDelete?.(client.id);
+                    onClose();
+                    setConfirmDelete(false);
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold text-xs transition-colors btn-haptic"
+                >
+                  Confirmar
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-3 py-2.5 bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-xs hover:bg-slate-300 dark:hover:bg-slate-700 btn-haptic"
+                >
+                  Cancelar
+                </button>
+              </div>
+            ) : (
+              <button 
+                onClick={() => setConfirmDelete(true)}
+                className="flex-1 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500 hover:text-white py-2.5 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 btn-haptic"
+              >
+                <Trash2 size={16} />
+                Eliminar
+              </button>
+            )}
           </div>
 
           {/* Información de Contacto */}
@@ -117,6 +156,10 @@ export function ClientDrawer({ client, isOpen, onClose }: ClientDrawerProps) {
               </div>
             </div>
           </div>
+
+          {/* Slot de Inyección Dinámica de Interfaz para Plugins */}
+          <UISlot name="crm.client_drawer.financial_stats" context={{ client }} />
+
 
           </div>
         </div>

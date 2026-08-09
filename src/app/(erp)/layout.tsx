@@ -1,7 +1,7 @@
 import { AICopilot } from '@/components/core/AICopilot';
-import { OnboardingWizard } from '@/components/core/OnboardingWizard';
 import { FloatingHeader } from '@/components/core/FloatingHeader';
 import { AmbientBackground } from '@/components/core/AmbientBackground';
+import { ErrorBoundary } from '@/components/core/ErrorBoundary';
 
 export default function ERPLayout({
   children,
@@ -11,23 +11,18 @@ export default function ERPLayout({
   return (
     <div className="min-h-screen text-foreground overflow-x-hidden selection:bg-primary/30 relative">
       <AmbientBackground />
-      
-      {/* Contenido Superior (z-10 para flotar sobre el fondo) */}
-      <div className="relative z-10 flex flex-col min-h-screen">
-        {/* Isla Flotante (Apple Vision Style) */}
-        <FloatingHeader />
 
-        {/* Contenedor Principal (100% Pantalla) */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <FloatingHeader />
         <main className="flex-1 w-full pt-20">
-          {children}
+          <ErrorBoundary moduleName="este módulo">
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
 
-      {/* Orbe de Inteligencia Artificial */}
       <AICopilot />
-      
-      {/* Asistente de Configuración Inicial */}
-      <OnboardingWizard />
     </div>
   );
 }
+

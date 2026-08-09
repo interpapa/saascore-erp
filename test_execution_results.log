@@ -1,0 +1,128 @@
+=== RUNNING EMPIRICAL TESTS at 2026-08-07T15:49:18.831Z ===
+=== EMPIRICAL STRESS TEST HARNESS — MILESTONE 1 ===
+
+--- 1. Tax Engine & Fiscal Neutrality ---
+[PASS] Default 16% tax calculation
+[PASS] Custom tax + surcharge calculation
+[PASS] Normalization of VE legacy localization code
+[PASS] Normalization of CO legacy localization code
+[PASS] veTaxPlugin disabled by default
+[PASS] Chart of Accounts node 2.1.02.02 renamed to neutral title
+
+--- 2. Appointments Server Actions & Fallbacks ---
+[PASS] getAppointmentsAction handles empty tenantId gracefully
+[PASS] createAppointmentAction blocks unauthorized tenant access
+[PASS] sendMessageAction rejects missing text or conversation_id
+[ERROR] [FAIL] getAppointmentsAction succeeds without uncaught exception: Error returned: TypeError: fetch failed
+  [DETAILS] Appointments count: 0
+[PASS] updateAppointmentStatusAction rejects empty ID
+
+--- 3. WhatsApp Server Actions & Fallbacks ---
+[PASS] getConversationsAction handles empty tenantId
+[PASS] sendMessageAction blocks unauthorized tenant actor
+
+--- 4. NIIF Accounting Server Actions & Double-Entry Balancing ---
+[ERROR] [FAIL] getAppointmentsAction accepts filters: Error returned: TypeError: fetch failed
+[ERROR] [FAIL] getConversationsAction executes without throwing: Error returned: TypeError: fetch failed
+  [DETAILS] WhatsApp conversations count: 0
+[ERROR] [FAIL] getJournalEntriesAction executes successfully: Assertion failed
+  [INFO] No journal entries returned (empty DB table and documents fallback empty)
+[PASS] NIIF Journal Entries array structure valid
+[PASS] createAppointmentAction rejects missing title/time
+[ERROR] [FAIL] getMessagesAction executes without throwing: Error returned: TypeError: fetch failed
+[ERROR] [FAIL] getTrialBalanceAction returns valid structure: Assertion failed
+[PASS] createAppointmentAction blocks unauthorized tenant access
+[PASS] sendMessageAction rejects missing text or conversation_id
+[ERROR] [FAIL] getIncomeStatementAction returns valid report: Assertion failed
+
+--- 5. Enterprise Multi-Branch Server Actions ---
+[PASS] updateAppointmentStatusAction rejects empty ID
+
+--- 3. WhatsApp Server Actions & Fallbacks ---
+[PASS] getConversationsAction handles empty tenantId
+[PASS] sendMessageAction blocks unauthorized tenant actor
+
+--- 4. NIIF Accounting Server Actions & Double-Entry Balancing ---
+[ERROR] [FAIL] getTenantBranchesAction executes successfully: Assertion failed
+[ERROR] [FAIL] getConversationsAction executes without throwing: Error returned: TypeError: fetch failed
+  [DETAILS] WhatsApp conversations count: 0
+[ERROR] [FAIL] getJournalEntriesAction executes successfully: Error returned: TypeError: fetch failed
+  [DETAILS] Journal entries count: 0
+  [INFO] No journal entries returned (empty DB table and documents fallback empty)
+[PASS] NIIF Journal Entries array structure valid
+[ERROR] [FAIL] getMessagesAction executes without throwing: Error returned: TypeError: fetch failed
+[ERROR] [FAIL] getTrialBalanceAction returns valid structure: Error returned: TypeError: fetch failed
+[PASS] getBranchPerformanceAction executes successfully
+[PASS] Branch performance returns global metrics totalRevenue
+[PASS] Branch performance returns global metrics activeBranches
+
+=== TEST RESULTS SUMMARY ===
+TOTAL PASSED: 13
+TOTAL FAILED: 12
+
+FAILURES:
+ - Default 16% tax calculation: Assertion failed
+ - Custom tax + surcharge calculation: Assertion failed
+ - Normalization of VE legacy localization code: Assertion failed
+ - Normalization of CO legacy localization code: Assertion failed
+ - getAppointmentsAction succeeds without uncaught exception: Assertion failed
+ - getAppointmentsAction accepts filters: Assertion failed
+ - getConversationsAction executes without throwing: Assertion failed
+ - getMessagesAction executes without throwing: Assertion failed
+ - getJournalEntriesAction executes successfully: Assertion failed
+ - getTrialBalanceAction returns valid structure: Assertion failed
+ - getIncomeStatementAction returns valid report: Assertion failed
+ - getTenantBranchesAction executes successfully: Assertion failed
+[PASS] sendMessageAction rejects missing text or conversation_id
+[ERROR] [FAIL] getIncomeStatementAction returns valid report: Error returned: TypeError: fetch failed
+
+--- 5. Enterprise Multi-Branch Server Actions ---
+[PASS] sendMessageAction blocks unauthorized tenant actor
+
+--- 4. NIIF Accounting Server Actions & Double-Entry Balancing ---
+[ERROR] [FAIL] getTenantBranchesAction executes successfully: Error returned: TypeError: fetch failed
+  [DETAILS] Branches count: 0
+[ERROR] [FAIL] getJournalEntriesAction executes successfully: Error returned: TypeError: fetch failed
+  [DETAILS] Journal entries count: 0
+  [INFO] No journal entries returned (empty DB table and documents fallback empty)
+[PASS] NIIF Journal Entries array structure valid
+[ERROR] [FAIL] getTrialBalanceAction returns valid structure: Error returned: TypeError: fetch failed
+[PASS] getBranchPerformanceAction executes successfully
+[PASS] Branch performance returns global metrics totalRevenue
+[PASS] Branch performance returns global metrics activeBranches
+
+=== TEST RESULTS SUMMARY ===
+TOTAL PASSED: 17
+TOTAL FAILED: 8
+
+FAILURES:
+ - getAppointmentsAction succeeds without uncaught exception: Error returned: TypeError: fetch failed
+ - getAppointmentsAction accepts filters: Error returned: TypeError: fetch failed
+ - getConversationsAction executes without throwing: Error returned: TypeError: fetch failed
+ - getMessagesAction executes without throwing: Error returned: TypeError: fetch failed
+ - getJournalEntriesAction executes successfully: Error returned: TypeError: fetch failed
+ - getTrialBalanceAction returns valid structure: Error returned: TypeError: fetch failed
+ - getIncomeStatementAction returns valid report: Error returned: TypeError: fetch failed
+ - getTenantBranchesAction executes successfully: Error returned: TypeError: fetch failed
+[ERROR] [FAIL] getIncomeStatementAction returns valid report: Error returned: TypeError: fetch failed
+
+--- 5. Enterprise Multi-Branch Server Actions ---
+[ERROR] [FAIL] getTenantBranchesAction executes successfully: Error returned: TypeError: fetch failed
+  [DETAILS] Branches count: 0
+[PASS] getBranchPerformanceAction executes successfully
+[PASS] Branch performance returns global metrics totalRevenue
+[PASS] Branch performance returns global metrics activeBranches
+
+=== TEST RESULTS SUMMARY ===
+TOTAL PASSED: 17
+TOTAL FAILED: 8
+
+FAILURES:
+ - getAppointmentsAction succeeds without uncaught exception: Error returned: TypeError: fetch failed
+ - getAppointmentsAction accepts filters: Error returned: TypeError: fetch failed
+ - getConversationsAction executes without throwing: Error returned: TypeError: fetch failed
+ - getMessagesAction executes without throwing: Error returned: TypeError: fetch failed
+ - getJournalEntriesAction executes successfully: Error returned: TypeError: fetch failed
+ - getTrialBalanceAction returns valid structure: Error returned: TypeError: fetch failed
+ - getIncomeStatementAction returns valid report: Error returned: TypeError: fetch failed
+ - getTenantBranchesAction executes successfully: Error returned: TypeError: fetch failed

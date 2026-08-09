@@ -16,9 +16,9 @@ export interface DocumentLine {
 export interface Document {
   id: string;
   entity_id: string;
-  type: 'invoice' | 'quote' | 'work_order';
+  type: 'invoice' | 'quote' | 'work_order' | 'purchase_order' | 'whatsapp_log' | 'journal_entry' | 'payroll_slip';
   document_number: string | null;
-  status: 'draft' | 'invoiced' | 'annulled';
+  status: 'draft' | 'in_progress' | 'invoiced' | 'annulled' | 'paid' | 'partial';
   subtotal_amount: number;
   tax_amount: number;
   total_amount: number;
@@ -100,4 +100,20 @@ export async function getDocuments(type?: Document['type']) {
   }
 
   return data as Document[];
+}
+
+export async function updateDocumentStatus(id: string, status: Document['status']) {
+  const { data, error } = await supabase
+    .from('documents')
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating document status:', error);
+    throw error;
+  }
+
+  return data as Document;
 }

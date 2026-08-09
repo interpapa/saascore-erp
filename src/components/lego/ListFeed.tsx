@@ -1,13 +1,17 @@
 import React from 'react';
 import { LegoPieceDNA } from '@/types/lego';
+import { EmptyState } from '@/components/core/EmptyState';
+import { Inbox } from 'lucide-react';
 
 interface ListFeedProps {
   dna: LegoPieceDNA;
   data: any[];
   onRowClick?: (item: any) => void;
+  /** Optional CTA for the empty state, passed from the parent page */
+  emptyAction?: { label: string; onClick: () => void };
 }
 
-export const ListFeed: React.FC<ListFeedProps> = ({ dna, data, onRowClick }) => {
+export const ListFeed: React.FC<ListFeedProps> = ({ dna, data, onRowClick, emptyAction }) => {
   const { title, columns } = dna.config;
 
   return (
@@ -15,17 +19,20 @@ export const ListFeed: React.FC<ListFeedProps> = ({ dna, data, onRowClick }) => 
       <div className="px-6 py-5 border-b border-border/50 flex items-center justify-between bg-white/30 dark:bg-slate-800/30">
         <h3 className="text-lg font-bold text-foreground">{title}</h3>
       </div>
-      
+
       <div className="flex-1 overflow-auto p-4">
         {!data || data.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
-            <p className="font-medium">No hay registros disponibles</p>
-          </div>
+          <EmptyState
+            icon={<Inbox size={40} />}
+            title="Sin registros"
+            description={`Aún no hay datos en "${title}". Empieza creando el primer registro.`}
+            action={emptyAction}
+          />
         ) : (
           <div className="space-y-3">
             {data.map((item, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 onClick={() => onRowClick && onRowClick(item)}
                 className="flex items-center justify-between p-4 rounded-xl border border-slate-200/80 dark:border-white/5 hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 transition-all group cursor-pointer bg-white/50 dark:bg-slate-800/40 backdrop-blur-md btn-haptic"
               >
@@ -44,8 +51,10 @@ export const ListFeed: React.FC<ListFeedProps> = ({ dna, data, onRowClick }) => 
                   </p>
                   {columns[3] && (
                     <span className={`inline-block px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full mt-1 ${
-                      columns[3].type === 'status' 
-                        ? (['Active', 'Ok', 'Al día', 'Al Día'].includes(item[columns[3].field]) ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400')
+                      columns[3].type === 'status'
+                        ? (['Active', 'Ok', 'Al día', 'Al Día'].includes(item[columns[3].field])
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                            : 'bg-rose-500/10 text-rose-600 dark:text-rose-400')
                         : 'bg-slate-500/10 text-slate-600'
                     }`}>
                       {item[columns[3].field]}

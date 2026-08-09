@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 export interface Entity {
   id: string;
   tenant_id: string | null;
-  type: 'customer' | 'supplier' | 'employee' | 'lead';
+  type: 'customer' | 'supplier' | 'employee' | 'lead' | 'branch';
   name: string;
   email: string | null;
   phone: string | null;

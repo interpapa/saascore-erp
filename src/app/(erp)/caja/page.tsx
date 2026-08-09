@@ -3,212 +3,405 @@
 import { useState, useEffect } from 'react';
 import { useERPStore } from '@/store/useERPStore';
 import { processSecureCheckout } from '@/app/actions/checkout';
-import { Search, ShoppingCart, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2 } from 'lucide-react';
-
-interface Item {
-  id: string;
-  name: string;
-  sku?: string;
-  base_price: number;
-  type: 'product' | 'service';
-}
-
-interface Customer {
-  id: string;
-  name: string;
-  tax_id?: string;
-}
-
-// Datos mock para desarrollo mientras se conecta Supabase
-const MOCK_ITEMS: Item[] = [
-  { id: 'P1', name: 'Aceite Sintético 5W30', sku: 'ACE-001', base_price: 15.50, type: 'product' },
-  { id: 'P2', name: 'Filtro de Aceite', sku: 'FLT-001', base_price: 8.00, type: 'product' },
-  { id: 'P3', name: 'Bujía Iridium', sku: 'BUJ-IR1', base_price: 12.00, type: 'product' },
-  { id: 'S1', name: 'Cambio de Aceite', sku: 'SRV-001', base_price: 25.00, type: 'service' },
-  { id: 'S2', name: 'Revisión de Frenos', sku: 'SRV-002', base_price: 40.00, type: 'service' },
-];
-
-const MOCK_CUSTOMERS: Customer[] = [
-  { id: 'C1', name: 'Juan Pérez', tax_id: 'V-12345678' },
-  { id: 'C2', name: 'Taller Los Hermanos', tax_id: 'J-30456789' },
-  { id: 'C3', name: 'Ana Silva', tax_id: 'V-19876543' },
-];
+import { getItemsAction } from '@/app/actions/items';
+import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
+import { createDocumentWithLines } from '@/lib/api/documents';
+import { InvoicePrintView } from '@/components/core/InvoicePrintView';
+import { Search, ShoppingCart, ShoppingBag, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2 } from 'lucide-react';
+import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useToast } from '@/components/core/ToastProvider';
+import { EmptyState } from '@/components/core/EmptyState';
 
 export default function CajaPage() {
-  const { currentTenant } = useERPStore();
-  const activeTenant = currentTenant;
+  const currentTenant = useTenantResolver();
+  const { session } = useERPStore();
+  const { toast } = useToast();
 
-  const [items] = useState<Item[]>(MOCK_ITEMS);
-  const [customers] = useState<Customer[]>(MOCK_CUSTOMERS);
-  
+  const [items, setItems] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
   const [searchItem, setSearchItem] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('generic_counter_customer');
+  const [filterType, setFilterType] = useState<'all' | 'product' | 'service'>('all');
+  const [filterCategory, setFilterCategory] = useState<string>('all');
+
+  // Customer Modal State
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', tax_id: '' });
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   
   // Ticket State
-  const [ticketLines, setTicketLines] = useState<{item: Item, quantity: number}[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'bolivares' | 'divisas'>('bolivares');
+  const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [printedDoc, setPrintedDoc] = useState<any>(null);
 
-  const filteredItems = items.filter(i => i.name.toLowerCase().includes(searchItem.toLowerCase()) || i.sku?.toLowerCase().includes(searchItem.toLowerCase()));
+  useEffect(() => {
+    async function loadData() {
+      if (!currentTenant) return;
+      try {
+        setLoadingData(true);
+        const [itemsRes, customersRes] = await Promise.all([
+          getItemsAction(currentTenant.id),
+          getEntitiesAction(currentTenant.id, 'customer'),
+        ]);
 
-  const addLine = (item: Item) => {
-    const existing = ticketLines.find(l => l.item.id === item.id);
+        if (itemsRes.success) setItems(itemsRes.items || []);
+        if (customersRes.success) setCustomers(customersRes.entities || []);
+      } catch (err) {
+        console.error('Error cargando POS:', err);
+      } finally {
+        setLoadingData(false);
+      }
+    }
+    loadData();
+  }, [currentTenant]);
+
+  const dynamicCategories = Array.from(new Set(items.map((i) => i.category).filter(Boolean))) as string[];
+
+  const filteredItems = items.filter(
+    (i) => {
+      const matchesSearch = i.name.toLowerCase().includes(searchItem.toLowerCase()) ||
+        i.sku?.toLowerCase().includes(searchItem.toLowerCase());
+      const matchesType = filterType === 'all' ? true : i.type === filterType;
+      const matchesCategory = filterCategory === 'all' ? true : i.category === filterCategory;
+      return matchesSearch && matchesType && matchesCategory;
+    }
+  );
+
+  const addLine = (item: any) => {
+    const existing = ticketLines.find((l) => l.item.id === item.id);
+    if (item.type === 'product') {
+      const stockVal = item.stock ?? item.stock_quantity ?? 0;
+      const currentQty = existing ? existing.quantity : 0;
+      if (currentQty >= stockVal) {
+        toast({ variant: 'warning', title: 'Sin Stock', description: `No hay más stock disponible para ${item.name}` });
+        return;
+      }
+    }
     if (existing) {
-      setTicketLines(ticketLines.map(l => l.item.id === item.id ? { ...l, quantity: l.quantity + 1 } : l));
+      setTicketLines(
+        ticketLines.map((l) =>
+          l.item.id === item.id ? { ...l, quantity: l.quantity + 1 } : l
+        )
+      );
     } else {
       setTicketLines([...ticketLines, { item, quantity: 1 }]);
     }
   };
 
   const removeLine = (itemId: string) => {
-    setTicketLines(ticketLines.filter(l => l.item.id !== itemId));
+    setTicketLines(ticketLines.filter((l) => l.item.id !== itemId));
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
-    setTicketLines(ticketLines.map(l => {
-      if (l.item.id === itemId) {
-        const newQ = Math.max(1, l.quantity + delta);
-        return { ...l, quantity: newQ };
-      }
-      return l;
-    }));
+    setTicketLines(
+      ticketLines.map((l) => {
+        if (l.item.id === itemId) {
+          const newQ = Math.max(1, l.quantity + delta);
+          if (l.item.type === 'product') {
+            const stockVal = l.item.stock ?? l.item.stock_quantity ?? 0;
+            if (newQ > stockVal) {
+              toast({ variant: 'warning', title: 'Sin Stock', description: `No hay más stock disponible para ${l.item.name}` });
+              return l;
+            }
+          }
+          return { ...l, quantity: newQ };
+        }
+        return l;
+      })
+    );
   };
 
-  // Cálculos Financieros
-  const subtotal = ticketLines.reduce((acc, l) => acc + (l.item.base_price * l.quantity), 0);
-  const iva = subtotal * 0.16;
-  const igtf = paymentMethod === 'divisas' ? (subtotal + iva) * 0.03 : 0;
-  const total = subtotal + iva + igtf;
+  // Cálculos Financieros Estándar (Sin impuestos específicos de un solo país hardcodeados)
+  const subtotal = ticketLines.reduce((acc, l) => acc + (l.item.base_price || 0) * l.quantity, 0);
+  const total = subtotal; // Impuestos serán calculados por la localización configurada
 
   const handleCharge = async (status: 'draft' | 'invoiced') => {
-    if (!activeTenant) return alert('Debes seleccionar un tenant');
-    if (!selectedCustomer) return alert('Debes seleccionar un cliente');
-    if (ticketLines.length === 0) return alert('El ticket está vacío');
+    if (!currentTenant) {
+      toast({ variant: 'error', title: 'Empresa no seleccionada', description: 'Debes seleccionar una empresa activa.' });
+      return;
+    }
+    if (ticketLines.length === 0) {
+      toast({ variant: 'warning', title: 'Ticket Vacío', description: 'Agrega al menos un ítem al ticket para cobrar.' });
+      return;
+    }
 
     setIsSaving(true);
     try {
+      const customerId = selectedCustomer === 'generic_counter_customer' 
+        ? (customers[0]?.id || currentTenant.id) 
+        : selectedCustomer;
+
       if (status === 'draft') {
-        // Borrador: guardar localmente (mock hasta conectar Supabase)
-        console.log('Presupuesto borrador guardado:', {
-          tenant_id: activeTenant?.id,
-          entity_id: selectedCustomer,
-          lines: ticketLines.map(l => ({ item_id: l.item.id, quantity: l.quantity, unit_price: l.item.base_price }))
+        await createDocumentWithLines({
+          tenant_id: currentTenant.id,
+          entity_id: customerId,
+          type: 'quote',
+          status: 'draft',
+          document_number: `PRES-${Date.now().toString().slice(-6)}`,
+          issue_date: new Date().toISOString(),
+          due_date: null,
+          notes: null,
+          metadata: { payment_method: paymentMethod },
+          lines: ticketLines.map((l) => ({
+            item_id: l.item.id,
+            description: l.item.name,
+            quantity: l.quantity,
+            unit_price: l.item.base_price || 0,
+            tax_amount: 0,
+          })),
         });
-        // Simular delay de guardado
-        await new Promise(resolve => setTimeout(resolve, 500));
+        toast({ variant: 'success', title: 'Borrador Guardado', description: 'El presupuesto ha sido registrado.' });
       } else {
-        // LAS FACTURAS VAN POR EL SERVIDOR OBLIGATORIAMENTE
-        const cartPayload = ticketLines.map(l => ({ itemId: l.item.id, quantity: l.quantity }));
-        const result = await processSecureCheckout(cartPayload, selectedCustomer, paymentMethod, activeTenant.id, 'VE');
-        
+        const cartPayload = ticketLines.map((l) => ({ itemId: l.item.id, quantity: l.quantity }));
+        const actor = {
+          email: session?.userEmail || 'admin@saascore.com',
+          role: session?.role || ('owner' as const),
+        };
+
+        const result = await processSecureCheckout(
+          cartPayload,
+          customerId,
+          paymentMethod,
+          currentTenant.id,
+          actor
+        );
+
         if (!result.success) throw new Error(result.error);
+
+        if (result.document) {
+          setPrintedDoc(result.document);
+        }
+        toast({ variant: 'success', title: '¡Venta Exitosa!', description: `Factura ${result.document?.document_number || ''} generada.` });
       }
 
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
         setTicketLines([]);
-        setSelectedCustomer('');
-      }, 3000);
-
+      }, 2500);
     } catch (error: any) {
-      alert('Error: ' + error.message);
+      toast({ variant: 'error', title: 'Error en Checkout', description: error.message });
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <div className="flex h-[calc(100vh-80px)] w-full max-w-7xl mx-auto p-4 gap-4 animate-in fade-in zoom-in-95 duration-500">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 flex flex-col lg:flex-row gap-6 space-y-0 animate-in fade-in duration-300">
       
-      {/* PANEL IZQUIERDO: Catálogo */}
-      <div className="flex-1 flex flex-col bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-[32px] shadow-2xl overflow-hidden">
-        <div className="p-6 border-b border-border/50 bg-white/30 dark:bg-slate-800/30">
-          <h2 className="text-xl font-black text-foreground flex items-center gap-2 mb-4">
-            <Search className="text-primary" />
-            Buscador Rápido
-          </h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar repuesto, servicio, SKU..." 
+      {/* PANEL IZQUIERDO: Catálogo de Productos */}
+      <div className="flex-1 flex flex-col bg-card/80 backdrop-blur-xl border border-border rounded-[32px] shadow-xl overflow-hidden min-h-[500px]">
+        <div className="p-6 border-b border-border/50 bg-card/50 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-black text-foreground tracking-tight flex items-center gap-2">
+              <ShoppingCart className="text-primary" size={24} />
+              Punto de Venta (POS)
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Catálogo de productos y servicios en tiempo real</p>
+          </div>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Buscar por nombre o SKU..."
               value={searchItem}
-              onChange={e => setSearchItem(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium"
+              onChange={(e) => setSearchItem(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm font-medium text-foreground transition-all"
             />
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {filteredItems.map(item => (
-              <div 
-                key={item.id} 
-                onClick={() => addLine(item)}
-                className="bg-white/80 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-primary cursor-pointer transition-all hover:scale-[1.02] active:scale-95 group shadow-sm hover:shadow-md"
+
+        {/* Filtros de Categorías y Tipo */}
+        <div className="px-6 pb-4 flex flex-wrap gap-2 items-center border-b border-border/30">
+          <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg text-xs">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-3 py-1 rounded-md font-bold transition-all ${filterType === 'all' ? 'bg-background shadow-sm text-foreground' : 'text-slate-500'}`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFilterType('product')}
+              className={`px-3 py-1 rounded-md font-bold transition-all ${filterType === 'product' ? 'bg-background shadow-sm text-foreground' : 'text-slate-500'}`}
+            >
+              Productos
+            </button>
+            <button
+              onClick={() => setFilterType('service')}
+              className={`px-3 py-1 rounded-md font-bold transition-all ${filterType === 'service' ? 'bg-background shadow-sm text-foreground' : 'text-slate-500'}`}
+            >
+              Servicios
+            </button>
+          </div>
+
+          <div className="h-4 w-px bg-border/50 hidden sm:block"></div>
+
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <button
+              onClick={() => setFilterCategory('all')}
+              className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
+                filterCategory === 'all'
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-background text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
+              }`}
+            >
+              Todas las cat.
+            </button>
+            {dynamicCategories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setFilterCategory(cat)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all ${
+                  filterCategory === cat
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-background text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
               >
-                <div className="text-xs font-bold text-slate-400 mb-1">{item.sku || 'S/N'}</div>
-                <h3 className="font-bold text-foreground leading-tight mb-2 group-hover:text-primary transition-colors">{item.name}</h3>
-                <div className="flex justify-between items-center mt-auto pt-2 border-t border-border/50">
-                  <span className="text-xs font-bold px-2 py-1 bg-slate-100 dark:bg-slate-900 rounded-md text-slate-500">{item.type === 'product' ? '📦' : '🔧'}</span>
-                  <span className="font-black text-lg text-primary">${item.base_price.toFixed(2)}</span>
-                </div>
-              </div>
+                {cat}
+              </button>
             ))}
           </div>
         </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          {loadingData ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <EmptyState
+              icon={<ShoppingCart size={48} />}
+              title="Sin productos en catálogo"
+              description="No se encontraron productos registrados en esta empresa. Ve a Catálogo para crear el primero."
+            />
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {filteredItems.map((item) => {
+                const stockVal = item.stock ?? item.stock_quantity ?? 0;
+                const isOutOfStock = item.type === 'product' && stockVal <= 0;
+                return (
+                  <button
+                    key={item.id}
+                    disabled={isOutOfStock}
+                    onClick={() => addLine(item)}
+                    className={`bg-card p-4 rounded-2xl border border-border hover:border-primary cursor-pointer transition-all hover:scale-[1.02] active:scale-95 group shadow-sm flex flex-col justify-between h-36 btn-haptic text-left w-full ${
+                      isOutOfStock ? 'opacity-50 cursor-not-allowed hover:border-border hover:scale-100 active:scale-100' : ''
+                    }`}
+                  >
+                    <div className="w-full">
+                      <div className="text-[10px] font-bold text-slate-400 tracking-wider uppercase mb-1 flex justify-between items-center w-full">
+                        <span>{item.sku || 'S/N'}</span>
+                        {item.type === 'product' && (
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                            stockVal > 10
+                              ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400'
+                              : stockVal > 0
+                              ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                              : 'bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'
+                          }`}>
+                            {stockVal > 0 ? `${stockVal} disp.` : 'Agotado'}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-bold text-sm text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                        {item.name}
+                      </h3>
+                    </div>
+                    <div className="flex justify-between items-center pt-2 border-t border-border w-full">
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-md text-slate-500">
+                        {item.type === 'product' ? '📦 SKU' : '🔧 Serv'}
+                      </span>
+                      <span className="font-black text-lg text-primary">
+                        ${Number(item.base_price || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* PANEL DERECHO: El Ticket */}
-      <div className="w-[400px] flex flex-col bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 rounded-[32px] shadow-2xl overflow-hidden relative">
+      {/* PANEL DERECHO: Ticket y Checkout */}
+      <div className="w-full lg:w-[420px] flex flex-col bg-card border border-border rounded-[32px] shadow-2xl overflow-hidden relative">
         {success && (
-          <div className="absolute inset-0 z-50 bg-emerald-500 text-white flex flex-col items-center justify-center animate-in slide-in-from-bottom">
+          <div className="absolute inset-0 z-60 bg-emerald-500/95 backdrop-blur-md text-white flex flex-col items-center justify-center animate-in zoom-in-95 duration-200">
             <CheckCircle2 size={64} className="mb-4 animate-bounce" />
-            <h2 className="text-2xl font-black">¡Facturado!</h2>
-            <p className="opacity-80">Guardado en la base de datos</p>
+            <h2 className="text-2xl font-black">¡Venta Registrada!</h2>
+            <p className="text-sm opacity-90">Factura procesada con éxito</p>
           </div>
         )}
 
-        {/* Cliente */}
-        <div className="p-6 border-b border-border/50 bg-slate-50/50 dark:bg-slate-900/50">
-          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block flex items-center gap-1">
-            <User size={14} /> Cliente
+        {/* Cliente Selector */}
+        <div className="p-5 border-b border-border bg-slate-50/50 dark:bg-slate-900/50">
+          <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-1.5"><User size={14} /> Cliente</span>
+            <button
+              onClick={() => setIsCustomerModalOpen(true)}
+              className="text-primary hover:text-primary/80 flex items-center gap-0.5 text-xs font-black transition-colors"
+            >
+              <Plus size={14} /> Nuevo
+            </button>
           </label>
-          <select 
+          <select
             value={selectedCustomer}
-            onChange={e => setSelectedCustomer(e.target.value)}
-            className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 appearance-none"
+            onChange={(e) => setSelectedCustomer(e.target.value)}
+            className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           >
-            <option value="">Seleccionar Cliente...</option>
-            {customers.map(c => (
-              <option key={c.id} value={c.id}>{c.name} - RIF: {c.tax_id || 'N/A'}</option>
+            <option value="generic_counter_customer">👤 Venta al Mostrador (Cliente General)</option>
+            {customers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name} {c.tax_id ? `(${c.tax_id})` : ''}
+              </option>
             ))}
           </select>
         </div>
 
-        {/* Líneas */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* Líneas del Ticket */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-3 min-h-[280px]">
           {ticketLines.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-50">
-              <ShoppingCart size={48} className="mb-4" />
-              <p className="font-medium text-center">Ticket Vacío<br/>Agrega ítems del catálogo</p>
-            </div>
+            <EmptyState
+              title="Carrito vacío"
+              description="Agrega productos desde el catálogo para iniciar una venta."
+              icon={<ShoppingBag size={40} />}
+            />
           ) : (
-            ticketLines.map(line => (
-              <div key={line.item.id} className="flex gap-3 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
-                <div className="flex-1">
-                  <h4 className="font-bold text-sm text-foreground leading-tight">{line.item.name}</h4>
-                  <p className="text-xs text-slate-500 font-medium">${line.item.base_price.toFixed(2)} c/u</p>
+            ticketLines.map((line) => (
+              <div
+                key={line.item.id}
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-background border border-border"
+              >
+                <div className="flex-1 min-w-0 pr-2">
+                  <h4 className="font-bold text-sm text-foreground truncate">{line.item.name}</h4>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    ${Number(line.item.base_price || 0).toFixed(2)} c/u
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden h-8">
-                    <button onClick={() => updateQuantity(line.item.id, -1)} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Minus size={12} /></button>
-                    <span className="w-8 text-center text-sm font-bold">{line.quantity}</span>
-                    <button onClick={() => updateQuantity(line.item.id, 1)} className="w-8 h-full flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><Plus size={12} /></button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5">
+                    <button
+                      onClick={() => updateQuantity(line.item.id, -1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card text-foreground transition-colors"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <span className="w-7 text-center text-xs font-bold">{line.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(line.item.id, 1)}
+                      className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-card text-foreground transition-colors"
+                    >
+                      <Plus size={12} />
+                    </button>
                   </div>
-                  <button onClick={() => removeLine(line.item.id)} className="w-8 h-8 flex items-center justify-center text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors">
+                  <button
+                    onClick={() => removeLine(line.item.id)}
+                    className="p-1.5 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors"
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -217,68 +410,184 @@ export default function CajaPage() {
           )}
         </div>
 
-        {/* Totales y Cobro */}
-        <div className="p-6 bg-slate-900 dark:bg-slate-900 text-white rounded-t-[32px] mt-auto relative z-10 shadow-[0_-20px_40px_rgba(0,0,0,0.2)]">
-          <div className="space-y-2 mb-6">
-            <div className="flex justify-between text-slate-400 text-sm font-medium">
-              <span>Base Imponible</span>
-              <span>${subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between text-slate-400 text-sm font-medium">
-              <span>IVA (16%)</span>
-              <span>${iva.toFixed(2)}</span>
-            </div>
-            
-            {/* Toggle Método de Pago */}
-            <div className="flex bg-slate-800 p-1 rounded-xl my-4">
-              <button 
-                onClick={() => setPaymentMethod('bolivares')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${paymentMethod === 'bolivares' ? 'bg-slate-700 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-              >
-                Bs (Sin IGTF)
-              </button>
-              <button 
-                onClick={() => setPaymentMethod('divisas')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${paymentMethod === 'divisas' ? 'bg-indigo-500 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-              >
-                Divisas (3% IGTF)
-              </button>
-            </div>
+        {/* Totales y Botones de Cobro */}
+        <div className="p-5 border-t border-border bg-slate-900 text-white rounded-t-[28px] mt-auto">
+          {/* Método de Pago */}
+          <div className="flex bg-slate-800 p-1 rounded-xl mb-4">
+            <button
+              onClick={() => setPaymentMethod('cash')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                paymentMethod === 'cash' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              💵 Efectivo
+            </button>
+            <button
+              onClick={() => setPaymentMethod('card')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                paymentMethod === 'card' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              💳 Tarjeta
+            </button>
+            <button
+              onClick={() => setPaymentMethod('transfer')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                paymentMethod === 'transfer' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🏦 Transferencia
+            </button>
+          </div>
 
-            {paymentMethod === 'divisas' && (
-              <div className="flex justify-between text-indigo-300 text-sm font-bold">
-                <span>IGTF (3%)</span>
-                <span>${igtf.toFixed(2)}</span>
-              </div>
-            )}
-
-            <div className="flex justify-between items-end border-t border-slate-700/50 pt-4 mt-4">
-              <span className="text-slate-300 font-bold">Total USD</span>
-              <span className="text-4xl font-black text-emerald-400">${total.toFixed(2)}</span>
+          <div className="flex justify-between items-end mb-5">
+            <div>
+              <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Total a Pagar</span>
+              <span className="text-xs text-slate-400">{ticketLines.length} ítems en ticket</span>
+            </div>
+            <div className="text-right">
+              <span className="text-3xl font-black text-emerald-400">${subtotal.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <button 
+            <button
               onClick={() => handleCharge('draft')}
               disabled={isSaving || ticketLines.length === 0}
-              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl font-bold transition-all disabled:opacity-50 btn-haptic"
+              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-sm transition-colors disabled:opacity-50 btn-haptic"
             >
-              <FileText size={18} />
+              <FileText size={16} />
               Borrador
             </button>
-            <button 
+            <button
               onClick={() => handleCharge('invoiced')}
               disabled={isSaving || ticketLines.length === 0}
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 py-3 rounded-xl font-black text-lg transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] disabled:opacity-50 btn-haptic"
+              className="flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground py-3 rounded-xl font-black text-base transition-colors shadow-[0_0_20px_rgba(79,70,229,0.3)] disabled:opacity-50 btn-haptic"
             >
-              <Wallet size={20} />
+              <Wallet size={18} />
               Cobrar
             </button>
           </div>
         </div>
 
       </div>
+
+      {printedDoc && (
+        <InvoicePrintView document={printedDoc} onClose={() => setPrintedDoc(null)} />
+      )}
+
+      {isCustomerModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-[28px] max-w-md w-full p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <div>
+              <h3 className="text-xl font-black text-foreground">Crear Cliente Rápido</h3>
+              <p className="text-xs text-slate-500 mt-1">Ingresa los datos para registrar al cliente en el sistema.</p>
+            </div>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej. Juan Pérez"
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Email</label>
+                <input
+                  type="email"
+                  placeholder="juan@ejemplo.com"
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Teléfono</label>
+                  <input
+                    type="text"
+                    placeholder="+56912345678"
+                    value={newCustomer.phone}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Identificación Fiscal</label>
+                  <input
+                    type="text"
+                    placeholder="RUT/NIF/RFC"
+                    value={newCustomer.tax_id}
+                    onChange={(e) => setNewCustomer({ ...newCustomer, tax_id: e.target.value })}
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomerModalOpen(false);
+                  setNewCustomer({ name: '', email: '', phone: '', tax_id: '' });
+                }}
+                className="flex-1 py-2.5 rounded-xl border border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 text-sm font-bold transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isSavingCustomer || !newCustomer.name}
+                onClick={async () => {
+                  if (!currentTenant) return;
+                  setIsSavingCustomer(true);
+                  try {
+                    const actor = {
+                      email: session?.userEmail || 'admin@saascore.com',
+                      role: session?.role || ('owner' as const),
+                    };
+                    const res = await createEntityAction(
+                      {
+                        type: 'customer',
+                        name: newCustomer.name,
+                        email: newCustomer.email || null,
+                        phone: newCustomer.phone || null,
+                        tax_id: newCustomer.tax_id || null,
+                      },
+                      currentTenant.id,
+                      actor
+                    );
+                    if (res.success && res.entity) {
+                      setCustomers([res.entity, ...customers]);
+                      setSelectedCustomer(res.entity.id);
+                      setIsCustomerModalOpen(false);
+                      setNewCustomer({ name: '', email: '', phone: '', tax_id: '' });
+                      toast({ variant: 'success', title: 'Cliente creado', description: `Se registró a ${res.entity.name} con éxito.` });
+                    } else {
+                      toast({ variant: 'error', title: 'Error al guardar', description: res.error || 'Ocurrió un error inesperado.' });
+                    }
+                  } catch (err: any) {
+                    toast({ variant: 'error', title: 'Error', description: err.message });
+                  } finally {
+                    setIsSavingCustomer(false);
+                  }
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-black transition-colors disabled:opacity-50"
+              >
+                {isSavingCustomer ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
