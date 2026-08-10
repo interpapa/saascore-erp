@@ -26,22 +26,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function getInitialSession() {
       try {
-        if (typeof window !== 'undefined' && window.localStorage.getItem('bypass_auth') === 'true') {
-          setSession({
-            userEmail: 'admin@saascore.com',
-            role: 'owner',
-            tenantId: '00000000-0000-0000-0000-000000000001'
-          });
-          setCurrentTenant({
-            id: '00000000-0000-0000-0000-000000000001',
-            name: 'SaaSCore Enterprise',
-            blocked: false,
-            metadata: {}
-          });
-          if (mounted) setIsLoading(false);
-          return;
-        }
-
         const { data: { session: supabaseSession } } = await supabase.auth.getSession();
         
         if (supabaseSession) {
@@ -134,9 +118,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [session, isLoading, pathname, router]);
 
   const signOut = async () => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('bypass_auth');
-    }
     await supabase.auth.signOut();
     setSession(null);
     setCurrentTenant(null);
