@@ -106,6 +106,21 @@ export default function LoginPage() {
             </Button>
           </form>
 
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.localStorage.setItem('bypass_auth', 'true');
+                  window.location.href = '/dashboard';
+                }
+              }}
+              className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            >
+              ⚡ Saltar inicio de sesión (Modo de Prueba)
+            </button>
+          </div>
+
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-600 dark:text-slate-400">
               {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
