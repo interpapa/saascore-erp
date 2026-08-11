@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLogin, setIsLogin] = useState(true);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [pendingVerification, setPendingVerification] = useState<{ email: string; pass: string } | null>(null);
 
   useEffect(() => {
     if (countdown === null) return;
@@ -26,6 +27,35 @@ export default function LoginPage() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [countdown]);
+
+  useEffect(() => {
+    if (!pendingVerification) return;
+
+    let active = true;
+    const interval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: pendingVerification.email,
+          password: pendingVerification.pass,
+        });
+
+        if (!error && data?.session) {
+          clearInterval(interval);
+          if (active) {
+            setPendingVerification(null);
+            // El AuthProvider detectará la sesión activa y redirigirá al dashboard
+          }
+        }
+      } catch (e) {
+        // Ignorar fallos de red durante el polling
+      }
+    }, 3000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [pendingVerification]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -44,11 +74,18 @@ export default function LoginPage() {
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
         });
         if (error) throw error;
+        
+        // Si la cuenta se crea pero requiere confirmación por email
+        if (data && !data.session) {
+          setPendingVerification({ email, pass: password });
+          setIsLoading(false);
+          return;
+        }
       }
       // Redirección manejada por el AuthProvider
     } catch (err: any) {
@@ -101,69 +138,97 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Formulario */}
+        {/* Formulario / Pantalla de Espera */}
         <div className="px-8 pb-10">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            {error && (
-              <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-xl font-medium animate-in slide-in-from-top-2">
-                {countdown !== null && countdown > 0 
-                  ? `Límite de intentos excedido. Por favor, espera ${countdown} segundos antes de intentar de nuevo.`
-                  : error
-                }
+          {pendingVerification ? (
+            <div className="text-center space-y-6 animate-in fade-in duration-300 py-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-full mx-auto flex items-center justify-center text-primary">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
               </div>
-            )}
-            
-            <Input 
-              name="email"
-              label="Correo Electrónico" 
-              type="email" 
-              placeholder="tu@empresa.com"
-              icon={<Mail size={18} />}
-              required
-            />
-            
-            <div className="space-y-1">
+              
+              <div className="space-y-3">
+                <h2 className="text-lg font-bold text-foreground">Confirmación enviada</h2>
+                <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
+                  Enviamos un enlace a <strong className="text-primary">{pendingVerification.email}</strong>.
+                </p>
+                <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+                  Confirma el correo desde tu teléfono u otro dispositivo. Esta pantalla se desbloqueará de forma automática tan pronto lo hagas.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setPendingVerification(null)}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 transition-colors uppercase tracking-wider"
+              >
+                Cancelar y Volver al Login
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-xl font-medium animate-in slide-in-from-top-2">
+                  {countdown !== null && countdown > 0 
+                    ? `Límite de intentos excedido. Por favor, espera ${countdown} segundos antes de intentar de nuevo.`
+                    : error
+                  }
+                </div>
+              )}
+              
               <Input 
-                name="password"
-                label="Contraseña" 
-                type="password" 
-                placeholder="••••••••"
-                icon={<Lock size={18} />}
+                name="email"
+                label="Correo Electrónico" 
+                type="email" 
+                placeholder="tu@empresa.com"
+                icon={<Mail size={18} />}
                 required
               />
-              <div className="flex justify-end pt-1">
-                <a href="#" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
-                  ¿Olvidaste tu contraseña?
-                </a>
+              
+              <div className="space-y-1">
+                <Input 
+                  name="password"
+                  label="Contraseña" 
+                  type="password" 
+                  placeholder="••••••••"
+                  icon={<Lock size={18} />}
+                  required
+                />
+                <div className="flex justify-end pt-1">
+                  <a href="#" className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
+                    ¿Olvidaste tu contraseña?
+                  </a>
+                </div>
               </div>
-            </div>
 
-            <Button 
-              type="submit" 
-              className="w-full mt-2" 
-              size="lg"
-              isLoading={isLoading}
-              disabled={countdown !== null && countdown > 0}
-            >
-              {countdown !== null && countdown > 0 
-                ? `Espera ${countdown}s...` 
-                : (isLogin ? 'Ingresar al Sistema' : 'Crear Cuenta')
-              }
-            </Button>
-          </form>
-
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p className="text-sm text-slate-600 dark:text-slate-400">
-              {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
-              <button 
-                type="button"
-                onClick={() => setIsLogin(!isLogin)}
-                className="font-semibold text-indigo-600 hover:text-indigo-700"
+              <Button 
+                type="submit" 
+                className="w-full mt-2" 
+                size="lg"
+                isLoading={isLoading}
+                disabled={countdown !== null && countdown > 0}
               >
-                {isLogin ? 'Regístrate aquí' : 'Inicia Sesión'}
-              </button>
-            </p>
-          </div>
+                {countdown !== null && countdown > 0 
+                  ? `Espera ${countdown}s...` 
+                  : (isLogin ? 'Ingresar al Sistema' : 'Crear Cuenta')
+                }
+              </Button>
+            </form>
+          )}
+
+          {!pendingVerification && (
+            <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {isLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+                <button 
+                  type="button"
+                  onClick={() => setIsLogin(!isLogin)}
+                  className="font-semibold text-indigo-600 hover:text-indigo-700"
+                >
+                  {isLogin ? 'Regístrate aquí' : 'Inicia Sesión'}
+                </button>
+              </p>
+            </div>
+          )}
         </div>
 
       </div>
