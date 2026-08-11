@@ -1,21 +1,26 @@
 'use client';
 
+import React, { Suspense, useEffect, useState } from 'react';
 import { Search, Bell, CheckCircle2, AlertTriangle, MessageCircle, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Breadcrumbs } from '@/components/core/Breadcrumbs';
 import { CommandPalette } from '@/components/core/CommandPalette';
-import { useEffect, useState } from 'react';
+
+interface NotificationItem {
+  id: string;
+  type: 'warning' | 'success' | 'info';
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+}
 
 export function FloatingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
-  const [notifications, setNotifications] = useState([
-    { id: '1', type: 'warning', title: 'Stock Bajo', message: 'Filtro de Aceite (3 unidades restantes)', time: 'Hace 5 min', read: false },
-    { id: '2', type: 'success', title: 'Venta Registrada', message: 'Factura #INV-2026-004 ($150.00)', time: 'Hace 12 min', read: false },
-    { id: '3', type: 'info', title: 'Cita Próxima', message: 'Mantenimiento preventivo agendado', time: 'Hace 30 min', read: true },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -45,9 +50,11 @@ export function FloatingHeader() {
               : 'bg-white/40 dark:bg-slate-900/40 shadow-sm border-white/20 dark:border-white/5 backdrop-blur-md hover:bg-white/60 dark:hover:bg-slate-900/60'
           }`}
         >
-          {/* Breadcrumbs */}
+          {/* Breadcrumbs wrapped in Suspense */}
           <div className="flex items-center pl-2 pr-1">
-            <Breadcrumbs />
+            <Suspense fallback={<div className="text-xs text-slate-400">Cargando...</div>}>
+              <Breadcrumbs />
+            </Suspense>
           </div>
 
           <div className="w-px h-6 bg-border mx-1" />
@@ -107,25 +114,31 @@ export function FloatingHeader() {
                 </div>
 
                 <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {notifications.map((n) => (
-                    <div 
-                      key={n.id} 
-                      className={`p-3 rounded-2xl border text-xs transition-all flex items-start gap-3 ${
-                        n.read ? 'bg-slate-50/50 dark:bg-slate-900/50 border-transparent opacity-60' : 'bg-card border-border shadow-xs'
-                      }`}
-                    >
-                      <div className="mt-0.5 shrink-0">
-                        {n.type === 'warning' && <AlertTriangle size={16} className="text-amber-500" />}
-                        {n.type === 'success' && <CheckCircle2 size={16} className="text-emerald-500" />}
-                        {n.type === 'info' && <MessageCircle size={16} className="text-blue-500" />}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-bold text-foreground">{n.title}</p>
-                        <p className="text-slate-500 dark:text-slate-400">{n.message}</p>
-                        <span className="text-[10px] text-slate-400 mt-1 block">{n.time}</span>
-                      </div>
+                  {notifications.length === 0 ? (
+                    <div className="text-center py-8 text-slate-400 text-xs font-medium">
+                      No tienes notificaciones pendientes
                     </div>
-                  ))}
+                  ) : (
+                    notifications.map((n) => (
+                      <div 
+                        key={n.id} 
+                        className={`p-3 rounded-2xl border text-xs transition-all flex items-start gap-3 ${
+                          n.read ? 'bg-slate-50/50 dark:bg-slate-900/50 border-transparent opacity-60' : 'bg-card border-border shadow-xs'
+                        }`}
+                      >
+                        <div className="mt-0.5 shrink-0">
+                          {n.type === 'warning' && <AlertTriangle size={16} className="text-amber-500" />}
+                          {n.type === 'success' && <CheckCircle2 size={16} className="text-emerald-500" />}
+                          {n.type === 'info' && <MessageCircle size={16} className="text-blue-500" />}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-bold text-foreground">{n.title}</p>
+                          <p className="text-slate-500 dark:text-slate-400">{n.message}</p>
+                          <span className="text-[10px] text-slate-400 mt-1 block">{n.time}</span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
             )}
