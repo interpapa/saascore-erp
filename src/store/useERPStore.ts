@@ -22,20 +22,9 @@ interface ERPState {
   setCurrentTenant: (tenant: Tenant | null) => void;
 }
 
-const INITIAL_TENANT: Tenant = {
-  id: '00000000-0000-0000-0000-000000000001',
-  name: 'SaaSCore Enterprise',
-  blocked: false,
-  metadata: {},
-};
-
 export const useERPStore = create<ERPState>((set) => ({
-  session: {
-    userEmail: 'admin@saascore.com',
-    role: 'owner',
-    tenantId: '00000000-0000-0000-0000-000000000001',
-  },
-  currentTenant: INITIAL_TENANT,
+  session: null,
+  currentTenant: null,
   
   setSession: (session) => set({ session }),
   setCurrentTenant: (tenant) => set({ currentTenant: tenant }),

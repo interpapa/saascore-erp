@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 export async function createTenant(userId: string, userEmail: string, businessName: string) {
   try {
     const db = supabaseAdmin || supabase;
+    const cleanEmail = (userEmail || '').trim().toLowerCase();
 
     // 1. Crear el Tenant con permisos de servidor
     const { data: tenant, error: tenantError } = await db
@@ -29,7 +30,7 @@ export async function createTenant(userId: string, userEmail: string, businessNa
       .from('user_tenants')
       .insert([
         {
-          user_email: userEmail,
+          user_email: cleanEmail,
           tenant_id: tenant.id,
           role: 'owner'
         }
@@ -94,6 +95,8 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
       .update({ is_active })
       .eq('id', tenantId);
 
+    if (error) throw new Error('Error updating status: ' + error.message);
+    
     revalidatePath('/admin');
     revalidatePath('/admin/billing');
     return { success: true };
@@ -105,17 +108,25 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
 export async function getUserTenant(userEmail: string) {
   try {
     const db = supabaseAdmin || supabase;
+    const cleanEmail = (userEmail || '').trim();
 
-    // 1. Buscar relación user_tenants por email
-    const { data: userTenant, error: utError } = await db
-      .from('user_tenants')
-      .select('tenant_id, role')
-      .eq('user_email', userEmail)
-      .maybeSingle();
-
-    if (utError || !userTenant) {
+    if (!cleanEmail) {
       return { success: false, tenant: null, role: null };
     }
+
+    // 1. Buscar relación user_tenants por email (usando limit 1 ordenado por creación para tomar el tenant más reciente)
+    const { data: userTenants, error: utError } = await db
+      .from('user_tenants')
+      .select('tenant_id, role, created_at')
+      .ilike('user_email', cleanEmail)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (utError || !userTenants || userTenants.length === 0) {
+      return { success: false, tenant: null, role: null };
+    }
+
+    const userTenant = userTenants[0];
 
     // 2. Buscar datos del tenant
     const { data: tenant, error: tError } = await db
