@@ -1,12 +1,14 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { supabase, supabaseAdmin } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 
 export async function createTenant(userId: string, userEmail: string, businessName: string) {
   try {
-    // 1. Crear el Tenant
-    const { data: tenant, error: tenantError } = await supabase
+    const db = supabaseAdmin || supabase;
+
+    // 1. Crear el Tenant con permisos de servidor
+    const { data: tenant, error: tenantError } = await db
       .from('tenants')
       .insert([
         {
@@ -22,8 +24,8 @@ export async function createTenant(userId: string, userEmail: string, businessNa
 
     if (tenantError) throw new Error('Error al crear la empresa: ' + tenantError.message);
 
-    // 2. Vincular el Usuario con el Tenant
-    const { error: linkError } = await supabase
+    // 2. Vincular el Usuario con el Tenant en user_tenants
+    const { error: linkError } = await db
       .from('user_tenants')
       .insert([
         {
@@ -34,7 +36,7 @@ export async function createTenant(userId: string, userEmail: string, businessNa
       ]);
 
     if (linkError) {
-      await supabase.from('tenants').delete().eq('id', tenant.id);
+      await db.from('tenants').delete().eq('id', tenant.id);
       throw new Error('Error al vincular el usuario con la empresa: ' + linkError.message);
     }
 
@@ -47,7 +49,8 @@ export async function createTenant(userId: string, userEmail: string, businessNa
 
 export async function updateTenantSettings(tenantId: string, name: string, metadata: any) {
   try {
-    const { data: tenant, error } = await supabase
+    const db = supabaseAdmin || supabase;
+    const { data: tenant, error } = await db
       .from('tenants')
       .update({
         name,
@@ -69,7 +72,8 @@ export async function updateTenantSettings(tenantId: string, name: string, metad
 
 export async function getAllTenants() {
   try {
-    const { data: tenants, error } = await supabase
+    const db = supabaseAdmin || supabase;
+    const { data: tenants, error } = await db
       .from('tenants')
       .select('*')
       .order('created_at', { ascending: false });
@@ -83,9 +87,11 @@ export async function getAllTenants() {
 
 export async function toggleTenantStatus(tenantId: string, newStatus: 'active' | 'suspended') {
   try {
-    const { error } = await supabase
+    const db = supabaseAdmin || supabase;
+    const is_active = newStatus === 'active';
+    const { error } = await db
       .from('tenants')
-      .update({ status: newStatus })
+      .update({ is_active })
       .eq('id', tenantId);
 
     if (error) throw new Error('Error updating status: ' + error.message);
