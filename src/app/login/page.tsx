@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Mail, Lock, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
@@ -12,6 +12,20 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLogin, setIsLogin] = useState(true);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (countdown === null) return;
+    if (countdown <= 0) {
+      setCountdown(null);
+      setError(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -38,7 +52,32 @@ export default function LoginPage() {
       }
       // Redirección manejada por el AuthProvider
     } catch (err: any) {
-      setError(err.message || 'Error en la autenticación');
+      let rawMessage = err.message || 'Error en la autenticación';
+      
+      // Intentar extraer segundos de rate limit
+      if (rawMessage.toLowerCase().includes('rate limit') || rawMessage.toLowerCase().includes('too many requests') || rawMessage.toLowerCase().includes('seconds')) {
+        const secondsMatch = rawMessage.match(/\d+/);
+        if (secondsMatch) {
+          const seconds = parseInt(secondsMatch[0], 10);
+          setCountdown(seconds);
+          setError(`Límite de intentos excedido. Por favor, espera ${seconds} segundos antes de intentar de nuevo.`);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Traducir otros errores conocidos
+      if (rawMessage.includes('Invalid login credentials')) {
+        setError('El correo o la contraseña son incorrectos. Por favor, verifícalos.');
+      } else if (rawMessage.toLowerCase().includes('email not confirmed') || rawMessage.toLowerCase().includes('confirm your email')) {
+        setError('Debes confirmar tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.');
+      } else if (rawMessage.includes('User already registered')) {
+        setError('Este correo electrónico ya está registrado. Intenta iniciar sesión.');
+      } else if (rawMessage.toLowerCase().includes('invalid api key')) {
+        setError('Error de configuración: Clave de API inválida en el servidor. Verifica las credenciales de tu proyecto.');
+      } else {
+        setError(rawMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -67,7 +106,10 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm p-3 rounded-xl font-medium animate-in slide-in-from-top-2">
-                {error}
+                {countdown !== null && countdown > 0 
+                  ? `Límite de intentos excedido. Por favor, espera ${countdown} segundos antes de intentar de nuevo.`
+                  : error
+                }
               </div>
             )}
             
@@ -101,8 +143,12 @@ export default function LoginPage() {
               className="w-full mt-2" 
               size="lg"
               isLoading={isLoading}
+              disabled={countdown !== null && countdown > 0}
             >
-              {isLogin ? 'Ingresar al Sistema' : 'Crear Cuenta'}
+              {countdown !== null && countdown > 0 
+                ? `Espera ${countdown}s...` 
+                : (isLogin ? 'Ingresar al Sistema' : 'Crear Cuenta')
+              }
             </Button>
           </form>
 
