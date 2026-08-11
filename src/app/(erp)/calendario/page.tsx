@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { CalendarKPIs } from '@/components/calendario/CalendarKPIs';
 import { CalendarFilters } from '@/components/calendario/CalendarFilters';
 import { CalendarGrid } from '@/components/calendario/CalendarGrid';
@@ -28,9 +29,12 @@ import {
 
 export default function CalendarioPage() {
   const currentTenant = useTenantResolver();
+  const searchParams = useSearchParams();
   const { session } = useERPStore();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+
+  const clientParam = searchParams.get('client') || searchParams.get('client_id');
 
   // Primary Data States
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -54,6 +58,12 @@ export default function CalendarioPage() {
   const [selectedDateForCreate, setSelectedDateForCreate] = useState<Date | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (clientParam) {
+      setIsCreateModalOpen(true);
+    }
+  }, [clientParam]);
 
   const actor = {
     email: session?.userEmail || 'admin@saascore.com',
@@ -312,6 +322,7 @@ export default function CalendarioPage() {
         services={services}
         clients={clients}
         initialDate={selectedDateForCreate}
+        initialClientId={clientParam}
       />
 
       {/* Appointment Details & Status Transition Modal */}

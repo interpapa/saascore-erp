@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
 import { processSecureCheckout } from '@/app/actions/checkout';
 import { getItemsAction } from '@/app/actions/items';
@@ -14,15 +15,18 @@ import { EmptyState } from '@/components/core/EmptyState';
 
 export default function CajaPage() {
   const currentTenant = useTenantResolver();
+  const searchParams = useSearchParams();
   const { session } = useERPStore();
   const { toast } = useToast();
+
+  const clientParam = searchParams.get('client') || searchParams.get('client_id');
 
   const [items, setItems] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const [searchItem, setSearchItem] = useState('');
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('generic_counter_customer');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(clientParam || 'generic_counter_customer');
   const [filterType, setFilterType] = useState<'all' | 'product' | 'service'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
 

@@ -14,6 +14,7 @@ export interface AppointmentModalProps {
   clients: Entity[];
   initialDate?: Date | null;
   initialTime?: string | null;
+  initialClientId?: string | null;
 }
 
 function toYYYYMMDD(d: Date): string {
@@ -32,6 +33,7 @@ export function AppointmentModal({
   clients,
   initialDate,
   initialTime,
+  initialClientId,
 }: AppointmentModalProps) {
   const [title, setTitle] = useState('');
   const [serviceId, setServiceId] = useState('');
@@ -53,7 +55,7 @@ export function AppointmentModal({
       setTimeStr(initialTime || '09:00');
       setTitle('');
       setServiceId('');
-      setClientId('');
+      setClientId(initialClientId || '');
       setEmployeeId('');
       setDurationMinutes(60);
       setStatus('scheduled');
@@ -61,7 +63,7 @@ export function AppointmentModal({
       setNotes('');
       setFormError(null);
     }
-  }, [isOpen, initialDate, initialTime]);
+  }, [isOpen, initialDate, initialTime, initialClientId]);
 
   if (!isOpen) return null;
 
