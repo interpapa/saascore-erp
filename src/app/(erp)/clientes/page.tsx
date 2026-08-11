@@ -7,7 +7,8 @@ import { ClientModal } from '@/components/clients/ClientModal';
 import { ClientDrawer } from '@/components/clients/ClientDrawer';
 import { getEntitiesAction, createEntityAction, updateEntityAction, deleteEntityAction } from '@/app/actions/entities';
 import { Entity } from '@/lib/api/entities';
-import { Plus } from 'lucide-react';
+import { Plus, Download } from 'lucide-react';
+import { exportToCSV } from '@/lib/core/exportToCSV';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
@@ -24,6 +25,22 @@ export default function ClientesPage() {
   const actor = {
     email: session?.userEmail || 'admin@saascore.com',
     role: session?.role || ('owner' as const),
+  };
+
+  const handleExportCSV = () => {
+    exportToCSV(
+      'directorio_clientes.csv',
+      [
+        { header: 'Nombre', accessor: c => c.name },
+        { header: 'Email', accessor: c => c.email || '' },
+        { header: 'Teléfono', accessor: c => c.phone || '' },
+        { header: 'Identificación Fiscal', accessor: c => c.tax_id || '' },
+        { header: 'Dirección', accessor: c => c.address || '' },
+        { header: 'Estado', accessor: c => c.status || 'active' },
+      ],
+      clients
+    );
+    toast({ variant: 'success', title: 'Reporte Exportado', description: 'El directorio de clientes se ha descargado en formato CSV.' });
   };
 
   const fetchClients = async () => {
@@ -184,16 +201,25 @@ export default function ClientesPage() {
           <h1 className="text-3xl font-black text-foreground tracking-tight">Directorio CRM</h1>
           <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5">Gestión de clientes y cuentas por cobrar</p>
         </div>
-        <button
-          onClick={() => {
-            setClientToEdit(null);
-            setIsModalOpen(true);
-          }}
-          className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2 btn-haptic"
-        >
-          <Plus size={18} />
-          Nuevo Cliente
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportCSV}
+            className="bg-card hover:bg-slate-100 dark:hover:bg-slate-800 border border-border text-foreground px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 btn-haptic"
+          >
+            <Download size={18} />
+            Exportar CSV
+          </button>
+          <button
+            onClick={() => {
+              setClientToEdit(null);
+              setIsModalOpen(true);
+            }}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2 btn-haptic"
+          >
+            <Plus size={18} />
+            Nuevo Cliente
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
