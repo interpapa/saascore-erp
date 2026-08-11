@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { getDocumentsAction, createDocumentAction } from '@/app/actions/documents';
 import { getItemsAction } from '@/app/actions/items';
@@ -76,8 +76,8 @@ export default function ComprasPage() {
     role: session?.role || ('owner' as const),
   };
 
-  const loadData = async () => {
-    if (!currentTenant) return;
+  const loadData = useCallback(async () => {
+    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
       const [suppliersRes, posRes, itemsRes] = await Promise.all([
@@ -86,20 +86,29 @@ export default function ComprasPage() {
         getItemsAction(currentTenant.id),
       ]);
 
-      if (suppliersRes.success) setSuppliers(suppliersRes.entities || []);
-      if (posRes.success) setPurchaseOrders(posRes.documents || []);
-      if (itemsRes.success) setCatalogItems(itemsRes.items || []);
+      if (suppliersRes?.success) setSuppliers(suppliersRes.entities || []);
+      if (posRes?.success) setPurchaseOrders(posRes.documents || []);
+      if (itemsRes?.success) setCatalogItems(itemsRes.items || []);
     } catch (err) {
       console.error('Error loading page data:', err);
-      toast({ variant: 'error', title: 'Error', description: 'No se pudieron cargar los datos de compras.' });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentTenant?.id]);
 
   useEffect(() => {
+    let isSubscribed = true;
+    const timer = setTimeout(() => {
+      if (isSubscribed) setIsLoading(false);
+    }, 2500);
+
     loadData();
-  }, [currentTenant]);
+
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
+  }, [loadData]);
 
   // Handle Create Supplier
   const handleCreateSupplier = async (e: React.FormEvent) => {

@@ -88,7 +88,7 @@ export default function ContabilidadPage() {
 
   // Fetch Financial Data
   const fetchAccountingData = useCallback(async () => {
-    if (!currentTenant) return;
+    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
       const [journalRes, trialRes, incomeRes] = await Promise.all([
@@ -97,50 +97,31 @@ export default function ContabilidadPage() {
         getIncomeStatementAction(currentTenant.id, period),
       ]);
 
-      if (journalRes.success) {
-        setJournalEntries(journalRes.data || []);
-      } else {
-        toast({
-          variant: 'error',
-          title: 'Error al consultar Libro Mayor',
-          description: journalRes.error || 'No se pudieron recuperar los asientos contables.',
-        });
-      }
-
-      if (trialRes.success) {
+      if (journalRes?.success) setJournalEntries(journalRes.data || []);
+      if (trialRes?.success) {
         setTrialBalance(trialRes.data || []);
         setTrialTotals(trialRes.totals || { debit: 0, credit: 0 });
-      } else {
-        toast({
-          variant: 'error',
-          title: 'Error al consultar Balance',
-          description: trialRes.error || 'No se pudo generar el Balance de Comprobación.',
-        });
       }
-
-      if (incomeRes.success) {
-        setIncomeStatement(incomeRes.data);
-      } else {
-        toast({
-          variant: 'error',
-          title: 'Error al consultar Estado de Resultados',
-          description: incomeRes.error || 'No se pudo generar el Estado de Resultados.',
-        });
-      }
+      if (incomeRes?.success) setIncomeStatement(incomeRes.data);
     } catch (err: any) {
       console.error('[ContabilidadPage Fetch Error]:', err);
-      toast({
-        variant: 'error',
-        title: 'Error de conexión',
-        description: 'Fallo al comunicarse con el servidor de contabilidad NIIF.',
-      });
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant, period, toast]);
+  }, [currentTenant?.id, period]);
 
   useEffect(() => {
+    let isSubscribed = true;
+    const timer = setTimeout(() => {
+      if (isSubscribed) setIsLoading(false);
+    }, 2500);
+
     fetchAccountingData();
+
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
   }, [fetchAccountingData]);
 
   // Handler for Create Journal Entry

@@ -43,8 +43,13 @@ export default function CajaPage() {
   const [printedDoc, setPrintedDoc] = useState<any>(null);
 
   useEffect(() => {
+    let isSubscribed = true;
+    const timer = setTimeout(() => {
+      if (isSubscribed) setLoadingData(false);
+    }, 2500);
+
     async function loadData() {
-      if (!currentTenant) return;
+      if (!currentTenant?.id) return;
       try {
         setLoadingData(true);
         const [itemsRes, customersRes] = await Promise.all([
@@ -52,16 +57,24 @@ export default function CajaPage() {
           getEntitiesAction(currentTenant.id, 'customer'),
         ]);
 
-        if (itemsRes.success) setItems(itemsRes.items || []);
-        if (customersRes.success) setCustomers(customersRes.entities || []);
+        if (isSubscribed) {
+          if (itemsRes?.success) setItems(itemsRes.items || []);
+          if (customersRes?.success) setCustomers(customersRes.entities || []);
+        }
       } catch (err) {
         console.error('Error cargando POS:', err);
       } finally {
-        setLoadingData(false);
+        if (isSubscribed) setLoadingData(false);
       }
     }
+
     loadData();
-  }, [currentTenant]);
+
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
+  }, [currentTenant?.id]);
 
   const dynamicCategories = Array.from(new Set(items.map((i) => i.category).filter(Boolean))) as string[];
 

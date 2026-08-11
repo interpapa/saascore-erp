@@ -40,59 +40,67 @@ export default function WhatsAppPage() {
 
   // Fetch conversations from Server Action
   const loadConversations = useCallback(async () => {
-    if (!currentTenant) return;
+    if (!currentTenant?.id) return;
     try {
+      setIsLoadingConvs(true);
       const res = await getConversationsAction(currentTenant.id, filter);
-      if (res.success && res.conversations) {
+      if (res?.success && res.conversations) {
         setConversations(res.conversations);
         if (!activeConvId && res.conversations.length > 0) {
           setActiveConvId(res.conversations[0].id);
         }
-      } else if (res.error) {
-        toast({ variant: 'error', title: 'Error al cargar conversaciones', description: res.error });
       }
     } catch (err: any) {
       console.error('[WhatsAppPage loadConversations Error]:', err);
     } finally {
       setIsLoadingConvs(false);
     }
-  }, [currentTenant, filter, activeConvId, toast]);
+  }, [currentTenant?.id, filter, activeConvId]);
 
   // Fetch messages for active conversation from Server Action
   const loadMessages = useCallback(async (convId: string) => {
-    if (!currentTenant) return;
+    if (!currentTenant?.id) return;
     try {
       setIsLoadingMsgs(true);
       const res = await getMessagesAction(convId, currentTenant.id);
-      if (res.success && res.messages) {
+      if (res?.success && res.messages) {
         setMessages(res.messages);
-      } else if (res.error) {
-        toast({ variant: 'error', title: 'Error al cargar mensajes', description: res.error });
       }
     } catch (err: any) {
       console.error('[WhatsAppPage loadMessages Error]:', err);
     } finally {
       setIsLoadingMsgs(false);
     }
-  }, [currentTenant, toast]);
-
-  // Fetch customer entities for Modal
-  const loadClients = useCallback(async () => {
-    if (!currentTenant) return;
-    try {
-      const res = await getEntitiesAction(currentTenant.id, 'customer');
-      if (res.success && res.entities) {
-        setClients(res.entities as Entity[]);
-      }
-    } catch (err: any) {
-      console.error('[WhatsAppPage loadClients Error]:', err);
-    }
-  }, [currentTenant]);
+  }, [currentTenant?.id]);
 
   useEffect(() => {
-    loadConversations();
-    loadClients();
-  }, [loadConversations, loadClients]);
+    let isSubscribed = true;
+    const timer = setTimeout(() => {
+      if (isSubscribed) setIsLoadingConvs(false);
+    }, 2500);
+
+    async function loadData() {
+      if (!currentTenant?.id) return;
+      try {
+        await loadConversations();
+        const custRes = await getEntitiesAction(currentTenant.id, 'customer');
+        if (isSubscribed && custRes?.success && custRes.entities) {
+          setClients(custRes.entities as Entity[]);
+        }
+      } catch (err: any) {
+        console.error('[WhatsAppPage loadData Error]:', err);
+      } finally {
+        if (isSubscribed) setIsLoadingConvs(false);
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
+  }, [currentTenant?.id, loadConversations]);
 
   useEffect(() => {
     if (activeConvId) {

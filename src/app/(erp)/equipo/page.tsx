@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { processPayrollDisbursementAction } from '@/app/actions/hrms';
 import { Entity } from '@/lib/api/entities';
@@ -45,13 +45,13 @@ export default function EquipoPage() {
     role: session?.role || ('owner' as const),
   };
 
-  const fetchEmployees = async () => {
-    if (!currentTenant) return;
+  const fetchEmployees = useCallback(async () => {
+    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
       const res = await getEntitiesAction(currentTenant.id, 'employee');
-      if (res.success) {
-        setEmployees(res.entities as any);
+      if (res?.success) {
+        setEmployees(res.entities as any || []);
         if (res.entities && res.entities.length > 0) {
           setSelectedEmployeeId(res.entities[0].id);
         }
@@ -61,11 +61,21 @@ export default function EquipoPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentTenant?.id]);
 
   useEffect(() => {
+    let isSubscribed = true;
+    const timer = setTimeout(() => {
+      if (isSubscribed) setIsLoading(false);
+    }, 2500);
+
     fetchEmployees();
-  }, [currentTenant]);
+
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
+  }, [fetchEmployees]);
 
   const handleCreateEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
