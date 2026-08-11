@@ -62,42 +62,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [setSession, setCurrentTenant, router]);
 
   const handleSessionSync = async (user: any) => {
-    // Buscar si el usuario tiene un tenant asignado
-    const { data: userTenants } = await supabase
-      .from('user_tenants')
-      .select('tenant_id, role')
-      .eq('user_id', user.id)
-      .single();
+    if (!user || !user.email) return;
 
-    if (userTenants) {
-      // Buscar la información del tenant
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('id', userTenants.tenant_id)
-        .single();
+    try {
+      // Buscar si el usuario tiene un tenant asignado por email
+      const { data: userTenants } = await supabase
+        .from('user_tenants')
+        .select('tenant_id, role')
+        .eq('user_email', user.email)
+        .maybeSingle();
 
-      if (tenantData) {
-        setCurrentTenant({
-          id: tenantData.id,
-          name: tenantData.name,
-          blocked: tenantData.status !== 'active',
-          metadata: tenantData.metadata
-        });
-        setSession({
-          userEmail: user.email,
-          role: userTenants.role as any,
-          tenantId: tenantData.id
-        });
+      if (userTenants && userTenants.tenant_id) {
+        // Buscar la información del tenant
+        const { data: tenantData } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('id', userTenants.tenant_id)
+          .maybeSingle();
+
+        if (tenantData) {
+          setCurrentTenant({
+            id: tenantData.id,
+            name: tenantData.name,
+            blocked: !tenantData.is_active,
+            metadata: tenantData.metadata
+          });
+          setSession({
+            userEmail: user.email,
+            role: userTenants.role as any,
+            tenantId: tenantData.id
+          });
+          return;
+        }
       }
-    } else {
+
       // Usuario sin empresa, va al onboarding
       setSession({
         userEmail: user.email,
-        role: 'technician', // rol temporal
+        role: 'owner',
         tenantId: ''
       });
       setCurrentTenant(null);
+    } catch (err) {
+      console.error('Error sincronizando sesión:', err);
     }
   };
 

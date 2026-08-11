@@ -53,7 +53,7 @@ export default function OnboardingPage() {
         tenantId: result.tenant.id
       });
       
-      router.push('/dashboard');
+      window.location.href = '/dashboard';
     } else {
       setError(result.error || 'Error al crear la empresa');
       setIsLoading(false);
