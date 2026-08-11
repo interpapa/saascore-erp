@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useERPStore, SessionData, Tenant } from '@/store/useERPStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { getUserTenant } from '@/app/actions/tenant';
 
 interface AuthContextType {
   isLoading: boolean;
@@ -65,35 +66,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || !user.email) return;
 
     try {
-      // Buscar si el usuario tiene un tenant asignado por email
-      const { data: userTenants } = await supabase
-        .from('user_tenants')
-        .select('tenant_id, role')
-        .eq('user_email', user.email)
-        .maybeSingle();
+      // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
+      const result = await getUserTenant(user.email);
 
-      if (userTenants && userTenants.tenant_id) {
-        // Buscar la información del tenant
-        const { data: tenantData } = await supabase
-          .from('tenants')
-          .select('*')
-          .eq('id', userTenants.tenant_id)
-          .maybeSingle();
-
-        if (tenantData) {
-          setCurrentTenant({
-            id: tenantData.id,
-            name: tenantData.name,
-            blocked: !tenantData.is_active,
-            metadata: tenantData.metadata
-          });
-          setSession({
-            userEmail: user.email,
-            role: userTenants.role as any,
-            tenantId: tenantData.id
-          });
-          return;
-        }
+      if (result.success && result.tenant) {
+        setCurrentTenant({
+          id: result.tenant.id,
+          name: result.tenant.name,
+          blocked: !result.tenant.is_active,
+          metadata: result.tenant.metadata
+        });
+        setSession({
+          userEmail: user.email,
+          role: (result.role as any) || 'owner',
+          tenantId: result.tenant.id
+        });
+        return;
       }
 
       // Usuario sin empresa, va al onboarding

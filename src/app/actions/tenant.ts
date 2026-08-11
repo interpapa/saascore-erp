@@ -94,12 +94,46 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
       .update({ is_active })
       .eq('id', tenantId);
 
-    if (error) throw new Error('Error updating status: ' + error.message);
-    
     revalidatePath('/admin');
     revalidatePath('/admin/billing');
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+export async function getUserTenant(userEmail: string) {
+  try {
+    const db = supabaseAdmin || supabase;
+
+    // 1. Buscar relación user_tenants por email
+    const { data: userTenant, error: utError } = await db
+      .from('user_tenants')
+      .select('tenant_id, role')
+      .eq('user_email', userEmail)
+      .maybeSingle();
+
+    if (utError || !userTenant) {
+      return { success: false, tenant: null, role: null };
+    }
+
+    // 2. Buscar datos del tenant
+    const { data: tenant, error: tError } = await db
+      .from('tenants')
+      .select('*')
+      .eq('id', userTenant.tenant_id)
+      .maybeSingle();
+
+    if (tError || !tenant) {
+      return { success: false, tenant: null, role: null };
+    }
+
+    return {
+      success: true,
+      tenant,
+      role: userTenant.role
+    };
+  } catch (error: any) {
+    return { success: false, tenant: null, role: null, error: error.message };
   }
 }
