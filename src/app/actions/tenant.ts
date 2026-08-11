@@ -3,7 +3,7 @@
 import { supabase } from '@/lib/supabase';
 import { revalidatePath } from 'next/cache';
 
-export async function createTenant(userId: string, businessName: string) {
+export async function createTenant(userId: string, userEmail: string, businessName: string) {
   try {
     // 1. Crear el Tenant
     const { data: tenant, error: tenantError } = await supabase
@@ -11,9 +11,10 @@ export async function createTenant(userId: string, businessName: string) {
       .insert([
         {
           name: businessName,
-          status: 'active',
-          active_modules: ["caja", "clientes", "catalogo", "tickets"],
-          subscription_plan: 'basic'
+          is_active: true,
+          currency: 'USD',
+          symbol: '$',
+          country_code: 'VE',
         }
       ])
       .select()
@@ -26,14 +27,13 @@ export async function createTenant(userId: string, businessName: string) {
       .from('user_tenants')
       .insert([
         {
-          user_id: userId,
+          user_email: userEmail,
           tenant_id: tenant.id,
           role: 'owner'
         }
       ]);
 
     if (linkError) {
-      // Rollback (idealmente en una función RPC, pero por ahora lo borramos manualmente)
       await supabase.from('tenants').delete().eq('id', tenant.id);
       throw new Error('Error al vincular el usuario con la empresa: ' + linkError.message);
     }

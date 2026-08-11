@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS tenants (
   symbol TEXT DEFAULT '$',
   country_code TEXT DEFAULT 'VE',
   is_active BOOLEAN DEFAULT TRUE,
+  metadata JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

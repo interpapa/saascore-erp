@@ -38,13 +38,13 @@ export default function OnboardingPage() {
     const formData = new FormData(e.currentTarget);
     const businessName = formData.get('businessName') as string;
 
-    const result = await createTenant(userId, businessName);
+    const result = await createTenant(userId, userEmail || 'admin@saascore.com', businessName);
 
     if (result.success && result.tenant) {
       setCurrentTenant({
         id: result.tenant.id,
         name: result.tenant.name,
-        blocked: result.tenant.status !== 'active'
+        blocked: !result.tenant.is_active
       });
       
       setSession({
