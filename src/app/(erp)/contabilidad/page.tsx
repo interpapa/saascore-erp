@@ -23,6 +23,8 @@ import {
   IncomeStatementReport,
   FiscalPeriodFilter,
 } from '@/types/accounting';
+import { useActionActor } from '@/hooks/useActionActor';
+import { exportToCSV } from '@/lib/core/exportToCSV';
 import { RefreshCw } from 'lucide-react';
 
 export default function ContabilidadPage() {
@@ -165,36 +167,53 @@ export default function ContabilidadPage() {
   // Export Action Handler
   const handleExportCSV = () => {
     try {
-      let csvContent = 'data:text/csv;charset=utf-8,';
-
       if (activeTab === 'journal') {
-        csvContent += 'Asiento,Fecha,Descripcion,RefDoc,DebitoTotal,CreditoTotal,Estado\n';
-        journalEntries.forEach((e) => {
-          csvContent += `"${e.entry_number || e.id}","${e.entry_date}","${e.description}","${e.source_document_ref || ''}",${e.total_debit},${e.total_credit},"${e.status}"\n`;
-        });
+        exportToCSV(
+          `libro_diario_niif_${new Date().toISOString().slice(0, 10)}`,
+          [
+            { header: 'Asiento', accessor: (e: any) => e.entry_number || e.id },
+            { header: 'Fecha', accessor: (e: any) => e.entry_date },
+            { header: 'Descripción', accessor: (e: any) => e.description },
+            { header: 'Ref Doc', accessor: (e: any) => e.source_document_ref || '' },
+            { header: 'Débito Total ($)', accessor: (e: any) => e.total_debit },
+            { header: 'Crédito Total ($)', accessor: (e: any) => e.total_credit },
+            { header: 'Estado', accessor: (e: any) => e.status },
+          ],
+          journalEntries
+        );
       } else if (activeTab === 'trial_balance') {
-        csvContent += 'Codigo,NombreCuenta,Tipo,MovDebito,MovCredito,SaldoFinalDebito,SaldoFinalCredito\n';
-        trialBalance.forEach((r) => {
-          csvContent += `"${r.account_code}","${r.account_name}","${r.account_type}",${r.period_debit},${r.period_credit},${r.final_debit},${r.final_credit}\n`;
-        });
+        exportToCSV(
+          `balance_comprobacion_${new Date().toISOString().slice(0, 10)}`,
+          [
+            { header: 'Código', accessor: (r: any) => r.account_code },
+            { header: 'Nombre Cuenta', accessor: (r: any) => r.account_name },
+            { header: 'Tipo', accessor: (r: any) => r.account_type },
+            { header: 'Mov. Débito ($)', accessor: (r: any) => r.period_debit },
+            { header: 'Mov. Crédito ($)', accessor: (r: any) => r.period_credit },
+            { header: 'Saldo Débito ($)', accessor: (r: any) => r.final_debit },
+            { header: 'Saldo Crédito ($)', accessor: (r: any) => r.final_credit },
+          ],
+          trialBalance
+        );
       } else if (activeTab === 'income_statement' && incomeStatement) {
-        csvContent += 'Concepto,MontoUSD\n';
-        csvContent += `"Ingresos Operacionales",${incomeStatement.revenue.total}\n`;
-        csvContent += `"Costo de Ventas",${incomeStatement.costOfSales.total}\n`;
-        csvContent += `"Margen Bruto",${incomeStatement.grossProfit}\n`;
-        csvContent += `"Gastos Operativos",${incomeStatement.operatingExpenses.total}\n`;
-        csvContent += `"Utilidad Operativa",${incomeStatement.operatingProfit}\n`;
-        csvContent += `"Otros Ingresos/Gastos",${incomeStatement.otherIncomeExpenses.total}\n`;
-        csvContent += `"Utilidad Neta",${incomeStatement.netProfit}\n`;
+        const rows = [
+          { concepto: 'Ingresos Operacionales', monto: incomeStatement.revenue.total },
+          { concepto: 'Costo de Ventas', monto: incomeStatement.costOfSales.total },
+          { concepto: 'Margen Bruto', monto: incomeStatement.grossProfit },
+          { concepto: 'Gastos Operativos', monto: incomeStatement.operatingExpenses.total },
+          { concepto: 'Utilidad Operativa', monto: incomeStatement.operatingProfit },
+          { concepto: 'Otros Ingresos/Gastos', monto: incomeStatement.otherIncomeExpenses.total },
+          { concepto: 'Utilidad Neta', monto: incomeStatement.netProfit },
+        ];
+        exportToCSV(
+          `estado_resultados_${new Date().toISOString().slice(0, 10)}`,
+          [
+            { header: 'Concepto', accessor: (r: any) => r.concepto },
+            { header: 'Monto ($)', accessor: (r: any) => r.monto },
+          ],
+          rows
+        );
       }
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `contabilidad_niif_${activeTab}_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
 
       toast({
         variant: 'success',
