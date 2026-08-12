@@ -162,16 +162,17 @@ export async function deleteEntityAction(
   }
 }
 
-export async function getEntitiesAction(tenantId: string, type?: EntityType) {
+export async function getEntitiesAction(tenantId: string, type?: EntityType, limit: number = 50) {
   try {
     if (!tenantId) return { success: true, entities: [] };
 
     let query = supabaseAdmin
       .from('entities')
-      .select('*')
+      .select('id, tenant_id, type, name, email, phone, tax_id, address, status, metadata, created_at, updated_at')
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, limit - 1);
 
     if (type) {
       query = query.eq('type', type);

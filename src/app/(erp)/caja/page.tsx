@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
 import { processSecureCheckout } from '@/app/actions/checkout';
@@ -76,17 +76,19 @@ export default function CajaPage() {
     };
   }, [currentTenant?.id]);
 
-  const dynamicCategories = Array.from(new Set(items.map((i) => i.category).filter(Boolean))) as string[];
+  const dynamicCategories = useMemo(() => {
+    return Array.from(new Set(items.map((i) => i.category).filter(Boolean))) as string[];
+  }, [items]);
 
-  const filteredItems = items.filter(
-    (i) => {
+  const filteredItems = useMemo(() => {
+    return items.filter((i) => {
       const matchesSearch = i.name.toLowerCase().includes(searchItem.toLowerCase()) ||
         i.sku?.toLowerCase().includes(searchItem.toLowerCase());
       const matchesType = filterType === 'all' ? true : i.type === filterType;
       const matchesCategory = filterCategory === 'all' ? true : i.category === filterCategory;
       return matchesSearch && matchesType && matchesCategory;
-    }
-  );
+    });
+  }, [items, searchItem, filterType, filterCategory]);
 
   const addLine = (item: any) => {
     const existing = ticketLines.find((l) => l.item.id === item.id);

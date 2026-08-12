@@ -38,6 +38,39 @@ export interface CreateDocumentActionInput {
   lines: DocumentLineInput[];
 }
 
+/**
+ * Genera el siguiente folio fiscal o número secuencial correlativo para una empresa y tipo de documento.
+ * Formato: FAC-000001, PO-000001, ORD-000001
+ */
+async function generateNextDocumentNumber(tenantId: string, type: DocumentType): Promise<string> {
+  const prefixes: Record<string, string> = {
+    invoice: 'FAC',
+    quote: 'COT',
+    work_order: 'ORD',
+    purchase_order: 'PO',
+    whatsapp_log: 'MSG',
+    journal_entry: 'ASI',
+    payroll_slip: 'NOM',
+  };
+
+  const prefix = prefixes[type] || 'DOC';
+
+  try {
+    const { count, error } = await supabaseAdmin
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('type', type);
+
+    const nextSeq = (count || 0) + 1;
+    const formattedSeq = String(nextSeq).padStart(6, '0');
+    return `${prefix}-${formattedSeq}`;
+  } catch (err) {
+    const fallbackSeq = String(Date.now()).slice(-6);
+    return `${prefix}-${fallbackSeq}`;
+  }
+}
+
 export async function createDocumentAction(
   input: CreateDocumentActionInput,
   tenantId: string,
@@ -62,6 +95,10 @@ export async function createDocumentAction(
 
     const totalDecimal = subtotalDecimal.plus(taxDecimal);
 
+    const finalDocNumber = input.document_number 
+      ? input.document_number 
+      : await generateNextDocumentNumber(tenantId, input.type);
+
     const { data: newDoc, error: docError } = await supabaseAdmin
       .from('documents')
       .insert([
@@ -70,8 +107,7 @@ export async function createDocumentAction(
           entity_id: input.entity_id || null,
           type: input.type,
           status: input.status || 'draft',
-          document_number:
-            input.document_number || `${input.type.toUpperCase().slice(0, 4)}-${Date.now().toString().slice(-6)}`,
+          document_number: finalDocNumber,
           subtotal_amount: subtotalDecimal.toNumber(),
           tax_amount: taxDecimal.toNumber(),
           total_amount: totalDecimal.toNumber(),
@@ -116,7 +152,7 @@ export async function createDocumentAction(
       action: 'invoice.created',
       target_type: 'document',
       target_id: newDoc.id,
-      metadata: { type: input.type, total: totalDecimal.toNumber() },
+      metadata: { type: input.type, total: totalDecimal.toNumber(), doc_number: finalDocNumber },
     });
 
     revalidatePath('/compras');
@@ -130,18 +166,19 @@ export async function createDocumentAction(
   }
 }
 
-export async function getDocumentsAction(tenantId: string, type?: DocumentType) {
+export async function getDocumentsAction(tenantId: string, type?: DocumentType, limit: number = 50) {
   try {
     if (!tenantId) return { success: true, documents: [] };
 
     let query = supabaseAdmin
       .from('documents')
       .select(`
-        *,
-        entity:entities (id, name, type, metadata, phone, email)
+        id, document_number, type, status, issue_date, due_date, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at,
+        entity:entities (id, name, type, tax_id, email, phone)
       `)
       .eq('tenant_id', tenantId)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, limit - 1);
 
     if (type) {
       query = query.eq('type', type);

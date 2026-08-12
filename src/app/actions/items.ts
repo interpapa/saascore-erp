@@ -157,16 +157,17 @@ export async function deleteItemAction(
   }
 }
 
-export async function getItemsAction(tenantId: string, type?: ItemType) {
+export async function getItemsAction(tenantId: string, type?: ItemType, limit: number = 50) {
   try {
     if (!tenantId) return { success: true, items: [] };
 
     let query = supabaseAdmin
       .from('items')
-      .select('*')
+      .select('id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at')
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, limit - 1);
 
     if (type) {
       query = query.eq('type', type);
