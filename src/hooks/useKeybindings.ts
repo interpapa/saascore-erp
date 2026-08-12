@@ -12,11 +12,14 @@ import { useEffect } from 'react';
 export function useKeybindings() {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      if (typeof window === 'undefined') return;
+
+      const platformStr = typeof navigator !== 'undefined' ? (navigator.platform || '') : '';
+      const isMac = platformStr.toUpperCase().indexOf('MAC') >= 0;
       const modifier = isMac ? e.metaKey : e.ctrlKey;
 
       // Ctrl + N or Cmd + N (Quick Create Action)
-      if (modifier && e.key.toLowerCase() === 'n') {
+      if (modifier && e.key && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('global:create_action'));
       }
@@ -27,7 +30,7 @@ export function useKeybindings() {
       }
 
       // Ctrl + K or Cmd + K (Open Command Palette)
-      if (modifier && e.key.toLowerCase() === 'k') {
+      if (modifier && e.key && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         window.dispatchEvent(new CustomEvent('global:open_command_palette'));
       }
