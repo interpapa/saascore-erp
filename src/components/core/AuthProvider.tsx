@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { useERPStore, SessionData, Tenant } from '@/store/useERPStore';
+import { useERPStore } from '@/store/useERPStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getUserTenant } from '@/app/actions/tenant';
@@ -18,7 +18,8 @@ const PUBLIC_ROUTES = ['/login'];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { session, setSession, setCurrentTenant } = useERPStore();
-  const [isLoading, setIsLoading] = useState(true);
+  // Si ya tenemos una sesión en localStorage (vía Zustand persist), no bloquear el renderizado
+  const [isLoading, setIsLoading] = useState(!session);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -60,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [setSession, setCurrentTenant, router]);
+  }, []);
 
   const handleSessionSync = async (user: any) => {
     if (!user || !user.email) return;
@@ -104,10 +105,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session && !isPublic) {
       router.push('/login');
     } else if (session && !session.tenantId && pathname !== '/onboarding') {
-      // Si está logueado pero no tiene tenant, mandarlo al onboarding (a menos que ya esté ahí)
       router.push('/onboarding');
     } else if (session && session.tenantId && (isPublic || pathname === '/onboarding')) {
-      // Si está logueado y tiene tenant, mandarlo al dashboard si intenta entrar a login u onboarding
       router.push('/dashboard');
     }
   }, [session, isLoading, pathname, router]);
@@ -119,7 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.push('/login');
   };
 
-  if (isLoading) {
+  if (isLoading && !session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">

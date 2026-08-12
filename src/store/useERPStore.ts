@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserRole } from '@/lib/rbac';
 
 export interface Tenant {
@@ -22,10 +23,18 @@ interface ERPState {
   setCurrentTenant: (tenant: Tenant | null) => void;
 }
 
-export const useERPStore = create<ERPState>((set) => ({
-  session: null,
-  currentTenant: null,
-  
-  setSession: (session) => set({ session }),
-  setCurrentTenant: (tenant) => set({ currentTenant: tenant }),
-}));
+export const useERPStore = create<ERPState>()(
+  persist(
+    (set) => ({
+      session: null,
+      currentTenant: null,
+      
+      setSession: (session) => set({ session }),
+      setCurrentTenant: (tenant) => set({ currentTenant: tenant }),
+    }),
+    {
+      name: 'saascore-erp-storage',
+      storage: createJSONStorage(() => localStorage),
+    }
+  )
+);
