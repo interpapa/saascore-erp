@@ -17,10 +17,11 @@ import { Entity } from '@/lib/api/entities';
 import { ConversationList } from '@/components/whatsapp/ConversationList';
 import { ChatInbox } from '@/components/whatsapp/ChatInbox';
 import { WhatsAppModal } from '@/components/whatsapp/WhatsAppModal';
-import { ActionActor } from '@/app/actions/entities';
+import { useActionActor } from '@/hooks/useActionActor';
 
 export default function WhatsAppPage() {
-  const { currentTenant, session } = useERPStore();
+  const { currentTenant } = useERPStore();
+  const actor = useActionActor();
   const { toast } = useToast();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -33,10 +34,7 @@ export default function WhatsAppPage() {
   const [isLoadingMsgs, setIsLoadingMsgs] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const getActor = (): ActionActor => ({
-    email: session?.userEmail || 'admin@saascore.com',
-    role: session?.role || 'owner',
-  });
+    const tempId = `temp-${Date.now()}`;
 
   // Fetch conversations from Server Action
   const loadConversations = useCallback(async () => {
@@ -129,7 +127,7 @@ export default function WhatsAppPage() {
     if (!activeConv) return;
 
     const tempId = `temp-${Date.now()}`;
-    const actor = getActor();
+
 
     const optimisticMsg: Message = {
       id: tempId,
@@ -168,7 +166,7 @@ export default function WhatsAppPage() {
   // Handle Send Message from Modal
   const handleModalSendMessage = async (data: { entity_id: string; phone: string; message: string }) => {
     if (!currentTenant) return;
-    const actor = getActor();
+
 
     const convId = data.entity_id;
 
@@ -203,7 +201,7 @@ export default function WhatsAppPage() {
     if (currentTagNames.includes(newTag)) return;
 
     const updatedTags = [...currentTagNames, newTag];
-    const actor = getActor();
+
 
     setConversations((prev) =>
       prev.map((c) => {
@@ -236,7 +234,7 @@ export default function WhatsAppPage() {
 
     const currentTagNames = (activeConv.tags || []).map((t) => (typeof t === 'string' ? t : t.name));
     const updatedTags = currentTagNames.filter((t) => t !== tagToRemove);
-    const actor = getActor();
+
 
     setConversations((prev) =>
       prev.map((c) => {
@@ -264,7 +262,7 @@ export default function WhatsAppPage() {
   // Update Conversation Status (Archive/Unarchive)
   const handleUpdateStatus = async (newStatus: 'active' | 'archived') => {
     if (!currentTenant || !activeConvId) return;
-    const actor = getActor();
+
 
     const res = await updateConversationStatusAction(activeConvId, newStatus, currentTenant.id, actor);
 

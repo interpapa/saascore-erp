@@ -10,6 +10,7 @@ import { AppointmentDetailsModal } from '@/components/calendario/AppointmentDeta
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
 import {
   getAppointmentsAction,
   createAppointmentAction,
@@ -65,10 +66,7 @@ export default function CalendarioPage() {
     }
   }, [clientParam]);
 
-  const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
-    role: session?.role || ('owner' as const),
-  };
+  const actor = useActionActor();
 
   // Fetch Data Function
   const fetchData = useCallback(async () => {
