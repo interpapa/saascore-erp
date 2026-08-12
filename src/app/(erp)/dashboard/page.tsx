@@ -76,7 +76,7 @@ export default function LauncherPage() {
 
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-y-12 gap-x-6">
           {apps.map((app) => (
-            <Link href={app.href} key={app.id} className="flex flex-col items-center gap-3 group btn-haptic">
+            <Link href={app.href} key={app.id} prefetch={false} className="flex flex-col items-center gap-3 group btn-haptic">
               <div className={`w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-[22px] bg-gradient-to-br ${app.gradient} flex items-center justify-center shadow-lg shadow-black/10 dark:shadow-black/60 border border-white/20 dark:border-white/10 group-hover:border-white/40 dark:group-hover:border-white/20 group-hover:scale-105 transition-all`}>
                 <app.icon className="text-white w-8 h-8 sm:w-9 sm:h-9 drop-shadow-md" strokeWidth={1.5} />
               </div>

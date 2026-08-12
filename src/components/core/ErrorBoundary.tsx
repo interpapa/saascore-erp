@@ -27,6 +27,8 @@ interface ErrorBoundaryProps {
  * A React class-component "parachute" that catches render errors in its
  * subtree. Shows a friendly, on-brand error card instead of a blank screen.
  * The rest of the ERP (Launcher, AI Copilot) continues working normally.
+ * 
+ * Auto-heals ChunkLoadErrors caused by Vercel redeployments.
  */
 export class ErrorBoundary extends React.Component<
   ErrorBoundaryProps,
@@ -38,16 +40,35 @@ export class ErrorBoundary extends React.Component<
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, errorMessage: error.message };
+    return { hasError: true, errorMessage: error?.message || 'Error desconocido' };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    // In production this should pipe to a real monitoring service (e.g. Sentry)
-    console.error('[ErrorBoundary]', error, info.componentStack);
+    console.error('[ErrorBoundary caught error]:', error, info.componentStack);
+
+    // Auto-heal stale bundle chunk load errors from Vercel deployments
+    const errorMsg = error?.message || '';
+    const isChunkError = 
+      errorMsg.includes('ChunkLoadError') || 
+      errorMsg.includes('Loading chunk') ||
+      errorMsg.includes('Failed to fetch') ||
+      errorMsg.includes('Dynamically imported module');
+
+    if (isChunkError && typeof window !== 'undefined') {
+      const alreadyReloaded = sessionStorage.getItem('auto_reloaded_chunk');
+      if (!alreadyReloaded) {
+        sessionStorage.setItem('auto_reloaded_chunk', 'true');
+        window.location.reload();
+      }
+    }
   }
 
   private handleRetry = () => {
     this.setState({ hasError: false, errorMessage: '' });
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('auto_reloaded_chunk');
+      window.location.reload();
+    }
   };
 
   render() {
@@ -83,7 +104,7 @@ export class ErrorBoundary extends React.Component<
             Algo salió mal
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-            Tuvimos un problema al cargar <span className="font-semibold">{moduleName}</span>. El resto del ERP sigue funcionando con normalidad.
+            Tuvimos un problema al cargar <span className="font-semibold">{moduleName}</span>. Se ha actualizado la versión del sistema.
           </p>
           {process.env.NODE_ENV === 'development' && this.state.errorMessage && (
             <p className="text-[11px] font-mono text-rose-500 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/20 rounded-lg px-3 py-2 mt-2 text-left break-all">
@@ -106,7 +127,7 @@ export class ErrorBoundary extends React.Component<
           "
         >
           <RefreshCw size={15} />
-          Reintentar
+          Cargar última versión
         </button>
       </div>
     );
