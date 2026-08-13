@@ -64,10 +64,10 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
         onClick={onClose}
       />
       
-      <div className="relative w-full max-w-lg bg-card/90 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-[32px] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
-        <div className="flex items-center justify-between p-6 border-b border-border/50 bg-white/40 dark:bg-slate-900/40">
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white ${itemType === 'product' ? 'bg-indigo-500' : 'bg-fuchsia-500'}`}>
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-card/90 backdrop-blur-2xl border border-white/20 dark:border-white/10 rounded-[24px] shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="sticky top-0 bg-card z-10 flex items-center justify-between p-5 border-b border-border/50 bg-white/40 dark:bg-slate-900/40">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 ${itemType === 'product' ? 'bg-indigo-500' : 'bg-fuchsia-500'}`}>
               <Package size={18} />
             </div>
             Nuevo Elemento
@@ -80,7 +80,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 flex-1">
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm rounded-xl">
               {error}
@@ -92,21 +92,21 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             <button
               type="button"
               onClick={() => setItemType('product')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-bold transition-all ${itemType === 'product' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${itemType === 'product' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              <Package size={16} /> Repuesto / Producto
+              <Package size={16} /> Repuesto
             </button>
             <button
               type="button"
               onClick={() => setItemType('service')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-sm font-bold transition-all ${itemType === 'service' ? 'bg-white dark:bg-slate-700 shadow-sm text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all ${itemType === 'service' ? 'bg-white dark:bg-slate-700 shadow-sm text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
             >
-              <Check size={16} /> Mano de Obra / Servicio
+              <Check size={16} /> Servicio
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="col-span-1 sm:col-span-2">
               <Input
                 name="name"
                 label="Nombre del Producto / Servicio *"
@@ -130,7 +130,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               name="cost"
               label="Costo Interno ($)"
@@ -162,7 +162,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             />
           </div>
 
-          <div className="pt-4 flex gap-3">
+          <div className="pt-2 flex gap-3 sticky bottom-0 bg-card mt-auto">
             <Button 
               type="button" 
               variant="outline" 

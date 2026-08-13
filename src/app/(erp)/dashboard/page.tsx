@@ -18,7 +18,6 @@ import {
   Sparkles,
   BarChart3
 } from 'lucide-react';
-import Link from 'next/link';
 import { useAuth } from '@/components/core/AuthProvider';
 import { useERPStore } from '@/store/useERPStore';
 
@@ -27,73 +26,126 @@ export default function LauncherPage() {
   const { currentTenant } = useERPStore();
 
   const apps = [
-    { id: 'caja', name: 'Caja POS', icon: Wrench, gradient: 'from-emerald-500 to-teal-600', href: '/caja' },
-    { id: 'clientes', name: 'Clientes', icon: Users, gradient: 'from-blue-500 to-indigo-600', href: '/clientes' },
-    { id: 'catalogo', name: 'Catálogo', icon: Box, gradient: 'from-violet-500 to-purple-600', href: '/catalogo' },
-    { id: 'estadisticas', name: 'Estadísticas', icon: BarChart3, gradient: 'from-sky-500 to-blue-600', href: '/estadisticas' },
-    { id: 'compras', name: 'Compras AP', icon: ShoppingCart, gradient: 'from-orange-500 to-amber-600', href: '/compras' },
-    { id: 'contabilidad', name: 'Contabilidad NIIF', icon: Scale, gradient: 'from-slate-800 to-slate-900', href: '/contabilidad' },
-    { id: 'calendario', name: 'Citas y Turnos', icon: CalendarDays, gradient: 'from-blue-400 to-blue-600', href: '/calendario' },
-    { id: 'whatsapp', name: 'WhatsApp CRM', icon: MessageCircle, gradient: 'from-green-400 to-emerald-600', href: '/whatsapp' },
-    { id: 'kanban', name: 'Órdenes de Trabajo', icon: KanbanSquare, gradient: 'from-yellow-400 to-orange-500', href: '/kanban' },
-    { id: 'equipo', name: 'Personal & Nómina', icon: Users, gradient: 'from-indigo-400 to-indigo-600', href: '/equipo' },
-    { id: 'franquicias', name: 'Franquicias', icon: Building2, gradient: 'from-cyan-500 to-blue-600', href: '/franquicias' },
-    { id: 'integraciones', name: 'Integraciones & APIs', icon: PlugZap, gradient: 'from-fuchsia-500 to-pink-600', href: '/integraciones' },
-    { id: 'apps', name: 'Mercado de Apps', icon: LayoutGrid, gradient: 'from-purple-500 to-indigo-700', href: '/apps' },
-    { id: 'config', name: 'Ajustes', icon: Settings, gradient: 'from-slate-500 to-slate-700', href: '/configuracion' },
-    { id: 'admin', name: 'SaaSCore Hub', icon: Crown, gradient: 'from-pink-500 to-rose-600', href: '/admin' },
+    { id: 'caja', name: 'Caja POS', icon: Wrench, color: '#10B981', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.3)]', href: '/caja' },
+    { id: 'clientes', name: 'Clientes CRM', icon: Users, color: '#3B82F6', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.3)]', href: '/clientes' },
+    { id: 'catalogo', name: 'Catálogo', icon: Box, color: '#8B5CF6', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(139,92,246,0.3)]', href: '/catalogo' },
+    { id: 'estadisticas', name: 'Estadísticas', icon: BarChart3, color: '#0ea5e9', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(14,165,233,0.3)]', href: '/estadisticas' },
+    { id: 'compras', name: 'Compras AP', icon: ShoppingCart, color: '#F59E0B', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(245,158,11,0.3)]', href: '/compras' },
+    { id: 'contabilidad', name: 'Contabilidad', icon: Scale, color: '#64748B', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(100,116,139,0.3)]', href: '/contabilidad' },
+    { id: 'calendario', name: 'Citas y Turnos', icon: CalendarDays, color: '#60A5FA', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(96,165,250,0.3)]', href: '/calendario' },
+    { id: 'whatsapp', name: 'WhatsApp', icon: MessageCircle, color: '#10B981', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(16,185,129,0.3)]', href: '/whatsapp' },
+    { id: 'kanban', name: 'Órdenes de Trabajo', icon: KanbanSquare, color: '#F97316', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(249,115,22,0.3)]', href: '/kanban' },
+    { id: 'equipo', name: 'Personal & Nómina', icon: Users, color: '#6366F1', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(99,102,241,0.3)]', href: '/equipo' },
+    { id: 'franquicias', name: 'Franquicias', icon: Building2, color: '#06B6D4', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(6,182,212,0.3)]', href: '/franquicias' },
+    { id: 'integraciones', name: 'Conexiones', icon: PlugZap, color: '#D946EF', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(217,70,239,0.3)]', href: '/integraciones' },
+    { id: 'apps', name: 'Marketplace', icon: LayoutGrid, color: '#A855F7', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(168,85,247,0.3)]', href: '/apps' },
+    { id: 'config', name: 'Ajustes', icon: Settings, color: '#475569', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(71,85,105,0.3)]', href: '/configuracion' },
+    { id: 'admin', name: 'SaaSCore Hub', icon: Crown, color: '#EC4899', bgGlow: 'hover:shadow-[0_0_30px_-5px_rgba(236,72,153,0.3)]', href: '/admin' },
   ];
 
   return (
-    <div className="min-h-screen flex flex-col pt-8 pb-24 px-4 sm:px-6 max-w-5xl mx-auto w-full space-y-10 animate-in fade-in zoom-in-95 duration-500">
+    <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border/60 pb-8">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-xs">
-              <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+          <h1 className="text-3xl font-extrabold text-foreground tracking-tight flex items-center gap-3 font-sans">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shadow-xs shrink-0">
+              <Sparkles className="w-5 h-5 text-primary" />
             </div>
             SaaSCore OS
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1">
+          <p className="text-sm text-slate-500 font-medium mt-1 font-sans">
             {currentTenant?.name || 'Configurando tu empresa...'}
           </p>
         </div>
         
         <button 
           onClick={signOut} 
-          className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/60 hover:bg-red-50 dark:hover:bg-red-500/10 border border-border hover:border-red-200 dark:hover:border-red-500/30 text-slate-600 dark:text-slate-300 hover:text-red-600 dark:hover:text-red-400 px-4 py-2 rounded-xl text-xs font-bold transition-all btn-haptic"
+          className="btn-base btn-secondary btn-sm flex items-center gap-2"
         >
           Cerrar Sesión
         </button>
       </div>
 
-      {/* Grid de Aplicaciones (Launcher Estilo Odoo / macOS) */}
-      <div>
-        <div className="flex items-center justify-between mb-8">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Ecosistema de Aplicaciones</h2>
-          <span className="text-xs text-slate-400 font-medium">{apps.length} módulos disponibles</span>
+      {/* Grid de Aplicaciones (Consola de Control Premium) */}
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest font-sans">Ecosistema de Aplicaciones</h2>
+          <span className="text-xs text-slate-400 font-semibold font-sans">{apps.length} módulos activos</span>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-y-12 gap-x-6">
-          {apps.map((app) => (
-            <a href={app.href} key={app.id} className="flex flex-col items-center gap-3 group btn-haptic">
-              <div className={`w-[72px] h-[72px] sm:w-20 sm:h-20 rounded-[22px] bg-gradient-to-br ${app.gradient} flex items-center justify-center shadow-lg shadow-black/10 dark:shadow-black/60 border border-white/20 dark:border-white/10 group-hover:border-white/40 dark:group-hover:border-white/20 group-hover:scale-105 transition-all`}>
-                <app.icon className="text-white w-8 h-8 sm:w-9 sm:h-9 drop-shadow-md" strokeWidth={1.5} />
-              </div>
-              <span className="text-foreground dark:text-slate-300 text-xs sm:text-sm font-semibold tracking-wide group-hover:text-primary transition-colors text-center leading-tight">
-                {app.name}
-              </span>
-            </a>
-          ))}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {apps.map((app) => {
+            const Icon = app.icon;
+            return (
+              <a
+                href={app.href}
+                key={app.id}
+                className={`
+                  flex flex-col items-start p-5 rounded-2xl border border-border/80 bg-card/45 backdrop-blur-md
+                  transition-all duration-300 group hover:-translate-y-1 hover:border-foreground/20 hover:bg-card/75
+                  ${app.bgGlow}
+                `}
+              >
+                {/* Contenedor del Icono */}
+                <div 
+                  className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110"
+                  style={{
+                    background: `${app.color}15`, // Fondo semitransparente del mismo color
+                    border: `1px solid ${app.color}25`
+                  }}
+                >
+                  <Icon 
+                    size={22} 
+                    style={{ color: app.color }} 
+                    strokeWidth={1.5}
+                    className="drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)] group-hover:drop-shadow-[0_2px_12px_var(--primary)]"
+                  />
+                </div>
+
+                {/* Nombre de la Aplicación */}
+                <span className="text-foreground font-semibold text-sm tracking-tight mb-1 group-hover:text-primary transition-colors font-sans">
+                  {app.name}
+                </span>
+                
+                {/* Indicador de Acción */}
+                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider group-hover:text-primary transition-colors flex items-center gap-1 font-sans">
+                  Abrir módulo
+                  <ArrowRight size={10} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                </span>
+              </a>
+            );
+          })}
         </div>
       </div>
 
-      <div className="mt-auto pt-16 text-center">
-        <p className="text-slate-400 text-xs font-semibold tracking-widest uppercase">SaaSCore OS v3.0 · Modular Enterprise Engine</p>
+      {/* Footer */}
+      <div className="mt-auto pt-16 text-center border-t border-border/40">
+        <p className="text-slate-500 text-xs font-semibold tracking-widest uppercase font-sans">SaaSCore OS v3.0 · Modular Enterprise Engine</p>
       </div>
 
     </div>
+  );
+}
+
+// Inline helper for arrow
+function ArrowRight({ size, className }: { size: number; className?: string }) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width={size} 
+      height={size} 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2.5" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+      <polyline points="12 5 19 12 12 19"></polyline>
+    </svg>
   );
 }

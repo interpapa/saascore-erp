@@ -86,10 +86,10 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
     <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+      <div className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="sticky top-0 bg-card z-10 flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
               <FileText size={18} />
             </div>
             Nueva Orden de Compra
@@ -99,7 +99,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 flex-1">
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm rounded-xl flex items-center gap-2">
               <AlertTriangle size={16} />
@@ -132,7 +132,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
             required
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               name="total"
               type="number"
@@ -156,7 +156,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
             </div>
           </div>
 
-          <div className="pt-2 flex gap-3">
+          <div className="pt-2 flex gap-3 sticky bottom-0 bg-card mt-auto">
             <Button type="button" variant="outline" className="w-full" onClick={onClose}>Cancelar</Button>
             <Button type="submit" className="w-full" isLoading={isLoading}>Crear Orden</Button>
           </div>

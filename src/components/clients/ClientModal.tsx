@@ -51,10 +51,10 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between p-6 border-b border-border">
-          <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-card border border-border rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+        <div className="sticky top-0 bg-card z-10 flex items-center justify-between p-5 border-b border-border">
+          <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
               <User size={18} />
             </div>
             {initialData ? 'Editar Cliente' : 'Nuevo Cliente'}
@@ -67,7 +67,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 flex-1">
           {error && (
             <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm rounded-xl">
               {error}
@@ -110,7 +110,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
             defaultValue={initialData?.address}
           />
 
-          <div className="pt-4 flex gap-3">
+          <div className="pt-2 flex gap-3 sticky bottom-0 bg-card mt-auto">
             <Button 
               type="button" 
               variant="outline" 
