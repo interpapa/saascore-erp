@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight } from 'lucide-react';
+import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface CommandItem {
@@ -13,13 +13,16 @@ interface CommandItem {
 }
 
 const COMMAND_ITEMS: CommandItem[] = [
-  { id: '1', title: 'Caja - POS Bimoneda', category: 'módulo', href: '/caja', icon: ShoppingCart },
-  { id: '2', title: 'Clientes - CRM Directorio', category: 'módulo', href: '/clientes', icon: Users },
-  { id: '3', title: 'Catálogo - Productos y Servicios', category: 'módulo', href: '/catalogo', icon: Box },
-  { id: '4', title: 'Compras - Proveedores y POs', category: 'módulo', href: '/compras', icon: ShoppingCart },
-  { id: '5', title: 'Contabilidad - Libro Mayor', category: 'módulo', href: '/contabilidad', icon: Scale },
-  { id: '6', title: 'Equipo - Personal HRMS', category: 'módulo', href: '/equipo', icon: Users },
-  { id: '7', title: 'Ajustes - Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
+  { id: '1',  title: 'Caja — POS Bimoneda',           category: 'módulo', href: '/caja',          icon: ShoppingCart },
+  { id: '2',  title: 'Clientes — CRM Directorio',     category: 'módulo', href: '/clientes',     icon: Users },
+  { id: '3',  title: 'Catálogo — Productos y Servicios', category: 'módulo', href: '/catalogo',    icon: Box },
+  { id: '4',  title: 'Estadísticas — Panel Ejecutivo',  category: 'módulo', href: '/estadisticas', icon: BarChart3 },
+  { id: '5',  title: 'Compras — Proveedores y POs',   category: 'módulo', href: '/compras',      icon: ShoppingCart },
+  { id: '6',  title: 'Contabilidad — Libro Mayor',    category: 'módulo', href: '/contabilidad', icon: Scale },
+  { id: '7',  title: 'Equipo — Personal y Nómina',   category: 'módulo', href: '/equipo',       icon: Users },
+  { id: '8',  title: 'Calendario — Citas y Turnos',   category: 'módulo', href: '/calendario',  icon: CalendarDays },
+  { id: '9',  title: 'WhatsApp — CRM Omnicanal',     category: 'módulo', href: '/whatsapp',    icon: MessageCircle },
+  { id: '10', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
 ];
 
 export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {

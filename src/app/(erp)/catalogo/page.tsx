@@ -1,28 +1,30 @@
 'use client';
 
-import { LegoModuleDNA } from '@/types/lego';
 import { useState, useEffect } from 'react';
-import { LegoEngine } from '@/components/lego/LegoEngine';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
 import { getItemsAction, createItemAction } from '@/app/actions/items';
 import { Item } from '@/lib/api/items';
-import { Plus, Package, DollarSign, AlertTriangle } from 'lucide-react';
-import { LegoStudio } from '@/components/studio/LegoStudio';
+import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
+import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
+import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useRouter } from 'next/navigation';
 
 export default function CatalogoPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [viewMode, setViewMode] = useViewPreference('catalogo-view-mode', 'grid');
 
   const activeTenant = useTenantResolver();
   const { session } = useERPStore();
   const { toast } = useToast();
+  const router = useRouter();
 
   const actor = {
     email: session?.userEmail || 'admin@saascore.com',
@@ -53,7 +55,6 @@ export default function CatalogoPage() {
   const handleCreateItem = async (data: any) => {
     if (!activeTenant) return;
     
-    // Inserción optimista en memoria para respuesta instantánea (0ms)
     const tempId = `temp_${Date.now()}`;
     const newItem: any = {
       id: tempId,
@@ -103,90 +104,19 @@ export default function CatalogoPage() {
   const totalValue = products.reduce((acc, p) => acc + (p.cost * (p.stock_quantity || 0)), 0);
   const lowStockCount = products.filter((p) => (p.stock_quantity || 0) <= 5).length;
 
-  const catalogCustomData = {
-    'catalog-stats': [{ dummy: true }],
-    'catalog-list': items.map((i) => {
-      let statusText = 'Activo';
-      if (i.type === 'product') {
-        if ((i.stock_quantity || 0) <= 0) statusText = 'Agotado';
-        else if ((i.stock_quantity || 0) <= 5) statusText = 'Stock Bajo';
-        else statusText = 'En Stock';
-      } else {
-        statusText = 'Servicio';
-      }
-
-      return {
-        id: i.id,
-        name: i.name,
-        category: i.category || 'General',
-        price: i.base_price || 0,
-        stock: i.type === 'product' ? i.stock_quantity : '-',
-        status: statusText,
-      };
-    }),
-  };
-
-  const handlePieceAction = (pieceId: string, rowItem: any) => {
-    if (pieceId === 'catalog-list') {
-      const fullItem = items.find((i) => i.id === rowItem.id);
-      if (fullItem) setSelectedItem(fullItem);
-    }
-  };
-
-  const catalogDNA: LegoModuleDNA = {
-    moduleId: 'catalog-module-unified',
-    name: 'Catálogo de Repuestos y Servicios',
-    layout: [
-      {
-        id: 'catalog-stats',
-        type: 'stat-grid',
-        span: 'full',
-        dataSource: 'catalog-stats',
-        config: {
-          metrics: [
-            { label: 'Total Ítems', value: totalItems.toString(), icon: 'Package', colorClass: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
-            { label: 'Valor del Inventario', value: totalValue.toString(), format: 'currency', icon: 'DollarSign', colorClass: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
-            { label: 'Alertas de Stock', value: lowStockCount.toString(), icon: 'AlertTriangle', colorClass: 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' },
-          ],
-        },
-      },
-      {
-        id: 'catalog-list',
-        type: 'list-feed',
-        span: 'full',
-        dataSource: 'catalog-list',
-        config: {
-          title: 'Directorio de Repuestos y Servicios',
-          columns: [
-            { field: 'name', label: 'Nombre' },
-            { field: 'category', label: 'Categoría' },
-            { field: 'stock', label: 'Inventario' },
-            { field: 'price', label: 'Precio', format: 'currency' },
-            { field: 'status', label: 'Estado', type: 'status' },
-          ],
-        },
-      },
-    ],
-  };
-
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
       {/* Cabecera Estandarizada */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight">Catálogo de Productos</h1>
-          <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5">Gestión de inventario, repuestos y servicios</p>
+          <h1 className="text-3xl font-black text-foreground tracking-tight font-sans">Catálogo de Productos</h1>
+          <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5 font-sans">Gestión de inventario, repuestos y servicios</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setIsEditing(true)}
-            className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold transition-all text-slate-600 dark:text-slate-300 btn-haptic"
-          >
-            Editar Layout
-          </button>
+        <div className="flex items-center gap-3">
+          <ViewToggle storageKey="catalogo-view-mode" currentView={viewMode} onViewChange={setViewMode} />
           <button
             onClick={() => setIsModalOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all shadow-[0_0_20px_rgba(79,70,229,0.3)] hover:shadow-[0_0_25px_rgba(79,70,229,0.5)] flex items-center gap-2 btn-haptic"
+            className="btn-base btn-primary btn-haptic flex items-center gap-2"
           >
             <Plus size={18} />
             Nuevo Ítem
@@ -194,12 +124,198 @@ export default function CatalogoPage() {
         </div>
       </div>
 
+      {/* KPI bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300">
+          <div className="w-10 h-10 rounded-xl bg-[rgba(27,95,168,0.15)] flex items-center justify-center text-primary">
+            <Package size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Ítems</p>
+            <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300 delay-75">
+          <div className="w-10 h-10 rounded-xl bg-[rgba(22,163,74,0.15)] flex items-center justify-center text-success">
+            <DollarSign size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Valor Inventario</p>
+            <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString('es', { minimumFractionDigits: 2 })}</p>
+          </div>
+        </div>
+
+        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300 delay-150">
+          <div className="w-10 h-10 rounded-xl bg-[rgba(217,119,6,0.15)] flex items-center justify-center text-warning">
+            <AlertTriangle size={20} />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Bajo</p>
+            <p className="text-2xl font-bold text-foreground">{lowStockCount}</p>
+          </div>
+        </div>
+      </div>
+
       {isLoading ? (
-        <div className="flex justify-center p-12">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <SkeletonCardGrid count={6} columns={3} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          icon={Package}
+          title="Catálogo vacío"
+          description="Comienza agregando productos o servicios que ofrezcas en tu negocio."
+          actionLabel="Agregar primer ítem"
+          onAction={() => setIsModalOpen(true)}
+        />
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {items.map((item) => {
+            const isLowStock = item.type === 'product' && (item.stock_quantity || 0) <= 5;
+            const isOut = item.type === 'product' && (item.stock_quantity || 0) === 0;
+
+            return (
+              <div
+                key={item.id}
+                onClick={() => setSelectedItem(item)}
+                className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
+              >
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                      {item.category || 'General'}
+                    </span>
+                    <span
+                      className={`badge ${
+                        item.type === 'service'
+                          ? 'badge-info'
+                          : isOut
+                          ? 'badge-danger'
+                          : isLowStock
+                          ? 'badge-warning'
+                          : 'badge-success'
+                      }`}
+                    >
+                      {item.type === 'service'
+                        ? 'Servicio'
+                        : isOut
+                        ? 'Agotado'
+                        : isLowStock
+                        ? 'Stock Bajo'
+                        : 'En Stock'}
+                    </span>
+                  </div>
+                  <h3 className="text-h3 font-bold text-foreground mb-1 group-hover:text-primary transition-colors font-sans">
+                    {item.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mb-4">{item.sku || 'Sin SKU'}</p>
+                </div>
+
+                <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
+                  <div>
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Precio</p>
+                    <p className="text-lg font-bold text-foreground">
+                      ${(item.base_price || 0).toLocaleString('es', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  {item.type === 'product' && (
+                    <div className="text-right">
+                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Inventario</p>
+                      <p className={`text-sm font-semibold ${isLowStock ? 'text-warning' : 'text-foreground'}`}>
+                        {item.stock_quantity} disp.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Smart Action en stock bajo/agotado */}
+                {isLowStock && (
+                  <div className="absolute inset-x-0 bottom-0 bg-slate-900/95 dark:bg-slate-955/95 p-3 flex justify-center items-center translate-y-full group-hover:translate-y-0 transition-transform duration-200" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => router.push(`/compras?item=${item.id}`)}
+                      className="btn-base btn-primary btn-sm flex items-center gap-1.5"
+                    >
+                      Reponer Inventario
+                      <ShoppingCart size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
-        <LegoEngine dna={catalogDNA} customData={catalogCustomData} onPieceAction={handlePieceAction} />
+        <div className="bg-card border border-border rounded-2xl overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-border bg-slate-50/50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500">
+                <th className="p-4">SKU</th>
+                <th className="p-4">Nombre</th>
+                <th className="p-4">Categoría</th>
+                <th className="p-4">Tipo</th>
+                <th className="p-4 text-right">Precio</th>
+                <th className="p-4 text-right">Inventario</th>
+                <th className="p-4">Estado</th>
+                <th className="p-4 text-right">Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => {
+                const isLowStock = item.type === 'product' && (item.stock_quantity || 0) <= 5;
+                const isOut = item.type === 'product' && (item.stock_quantity || 0) === 0;
+
+                return (
+                  <tr
+                    key={item.id}
+                    onClick={() => setSelectedItem(item)}
+                    className="border-b border-border/50 last:border-0 hover:bg-slate-50/30 dark:hover:bg-slate-900/10 cursor-pointer transition-colors text-sm"
+                  >
+                    <td className="p-4 font-mono text-xs">{item.sku || '-'}</td>
+                    <td className="p-4 font-semibold text-foreground">{item.name}</td>
+                    <td className="p-4 text-slate-500">{item.category || 'General'}</td>
+                    <td className="p-4 capitalize">{item.type === 'product' ? 'Producto' : 'Servicio'}</td>
+                    <td className="p-4 text-right font-bold text-foreground">
+                      ${(item.base_price || 0).toLocaleString('es', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-4 text-right font-medium">
+                      {item.type === 'product' ? `${item.stock_quantity} uds` : '-'}
+                    </td>
+                    <td className="p-4">
+                      <span
+                        className={`badge ${
+                          item.type === 'service'
+                            ? 'badge-info'
+                            : isOut
+                            ? 'badge-danger'
+                            : isLowStock
+                            ? 'badge-warning'
+                            : 'badge-success'
+                        }`}
+                      >
+                        {item.type === 'service'
+                          ? 'Servicio'
+                          : isOut
+                          ? 'Agotado'
+                          : isLowStock
+                          ? 'Stock Bajo'
+                          : 'En Stock'}
+                      </span>
+                    </td>
+                    <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
+                      {isLowStock && (
+                        <button
+                          onClick={() => router.push(`/compras?item=${item.id}`)}
+                          className="btn-base btn-ghost btn-sm text-warning hover:bg-warning-50"
+                        >
+                          Reponer
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <CatalogModal
@@ -213,17 +329,6 @@ export default function CatalogoPage() {
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
       />
-
-      {isEditing && (
-        <LegoStudio
-          initialLayout={catalogDNA.layout}
-          onSave={(newLayout) => {
-            console.log('Nuevo Layout Guardado:', newLayout);
-            setIsEditing(false);
-          }}
-          onClose={() => setIsEditing(false)}
-        />
-      )}
     </div>
   );
 }

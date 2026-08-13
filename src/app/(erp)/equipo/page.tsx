@@ -8,6 +8,8 @@ import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { EmployeeDirectoryTab } from '@/components/equipo/EmployeeDirectoryTab';
 import { AttendanceTab } from '@/components/equipo/AttendanceTab';
 import { PayrollTab } from '@/components/equipo/PayrollTab';
+import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
+import { SkeletonTable } from '@/components/ui/SkeletonTable';
 
 type TabType = 'directorio' | 'asistencia' | 'nomina';
 
@@ -108,9 +110,12 @@ export default function EquipoPage() {
 
       {/* Contenido Modular */}
       {isLoading ? (
-        <div className="py-20 text-center text-slate-400 text-xs font-medium flex items-center justify-center gap-2">
-          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          Cargando personal...
+        <div className="bg-card border border-border rounded-2xl p-6">
+          {activeTab === 'directorio' ? (
+            <SkeletonCardGrid count={4} columns={2} showAvatar />
+          ) : (
+            <SkeletonTable rows={5} columns={4} />
+          )}
         </div>
       ) : (
         <>

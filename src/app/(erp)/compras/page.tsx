@@ -11,6 +11,7 @@ import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { SupplierTab } from '@/components/compras/SupplierTab';
 import { PurchaseOrderTab } from '@/components/compras/PurchaseOrderTab';
 import { MatchValidationTab } from '@/components/compras/MatchValidationTab';
+import { SkeletonTable } from '@/components/ui/SkeletonTable';
 
 export default function ComprasPage() {
   const currentTenant = useTenantResolver();
@@ -118,9 +119,8 @@ export default function ComprasPage() {
 
       {/* Contenido Modular de Pestañas */}
       {isLoading ? (
-        <div className="py-20 text-center text-slate-400 text-xs font-medium flex items-center justify-center gap-2">
-          <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          Cargando datos de compras...
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <SkeletonTable rows={5} columns={4} />
         </div>
       ) : (
         <>

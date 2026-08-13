@@ -15,7 +15,8 @@ import {
   Building2,
   PlugZap,
   LayoutGrid,
-  Sparkles
+  Sparkles,
+  BarChart3
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/components/core/AuthProvider';
@@ -29,6 +30,7 @@ export default function LauncherPage() {
     { id: 'caja', name: 'Caja POS', icon: Wrench, gradient: 'from-emerald-500 to-teal-600', href: '/caja' },
     { id: 'clientes', name: 'Clientes', icon: Users, gradient: 'from-blue-500 to-indigo-600', href: '/clientes' },
     { id: 'catalogo', name: 'Catálogo', icon: Box, gradient: 'from-violet-500 to-purple-600', href: '/catalogo' },
+    { id: 'estadisticas', name: 'Estadísticas', icon: BarChart3, gradient: 'from-sky-500 to-blue-600', href: '/estadisticas' },
     { id: 'compras', name: 'Compras AP', icon: ShoppingCart, gradient: 'from-orange-500 to-amber-600', href: '/compras' },
     { id: 'contabilidad', name: 'Contabilidad NIIF', icon: Scale, gradient: 'from-slate-800 to-slate-900', href: '/contabilidad' },
     { id: 'calendario', name: 'Citas y Turnos', icon: CalendarDays, gradient: 'from-blue-400 to-blue-600', href: '/calendario' },
