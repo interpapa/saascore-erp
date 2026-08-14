@@ -76,14 +76,14 @@
 
 /* ── Dark Theme ── */
 .dark {
-  --background: #000033;
-  --foreground: #F1F5F9;
-  --card: #090924;
-  --card-foreground: #F1F5F9;
+  --background: #9BA4B5;
+  --foreground: #0F172A;
+  --card: #F4F6F9;
+  --card-foreground: #0F172A;
   --border: #495464;
-  --border-subtle: #0d0d38;
-  --muted: #9BA4B5;
-  --muted-foreground: #9BA4B5;
+  --border-subtle: #D2D7DF;
+  --muted: #495464;
+  --muted-foreground: #495464;
 
   /* Azul Eléctrico Vibrante (Primary) en Dark */
   --primary-50:  rgba(0, 102, 204, 0.15);
