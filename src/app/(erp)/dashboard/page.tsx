@@ -5,7 +5,7 @@ import { useAuth } from '@/components/core/AuthProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { 
   Sparkles, 
-  ShoppingBag, 
+  Coins, 
   Users, 
   Package, 
   BarChart3, 
@@ -33,7 +33,7 @@ export default function LauncherPage() {
       href: '/caja',
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
-        <ShoppingBag className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1" />
+        <Coins className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-2.5 group-hover:rotate-[15deg]" />
       )
     },
     { 
