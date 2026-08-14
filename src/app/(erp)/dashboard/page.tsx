@@ -17,11 +17,10 @@ export default function LauncherPage() {
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
         <svg className="w-9 h-9 text-white custom-pos-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {/* Dos monedas gruesas superpuestas tridimensionales */}
-          <circle cx="9" cy="13" r="7" className="pos-coin-back fill-emerald-500/20" />
-          <circle cx="15" cy="11" r="7" className="pos-coin-front fill-emerald-400/20" />
-          <path d="M15 8v6" className="pos-coin-symbol" />
-          <path d="M13.5 9.5c0-.8.7-1 1.5-1s1.5.2 1.5 1-.6 1-1.5 1-1.5.2-1.5 1 .6 1 1.5 1 1.5-.2 1.5-1" className="pos-coin-symbol" />
+          {/* Moneda única, limpia y minimalista para evitar saturación visual */}
+          <circle cx="12" cy="12" r="10" className="fill-emerald-500/10" />
+          <path d="M12 6v12" />
+          <path d="M15 9H12a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4H9" />
         </svg>
       )
     },
@@ -259,20 +258,31 @@ export default function LauncherPage() {
       
       {/* Estilos CSS locales de Keyframes para los 15 Iconos Custom */}
       <style jsx global>{`
-        /* 1. Caja POS: 3D Flip de doble moneda */
+        /* 1. Caja POS: Lanzamiento de moneda en 3D (Subida, Giro completo 360 y Caída con amortiguación) */
+        @keyframes coinTossAndLand {
+          0% {
+            transform: translateY(0) rotateY(0deg) scale(1);
+          }
+          35% {
+            transform: translateY(-18px) rotateY(180deg) scale(1.15);
+          }
+          70% {
+            transform: translateY(0) rotateY(360deg) scale(1);
+          }
+          85% {
+            transform: translateY(-2px) rotateY(360deg) scale(1.03);
+          }
+          100% {
+            transform: translateY(0) rotateY(360deg) scale(1);
+          }
+        }
         .custom-pos-coin {
-          transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform 0.4s ease-out;
           transform-style: preserve-3d;
           perspective: 800px;
         }
         .group:hover .custom-pos-coin {
-          transform: translateY(-10px) rotateY(180deg) scale(1.1);
-        }
-        .pos-coin-back, .pos-coin-front, .pos-coin-symbol {
-          transition: all 0.5s ease;
-        }
-        .group:hover .pos-coin-back {
-          transform: translate(-1px, 1px);
+          animation: coinTossAndLand 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
         /* 2. Clientes CRM: Desplazamiento de tarjetas */
