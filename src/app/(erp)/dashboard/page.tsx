@@ -5,7 +5,6 @@ import { useAuth } from '@/components/core/AuthProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { 
   Sparkles, 
-  Coins, 
   Users, 
   Package, 
   BarChart3, 
@@ -33,7 +32,13 @@ export default function LauncherPage() {
       href: '/caja',
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
-        <Coins className="w-8 h-8 text-white transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-2.5 group-hover:rotate-[15deg]" />
+        <svg className="w-8 h-8 text-white coin-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {/* Moneda tridimensional con signo de Dólar ($) central distintivo */}
+          <circle cx="12" cy="12" r="10" />
+          <circle cx="12" cy="12" r="7" className="opacity-50" strokeDasharray="3 2" />
+          <path d="M12 7v10" />
+          <path d="M9.5 9.5c0-1.2 1-1.5 2.5-1.5s2.5.3 2.5 1.5-1 1.5-2.5 1.5-2.5.3-2.5 1.5 1 1.5 2.5 1.5 2.5-.3 2.5-1.5" />
+        </svg>
       )
     },
     { 
@@ -167,6 +172,18 @@ export default function LauncherPage() {
   return (
     <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
+      {/* Estilo local para la rotación 3D de la moneda de Caja POS */}
+      <style jsx global>{`
+        .coin-svg {
+          transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transform-style: preserve-3d;
+          perspective: 800px;
+        }
+        .group:hover .coin-svg {
+          transform: translateY(-12px) rotateY(360deg) scale(1.15);
+        }
+      `}</style>
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border/60 pb-8">
         <div>
