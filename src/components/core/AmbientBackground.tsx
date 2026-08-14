@@ -7,7 +7,8 @@ import React from 'react';
  * 
  * Restored organic colorful vibe with higher saturation and opacity
  * to prevent the background from looking flat white in light mode.
- * Uses cyan, purple, and pink animating orbs with balanced blur.
+ * Grid lines ("cuadros") opacity has been reduced significantly to make 
+ * them almost invisible and prevent any visual strain.
  */
 export function AmbientBackground() {
   return (
@@ -24,9 +25,13 @@ export function AmbientBackground() {
       
       <div className="absolute bottom-[-5%] left-[15%] w-[55%] h-[55%] rounded-full filter blur-[100px] dark:blur-[140px] opacity-85 dark:opacity-50 animate-blob animation-delay-4000 bg-pink-400 dark:bg-blue-900 transition-all duration-1000"></div>
 
-      {/* Grid Textura Arquitectónica con opacidad muy sutil */}
+      {/* 
+        Grid Textura Arquitectónica 
+        Reducimos la opacidad a valores extremadamente bajos (0.003 y 0.006) 
+        para hacer los cuadros casi invisibles, evitando que molesten a la vista.
+      */}
       <div 
-        className="absolute inset-0 opacity-[0.015] dark:opacity-[0.03] transition-opacity duration-700" 
+        className="absolute inset-0 opacity-[0.003] dark:opacity-[0.006] transition-opacity duration-700" 
         style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H20V20z' fill='%23000000' fill-opacity='1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
           backgroundSize: '40px 40px'
