@@ -17,10 +17,10 @@ export default function LauncherPage() {
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
         <svg className="w-9 h-9 text-white custom-pos-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {/* Moneda única, limpia y minimalista para evitar saturación visual */}
+          {/* Moneda minimalista con signo de dólar ($) matemáticamente centrado */}
           <circle cx="12" cy="12" r="10" className="fill-emerald-500/10" />
-          <path d="M12 6v12" />
-          <path d="M15 9H12a2 2 0 0 0 0 4h1a2 2 0 0 1 0 4H9" />
+          <path d="M12 5v14" />
+          <path d="M15 9c0-2-6-2-6 0 0 2 6 2 6 4 0 2-6 2-6 0" />
         </svg>
       )
     },
@@ -258,31 +258,14 @@ export default function LauncherPage() {
       
       {/* Estilos CSS locales de Keyframes para los 15 Iconos Custom */}
       <style jsx global>{`
-        /* 1. Caja POS: Lanzamiento de moneda en 3D (Subida, Giro completo 360 y Caída con amortiguación) */
-        @keyframes coinTossAndLand {
-          0% {
-            transform: translateY(0) rotateY(0deg) scale(1);
-          }
-          35% {
-            transform: translateY(-18px) rotateY(180deg) scale(1.15);
-          }
-          70% {
-            transform: translateY(0) rotateY(360deg) scale(1);
-          }
-          85% {
-            transform: translateY(-2px) rotateY(360deg) scale(1.03);
-          }
-          100% {
-            transform: translateY(0) rotateY(360deg) scale(1);
-          }
-        }
+        /* 1. Caja POS: 3D Flip que sube, gira 360 y se sostiene en el aire en hover */
         .custom-pos-coin {
-          transition: transform 0.4s ease-out;
+          transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
           transform-style: preserve-3d;
           perspective: 800px;
         }
         .group:hover .custom-pos-coin {
-          animation: coinTossAndLand 0.75s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+          transform: translateY(-14px) rotateY(360deg) scale(1.15);
         }
 
         /* 2. Clientes CRM: Desplazamiento de tarjetas */
