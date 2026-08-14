@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
 import { getItemsAction, createItemAction } from '@/app/actions/items';
+import { getAuditLogsAction } from '@/app/actions/audit';
 import { Item } from '@/lib/api/items';
-import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart } from 'lucide-react';
+import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart, Activity } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
@@ -13,6 +14,10 @@ import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
 import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useRouter } from 'next/navigation';
+import { UnderlineTabs } from '@/components/ui/Tabs';
+import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
+
+type TabType = 'items' | 'audit';
 
 export default function CatalogoPage() {
   const [items, setItems] = useState<Item[]>([]);
@@ -20,6 +25,9 @@ export default function CatalogoPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [viewMode, setViewMode] = useViewPreference('catalogo-view-mode', 'grid');
+  const [activeTab, setActiveTab] = useState<TabType>('items');
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   const activeTenant = useTenantResolver();
   const { session } = useERPStore();
@@ -46,11 +54,32 @@ export default function CatalogoPage() {
     }
   };
 
+  const loadAuditLogs = useCallback(async () => {
+    if (!activeTenant?.id) return;
+    try {
+      setIsLoadingAudit(true);
+      const res = await getAuditLogsAction(activeTenant.id, 'item', 40);
+      if (res.success) {
+        setAuditLogs(res.logs);
+      }
+    } catch (err) {
+      console.error('Error cargando auditoría de inventario:', err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  }, [activeTenant?.id]);
+
   useEffect(() => {
     if (activeTenant) {
       fetchItems();
     }
   }, [activeTenant]);
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      loadAuditLogs();
+    }
+  }, [activeTab, loadAuditLogs]);
 
   const handleCreateItem = async (data: any) => {
     if (!activeTenant) return;
@@ -104,217 +133,243 @@ export default function CatalogoPage() {
   const totalValue = products.reduce((acc, p) => acc + (p.cost * (p.stock_quantity || 0)), 0);
   const lowStockCount = products.filter((p) => (p.stock_quantity || 0) <= 5).length;
 
+  const tabs = [
+    { id: 'items', label: 'Repuestos & Servicios', icon: Package },
+    { id: 'audit', label: 'Auditoría de Inventario', icon: Activity },
+  ];
+
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
       {/* Cabecera Estandarizada */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
         <div>
           <h1 className="text-3xl font-black text-foreground tracking-tight font-sans">Catálogo de Productos</h1>
           <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5 font-sans">Gestión de inventario, repuestos y servicios</p>
         </div>
-        <div className="flex items-center gap-3">
-          <ViewToggle storageKey="catalogo-view-mode" currentView={viewMode} onViewChange={setViewMode} />
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="btn-base btn-primary btn-haptic flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Nuevo Ítem
-          </button>
-        </div>
+        {activeTab === 'items' && (
+          <div className="flex items-center gap-3">
+            <ViewToggle storageKey="catalogo-view-mode" currentView={viewMode} onViewChange={setViewMode} />
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="btn-base btn-primary btn-haptic flex items-center gap-2"
+            >
+              <Plus size={18} />
+              Nuevo Ítem
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* KPI bar */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300">
-          <div className="w-10 h-10 rounded-xl bg-[rgba(27,95,168,0.15)] flex items-center justify-center text-primary">
-            <Package size={20} />
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Ítems</p>
-            <p className="text-2xl font-bold text-foreground">{totalItems}</p>
-          </div>
-        </div>
+      {/* Tabs */}
+      <UnderlineTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as TabType)}
+      />
 
-        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300 delay-75">
-          <div className="w-10 h-10 rounded-xl bg-[rgba(22,163,74,0.15)] flex items-center justify-center text-success">
-            <DollarSign size={20} />
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Valor Inventario</p>
-            <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString('es', { minimumFractionDigits: 2 })}</p>
-          </div>
-        </div>
-
-        <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300 delay-150">
-          <div className="w-10 h-10 rounded-xl bg-[rgba(217,119,6,0.15)] flex items-center justify-center text-warning">
-            <AlertTriangle size={20} />
-          </div>
-          <div>
-            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Bajo</p>
-            <p className="text-2xl font-bold text-foreground">{lowStockCount}</p>
-          </div>
-        </div>
-      </div>
-
-      {isLoading ? (
-        <SkeletonCardGrid count={6} columns={3} />
-      ) : items.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="Catálogo vacío"
-          description="Comienza agregando productos o servicios que ofrezcas en tu negocio."
-          actionLabel="Agregar primer ítem"
-          onAction={() => setIsModalOpen(true)}
-        />
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item) => {
-            const isLowStock = item.type === 'product' && (item.stock_quantity || 0) <= 5;
-            const isOut = item.type === 'product' && (item.stock_quantity || 0) === 0;
-
-            return (
-              <div
-                key={item.id}
-                onClick={() => setSelectedItem(item)}
-                className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden"
-              >
-                <div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                      {item.category || 'General'}
-                    </span>
-                    <span
-                      className={`badge ${
-                        item.type === 'service'
-                          ? 'badge-info'
-                          : isOut
-                          ? 'badge-danger'
-                          : isLowStock
-                          ? 'badge-warning'
-                          : 'badge-success'
-                      }`}
-                    >
-                      {item.type === 'service'
-                        ? 'Servicio'
-                        : isOut
-                        ? 'Agotado'
-                        : isLowStock
-                        ? 'Stock Bajo'
-                        : 'En Stock'}
-                    </span>
-                  </div>
-                  <h3 className="text-h3 font-bold text-foreground mb-1 group-hover:text-primary transition-colors font-sans">
-                    {item.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 mb-4">{item.sku || 'Sin SKU'}</p>
-                </div>
-
-                <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
-                  <div>
-                    <p className="text-[10px] text-slate-500 uppercase tracking-wider">Precio</p>
-                    <p className="text-lg font-bold text-foreground">
-                      ${(item.base_price || 0).toLocaleString('es', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  {item.type === 'product' && (
-                    <div className="text-right">
-                      <p className="text-[10px] text-slate-500 uppercase tracking-wider">Inventario</p>
-                      <p className={`text-sm font-semibold ${isLowStock ? 'text-warning' : 'text-foreground'}`}>
-                        {item.stock_quantity} disp.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Smart Action en stock bajo/agotado */}
-                {isLowStock && (
-                  <div className="absolute inset-x-0 bottom-0 bg-slate-900/95 dark:bg-slate-955/95 p-3 flex justify-center items-center translate-y-full group-hover:translate-y-0 transition-transform duration-200" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => router.push(`/compras?item=${item.id}`)}
-                      className="btn-base btn-primary btn-sm flex items-center gap-1.5"
-                    >
-                      Reponer Inventario
-                      <ShoppingCart size={14} />
-                    </button>
-                  </div>
-                )}
+      {activeTab === 'items' ? (
+        <>
+          {/* KPI bar */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(27,95,168,0.15)] flex items-center justify-center text-primary">
+                <Package size={20} />
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="bg-card border border-border rounded-2xl overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border bg-slate-50/50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500">
-                <th className="p-4">SKU</th>
-                <th className="p-4">Nombre</th>
-                <th className="p-4">Categoría</th>
-                <th className="p-4">Tipo</th>
-                <th className="p-4 text-right">Precio</th>
-                <th className="p-4 text-right">Inventario</th>
-                <th className="p-4">Estado</th>
-                <th className="p-4 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Ítems</p>
+                <p className="text-2xl font-bold text-foreground">{totalItems}</p>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300 delay-75">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(22,163,74,0.15)] flex items-center justify-center text-success">
+                <DollarSign size={20} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Valor Inventario</p>
+                <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString('es', { minimumFractionDigits: 2 })}</p>
+              </div>
+            </div>
+
+            <div className="bg-card border border-border rounded-2xl p-5 flex items-center gap-4 animate-in fade-in duration-300 delay-150">
+              <div className="w-10 h-10 rounded-xl bg-[rgba(217,119,6,0.15)] flex items-center justify-center text-warning">
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Stock Bajo</p>
+                <p className="text-2xl font-bold text-foreground">{lowStockCount}</p>
+              </div>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <SkeletonCardGrid count={6} columns={3} />
+          ) : items.length === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="Catálogo vacío"
+              description="Comienza agregando productos o servicios que ofrezcas en tu negocio."
+              actionLabel="Agregar primer ítem"
+              onAction={() => setIsModalOpen(true)}
+            />
+          ) : viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {items.map((item) => {
                 const isLowStock = item.type === 'product' && (item.stock_quantity || 0) <= 5;
                 const isOut = item.type === 'product' && (item.stock_quantity || 0) === 0;
 
                 return (
-                  <tr
+                  <div
                     key={item.id}
                     onClick={() => setSelectedItem(item)}
-                    className="border-b border-border/50 last:border-0 hover:bg-slate-50/30 dark:hover:bg-slate-900/10 cursor-pointer transition-colors text-sm"
+                    className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between hover:border-primary/40 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden animate-in fade-in duration-300"
                   >
-                    <td className="p-4 font-mono text-xs">{item.sku || '-'}</td>
-                    <td className="p-4 font-semibold text-foreground">{item.name}</td>
-                    <td className="p-4 text-slate-500">{item.category || 'General'}</td>
-                    <td className="p-4 capitalize">{item.type === 'product' ? 'Producto' : 'Servicio'}</td>
-                    <td className="p-4 text-right font-bold text-foreground">
-                      ${(item.base_price || 0).toLocaleString('es', { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="p-4 text-right font-medium">
-                      {item.type === 'product' ? `${item.stock_quantity} uds` : '-'}
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`badge ${
-                          item.type === 'service'
-                            ? 'badge-info'
+                    <div>
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-xs font-semibold px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          {item.category || 'General'}
+                        </span>
+                        <span
+                          className={`badge ${
+                            item.type === 'service'
+                              ? 'badge-info'
+                              : isOut
+                              ? 'badge-danger'
+                              : isLowStock
+                              ? 'badge-warning'
+                              : 'badge-success'
+                          }`}
+                        >
+                          {item.type === 'service'
+                            ? 'Servicio'
                             : isOut
-                            ? 'badge-danger'
+                            ? 'Agotado'
                             : isLowStock
-                            ? 'badge-warning'
-                            : 'badge-success'
-                        }`}
-                      >
-                        {item.type === 'service'
-                          ? 'Servicio'
-                          : isOut
-                          ? 'Agotado'
-                          : isLowStock
-                          ? 'Stock Bajo'
-                          : 'En Stock'}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
-                      {isLowStock && (
+                            ? 'Stock Bajo'
+                            : 'En Stock'}
+                        </span>
+                      </div>
+                      <h3 className="text-h3 font-bold text-foreground mb-1 group-hover:text-primary transition-colors font-sans">
+                        {item.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 mb-4">{item.sku || 'Sin SKU'}</p>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-4 pt-4 border-t border-border/50">
+                      <div>
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wider">Precio</p>
+                        <p className="text-lg font-bold text-foreground">
+                          ${(item.base_price || 0).toLocaleString('es', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      {item.type === 'product' && (
+                        <div className="text-right">
+                          <p className="text-[10px] text-slate-500 uppercase tracking-wider">Inventario</p>
+                          <p className={`text-sm font-semibold ${isLowStock ? 'text-warning' : 'text-foreground'}`}>
+                            {item.stock_quantity} disp.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Smart Action en stock bajo/agotado */}
+                    {isLowStock && (
+                      <div className="absolute inset-x-0 bottom-0 bg-slate-900/95 dark:bg-slate-955/95 p-3 flex justify-center items-center translate-y-full group-hover:translate-y-0 transition-transform duration-200" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => router.push(`/compras?item=${item.id}`)}
-                          className="btn-base btn-ghost btn-sm text-warning hover:bg-warning-50"
+                          className="btn-base btn-primary btn-sm flex items-center gap-1.5"
                         >
-                          Reponer
+                          Reponer Inventario
+                          <ShoppingCart size={14} />
                         </button>
-                      )}
-                    </td>
-                  </tr>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-2xl overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-border bg-slate-50/50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500">
+                    <th className="p-4">SKU</th>
+                    <th className="p-4">Nombre</th>
+                    <th className="p-4">Categoría</th>
+                    <th className="p-4">Tipo</th>
+                    <th className="p-4 text-right">Precio</th>
+                    <th className="p-4 text-right">Inventario</th>
+                    <th className="p-4">Estado</th>
+                    <th className="p-4 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const isLowStock = item.type === 'product' && (item.stock_quantity || 0) <= 5;
+                    const isOut = item.type === 'product' && (item.stock_quantity || 0) === 0;
+
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => setSelectedItem(item)}
+                        className="border-b border-border/50 last:border-0 hover:bg-slate-50/30 dark:hover:bg-slate-900/10 cursor-pointer transition-colors text-sm"
+                      >
+                        <td className="p-4 font-mono text-xs">{item.sku || '-'}</td>
+                        <td className="p-4 font-semibold text-foreground">{item.name}</td>
+                        <td className="p-4 text-slate-500">{item.category || 'General'}</td>
+                        <td className="p-4 capitalize">{item.type === 'product' ? 'Producto' : 'Servicio'}</td>
+                        <td className="p-4 text-right font-bold text-foreground">
+                          ${(item.base_price || 0).toLocaleString('es', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="p-4 text-right font-medium">
+                          {item.type === 'product' ? `${item.stock_quantity} uds` : '-'}
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className={`badge ${
+                              item.type === 'service'
+                                ? 'badge-info'
+                                : isOut
+                                ? 'badge-danger'
+                                : isLowStock
+                                ? 'badge-warning'
+                                : 'badge-success'
+                            }`}
+                          >
+                            {item.type === 'service'
+                              ? 'Servicio'
+                              : isOut
+                              ? 'Agotado'
+                              : isLowStock
+                              ? 'Stock Bajo'
+                              : 'En Stock'}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right" onClick={(e) => e.stopPropagation()}>
+                          {isLowStock && (
+                            <button
+                              onClick={() => router.push(`/compras?item=${item.id}`)}
+                              className="btn-base btn-ghost btn-sm text-warning hover:bg-warning-50"
+                            >
+                              Reponer
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mb-4">
+            <h3 className="text-h3 font-bold text-foreground font-sans">Historial de Cambios de Inventario</h3>
+            <p className="text-xs text-slate-500 font-sans mt-0.5">Bitácora de auditoría para productos, precios y repuestos creados o modificados.</p>
+          </div>
+          <AuditTrailSection logs={auditLogs} isLoading={isLoadingAudit} />
         </div>
       )}
 

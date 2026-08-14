@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { FiscalPeriodFilter } from '@/types/accounting';
-import { BookOpen, Scale, FileText, Download, Plus, Calendar } from 'lucide-react';
+import { BookOpen, Scale, FileText, Download, Plus, Calendar, Activity } from 'lucide-react';
 
-export type AccountingTab = 'journal' | 'trial_balance' | 'income_statement';
+export type AccountingTab = 'journal' | 'trial_balance' | 'income_statement' | 'audit';
 
 interface AccountingFiltersProps {
   period: FiscalPeriodFilter;
@@ -102,6 +102,18 @@ export function AccountingFilters({
         >
           <FileText className="w-4 h-4" />
           <span>Estado de Resultados</span>
+        </button>
+
+        <button
+          onClick={() => onTabChange('audit')}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+            activeTab === 'audit'
+              ? 'bg-white dark:bg-slate-900 text-primary shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+          }`}
+        >
+          <Activity className="w-4 h-4" />
+          <span>Auditoría Contable</span>
         </button>
       </div>
 

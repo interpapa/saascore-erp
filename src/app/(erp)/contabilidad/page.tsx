@@ -7,10 +7,12 @@ import { AccountingFilters, AccountingTab } from '@/components/contabilidad/Acco
 import { GeneralJournalTable } from '@/components/contabilidad/GeneralJournalTable';
 import { TrialBalanceTable } from '@/components/contabilidad/TrialBalanceTable';
 import { IncomeStatementCard } from '@/components/contabilidad/IncomeStatementCard';
-import { CreateJournalEntryModal, CreateJournalEntryPayload } from '@/components/contabilidad/CreateJournalEntryModal';
+import { CreateJournalEntryModal } from '@/components/contabilidad/CreateJournalEntryModal';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { getAuditLogsAction } from '@/app/actions/audit';
+import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import {
   getJournalEntriesAction,
   getTrialBalanceAction,
@@ -23,7 +25,6 @@ import {
   IncomeStatementReport,
   FiscalPeriodFilter,
 } from '@/types/accounting';
-import { useActionActor } from '@/hooks/useActionActor';
 import { exportToCSV } from '@/lib/core/exportToCSV';
 import { RefreshCw } from 'lucide-react';
 
@@ -41,6 +42,10 @@ export default function ContabilidadPage() {
   const [trialTotals, setTrialTotals] = useState<{ debit: number; credit: number }>({ debit: 0, credit: 0 });
   const [incomeStatement, setIncomeStatement] = useState<IncomeStatementReport | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Audit Logs States
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   // Filters & Tabs
   const [period, setPeriod] = useState<FiscalPeriodFilter & { year?: number; month?: number }>(() => {
@@ -57,6 +62,15 @@ export default function ContabilidadPage() {
   });
   const [activeTab, setActiveTab] = useState<AccountingTab>('journal');
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+
+  // Modals
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
+
+  const actor = {
+    email: session?.userEmail || 'admin@saascore.com',
+    role: session?.role || ('owner' as const),
+  };
 
   // Sync period filter to URL
   useEffect(() => {
@@ -76,19 +90,9 @@ export default function ContabilidadPage() {
     } else {
       params.delete('month');
     }
-    router.replace(`?${params.toString()}`, { scroll: false });
+    router.replace(`?${params.toString()}`);
   }, [period, router]);
 
-  // Modal State
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
-
-  const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
-    role: session?.role || ('owner' as const),
-  };
-
-  // Fetch Financial Data
   const fetchAccountingData = useCallback(async () => {
     if (!currentTenant?.id) return;
     try {
@@ -99,85 +103,78 @@ export default function ContabilidadPage() {
         getIncomeStatementAction(currentTenant.id, period),
       ]);
 
-      if (journalRes?.success) setJournalEntries(journalRes.data || []);
-      if (trialRes?.success) {
+      if (journalRes.success) setJournalEntries(journalRes.data || []);
+      if (trialRes.success) {
         setTrialBalance(trialRes.data || []);
         setTrialTotals(trialRes.totals || { debit: 0, credit: 0 });
       }
-      if (incomeRes?.success) setIncomeStatement(incomeRes.data);
-    } catch (err: any) {
-      console.error('[ContabilidadPage Fetch Error]:', err);
+      if (incomeRes.success) setIncomeStatement(incomeRes.data);
+    } catch (error) {
+      console.error('Error cargando contabilidad:', error);
     } finally {
       setIsLoading(false);
     }
   }, [currentTenant?.id, period]);
 
+  const loadAuditLogs = useCallback(async () => {
+    if (!currentTenant?.id) return;
+    try {
+      setIsLoadingAudit(true);
+      // Obtener logs de auditoría contable
+      const res = await getAuditLogsAction(currentTenant.id, 'document', 40);
+      if (res.success) {
+        const accountingLogs = res.logs.filter(
+          (l: any) => l.action.includes('journal_entry') || l.action.includes('invoice')
+        );
+        setAuditLogs(accountingLogs.length > 0 ? accountingLogs : res.logs);
+      }
+    } catch (err) {
+      console.error('Error cargando auditoría contable:', err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  }, [currentTenant?.id]);
+
   useEffect(() => {
-    let isSubscribed = true;
-    const timer = setTimeout(() => {
-      if (isSubscribed) setIsLoading(false);
-    }, 2500);
-
     fetchAccountingData();
-
-    return () => {
-      isSubscribed = false;
-      clearTimeout(timer);
-    };
   }, [fetchAccountingData]);
 
-  // Handler for Create Journal Entry
-  const handleCreateJournalEntry = async (payload: CreateJournalEntryPayload) => {
-    if (!currentTenant) {
-      toast({ variant: 'error', title: 'Sin empresa activa' });
-      return;
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      loadAuditLogs();
     }
+  }, [activeTab, loadAuditLogs]);
 
+  const handleCreateJournalEntry = async (payload: any) => {
+    if (!currentTenant?.id) return;
     try {
       setIsSubmittingEntry(true);
       const res = await createJournalEntryAction(payload, currentTenant.id, actor);
-
       if (res.success) {
-        toast({
-          variant: 'success',
-          title: 'Asiento Contable Creado',
-          description: `Se registró exitosamente el asiento NIIF: "${payload.description}".`,
-        });
+        toast({ variant: 'success', title: 'Asiento contable registrado', description: 'El asiento diario se ha ingresado con éxito.' });
         setIsCreateModalOpen(false);
-        // Refresh financial ledgers
-        await fetchAccountingData();
+        fetchAccountingData();
       } else {
-        toast({
-          variant: 'error',
-          title: 'Error al crear asiento',
-          description: res.error || 'No se pudo registrar el asiento contable.',
-        });
+        toast({ variant: 'error', title: 'Error al registrar asiento', description: res.error });
       }
-    } catch (err: any) {
-      toast({
-        variant: 'error',
-        title: 'Error inesperado',
-        description: err.message || 'Ocurrió un error al procesar el asiento contable.',
-      });
+    } catch (error: any) {
+      toast({ variant: 'error', title: 'Error de servidor', description: error.message });
     } finally {
       setIsSubmittingEntry(false);
     }
   };
 
-  // Export Action Handler
   const handleExportCSV = () => {
     try {
       if (activeTab === 'journal') {
         exportToCSV(
-          `libro_diario_niif_${new Date().toISOString().slice(0, 10)}`,
+          `libro_diario_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'Asiento', accessor: (e: any) => e.entry_number || e.id },
-            { header: 'Fecha', accessor: (e: any) => e.entry_date },
-            { header: 'Descripción', accessor: (e: any) => e.description },
-            { header: 'Ref Doc', accessor: (e: any) => e.source_document_ref || '' },
-            { header: 'Débito Total ($)', accessor: (e: any) => e.total_debit },
-            { header: 'Crédito Total ($)', accessor: (e: any) => e.total_credit },
-            { header: 'Estado', accessor: (e: any) => e.status },
+            { header: 'ID Asiento', accessor: (r: any) => r.id },
+            { header: 'Fecha', accessor: (r: any) => new Date(r.date).toLocaleDateString() },
+            { header: 'Número Doc', accessor: (r: any) => r.document_number || '' },
+            { header: 'Referencia', accessor: (r: any) => r.reference || '' },
+            { header: 'Concepto / Glosa', accessor: (r: any) => r.concept },
           ],
           journalEntries
         );
@@ -185,7 +182,7 @@ export default function ContabilidadPage() {
         exportToCSV(
           `balance_comprobacion_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'Código', accessor: (r: any) => r.account_code },
+            { header: 'Código Cuenta', accessor: (r: any) => r.account_code },
             { header: 'Nombre Cuenta', accessor: (r: any) => r.account_name },
             { header: 'Tipo', accessor: (r: any) => r.account_type },
             { header: 'Mov. Débito ($)', accessor: (r: any) => r.period_debit },
@@ -230,9 +227,9 @@ export default function ContabilidadPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative z-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
         <div>
           <h1 className="text-3xl font-black text-foreground tracking-tight">
             Contabilidad NIIF / IFRS
@@ -245,7 +242,7 @@ export default function ContabilidadPage() {
         <button
           onClick={() => fetchAccountingData()}
           disabled={isLoading}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700 self-start sm:self-auto"
+          className="btn-base btn-secondary btn-sm flex items-center gap-2"
           title="Recargar datos contables"
         >
           <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -312,6 +309,16 @@ export default function ContabilidadPage() {
           report={incomeStatement}
           isLoading={isLoading}
         />
+      )}
+
+      {activeTab === 'audit' && (
+        <div className="bg-card border border-border rounded-2xl p-6">
+          <div className="mb-4">
+            <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora Contable NIIF</h3>
+            <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de asientos diarios creados, facturación y operaciones de mayor.</p>
+          </div>
+          <AuditTrailSection logs={auditLogs} isLoading={isLoadingAudit} />
+        </div>
       )}
 
       {/* Create Journal Entry Modal */}
