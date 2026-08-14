@@ -14,7 +14,7 @@ import {
   Calendar, 
   MessageSquare, 
   Kanban, 
-  Fingerprint,  
+  Fingerprint, 
   Store, 
   Cable, 
   Grid, 
@@ -33,7 +33,7 @@ export default function LauncherPage() {
       href: '/caja',
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
-        <Coins className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-2.5 group-hover:rotate-[15deg]" />
+        <Coins className="w-8 h-8 text-white transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-2.5 group-hover:rotate-[15deg]" />
       )
     },
     { 
@@ -42,7 +42,7 @@ export default function LauncherPage() {
       href: '/clientes',
       gradient: 'from-blue-500 to-indigo-600',
       icon: (
-        <Users className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1" />
+        <Users className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1.5 group-hover:translate-x-0.5" />
       )
     },
     { 
@@ -51,7 +51,7 @@ export default function LauncherPage() {
       href: '/catalogo',
       gradient: 'from-violet-500 to-purple-600',
       icon: (
-        <Package className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-rotate-6 group-hover:-translate-y-1" />
+        <Package className="w-8 h-8 text-white transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-rotate-6 group-hover:-translate-y-2" />
       )
     },
     { 
@@ -60,7 +60,7 @@ export default function LauncherPage() {
       href: '/estadisticas',
       gradient: 'from-sky-400 to-blue-500',
       icon: (
-        <BarChart3 className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1" />
+        <BarChart3 className="w-8 h-8 text-white transition-all duration-500 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-115 group-hover:-translate-y-1.5" />
       )
     },
     { 
@@ -69,7 +69,7 @@ export default function LauncherPage() {
       href: '/compras',
       gradient: 'from-amber-400 to-orange-500',
       icon: (
-        <ShoppingCart className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1 group-hover:-rotate-3" />
+        <ShoppingCart className="w-8 h-8 text-white transition-all duration-450 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:translate-x-2 group-hover:-rotate-3" />
       )
     },
     { 
@@ -78,7 +78,7 @@ export default function LauncherPage() {
       href: '/contabilidad',
       gradient: 'from-teal-400 to-emerald-600',
       icon: (
-        <Scale className="w-8 h-8 text-white transition-all duration-550 ease-[cubic-bezier(0.175,0.885,0.32,1.2)] transform group-hover:rotate-12 group-hover:scale-105" />
+        <Scale className="w-8 h-8 text-white transition-all duration-550 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:rotate-12 group-hover:scale-105" />
       )
     },
     { 
@@ -87,7 +87,7 @@ export default function LauncherPage() {
       href: '/calendario',
       gradient: 'from-cyan-400 to-blue-500',
       icon: (
-        <Calendar className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1" />
+        <Calendar className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1.5" />
       )
     },
     { 
@@ -105,7 +105,7 @@ export default function LauncherPage() {
       href: '/kanban',
       gradient: 'from-orange-400 to-red-500',
       icon: (
-        <Kanban className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1" />
+        <Kanban className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1 group-hover:-rotate-12" />
       )
     },
     { 
@@ -123,7 +123,7 @@ export default function LauncherPage() {
       href: '/franquicias',
       gradient: 'from-pink-500 to-rose-600',
       icon: (
-        <Store className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1" />
+        <Store className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:-translate-y-1.5" />
       )
     },
     { 
@@ -141,7 +141,7 @@ export default function LauncherPage() {
       href: '/apps',
       gradient: 'from-yellow-400 to-amber-500',
       icon: (
-        <Grid className="w-8 h-8 text-white transition-all duration-400 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:rotate-90" />
+        <Grid className="w-8 h-8 text-white transition-all duration-550 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] transform group-hover:scale-110 group-hover:rotate-90" />
       )
     },
     { 
