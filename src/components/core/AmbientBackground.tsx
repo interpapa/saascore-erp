@@ -12,13 +12,13 @@ import React from 'react';
  */
 export function AmbientBackground() {
   return (
-    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none transition-colors duration-700 bg-zinc-100 dark:bg-zinc-950">
+    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none transition-colors duration-700 bg-background">
       
-      {/* Grid Textura Arquitectónica con opacidad muy sutil sobre el fondo gris */}
+      {/* Grid Textura Arquitectónica con opacidad muy sutil sobre la nueva paleta */}
       <div 
         className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] transition-opacity duration-700" 
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H20V20z' fill='%2371717a' fill-opacity='0.2' fill-rule='evenodd'/%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H20V20z' fill='%23000000' fill-opacity='0.25' fill-rule='evenodd'/%3E%3C/svg%3E")`,
           backgroundSize: '40px 40px'
         }}
       ></div>
