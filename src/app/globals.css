@@ -20,21 +20,21 @@
 
 /* ── Light Theme ── */
 :root {
-  --background: #9BA4B5;
+  --background: #F8FAFC;
   --foreground: #0F172A;
-  --card: #F4F6F9;
+  --card: #FFFFFF;
   --card-foreground: #0F172A;
-  --border: #495464;
-  --border-subtle: #D2D7DF;
-  --muted: #495464;
-  --muted-foreground: #495464;
+  --border: #E2E8F0;
+  --border-subtle: #F1F5F9;
+  --muted: #94A3B8;
+  --muted-foreground: #64748B;
 
-  /* Azul Eléctrico Vibrante (Primary) solicitado */
-  --primary-50:  #E6F0FA;
-  --primary-400: #3399FF;
-  --primary:     #0066CC;
-  --primary-700: #004D99;
-  --primary-900: #000033;
+  /* Azul Corporativo (Primary) */
+  --primary-50:  #E8F0FE;
+  --primary-400: #4A8FD4;
+  --primary:     #1B5FA8;
+  --primary-700: #0D3F75;
+  --primary-900: #061E3D;
   --primary-foreground: #FFFFFF;
 
   /* Verde Operacional (Success) */
@@ -76,21 +76,21 @@
 
 /* ── Dark Theme ── */
 .dark {
-  --background: #9BA4B5;
-  --foreground: #0F172A;
-  --card: #F4F6F9;
-  --card-foreground: #0F172A;
-  --border: #495464;
-  --border-subtle: #D2D7DF;
-  --muted: #495464;
-  --muted-foreground: #495464;
+  --background: #080E1A;
+  --foreground: #F1F5F9;
+  --card: #111827;
+  --card-foreground: #F1F5F9;
+  --border: #1F2D45;
+  --border-subtle: #162035;
+  --muted: #475569;
+  --muted-foreground: #94A3B8;
 
-  /* Azul Eléctrico Vibrante (Primary) en Dark */
-  --primary-50:  rgba(0, 102, 204, 0.15);
-  --primary-400: #3399FF;
-  --primary:     #0066CC;
-  --primary-700: #004D99;
-  --primary-900: #000033;
+  /* Azul Corporativo — más brillante en dark para contraste */
+  --primary-50:  rgba(27, 95, 168, 0.15);
+  --primary-400: #5B9DD4;
+  --primary:     #2470BD;
+  --primary-700: #1B5FA8;
+  --primary-900: #0D3F75;
   --primary-foreground: #FFFFFF;
 
   /* Verde Operacional */
