@@ -123,14 +123,16 @@ export async function createDocumentAction(
       .select()
       .single();
 
-    if (docError && (docError.message.includes('due_date') || docError.message.includes('column'))) {
-      // Fallback: If DB schema doesn't have issue_date / due_date columns, save them in metadata
+    if (docError && (docError.message.includes('due_date') || docError.message.includes('notes') || docError.message.includes('column'))) {
+      // Fallback: If DB schema doesn't have issue_date / due_date / notes columns, save them in metadata
       delete insertData.issue_date;
       delete insertData.due_date;
+      delete insertData.notes;
       insertData.metadata = {
         ...insertData.metadata,
         issue_date: input.issue_date || new Date().toISOString(),
         due_date: input.due_date || null,
+        notes: input.notes || null,
       };
 
       const retry = await supabaseAdmin
@@ -208,10 +210,10 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
 
     let { data: documents, error } = await baseQuery;
 
-    if (error && (error.message.includes('due_date') || error.message.includes('column'))) {
-      // Fallback: Query without due_date / issue_date columns
+    if (error && (error.message.includes('due_date') || error.message.includes('notes') || error.message.includes('column'))) {
+      // Fallback: Query without due_date / issue_date / notes columns
       selectFields = `
-        id, document_number, type, status, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at,
+        id, document_number, type, status, subtotal_amount, tax_amount, total_amount, metadata, created_at,
         entity:entities (id, name, type, tax_id, email, phone)
       `;
       const retryQuery = supabaseAdmin
@@ -227,6 +229,7 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
         ...doc,
         issue_date: doc.metadata?.issue_date || doc.created_at,
         due_date: doc.metadata?.due_date || null,
+        notes: doc.metadata?.notes || null,
       }));
       error = retry.error;
     } else if (documents) {
@@ -235,6 +238,7 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
         ...doc,
         issue_date: doc.issue_date || doc.metadata?.issue_date || doc.created_at,
         due_date: doc.due_date || doc.metadata?.due_date || null,
+        notes: doc.notes || doc.metadata?.notes || null,
       }));
     }
 

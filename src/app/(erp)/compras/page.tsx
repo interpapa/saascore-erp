@@ -20,7 +20,7 @@ type TabType = 'suppliers' | 'pos' | 'match' | 'audit';
 
 export default function ComprasPage() {
   const currentTenant = useTenantResolver();
-  const [activeTab, setActiveTab] = useState<TabType>('suppliers');
+  const [activeTab, setActiveTab] = useState<TabType>('pos');
 
   // Data State
   const [suppliers, setSuppliers] = useState<Entity[]>([]);
@@ -93,8 +93,8 @@ export default function ComprasPage() {
   }, [activeTab, loadAuditLogs]);
 
   const tabs = [
-    { id: 'suppliers', label: 'Proveedores', icon: Users, count: suppliers.length },
     { id: 'pos', label: 'Órdenes de Compra (PO)', icon: ShoppingCart, count: purchaseOrders.length },
+    { id: 'suppliers', label: 'Proveedores', icon: Users, count: suppliers.length },
     { id: 'match', label: 'Validación 3-Way Match', icon: ShieldCheck },
     { id: 'audit', label: 'Historial de Auditoría', icon: Activity },
   ];
