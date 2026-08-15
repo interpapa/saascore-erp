@@ -37,25 +37,38 @@ export async function createItemAction(
       throw new Error('Empresa y Nombre de ítem son requeridos.');
     }
 
-    const { data: newItem, error } = await supabaseAdmin
+    let insertData: any = {
+      tenant_id: tenantId,
+      type: input.type,
+      sku: input.sku || null,
+      name: input.name,
+      description: input.description || null,
+      category: input.category || null,
+      base_price: input.base_price,
+      cost: input.cost,
+      stock: input.type === 'product' ? (input.stock_quantity ?? 0) : null,
+      is_active: input.is_active ?? true,
+      metadata: input.metadata || {},
+    };
+
+    let { data: newItem, error } = await supabaseAdmin
       .from('items')
-      .insert([
-        {
-          tenant_id: tenantId,
-          type: input.type,
-          sku: input.sku || null,
-          name: input.name,
-          description: input.description || null,
-          category: input.category || null,
-          base_price: input.base_price,
-          cost: input.cost,
-          stock: input.type === 'product' ? (input.stock_quantity ?? 0) : null,
-          is_active: input.is_active ?? true,
-          metadata: input.metadata || {},
-        },
-      ])
+      .insert([insertData])
       .select()
       .single();
+
+    if (error && (error.message.includes('stock') || error.message.includes('column'))) {
+      // Fallback: If DB schema uses stock_quantity instead of stock (migration_run)
+      delete insertData.stock;
+      insertData.stock_quantity = input.type === 'product' ? (input.stock_quantity ?? 0) : null;
+      const retry = await supabaseAdmin
+        .from('items')
+        .insert([insertData])
+        .select()
+        .single();
+      newItem = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw new Error('Error al guardar el ítem: ' + error.message);
 
@@ -129,11 +142,21 @@ export async function deleteItemAction(
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
     // Soft delete: preservar historial e integridad contable/fiscal
-    const { error } = await supabaseAdmin
+    let { error } = await supabaseAdmin
       .from('items')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
       .eq('tenant_id', tenantId);
+
+    if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
+      // Fallback: Hard delete if soft-delete column does not exist
+      const retry = await supabaseAdmin
+        .from('items')
+        .delete()
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+      error = retry.error;
+    }
 
     if (error) throw new Error('Error al eliminar ítem: ' + error.message);
 
@@ -161,26 +184,46 @@ export async function getItemsAction(tenantId: string, type?: ItemType, limit: n
   try {
     if (!tenantId) return { success: true, items: [] };
 
-    let query = supabaseAdmin
+    let selectFields = 'id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at';
+    let baseQuery = supabaseAdmin
       .from('items')
-      .select('id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at')
+      .select(selectFields)
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(0, limit - 1);
 
     if (type) {
-      query = query.eq('type', type);
+      baseQuery = baseQuery.eq('type', type);
     }
 
-    const { data: items, error } = await query;
+    let { data: items, error } = await baseQuery;
+
+    if (error && (error.message.includes('stock') || error.message.includes('deleted_at') || error.message.includes('column'))) {
+      // Fallback: Query using stock_quantity and ignoring deleted_at column if missing (migration_run schema)
+      selectFields = 'id, type, sku, name, description, category, base_price, cost, stock_quantity, is_active, metadata, created_at';
+      let retryQuery = supabaseAdmin
+        .from('items')
+        .select(selectFields)
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .range(0, limit - 1);
+      
+      if (type) {
+        retryQuery = retryQuery.eq('type', type);
+      }
+      const retry = await retryQuery;
+      items = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw new Error(error.message);
 
-    // Map `stock` column to `stock_quantity` for interface compatibility
-    const mappedItems = (items || []).map((item) => ({
+    // Map `stock` or `stock_quantity` safely to `stock_quantity` for interface compatibility
+    const mappedItems = (items || []).map((item: any) => ({
       ...item,
-      stock_quantity: item.stock ?? 0,
+      stock: item.stock !== undefined ? item.stock : item.stock_quantity,
+      stock_quantity: item.stock_quantity !== undefined ? item.stock_quantity : (item.stock ?? 0),
     }));
 
     return { success: true, items: mappedItems };

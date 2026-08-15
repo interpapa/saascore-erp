@@ -126,7 +126,9 @@ export async function processSecureCheckout(
       const realItem = dbItems.find(i => i.id === cartItem.itemId);
       if (!realItem) throw new Error(`Ítem no existe: ${cartItem.itemId}`);
 
-      if (realItem.stock !== null && realItem.stock < cartItem.quantity) {
+      const itemStock = realItem.stock !== undefined ? realItem.stock : realItem.stock_quantity;
+
+      if (itemStock !== null && itemStock !== undefined && itemStock < cartItem.quantity) {
         throw new Error(`Stock insuficiente para: ${realItem.name}`);
       }
 
@@ -141,8 +143,8 @@ export async function processSecureCheckout(
         tax_amount: 0
       });
 
-      if (realItem.stock !== null) {
-        stockUpdates.push({ id: realItem.id, new_stock: realItem.stock - cartItem.quantity });
+      if (itemStock !== null && itemStock !== undefined) {
+        stockUpdates.push({ id: realItem.id, new_stock: itemStock - cartItem.quantity });
       }
     }
 
@@ -217,9 +219,14 @@ export async function processSecureCheckout(
         // En caso de que la función RPC aún no se haya desplegado, usar decremento atómico directo en SQL
         console.warn('RPC decrement_item_stock no disponible, usando fallback seguro:', rpcErr.message);
         const realItem = dbItems.find(i => i.id === cartItem.itemId);
-        if (realItem && realItem.stock !== null) {
-          const newStock = Math.max(0, realItem.stock - cartItem.quantity);
-          await supabaseAdmin.from('items').update({ stock: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
+        const itemStock = realItem ? (realItem.stock !== undefined ? realItem.stock : realItem.stock_quantity) : null;
+        if (realItem && itemStock !== null && itemStock !== undefined) {
+          const newStock = Math.max(0, itemStock - cartItem.quantity);
+          let { error: updateErr } = await supabaseAdmin.from('items').update({ stock: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
+          if (updateErr && (updateErr.message.includes('stock') || updateErr.message.includes('column'))) {
+            // Fallback: If DB schema uses stock_quantity instead of stock
+            await supabaseAdmin.from('items').update({ stock_quantity: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
+          }
         }
       } else if (rpcRes && rpcRes.length > 0 && !rpcRes[0].success) {
         // Si el procedimiento almacenado detectó stock insuficiente en el momento exacto

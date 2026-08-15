@@ -68,7 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
-      const result = await getUserTenant(user.email);
+      const result = await getUserTenant(user.email, user.id);
 
       if (result.success && result.tenant) {
         setCurrentTenant({

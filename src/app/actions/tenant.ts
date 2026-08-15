@@ -9,32 +9,66 @@ export async function createTenant(userId: string, userEmail: string, businessNa
     const cleanEmail = (userEmail || '').trim().toLowerCase();
 
     // 1. Crear el Tenant con permisos de servidor
-    const { data: tenant, error: tenantError } = await db
+    let insertTenant: any = {
+      name: businessName,
+      is_active: true,
+      currency: 'USD',
+      symbol: '$',
+      country_code: 'VE',
+    };
+
+    let { data: tenant, error: tenantError } = await db
       .from('tenants')
-      .insert([
-        {
-          name: businessName,
+      .insert([insertTenant])
+      .select()
+      .single();
+
+    if (tenantError && (tenantError.message.includes('is_active') || tenantError.message.includes('column'))) {
+      // Fallback: If DB schema doesn't have is_active / currency columns, save them in metadata
+      insertTenant = {
+        name: businessName,
+        status: 'active',
+        metadata: {
           is_active: true,
           currency: 'USD',
           symbol: '$',
           country_code: 'VE',
         }
-      ])
-      .select()
-      .single();
+      };
+      const retry = await db
+        .from('tenants')
+        .insert([insertTenant])
+        .select()
+        .single();
+      tenant = retry.data;
+      tenantError = retry.error;
+    }
 
     if (tenantError) throw new Error('Error al crear la empresa: ' + tenantError.message);
 
     // 2. Vincular el Usuario con el Tenant en user_tenants
-    const { error: linkError } = await db
+    let linkData: any = {
+      user_email: cleanEmail,
+      tenant_id: tenant.id,
+      role: 'owner'
+    };
+
+    let { error: linkError } = await db
       .from('user_tenants')
-      .insert([
-        {
-          user_email: cleanEmail,
-          tenant_id: tenant.id,
-          role: 'owner'
-        }
-      ]);
+      .insert([linkData]);
+
+    if (linkError && (linkError.message.includes('user_email') || linkError.message.includes('column'))) {
+      // Fallback: If DB schema uses user_id instead of user_email (as in migration_run)
+      linkData = {
+        user_id: userId,
+        tenant_id: tenant.id,
+        role: 'owner'
+      };
+      const retry = await db
+        .from('user_tenants')
+        .insert([linkData]);
+      linkError = retry.error;
+    }
 
     if (linkError) {
       await db.from('tenants').delete().eq('id', tenant.id);
@@ -90,10 +124,20 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
   try {
     const db = supabaseAdmin || supabase;
     const is_active = newStatus === 'active';
-    const { error } = await db
+    
+    let { error } = await db
       .from('tenants')
       .update({ is_active })
       .eq('id', tenantId);
+
+    if (error && (error.message.includes('is_active') || error.message.includes('column'))) {
+      // Fallback: update status column instead of is_active (migration_run schema)
+      const retry = await db
+        .from('tenants')
+        .update({ status: newStatus })
+        .eq('id', tenantId);
+      error = retry.error;
+    }
 
     if (error) throw new Error('Error updating status: ' + error.message);
     
@@ -105,7 +149,7 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
   }
 }
 
-export async function getUserTenant(userEmail: string) {
+export async function getUserTenant(userEmail: string, userId?: string) {
   try {
     const db = supabaseAdmin || supabase;
     const cleanEmail = (userEmail || '').trim();
@@ -114,13 +158,45 @@ export async function getUserTenant(userEmail: string) {
       return { success: false, tenant: null, role: null };
     }
 
-    // 1. Buscar relación user_tenants por email (usando limit 1 ordenado por creación para tomar el tenant más reciente)
-    const { data: userTenants, error: utError } = await db
+    // 1. Buscar relación user_tenants por email
+    let userTenantsRes = await db
       .from('user_tenants')
       .select('tenant_id, role, created_at')
       .ilike('user_email', cleanEmail)
       .order('created_at', { ascending: false })
       .limit(1);
+
+    let userTenants = userTenantsRes.data;
+    let utError = userTenantsRes.error;
+
+    if (utError && (utError.message.includes('user_email') || utError.message.includes('column'))) {
+      // Fallback: If user_email column is missing (migration_run schema)
+      if (userId) {
+        // Option A: If we already have the UUID of the user, query by user_id directly
+        const retry = await db
+          .from('user_tenants')
+          .select('tenant_id, role, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        userTenants = retry.data;
+        utError = retry.error;
+      } else {
+        // Option B: If no UUID is passed, list users from Auth API and match by email in memory
+        const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
+        const match = (usersList?.users || []).find((u) => u.email?.toLowerCase() === cleanEmail.toLowerCase());
+        if (match) {
+          const retry = await db
+            .from('user_tenants')
+            .select('tenant_id, role, created_at')
+            .eq('user_id', match.id)
+            .order('created_at', { ascending: false })
+            .limit(1);
+          userTenants = retry.data;
+          utError = retry.error;
+        }
+      }
+    }
 
     if (utError || !userTenants || userTenants.length === 0) {
       return { success: false, tenant: null, role: null };
