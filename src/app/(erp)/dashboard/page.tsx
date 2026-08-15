@@ -17,13 +17,12 @@ export default function LauncherPage() {
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-pos-register" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Caja registradora: base con cajón de dinero, botonera y pantalla */}
-          <rect x="2" y="14" width="20" height="6" rx="1.5" className="fill-emerald-500/10" />
-          <path d="M12 14v6M7 17h10" />
-          <path d="M6 14l2-6h8l2 6" />
-          <rect x="9" y="4" width="6" height="4" rx="1" className="fill-emerald-400/20" />
-          {/* Ticket de papel saliendo de la registradora */}
-          <path d="M11 4h2v2h-2z" className="register-ticket fill-white" />
+          {/* Caja registradora limpia, geométrica e intuitiva */}
+          <rect x="3" y="13" width="18" height="7" rx="1" className="fill-emerald-500/10" />
+          <path d="M8 13V8h8v5" />
+          <path d="M6 16h12" />
+          {/* Ticket de venta que emerge en hover */}
+          <path d="M11 4h2v4h-2z" className="register-ticket fill-white" strokeWidth="0" />
         </svg>
       )
     },
@@ -34,14 +33,13 @@ export default function LauncherPage() {
       gradient: 'from-blue-500 to-indigo-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-crm-profiles" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Tarjeta de cliente secundaria de fondo */}
-          <rect x="2" y="7" width="14" height="14" rx="2" className="crm-card-back fill-blue-500/15" />
-          <line x1="5" y1="12" x2="11" y2="12" className="crm-card-back" />
-          <line x1="5" y1="16" x2="9" y2="16" className="crm-card-back" />
-          {/* Tarjeta de cliente principal al frente */}
-          <rect x="8" y="3" width="14" height="14" rx="2" className="crm-card-front fill-indigo-400/25" />
+          {/* Fichas de perfiles simétricas */}
+          <rect x="2" y="6" width="13" height="13" rx="2" className="crm-card-back fill-blue-500/15" />
+          <circle cx="8" cy="11" r="2" className="crm-card-back" />
+          
+          <rect x="9" y="3" width="13" height="13" rx="2" className="crm-card-front fill-indigo-400/25" />
           <circle cx="15" cy="8" r="2" className="crm-card-front" />
-          <line x1="11" y1="13" x2="19" y2="13" className="crm-card-front" />
+          <path d="M11 13a4 4 0 0 1 8 0" className="crm-card-front" />
         </svg>
       )
     },
@@ -52,13 +50,11 @@ export default function LauncherPage() {
       gradient: 'from-violet-500 to-purple-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-catalog-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Caja de inventario isométrica con solapa izquierda y derecha */}
-          <path d="M12 22V12m-10 5l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" className="opacity-45" />
-          {/* Solapa izquierda de la caja */}
-          <path d="M2 12L12 7l4 2-6 5z" className="catalog-flap-left fill-violet-500/20" />
-          {/* Solapa derecha de la caja */}
-          <path d="M22 12l-10-5-4 2 6 5z" className="catalog-flap-right fill-violet-500/20" />
+          {/* Caja isométrica perfectamente alineada */}
+          <polygon points="12,3 21,7.5 12,12 3,7.5" className="catalog-top fill-violet-500/20" />
+          <polygon points="3,7.5 12,12 12,21 3,16.5" />
+          <polygon points="21,7.5 12,12 12,21 21,16.5" />
+          <line x1="12" y1="12" x2="12" y2="21" strokeWidth="3" />
         </svg>
       )
     },
@@ -69,12 +65,12 @@ export default function LauncherPage() {
       gradient: 'from-sky-400 to-blue-500',
       icon: (
         <svg className="w-10 h-10 text-white custom-stats-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Barras de datos estáticas y flecha de tendencia al frente */}
-          <rect x="3" y="12" width="4" height="8" rx="0.5" className="stats-bar-1 fill-sky-500/20" />
-          <rect x="10" y="8" width="4" height="12" rx="0.5" className="stats-bar-2 fill-sky-500/20" />
-          <rect x="17" y="4" width="4" height="16" rx="0.5" className="stats-bar-3 fill-sky-500/20" />
-          <path d="M2 18l6-6 4 4 10-10" className="stats-arrow" strokeWidth="3" />
-          <polygon points="18 6 22 6 22 10" className="stats-arrow fill-white" />
+          {/* Tendencia y barras */}
+          <rect x="4" y="14" width="3" height="6" rx="0.5" className="stats-bar-1 fill-sky-500/25" />
+          <rect x="10" y="10" width="3" height="10" rx="0.5" className="stats-bar-2 fill-sky-500/25" />
+          <rect x="16" y="6" width="3" height="14" rx="0.5" className="stats-bar-3 fill-sky-500/25" />
+          <path d="M2 17l6-6 4 3 9-9" className="stats-arrow" />
+          <circle cx="21" cy="5" r="1.5" className="stats-arrow fill-white" />
         </svg>
       )
     },
@@ -85,18 +81,11 @@ export default function LauncherPage() {
       gradient: 'from-amber-400 to-orange-500',
       icon: (
         <svg className="w-10 h-10 text-white custom-purchases-form" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Tabla portapapeles y camión pequeño de entrega */}
-          <rect x="4" y="2" width="12" height="16" rx="1.5" className="purchase-clip fill-amber-500/15" />
-          <path d="M8 2h4v2H8z" className="purchase-clip" />
-          <line x1="7" y1="7" x2="13" y2="7" className="purchase-clip" />
-          <line x1="7" y1="11" x2="11" y2="11" className="purchase-clip" />
-          {/* Camioncito de compras de fondo */}
-          <g className="purchase-truck">
-            <rect x="10" y="12" width="10" height="6" rx="1" className="fill-orange-400/25" />
-            <circle cx="12" cy="19" r="1.5" />
-            <circle cx="18" cy="19" r="1.5" />
-            <path d="M20 14h2v3h-2z" />
-          </g>
+          {/* Carrito de compras clásico rodando */}
+          <circle cx="8" cy="20" r="2" className="purchase-wheel-1" />
+          <circle cx="17" cy="20" r="2" className="purchase-wheel-2" />
+          <path d="M2 3h3l2.5 11h10l2-7H7.5" />
+          <rect x="9" y="6" width="6" height="4" rx="0.5" className="fill-orange-400/20" />
         </svg>
       )
     },
@@ -107,17 +96,14 @@ export default function LauncherPage() {
       gradient: 'from-teal-400 to-emerald-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-accounting-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Balanza de mayor contable robusta */}
+          {/* Balanza con física real independiente de inclinación */}
           <line x1="12" y1="3" x2="12" y2="21" strokeWidth="3" />
-          <line x1="8" y1="21" x2="16" y2="21" />
-          <g className="accounting-crossbar">
-            {/* Travesaño de la balanza */}
-            <line x1="4" y1="7" x2="20" y2="7" strokeWidth="3" />
-            {/* Cesta izquierda */}
-            <path d="M4 7l-2 7h4Z" className="scale-left-cup fill-teal-500/20" />
-            {/* Cesta derecha */}
-            <path d="M20 7l-2 7h4Z" className="scale-right-cup fill-teal-500/20" />
-          </g>
+          <line x1="7" y1="21" x2="17" y2="21" />
+          {/* Barra central que rota en hover */}
+          <line x1="4" y1="7" x2="20" y2="7" strokeWidth="3.2" className="scale-bar" />
+          {/* Platillos que bajan/suben verticalmente sin inclinarse */}
+          <path d="M4 7v6M2 13h4" className="scale-left-cup" />
+          <path d="M20 7v6M18 13h4" className="scale-right-cup" />
         </svg>
       )
     },
@@ -128,14 +114,14 @@ export default function LauncherPage() {
       gradient: 'from-cyan-400 to-blue-500',
       icon: (
         <svg className="w-10 h-10 text-white custom-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Calendario con reloj en la esquina inferior */}
-          <rect x="3" y="4" width="18" height="16" rx="2" className="calendar-sheet fill-cyan-500/15" />
-          <path d="M3 9h18" className="calendar-sheet" />
-          <line x1="16" y1="2" x2="16" y2="5" className="calendar-sheet" />
+          {/* Calendario con reloj rotatorio en la esquina inferior */}
+          <rect x="3" y="4" width="18" height="15" rx="2" className="calendar-sheet fill-cyan-500/15" />
+          <line x1="3" y1="9" x2="21" y2="9" className="calendar-sheet" />
           <line x1="8" y1="2" x2="8" y2="5" className="calendar-sheet" />
-          {/* Reloj indicador */}
-          <circle cx="17" cy="15" r="4" className="fill-white/10" />
-          <polyline points="17 13 17 15 18.5 15" className="calendar-clock-hand" />
+          <line x1="16" y1="2" x2="16" y2="5" className="calendar-sheet" />
+          {/* Reloj con aguja pivotando exactamente sobre el eje 16,14 */}
+          <circle cx="16" cy="14" r="4.5" className="fill-white/10" />
+          <polyline points="16 11.5 16 14 17.5 14" className="calendar-clock-hand" />
         </svg>
       )
     },
@@ -146,10 +132,9 @@ export default function LauncherPage() {
       gradient: 'from-green-400 to-emerald-500',
       icon: (
         <svg className="w-10 h-10 text-white custom-chat-bubbles" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Dos globos de chat superpuestos */}
-          <path d="M21 11.5a7 7 0 0 0-13.3-3L4 7l1.7 4a7 7 0 0 0 0 5L4 20l4.3-1.5a7 7 0 0 0 12.7-7z" className="chat-bubble-main fill-green-500/10" />
-          {/* Globo secundario de diálogo */}
-          <path d="M18 16a5 5 0 0 1-9.5-2.2L6 15l1.2-2.8A5 5 0 0 1 18 16z" className="chat-bubble-sub stroke-emerald-300 fill-emerald-500/20" />
+          {/* Globos de diálogo limpios */}
+          <path d="M12 3c-4.4 0-8 3-8 6.8 0 1.6.7 3.1 2 4.3L5 18l4.2-1.4c.8.3 1.7.4 2.6.4 4.4 0 8-3 8-6.8S16.4 3 12 3z" className="chat-bubble-main fill-green-500/10" />
+          <path d="M16 12c.5 0 1-.1 1.5-.2L20 15l-1-2.6c.7-.7 1.1-1.7 1.1-2.7 0-2.5-2.5-4.5-5.6-4.5" className="chat-bubble-sub stroke-emerald-300 fill-emerald-500/15" />
         </svg>
       )
     },
@@ -160,14 +145,12 @@ export default function LauncherPage() {
       gradient: 'from-orange-400 to-red-500',
       icon: (
         <svg className="w-10 h-10 text-white custom-kanban-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Tablero Kanban con tres columnas y tarjetas */}
-          <line x1="8" y1="3" x2="8" y2="21" className="opacity-40" />
-          <line x1="16" y1="3" x2="16" y2="21" className="opacity-40" />
-          {/* Tarjeta estática */}
-          <rect x="2" y="5" width="4" height="6" rx="1" className="fill-orange-500/15" />
-          <rect x="10" y="8" width="4" height="8" rx="1" className="fill-red-500/15" />
-          {/* Tarjeta que fluye a la segunda columna en hover */}
-          <rect x="2" y="13" width="4" height="5" rx="1" className="kanban-card-active fill-white" />
+          {/* Columnas y tarjeta fluyendo */}
+          <line x1="8" y1="3" x2="8" y2="21" className="opacity-30" />
+          <line x1="16" y1="3" x2="16" y2="21" className="opacity-30" />
+          <rect x="3" y="5" width="3.5" height="5" rx="0.5" className="fill-orange-500/15" />
+          <rect x="10.5" y="8" width="3.5" height="7" rx="0.5" className="fill-red-500/15" />
+          <rect x="3" y="12" width="3.5" height="5" rx="0.5" className="kanban-card-active fill-white" strokeWidth="0" />
         </svg>
       )
     },
@@ -178,13 +161,12 @@ export default function LauncherPage() {
       gradient: 'from-indigo-400 to-purple-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-hr-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Carnet de identificación colgante */}
-          <line x1="12" y1="1" x2="12" y2="4" />
+          {/* Fotocheck de empleado */}
+          <rect x="10" y="2" width="4" height="3" rx="0.5" />
           <g className="hr-badge-body">
-            <rect x="4" y="4" width="16" height="17" rx="2" className="fill-indigo-500/10" />
-            <circle cx="12" cy="9" r="2.5" className="fill-white/10" />
-            <line x1="7" y1="14" x2="17" y2="14" />
-            <line x1="9" y1="17" x2="15" y2="17" />
+            <rect x="5" y="5" width="14" height="16" rx="1.5" className="fill-indigo-500/10" />
+            <circle cx="12" cy="11" r="2.5" className="fill-white/10" />
+            <path d="M8 17h8" />
           </g>
         </svg>
       )
@@ -196,13 +178,10 @@ export default function LauncherPage() {
       gradient: 'from-pink-500 to-rose-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-store-front" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Fachada corporativa / toldo y puerta corredera */}
-          <path d="M2 21h20" />
-          <path d="M4 21V9l8-4 8 4v12" className="fill-pink-500/15" />
-          {/* Toldo de la fachada */}
-          <path d="M3 9h18l-1-2H4z" className="store-awning fill-white/10" />
-          {/* Puerta corredera */}
-          <rect x="10" y="14" width="4" height="7" className="store-door fill-white" />
+          {/* Fachada local con puerta corredera */}
+          <polygon points="3,10 12,4 21,10" className="store-awning fill-pink-500/15" />
+          <rect x="5" y="10" width="14" height="11" />
+          <rect x="9" y="14" width="6" height="7" className="store-door fill-white" strokeWidth="0" />
         </svg>
       )
     },
@@ -213,11 +192,15 @@ export default function LauncherPage() {
       gradient: 'from-fuchsia-400 to-pink-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-gears" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Dos engranajes mecánicos acoplados */}
-          <circle cx="16" cy="8" r="4" className="gear-small fill-fuchsia-500/15" />
-          <circle cx="8" cy="16" r="6" className="gear-big fill-fuchsia-500/15" />
-          <path d="M8 12v8M4 16h8" />
-          <path d="M16 5v6M13 8h6" />
+          {/* Dos engranajes de dientes geométricos acoplados */}
+          <g className="gear-small">
+            <circle cx="16" cy="8" r="3.5" className="fill-fuchsia-500/15" />
+            <path d="M16 3v2M16 11v2M11 8h2M19 8h2" />
+          </g>
+          <g className="gear-big">
+            <circle cx="8" cy="16" r="5" className="fill-fuchsia-500/15" />
+            <path d="M8 9v2M8 21v2M2 16h2M14 16h2" />
+          </g>
         </svg>
       )
     },
@@ -228,12 +211,11 @@ export default function LauncherPage() {
       gradient: 'from-yellow-400 to-amber-500',
       icon: (
         <svg className="w-10 h-10 text-white custom-marketplace-puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Bloques de módulos integrables */}
-          <rect x="3" y="3" width="8" height="8" rx="1.5" className="fill-yellow-500/15" />
-          <rect x="3" y="13" width="8" height="8" rx="1.5" className="fill-yellow-500/15" />
-          <rect x="13" y="13" width="8" height="8" rx="1.5" className="fill-yellow-500/15" />
-          {/* Bloque superior derecho que se acopla en hover */}
-          <rect x="13" y="3" width="8" height="8" rx="1.5" className="marketplace-app-module fill-white" />
+          {/* Bloques de módulos */}
+          <rect x="4" y="4" width="7" height="7" rx="1.5" className="fill-yellow-500/15" />
+          <rect x="4" y="13" width="7" height="7" rx="1.5" className="fill-yellow-500/15" />
+          <rect x="13" y="13" width="7" height="7" rx="1.5" className="fill-yellow-500/15" />
+          <rect x="13" y="4" width="7" height="7" rx="1.5" className="marketplace-app-module fill-white" strokeWidth="0" />
         </svg>
       )
     },
@@ -244,14 +226,13 @@ export default function LauncherPage() {
       gradient: 'from-slate-400 to-slate-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-dashboard-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Deslizadores de consola de ajustes */}
-          <line x1="4" y1="21" x2="4" y2="3" className="opacity-45" />
-          <line x1="12" y1="21" x2="12" y2="3" className="opacity-45" />
-          <line x1="20" y1="21" x2="20" y2="3" className="opacity-45" />
-          {/* Knobs */}
-          <circle cx="4" cy="14" r="2.2" className="slider-knob-1 fill-white" />
-          <circle cx="12" cy="7" r="2.2" className="slider-knob-2 fill-white" />
-          <circle cx="20" cy="16" r="2.2" className="slider-knob-3 fill-white" />
+          {/* Deslizadores */}
+          <line x1="6" y1="4" x2="6" y2="20" className="opacity-45" />
+          <line x1="12" y1="4" x2="12" y2="20" className="opacity-45" />
+          <line x1="18" y1="4" x2="18" y2="20" className="opacity-45" />
+          <circle cx="6" cy="14" r="2.2" className="slider-knob-1 fill-white" strokeWidth="0" />
+          <circle cx="12" cy="8" r="2.2" className="slider-knob-2 fill-white" strokeWidth="0" />
+          <circle cx="18" cy="16" r="2.2" className="slider-knob-3 fill-white" strokeWidth="0" />
         </svg>
       )
     },
@@ -262,11 +243,10 @@ export default function LauncherPage() {
       gradient: 'from-rose-400 to-pink-600',
       icon: (
         <svg className="w-10 h-10 text-white custom-shield-core" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          {/* Escudo con candado interior */}
+          {/* Escudo con candado en el núcleo */}
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" className="fill-rose-500/15" />
-          <rect x="9" y="12" width="6" height="5" rx="1" className="fill-white/10" />
-          {/* Arco del candado */}
-          <path d="M10 12v-2a2 2 0 0 1 4 0v2" className="shield-lock-shackle" />
+          <rect x="9" y="12" width="6" height="5" rx="1.2" className="fill-white/10" />
+          <path d="M10 12v-2.5a2 2 0 0 1 4 0v2.5" className="shield-lock-shackle" />
         </svg>
       )
     }
@@ -275,26 +255,24 @@ export default function LauncherPage() {
   return (
     <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
-      {/* Estilos CSS locales de Keyframes para los 15 Iconos Custom y Sombras 3D */}
+      {/* Estilos CSS locales de Keyframes para los 15 Iconos Custom y Animaciones */}
       <style jsx global>{`
-        /* Efecto de sombra e inclinación 3D para vectores dentro del Squircle */
+        /* 
+          1. Caja POS: Emerge ticket de la registradora.
+          Eliminamos los filtros drop-shadow que causan borrosidad en navegadores web.
+        */
         .custom-pos-register, .custom-crm-profiles, .custom-catalog-box, .custom-stats-chart,
         .custom-purchases-form, .custom-accounting-scale, .custom-calendar, .custom-chat-bubbles,
         .custom-kanban-board, .custom-hr-badge, .custom-store-front, .custom-gears,
         .custom-marketplace-puzzle, .custom-dashboard-sliders, .custom-shield-core {
-          filter: drop-shadow(0px 3.5px 3.5px rgba(0, 0, 0, 0.4));
           transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-
-        /* 1. Caja POS: Emerge ticket de la registradora */
+        
         .register-ticket {
-          transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .group:hover .register-ticket {
           transform: translateY(-4px);
-        }
-        .group:hover .custom-pos-register {
-          transform: translateY(-2px);
         }
 
         /* 2. Clientes CRM: Desplazamiento de tarjetas */
@@ -302,25 +280,16 @@ export default function LauncherPage() {
           transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
         }
         .group:hover .crm-card-back {
-          transform: translate(-3px, 3px) rotate(-3deg);
+          transform: translate(-2px, 2px);
           opacity: 0.8;
         }
         .group:hover .crm-card-front {
-          transform: translate(1px, -1px);
+          transform: translate(0.5px, -0.5px);
         }
 
-        /* 3. Catálogo: Apertura de solapas isométrica */
-        .catalog-flap-left, .catalog-flap-right {
-          transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.2);
-        }
-        .group:hover .catalog-flap-left {
-          transform: translate(-2.5px, -1.5px);
-        }
-        .group:hover .catalog-flap-right {
-          transform: translate(2.5px, -1.5px);
-        }
+        /* 3. Catálogo: Flotación de caja isométrica */
         .group:hover .custom-catalog-box {
-          transform: translateY(-3px);
+          transform: translateY(-3.5px);
         }
 
         /* 4. Estadísticas: Barras escalan y flecha asciende */
@@ -328,30 +297,29 @@ export default function LauncherPage() {
           transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         .group:hover .stats-bar-1 { transform: scaleY(1.15); transform-origin: bottom; }
-        .group:hover .stats-bar-2 { transform: scaleY(1.28); transform-origin: bottom; }
-        .group:hover .stats-bar-3 { transform: scaleY(1.4); transform-origin: bottom; }
-        .group:hover .stats-arrow { transform: translate(2px, -2px); }
+        .group:hover .stats-bar-2 { transform: scaleY(1.3); transform-origin: bottom; }
+        .group:hover .stats-bar-3 { transform: scaleY(1.45); transform-origin: bottom; }
+        .group:hover .stats-arrow { transform: translate(1.5px, -1.5px); }
 
-        /* 5. Compras: Camioncito de carga avanza en hover */
-        .purchase-truck, .purchase-clip {
-          transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
+        /* 5. Compras: Carrito rueda y se traslada horizontalmente */
+        .purchase-wheel-1, .purchase-wheel-2 {
+          transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
         }
-        .group:hover .purchase-truck {
-          transform: translateX(4.5px);
+        .group:hover .custom-purchases-form {
+          transform: translateX(3px) scale(1.02);
         }
-        .group:hover .purchase-clip {
-          transform: translateY(-1.5px);
-        }
+        .group:hover .purchase-wheel-1 { transform: rotate(180deg); transform-origin: 8px 20px; }
+        .group:hover .purchase-wheel-2 { transform: rotate(180deg); transform-origin: 17px 20px; }
 
-        /* 6. Contabilidad: Balanza se inclina y cestas compensan */
-        .accounting-crossbar {
+        /* 6. Contabilidad: Balanza se inclina y cestas compensan físicamente (solo bajan/suben) */
+        .scale-bar {
           transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
           transform-origin: 12px 7px;
         }
         .scale-left-cup, .scale-right-cup {
           transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
-        .group:hover .accounting-crossbar {
+        .group:hover .scale-bar {
           transform: rotate(8deg);
         }
         .group:hover .scale-left-cup {
@@ -362,57 +330,56 @@ export default function LauncherPage() {
         }
 
         /* 7. Calendario: Reloj de aguja gira 360 grados */
-        .calendar-clock-hand, .calendar-sheet {
+        .calendar-clock-hand {
           transition: transform 0.6s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .group:hover .calendar-clock-hand {
           transform: rotate(360deg);
-          transform-origin: 17px 15px;
+          transform-origin: 16px 14px;
         }
-        .group:hover .calendar-sheet {
+        .group:hover .custom-calendar {
           transform: translateY(-2px);
         }
 
-        /* 8. WhatsApp: Globo secundario late (notificación activa) */
+        /* 8. WhatsApp: Globo secundario emerge */
         .chat-bubble-sub {
           transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.3);
         }
         .group:hover .chat-bubble-sub {
-          transform: scale(1.15) translate(1px, -1px);
-          transform-origin: 13px 11px;
+          transform: scale(1.1) translate(1px, -1px);
+          transform-origin: 15px 12px;
         }
 
-        /* 9. Kanban: Tarjeta activa se desplaza de columna */
+        /* 9. Kanban: Tarjeta se desplaza horizontalmente de columna */
         .kanban-card-active {
           transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
         }
         .group:hover .kanban-card-active {
-          transform: translateX(8.5px);
+          transform: translateX(7.5px);
         }
 
-        /* 10. Personal HRMS: Balanceo físico del fotocheck */
+        /* 10. Personal HRMS: Balanceo del fotocheck */
         .hr-badge-body {
           transition: transform 0.5s ease-in-out;
-          transform-origin: 12px 1px;
+          transform-origin: 12px 2px;
         }
         .group:hover .hr-badge-body {
           transform: rotate(8deg);
         }
 
-        /* 11. Franquicias: Puerta corredera abre y toldo estira */
-        .store-door, .store-awning {
+        /* 11. Franquicias: Puerta corredera abre y local se eleva */
+        .store-door {
           transition: transform 0.4s ease-in-out;
         }
         .group:hover .store-door {
           transform: scaleX(0);
           transform-origin: right;
         }
-        .group:hover .store-awning {
-          transform: scaleY(1.05);
-          transform-origin: top;
+        .group:hover .custom-store-front {
+          transform: translateY(-2px);
         }
 
-        /* 12. Conexiones API: Engranajes giran en sentidos contrarios */
+        /* 12. Conexiones API: Engranajes giran acoplados */
         .gear-small {
           transition: transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
           transform-origin: 16px 8px;
@@ -428,15 +395,15 @@ export default function LauncherPage() {
           transform: rotate(90deg);
         }
 
-        /* 13. Marketplace: Bloque se acopla en el puzzle */
+        /* 13. Marketplace: Bloque se acopla */
         .marketplace-app-module {
           transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.25);
         }
         .group:hover .marketplace-app-module {
-          transform: translate(-2.5px, 2.5px);
+          transform: translate(-2px, 2px);
         }
 
-        /* 14. Ajustes: Deslizamiento alternado de potenciómetros */
+        /* 14. Ajustes: Deslizamiento alternado */
         .slider-knob-1, .slider-knob-2, .slider-knob-3 {
           transition: transform 0.45s cubic-bezier(0.25, 1, 0.5, 1);
         }
@@ -444,7 +411,7 @@ export default function LauncherPage() {
         .group:hover .slider-knob-2 { transform: translateY(5px); }
         .group:hover .slider-knob-3 { transform: translateY(-6px); }
 
-        /* 15. SaaSCore Hub: Cierre de candado interior */
+        /* 15. SaaSCore Hub: Cierre de candado */
         .shield-lock-shackle {
           transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.25);
         }
