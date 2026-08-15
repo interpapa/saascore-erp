@@ -45,11 +45,13 @@ export function PurchaseOrderTab({
     const itemObj = catalogItems.find(i => i.id === selectedItemId);
     if (!itemObj) return;
 
+    const uom = itemObj.metadata?.unit_of_measure || itemObj.metadata?.unit || 'Unidad';
+
     setPoLines([
       ...poLines,
       {
         item_id: itemObj.id,
-        description: itemObj.name,
+        description: `${itemObj.name} (${uom})`,
         quantity: Number(itemQty),
         unit_price: Number(itemCost || itemObj.cost || itemObj.base_price),
       },
@@ -70,8 +72,25 @@ export function PurchaseOrderTab({
 
   const handleCreatePO = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (poLines.length === 0) {
-      toast({ variant: 'error', title: 'Atención', description: 'Agrega al menos un ítem a la orden de compra.' });
+    
+    let activeLines = [...poLines];
+    
+    // Si hay un producto seleccionado en los inputs del formulario rápido, agregarlo automáticamente como línea
+    if (selectedItemId) {
+      const itemObj = catalogItems.find(i => i.id === selectedItemId);
+      if (itemObj) {
+        const uom = itemObj.metadata?.unit_of_measure || itemObj.metadata?.unit || 'Unidad';
+        activeLines.push({
+          item_id: itemObj.id,
+          description: `${itemObj.name} (${uom})`,
+          quantity: Number(itemQty),
+          unit_price: Number(itemCost || itemObj.cost || itemObj.base_price),
+        });
+      }
+    }
+
+    if (activeLines.length === 0) {
+      toast({ variant: 'error', title: 'Atención', description: 'Selecciona al menos un producto del catálogo e introduce la cantidad.' });
       return;
     }
 
@@ -83,7 +102,7 @@ export function PurchaseOrderTab({
           status: 'in_progress',
           entity_id: selectedSupplierId || null,
           notes: poNotes || null,
-          lines: poLines.map(l => ({
+          lines: activeLines.map(l => ({
             item_id: l.item_id,
             description: l.description,
             quantity: l.quantity,
@@ -100,6 +119,9 @@ export function PurchaseOrderTab({
         setPoLines([]);
         setPoNotes('');
         setSelectedSupplierId('');
+        setSelectedItemId('');
+        setItemQty(1);
+        setItemCost(0);
         setIsModalOpen(false);
         onRefresh();
       } else {
@@ -201,47 +223,67 @@ export function PurchaseOrderTab({
               <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-border space-y-3">
                 <h4 className="text-xs font-bold text-foreground">Agregar Producto del Catálogo</h4>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <select
-                    value={selectedItemId}
-                    onChange={(e) => {
-                      setSelectedItemId(e.target.value);
-                      const item = catalogItems.find(i => i.id === e.target.value);
-                      if (item) setItemCost(item.cost || item.base_price || 0);
-                    }}
-                    className="bg-background border border-border rounded-xl px-3 py-2 text-xs"
-                  >
-                    <option value="">-- Producto --</option>
-                    {catalogItems.map(i => (
-                      <option key={i.id} value={i.id}>{i.name} (${i.cost || i.base_price})</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider">Producto *</label>
+                    <select
+                      value={selectedItemId}
+                      onChange={(e) => {
+                        setSelectedItemId(e.target.value);
+                        const item = catalogItems.find(i => i.id === e.target.value);
+                        if (item) setItemCost(item.cost || item.base_price || 0);
+                      }}
+                      className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                    >
+                      <option value="">-- Seleccionar --</option>
+                      {catalogItems.map(i => (
+                        <option key={i.id} value={i.id}>{i.name} (${i.cost || i.base_price})</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={itemQty}
-                    onChange={(e) => setItemQty(Number(e.target.value))}
-                    placeholder="Cant."
-                    className="bg-background border border-border rounded-xl px-3 py-2 text-xs"
-                  />
+                  <div>
+                    <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider">Cantidad</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={itemQty}
+                      onChange={(e) => setItemQty(Number(e.target.value))}
+                      placeholder="Cant."
+                      className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
 
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={itemCost}
-                    onChange={(e) => setItemCost(Number(e.target.value))}
-                    placeholder="Costo U."
-                    className="bg-background border border-border rounded-xl px-3 py-2 text-xs"
-                  />
+                  <div>
+                    <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider">Costo Pactado (USD)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={itemCost}
+                      onChange={(e) => setItemCost(Number(e.target.value))}
+                      placeholder="Costo U."
+                      className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
                 </div>
+
+                {/* Indicador de Unidad de Medida (UoM) dinámico */}
+                {selectedItemId && (() => {
+                  const item = catalogItems.find(i => i.id === selectedItemId);
+                  const uom = item?.metadata?.unit_of_measure || item?.metadata?.unit || 'Unidad';
+                  return (
+                    <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-orange-600 dark:text-orange-400 bg-orange-500/10 px-2.5 py-1 rounded-lg border border-orange-500/10 w-fit">
+                      Medida de Compra: <span className="underline uppercase">{uom}</span>
+                    </div>
+                  );
+                })()}
 
                 <button
                   type="button"
                   onClick={handleAddLine}
                   className="w-full bg-slate-200 dark:bg-slate-800 hover:bg-primary hover:text-white text-slate-700 dark:text-slate-300 py-1.5 rounded-xl text-xs font-bold transition-all"
                 >
-                  + Agregar Línea
+                  + Agregar Otro Producto (Múltiples Líneas)
                 </button>
               </div>
 
@@ -306,7 +348,7 @@ export function PurchaseOrderTab({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || poLines.length === 0}
+                  disabled={isSubmitting || (poLines.length === 0 && !selectedItemId)}
                   className="bg-primary text-primary-foreground px-5 py-2 rounded-xl text-xs font-bold btn-haptic disabled:opacity-50"
                 >
                   {isSubmitting ? 'Emitiendo...' : 'Emitir Orden de Compra'}
