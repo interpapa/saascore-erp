@@ -16,7 +16,7 @@ export default function LauncherPage() {
       href: '/caja',
       gradient: 'from-emerald-400 to-emerald-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-pos-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-pos-coin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Moneda minimalista con signo de dólar ($) perfectamente simétrico */}
           <circle cx="12" cy="12" r="10" className="fill-emerald-500/10" />
           <path d="M12 6v12" />
@@ -30,7 +30,7 @@ export default function LauncherPage() {
       href: '/clientes',
       gradient: 'from-blue-500 to-indigo-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-crm-profiles" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-crm-profiles" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Tarjeta de cliente secundaria de fondo */}
           <rect x="2" y="7" width="14" height="14" rx="2" className="crm-card-back fill-blue-500/10" />
           <line x1="5" y1="12" x2="11" y2="12" className="crm-card-back" />
@@ -48,7 +48,7 @@ export default function LauncherPage() {
       href: '/catalogo',
       gradient: 'from-violet-500 to-purple-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-catalog-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-catalog-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Caja de inventario isométrica tridimensional */}
           <path d="M12 2L2 7l10 5 10-5-10-5z" className="catalog-box-top fill-violet-400/20" />
           <path d="M2 7v10l10 5V12L2 7z" />
@@ -64,7 +64,7 @@ export default function LauncherPage() {
       href: '/estadisticas',
       gradient: 'from-sky-400 to-blue-500',
       icon: (
-        <svg className="w-9 h-9 text-white custom-stats-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-stats-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Gráfico de línea con gradiente de área */}
           <path d="M3 21h18" />
           <path d="M3 21V3" className="opacity-30" />
@@ -80,7 +80,7 @@ export default function LauncherPage() {
       href: '/compras',
       gradient: 'from-amber-400 to-orange-500',
       icon: (
-        <svg className="w-9 h-9 text-white custom-purchases-form" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-purchases-form" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Tabla portapapeles de Orden de Compra */}
           <rect x="5" y="4" width="14" height="17" rx="2" className="purchase-board fill-amber-500/10" />
           <path d="M9 2h6v3H9z" />
@@ -97,7 +97,7 @@ export default function LauncherPage() {
       href: '/contabilidad',
       gradient: 'from-teal-400 to-emerald-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-accounting-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-accounting-scale" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Balanza de mayor contable robusta */}
           <line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5" />
           <line x1="8" y1="21" x2="16" y2="21" />
@@ -115,7 +115,7 @@ export default function LauncherPage() {
       href: '/calendario',
       gradient: 'from-cyan-400 to-blue-500',
       icon: (
-        <svg className="w-9 h-9 text-white custom-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Calendario con hoja que se levanta */}
           <rect x="3" y="4" width="18" height="17" rx="2" className="fill-cyan-500/10" />
           <path d="M3 9h18" />
@@ -132,7 +132,7 @@ export default function LauncherPage() {
       href: '/whatsapp',
       gradient: 'from-green-400 to-emerald-500',
       icon: (
-        <svg className="w-9 h-9 text-white custom-chat-bubbles" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-chat-bubbles" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Dos globos de chat superpuestos */}
           <path d="M18 10a5 5 0 0 0-9.5-2.2L6 6l1.2 2.8A5 5 0 0 0 4 10c0 2.2 1.8 4 4.5 4.8L9 18l3.5-3.2A5 5 0 0 0 18 10z" className="chat-bubble-main fill-green-500/10" />
           <path d="M15 13a4 4 0 0 1-7.6-1.8L6 14.5l1-2.2A4 4 0 0 1 15 13z" className="chat-bubble-sub stroke-emerald-300 opacity-60" />
@@ -145,7 +145,7 @@ export default function LauncherPage() {
       href: '/kanban',
       gradient: 'from-orange-400 to-red-500',
       icon: (
-        <svg className="w-9 h-9 text-white custom-kanban-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-kanban-board" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Columnas del tablero */}
           <line x1="8" y1="3" x2="8" y2="21" className="opacity-40" />
           <line x1="16" y1="3" x2="16" y2="21" className="opacity-40" />
@@ -163,7 +163,7 @@ export default function LauncherPage() {
       href: '/equipo',
       gradient: 'from-indigo-400 to-purple-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-hr-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-hr-badge" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Carnet de identificación de empleado */}
           <rect x="4" y="3" width="16" height="18" rx="2" className="hr-badge-frame fill-indigo-500/10" />
           <line x1="8" y1="16" x2="16" y2="16" />
@@ -178,7 +178,7 @@ export default function LauncherPage() {
       href: '/franquicias',
       gradient: 'from-pink-500 to-rose-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-store-front" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-store-front" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Fachada corporativa/sucursal */}
           <path d="M3 21h18" />
           <path d="M3 21V9l9-4 9 4v12" className="fill-pink-500/10" />
@@ -193,7 +193,7 @@ export default function LauncherPage() {
       href: '/integraciones',
       gradient: 'from-fuchsia-400 to-pink-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-gears" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-gears" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Dos engranajes que interactúan mecánicamente */}
           <circle cx="16" cy="8" r="4" className="gear-small" />
           <circle cx="8" cy="16" r="6" className="gear-big" />
@@ -208,7 +208,7 @@ export default function LauncherPage() {
       href: '/apps',
       gradient: 'from-yellow-400 to-amber-500',
       icon: (
-        <svg className="w-9 h-9 text-white custom-marketplace-puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-marketplace-puzzle" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Bloques de software */}
           <rect x="3" y="3" width="8" height="8" rx="1" className="fill-yellow-500/10" />
           <rect x="3" y="13" width="8" height="8" rx="1" className="fill-yellow-500/10" />
@@ -224,7 +224,7 @@ export default function LauncherPage() {
       href: '/configuracion',
       gradient: 'from-slate-400 to-slate-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-dashboard-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-dashboard-sliders" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Consola con deslizadores de configuración */}
           <line x1="4" y1="21" x2="4" y2="3" className="opacity-45" />
           <line x1="12" y1="21" x2="12" y2="3" className="opacity-45" />
@@ -242,7 +242,7 @@ export default function LauncherPage() {
       href: '/admin',
       gradient: 'from-rose-400 to-pink-600',
       icon: (
-        <svg className="w-9 h-9 text-white custom-shield-core" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg className="w-10 h-10 text-white custom-shield-core" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           {/* Escudo de seguridad central */}
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" className="fill-rose-500/10" />
           {/* Núcleo o llave interna que pulsa */}
@@ -256,16 +256,20 @@ export default function LauncherPage() {
   return (
     <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
-      {/* Estilos CSS locales de Keyframes para los 15 Iconos Custom */}
+      {/* Estilos CSS locales de Keyframes para los 15 Iconos Custom y Sombras 3D */}
       <style jsx global>{`
-        /* 1. Caja POS: 3D Flip que sube, gira 360 y se sostiene en el aire en hover */
-        .custom-pos-coin {
-          transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-          transform-style: preserve-3d;
-          perspective: 800px;
+        /* Efecto de sombra e inclinación 3D para vectores dentro del Squircle */
+        .custom-pos-coin, .custom-crm-profiles, .custom-catalog-box, .custom-stats-chart,
+        .custom-purchases-form, .custom-accounting-scale, .custom-calendar, .custom-chat-bubbles,
+        .custom-kanban-board, .custom-hr-badge, .custom-store-front, .custom-gears,
+        .custom-marketplace-puzzle, .custom-dashboard-sliders, .custom-shield-core {
+          filter: drop-shadow(0px 3.5px 3.5px rgba(0, 0, 0, 0.4));
+          transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
+
+        /* 1. Caja POS: 3D Flip que sube, gira 360 y se sostiene en el aire en hover */
         .group:hover .custom-pos-coin {
-          transform: translateY(-14px) rotateY(360deg) scale(1.15);
+          transform: translateY(-5px) rotateY(360deg) scale(1.1);
         }
 
         /* 2. Clientes CRM: Desplazamiento de tarjetas */
@@ -313,7 +317,7 @@ export default function LauncherPage() {
           transform-origin: center;
         }
         .group:hover .purchase-check {
-          transform: scale(1.1);
+          transform: scale(1.15);
           opacity: 1;
         }
         .group:hover .purchase-board {
@@ -335,7 +339,7 @@ export default function LauncherPage() {
           transform-origin: center;
         }
         .group:hover .calendar-event-badge {
-          transform: scale(1.25) translateY(-1px);
+          transform: scale(1.3) translateY(-1px);
         }
 
         /* 8. WhatsApp: Globo secundario emergiendo */
@@ -449,34 +453,33 @@ export default function LauncherPage() {
         </div>
 
         {/* 
-          Grilla limpia tipo Launchpad / iPhone.
-          Módulos sin bordes ni metadatos, usando los iconos estándar de Lucide-React
-          que están perfectamente balanceados de inicio a fin y se animan con suavidad.
+          Grilla limpia tipo Launchpad / iPhone optimizada.
+          Squircles de tamaño mayor (w-20 h-20, rounded-[24px]) con bordes finos,
+          brillo interior 3D y sombras arrojadas realistas (iOS/macOS Big Sur style).
         */}
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-y-10 gap-x-6 justify-items-center">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-y-12 gap-x-8 justify-items-center">
           {apps.map((app) => (
             <a
               href={app.href}
               key={app.id}
-              className="flex flex-col items-center group btn-haptic w-24"
+              className="flex flex-col items-center group btn-haptic w-28"
             >
-              {/* Contenedor Squircle Premium */}
+              {/* Contenedor Squircle Premium con Efecto de Brillo y Sombra Interior */}
               <div 
                 className={`
-                  w-16 h-16 rounded-[22px] bg-gradient-to-br ${app.gradient}
-                  flex items-center justify-center shadow-lg transition-all duration-350 ease-out
-                  group-hover:scale-105 group-hover:-translate-y-1
-                  group-hover:shadow-[0_8px_25px_rgba(0,0,0,0.35)]
+                  w-20 h-20 rounded-[24px] bg-gradient-to-br ${app.gradient}
+                  flex items-center justify-center border border-white/15
+                  shadow-[inset_0_1.5px_3px_rgba(255,255,255,0.4),_0_8px_20px_rgba(0,0,0,0.25)]
+                  transition-all duration-350 ease-out
+                  group-hover:scale-105 group-hover:-translate-y-1.5
+                  group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.45),_inset_0_2px_4px_rgba(255,255,255,0.6)]
                 `}
-                style={{
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.15)'
-                }}
               >
                 {app.icon}
               </div>
 
               {/* Nombre de la Aplicación */}
-              <span className="text-foreground font-semibold text-xs mt-3 text-center tracking-tight font-sans group-hover:text-primary transition-colors line-clamp-2 px-1">
+              <span className="text-foreground font-semibold text-xs mt-3.5 text-center tracking-tight font-sans group-hover:text-primary transition-colors line-clamp-2 px-1">
                 {app.name}
               </span>
             </a>
