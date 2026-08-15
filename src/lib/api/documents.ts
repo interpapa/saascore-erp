@@ -42,17 +42,82 @@ export type CreateDocumentInput = Omit<Document, 'id' | 'created_at' | 'updated_
 export async function createDocumentWithLines(data: CreateDocumentInput) {
   const { lines, ...docData } = data;
 
-  // Calculamos los totales en JS antes de enviar (Supabase también puede hacerlo en la DB, pero lo requerimos aquí para insertar)
+  // Calculamos los totales en JS antes de enviar
   const subtotal_amount = lines.reduce((acc, line) => acc + (line.quantity * line.unit_price), 0);
   const tax_amount = lines.reduce((acc, line) => acc + line.tax_amount, 0);
   const total_amount = subtotal_amount + tax_amount;
 
+  // Adaptar el tipo de documento según compatibilidad de base de datos
+  let finalType = docData.type;
+  if (finalType === 'quote') {
+    finalType = 'quotation' as any; // schema_v1 usa 'quotation'
+  }
+
+  let insertData: any = {
+    ...docData,
+    type: finalType,
+    subtotal_amount,
+    tax_amount,
+    total_amount,
+  };
+
   // Insertamos el documento principal
-  const { data: newDoc, error: docError } = await supabase
+  let { data: newDoc, error: docError } = await supabase
     .from('documents')
-    .insert([{ ...docData, subtotal_amount, tax_amount, total_amount }])
+    .insert([insertData])
     .select()
     .single();
+
+  if (docError && (docError.message.includes('due_date') || docError.message.includes('issue_date') || docError.message.includes('notes') || docError.message.includes('column'))) {
+    // Fallback A: If DB schema is missing issue_date / due_date / notes columns (schema_v1)
+    const cleanInsert = { ...insertData };
+    delete cleanInsert.issue_date;
+    delete cleanInsert.due_date;
+    delete cleanInsert.notes;
+    
+    cleanInsert.metadata = {
+      ...cleanInsert.metadata,
+      issue_date: docData.issue_date,
+      due_date: docData.due_date,
+      notes: docData.notes,
+    };
+
+    const retry = await supabase
+      .from('documents')
+      .insert([cleanInsert])
+      .select()
+      .single();
+    
+    newDoc = retry.data;
+    docError = retry.error;
+  }
+
+  if (docError && (docError.message.includes('constraint') || docError.message.includes('type'))) {
+    // Fallback B: If DB fails due to document type CHECK constraints (e.g. quote, service_order, etc.)
+    // Store type: 'invoice' (always supported) and save real type in metadata
+    const cleanInsert = { ...insertData };
+    delete cleanInsert.issue_date;
+    delete cleanInsert.due_date;
+    delete cleanInsert.notes;
+    
+    cleanInsert.type = 'invoice';
+    cleanInsert.metadata = {
+      ...cleanInsert.metadata,
+      real_type: docData.type,
+      issue_date: docData.issue_date,
+      due_date: docData.due_date,
+      notes: docData.notes,
+    };
+
+    const retry = await supabase
+      .from('documents')
+      .insert([cleanInsert])
+      .select()
+      .single();
+    
+    newDoc = retry.data;
+    docError = retry.error;
+  }
 
   if (docError) {
     console.error('Error creating document:', docError.message, docError.details, docError);
@@ -71,7 +136,6 @@ export async function createDocumentWithLines(data: CreateDocumentInput) {
 
   if (linesError) {
     console.error('Error creating document lines:', linesError.message, linesError.details, linesError);
-    // Idealmente haríamos rollback aquí si tuviéramos RPC, por ahora borramos el doc huérfano
     await supabase.from('documents').delete().eq('id', newDoc.id);
     throw linesError;
   }

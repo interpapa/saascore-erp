@@ -25,10 +25,10 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
     setError(null);
 
     const formData = new FormData(e.currentTarget);
-    const basePrice = Number(formData.get('base_price'));
+    const basePrice = Number(formData.get('base_price') || 0);
     const cost = Number(formData.get('cost') || 0);
 
-    if (basePrice < cost) {
+    if (cost > 0 && basePrice < cost) {
       setError('El precio de venta no puede ser menor al costo.');
       setIsLoading(false);
       return;
@@ -43,7 +43,9 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
       base_price: basePrice,
       cost: cost,
       stock_quantity: itemType === 'product' ? Number(formData.get('stock_quantity') || 0) : 0,
-      metadata: {},
+      metadata: {
+        unit_of_measure: (formData.get('unit_of_measure') as string) || 'unidad'
+      },
       is_active: true
     };
 
@@ -133,16 +135,15 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               name="cost"
-              label="Costo Interno ($)"
+              label="Costo Interno ($) - Opcional"
               type="number"
               step="0.01"
               placeholder="0.00"
               icon={<DollarSign size={18} />}
-              required
             />
             <Input
               name="base_price"
-              label="Precio de Venta ($)"
+              label="Precio de Venta ($) *"
               type="number"
               step="0.01"
               placeholder="0.00"
@@ -151,15 +152,33 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             />
           </div>
 
-          {/* Ocultar stock si es servicio */}
-          <div className={`transition-all duration-300 overflow-hidden ${itemType === 'product' ? 'h-[72px] opacity-100' : 'h-0 opacity-0'}`}>
-            <Input
-              name="stock_quantity"
-              label="Stock Inicial"
-              type="number"
-              placeholder="0"
-              icon={<Archive size={18} />}
-            />
+          {/* Ocultar campos de stock y medida si es servicio */}
+          <div className={`transition-all duration-300 overflow-hidden space-y-4 ${itemType === 'product' ? 'max-h-[160px] opacity-100' : 'max-h-0 opacity-0 pointer-events-none'}`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                name="stock_quantity"
+                label="Stock Inicial (Opcional)"
+                type="number"
+                placeholder="0"
+                icon={<Archive size={18} />}
+              />
+              
+              <div>
+                <label className="text-xs font-bold text-slate-500 block mb-1">Unidad de Medida (UoM)</label>
+                <select
+                  name="unit_of_measure"
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="unidad">📦 Unidad (unidad)</option>
+                  <option value="docena">📦 Docena (12 uds)</option>
+                  <option value="caja de 50">📦 Caja de 50 uds</option>
+                  <option value="caja de 100">📦 Caja de 100 uds</option>
+                  <option value="paquete">📦 Paquete</option>
+                  <option value="litro">🧪 Litro</option>
+                  <option value="kilogramo">⚖️ Kilogramo</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div className="pt-2 flex gap-3 sticky bottom-0 bg-card mt-auto">
