@@ -89,10 +89,30 @@ export function PurchaseOrderTab({
       }
     }
 
-    if (activeLines.length === 0) {
-      toast({ variant: 'error', title: 'Atención', description: 'Selecciona al menos un producto del catálogo e introduce la cantidad.' });
+    if (!selectedSupplierId) {
+      toast({ variant: 'error', title: 'Proveedor Requerido', description: 'Por favor, selecciona un proveedor de la lista antes de emitir la orden.' });
       return;
     }
+
+    if (activeLines.length === 0) {
+      toast({ variant: 'error', title: 'Sin Productos', description: 'Selecciona al menos un producto del catálogo e introduce la cantidad.' });
+      return;
+    }
+
+    // Traducir errores de base de datos o tokens para usuarios finales
+    const sanitizeUserError = (err: string) => {
+      const lower = err.toLowerCase();
+      if (lower.includes('entity_id') || lower.includes('foreign key') || lower.includes('provider')) {
+        return 'Por favor, selecciona un proveedor válido de la lista.';
+      }
+      if (lower.includes('notes') || lower.includes('due_date') || lower.includes('column') || lower.includes('cache')) {
+        return 'Se detectó un cambio en el servidor. La base de datos se actualizó automáticamente, por favor intenta presionar Emitir nuevamente.';
+      }
+      if (lower.includes('token') || lower.includes('session') || lower.includes('unauthorized')) {
+        return 'Tu sesión de usuario ha expirado. Por favor, recarga la página para continuar.';
+      }
+      return err;
+    };
 
     try {
       setIsSubmitting(true);
@@ -125,10 +145,10 @@ export function PurchaseOrderTab({
         setIsModalOpen(false);
         onRefresh();
       } else {
-        toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo crear la orden de compra.' });
+        toast({ variant: 'error', title: 'Atención', description: sanitizeUserError(res.error || 'No se pudo crear la orden de compra.') });
       }
     } catch (err: any) {
-      toast({ variant: 'error', title: 'Error de servidor', description: err.message });
+      toast({ variant: 'error', title: 'Atención', description: sanitizeUserError(err.message) });
     } finally {
       setIsSubmitting(false);
     }
@@ -178,7 +198,7 @@ export function PurchaseOrderTab({
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-foreground text-sm">{po.document_number}</span>
                     <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-                      {po.status}
+                      {po.status === 'in_progress' ? 'En Proceso' : po.status === 'draft' ? 'Borrador' : po.status === 'completed' ? 'Completado' : po.status === 'pending' ? 'Pendiente' : po.status}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5">
