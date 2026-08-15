@@ -12,8 +12,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "SaaSCore ERP",
-  description: "Enterprise Resource Planning System",
+  title: {
+    default: 'SaaSCore ERP',
+    template: '%s | SaaSCore ERP'
+  },
+  description: 'Enterprise Resource Planning System',
+  robots: {
+    index: false,
+    follow: false,
+  }
 };
 
 export default function RootLayout({
