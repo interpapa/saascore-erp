@@ -34,38 +34,71 @@ export async function getAppointmentsAction(
     // 1. Primary Attempt: Query custom 'appointments' table
     const { data: appts, error } = await supabaseAdmin
       .from('appointments')
-      .select(`
-        *,
-        client:entities!client_id (id, name, phone, email),
-        service:items!service_id (id, name, base_price),
-        employee:entities!employee_id (id, name, email)
-      `)
+      .select('*')
       .eq('tenant_id', tenantId)
       .order('start_time', { ascending: true });
 
     if (!error && appts) {
-      const formatted: Appointment[] = appts.map((a: any) => ({
-        id: a.id,
-        tenant_id: a.tenant_id,
-        title: a.title,
-        description: a.description,
-        client_id: a.client_id,
-        client_name: a.client?.name || a.client_name,
-        client_phone: a.client?.phone || a.client_phone,
-        client_email: a.client?.email,
-        service_id: a.service_id,
-        service_name: a.service?.name || a.service_name,
-        employee_id: a.employee_id,
-        employee_name: a.employee?.name || a.employee_name,
-        start_time: a.start_time,
-        end_time: a.end_time,
-        status: a.status,
-        notes: a.notes,
-        price: a.price,
-        metadata: a.metadata,
-        created_at: a.created_at,
-        updated_at: a.updated_at,
-      }));
+      // Gather unique IDs to fetch related records in batch, bypassing PostgreSQL schema foreign key relationship checks
+      const clientIds = Array.from(new Set(appts.map((a: any) => a.client_id).filter(Boolean)));
+      const employeeIds = Array.from(new Set(appts.map((a: any) => a.employee_id).filter(Boolean)));
+      const serviceIds = Array.from(new Set(appts.map((a: any) => a.service_id).filter(Boolean)));
+
+      const allEntityIds = [...clientIds, ...employeeIds];
+      const entitiesMap: Record<string, any> = {};
+      if (allEntityIds.length > 0) {
+        const { data: entities } = await supabaseAdmin
+          .from('entities')
+          .select('id, name, phone, email')
+          .in('id', allEntityIds);
+        if (entities) {
+          entities.forEach((e) => {
+            entitiesMap[e.id] = e;
+          });
+        }
+      }
+
+      const itemsMap: Record<string, any> = {};
+      if (serviceIds.length > 0) {
+        const { data: items } = await supabaseAdmin
+          .from('items')
+          .select('id, name, base_price')
+          .in('id', serviceIds);
+        if (items) {
+          items.forEach((i) => {
+            itemsMap[i.id] = i;
+          });
+        }
+      }
+
+      const formatted: Appointment[] = appts.map((a: any) => {
+        const client = a.client_id ? entitiesMap[a.client_id] : null;
+        const employee = a.employee_id ? entitiesMap[a.employee_id] : null;
+        const service = a.service_id ? itemsMap[a.service_id] : null;
+
+        return {
+          id: a.id,
+          tenant_id: a.tenant_id,
+          title: a.title,
+          description: a.description,
+          client_id: a.client_id,
+          client_name: client?.name || a.client_name,
+          client_phone: client?.phone || a.client_phone,
+          client_email: client?.email,
+          service_id: a.service_id,
+          service_name: service?.name || a.service_name,
+          employee_id: a.employee_id,
+          employee_name: employee?.name || a.employee_name,
+          start_time: a.start_time,
+          end_time: a.end_time,
+          status: a.status,
+          notes: a.notes,
+          price: a.price,
+          metadata: a.metadata,
+          created_at: a.created_at,
+          updated_at: a.updated_at,
+        };
+      });
       return { success: true, appointments: filterAppointments(formatted, filter) };
     }
 
