@@ -130,7 +130,7 @@ export default function CatalogoPage() {
   // Estadísticas
   const totalItems = items.length;
   const products = items.filter((i) => i.type === 'product');
-  const totalValue = products.reduce((acc, p) => acc + (p.cost * (p.stock_quantity || 0)), 0);
+  const totalValue = products.reduce((acc, p) => acc + (p.base_price * (p.stock_quantity || 0)), 0);
   const lowStockCount = products.filter((p) => (p.stock_quantity || 0) <= 5).length;
 
   const tabs = [
@@ -186,7 +186,7 @@ export default function CatalogoPage() {
                 <DollarSign size={20} />
               </div>
               <div>
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Valor Inventario</p>
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Valor Estimado en Venta</p>
                 <p className="text-2xl font-bold text-foreground">${totalValue.toLocaleString('es', { minimumFractionDigits: 2 })}</p>
               </div>
             </div>

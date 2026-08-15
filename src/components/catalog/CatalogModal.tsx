@@ -26,13 +26,6 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
 
     const formData = new FormData(e.currentTarget);
     const basePrice = Number(formData.get('base_price') || 0);
-    const cost = Number(formData.get('cost') || 0);
-
-    if (cost > 0 && basePrice < cost) {
-      setError('El precio de venta no puede ser menor al costo.');
-      setIsLoading(false);
-      return;
-    }
 
     const itemData: CreateItemInput = {
       type: itemType,
@@ -41,7 +34,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
       category: (formData.get('category') as string) || null,
       description: null,
       base_price: basePrice,
-      cost: cost,
+      cost: 0,
       stock_quantity: itemType === 'product' ? Number(formData.get('stock_quantity') || 0) : 0,
       metadata: {
         unit_of_measure: (formData.get('unit_of_measure') as string) || 'unidad'
@@ -132,15 +125,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              name="cost"
-              label="Costo Interno ($) - Opcional"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              icon={<DollarSign size={18} />}
-            />
+          <div>
             <Input
               name="base_price"
               label="Precio de Venta ($) *"

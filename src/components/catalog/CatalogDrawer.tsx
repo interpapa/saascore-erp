@@ -12,8 +12,6 @@ export function CatalogDrawer({ item, isOpen, onClose }: CatalogDrawerProps) {
   if (!item) return null;
 
   const isProduct = item.type === 'product';
-  const margin = item.base_price - item.cost;
-  const marginPercent = item.base_price > 0 ? (margin / item.base_price) * 100 : 0;
   
   const lowStock = isProduct && item.stock_quantity <= 5 && item.stock_quantity > 0;
   const outOfStock = isProduct && item.stock_quantity <= 0;
@@ -77,41 +75,26 @@ export function CatalogDrawer({ item, isOpen, onClose }: CatalogDrawerProps) {
               </div>
             )}
 
-            {/* Precios y Finanzas */}
-            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[24px] space-y-6">
+            {/* Precios y Medida */}
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[24px] space-y-4">
               <h4 className="font-bold text-foreground flex items-center gap-2">
                 <DollarSign size={18} className="text-indigo-500" />
-                Análisis Financiero
+                Información de Venta
               </h4>
               
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <p className="text-slate-500 text-sm">Precio de Venta</p>
+                  <p className="text-slate-500 text-sm">Precio al Público</p>
                   <p className="text-2xl font-black text-foreground">${Number(item.base_price).toFixed(2)}</p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-slate-500 text-sm">Costo Interno</p>
-                  <p className="text-2xl font-black text-slate-400">${Number(item.cost).toFixed(2)}</p>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-border">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-slate-500 text-sm">Margen de Ganancia</p>
-                  <span className="text-emerald-500 font-bold flex items-center gap-1 text-sm">
-                    <TrendingUp size={14} />
-                    {marginPercent.toFixed(1)}%
-                  </span>
-                </div>
-                <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full"
-                    style={{ width: `${Math.min(Math.max(marginPercent, 0), 100)}%` }}
-                  />
-                </div>
-                <p className="text-right text-emerald-600 dark:text-emerald-400 font-bold mt-2">
-                  +${margin.toFixed(2)}
-                </p>
+                {isProduct && (
+                  <div className="space-y-1">
+                    <p className="text-slate-500 text-sm">Unidad de Medida</p>
+                    <p className="text-xl font-bold text-slate-600 dark:text-slate-300 capitalize font-mono">
+                      {item.metadata?.unit_of_measure || item.metadata?.unit || 'Unidad'}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 
