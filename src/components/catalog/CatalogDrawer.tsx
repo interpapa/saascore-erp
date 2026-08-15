@@ -6,9 +6,11 @@ interface CatalogDrawerProps {
   item: Item | null;
   isOpen: boolean;
   onClose: () => void;
+  onEdit?: (item: Item) => void;
+  onDelete?: (id: string) => void;
 }
 
-export function CatalogDrawer({ item, isOpen, onClose }: CatalogDrawerProps) {
+export function CatalogDrawer({ item, isOpen, onClose, onEdit, onDelete }: CatalogDrawerProps) {
   if (!item) return null;
 
   const isProduct = item.type === 'product';
@@ -109,6 +111,29 @@ export function CatalogDrawer({ item, isOpen, onClose }: CatalogDrawerProps) {
                 </div>
               </div>
             )}
+            {/* Acciones de Edición / Eliminación */}
+            <div className="pt-6 border-t border-border/50 flex flex-col sm:flex-row gap-3">
+              {onEdit && (
+                <button
+                  onClick={() => onEdit(item)}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl text-xs font-bold transition-all btn-haptic shadow-xs flex items-center justify-center gap-1.5"
+                >
+                  Editar Elemento
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={() => {
+                    if (confirm(`¿Estás seguro de que deseas eliminar "${item.name}" del catálogo?`)) {
+                      onDelete(item.id);
+                    }
+                  }}
+                  className="flex-1 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-600 dark:text-red-400 py-2.5 rounded-xl text-xs font-bold transition-all btn-haptic border border-red-200 dark:border-red-500/20 flex items-center justify-center"
+                >
+                  Eliminar Elemento
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

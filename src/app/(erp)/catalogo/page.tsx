@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
-import { getItemsAction, createItemAction } from '@/app/actions/items';
+import { getItemsAction, createItemAction, updateItemAction, deleteItemAction } from '@/app/actions/items';
 import { getAuditLogsAction } from '@/app/actions/audit';
 import { Item } from '@/lib/api/items';
 import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart, Activity } from 'lucide-react';
@@ -24,6 +24,7 @@ export default function CatalogoPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [viewMode, setViewMode] = useViewPreference('catalogo-view-mode', 'grid');
   const [activeTab, setActiveTab] = useState<TabType>('items');
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -81,49 +82,97 @@ export default function CatalogoPage() {
     }
   }, [activeTab, loadAuditLogs]);
 
-  const handleCreateItem = async (data: any) => {
+  const handleSaveItem = async (data: any) => {
     if (!activeTenant) return;
-    
-    const tempId = `temp_${Date.now()}`;
-    const newItem: any = {
-      id: tempId,
-      type: data.type,
-      name: data.name,
-      sku: data.sku || 'SKU-PENDIENTE',
-      category: data.category || 'General',
-      base_price: Number(data.base_price || 0),
-      cost: Number(data.cost || 0),
-      stock_quantity: data.type === 'product' ? Number(data.stock_quantity || 0) : 0,
-      metadata: data.metadata || {},
-      is_active: true,
-    };
 
-    setItems((prev) => [newItem, ...prev]);
+    if (editingItem) {
+      // MODO EDICIÓN
+      try {
+        const res = await updateItemAction(
+          editingItem.id,
+          {
+            type: data.type,
+            name: data.name,
+            sku: data.sku,
+            category: data.category,
+            base_price: Number(data.base_price || 0),
+            cost: Number(data.cost || 0),
+            stock_quantity: Number(data.stock_quantity || 0),
+            metadata: data.metadata,
+          },
+          activeTenant.id,
+          actor
+        );
 
+        if (res.success) {
+          toast({ variant: 'success', title: 'Producto Actualizado', description: `"${data.name}" se actualizó correctamente.` });
+          setEditingItem(null);
+          fetchItems();
+        } else {
+          toast({ variant: 'warning', title: 'Error al actualizar', description: res.error || 'No se pudieron guardar los cambios.' });
+        }
+      } catch (err: any) {
+        toast({ variant: 'error', title: 'Error de red', description: err.message });
+      }
+    } else {
+      // MODO CREACIÓN
+      const tempId = `temp_${Date.now()}`;
+      const newItem: any = {
+        id: tempId,
+        type: data.type,
+        name: data.name,
+        sku: data.sku || 'SKU-PENDIENTE',
+        category: data.category || 'General',
+        base_price: Number(data.base_price || 0),
+        cost: Number(data.cost || 0),
+        stock_quantity: data.type === 'product' ? Number(data.stock_quantity || 0) : 0,
+        metadata: data.metadata || {},
+        is_active: true,
+      };
+
+      setItems((prev) => [newItem, ...prev]);
+
+      try {
+        const res = await createItemAction(
+          {
+            type: data.type,
+            name: data.name,
+            sku: data.sku,
+            category: data.category,
+            base_price: Number(data.base_price || 0),
+            cost: Number(data.cost || 0),
+            stock_quantity: Number(data.stock_quantity || 0),
+            metadata: data.metadata,
+          },
+          activeTenant.id,
+          actor
+        );
+
+        if (!res.success) {
+          toast({ variant: 'warning', title: 'Guardado Local', description: 'El ítem se agregó en pantalla. Configura Supabase para sincronizar.' });
+        } else {
+          toast({ variant: 'success', title: 'Producto Creado', description: `"${data.name}" se guardó en el catálogo.` });
+          fetchItems();
+        }
+      } catch (err: any) {
+        toast({ variant: 'info', title: 'Modo Offline', description: 'Ítem guardado localmente en esta sesión.' });
+      }
+    }
+  };
+
+  const handleDeleteItem = async (id: string) => {
+    if (!activeTenant) return;
     try {
-      const res = await createItemAction(
-        {
-          type: data.type,
-          name: data.name,
-          sku: data.sku,
-          category: data.category,
-          base_price: Number(data.base_price || 0),
-          cost: Number(data.cost || 0),
-          stock_quantity: Number(data.stock_quantity || 0),
-          metadata: data.metadata,
-        },
-        activeTenant.id,
-        actor
-      );
-
-      if (!res.success) {
-        toast({ variant: 'warning', title: 'Guardado Local', description: 'El ítem se agregó en pantalla. Configura Supabase para sincronizar.' });
-      } else {
-        toast({ variant: 'success', title: 'Producto Creado', description: `"${data.name}" se guardó en el catálogo.` });
+      const res = await deleteItemAction(id, activeTenant.id, actor);
+      if (res.success) {
+        toast({ variant: 'success', title: 'Elemento Eliminado', description: 'El producto ha sido borrado del catálogo.' });
+        setSelectedItem(null);
         fetchItems();
+      } else {
+        toast({ variant: 'warning', title: 'Error al eliminar', description: res.error || 'No se pudo eliminar el ítem.' });
       }
     } catch (err: any) {
-      toast({ variant: 'info', title: 'Modo Offline', description: 'Ítem guardado localmente en esta sesión.' });
+      toast({ variant: 'error', title: 'Error', description: err.message });
     }
   };
 
@@ -375,14 +424,24 @@ export default function CatalogoPage() {
 
       <CatalogModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleCreateItem}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingItem(null);
+        }}
+        onSave={handleSaveItem}
+        editItem={editingItem}
       />
 
       <CatalogDrawer
         item={selectedItem}
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
+        onEdit={(item) => {
+          setSelectedItem(null);
+          setEditingItem(item);
+          setIsModalOpen(true);
+        }}
+        onDelete={handleDeleteItem}
       />
     </div>
   );

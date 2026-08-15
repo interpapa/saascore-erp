@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Package, Tag, DollarSign, Archive, Check } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -10,12 +10,21 @@ interface CatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: CreateItemInput) => Promise<void>;
+  editItem?: any | null;
 }
 
-export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
+export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [itemType, setItemType] = useState<'product' | 'service'>('product');
+
+  useEffect(() => {
+    if (editItem) {
+      setItemType(editItem.type);
+    } else {
+      setItemType('product');
+    }
+  }, [editItem, isOpen]);
 
   if (!isOpen) return null;
 
@@ -65,7 +74,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 ${itemType === 'product' ? 'bg-indigo-500' : 'bg-fuchsia-500'}`}>
               <Package size={18} />
             </div>
-            Nuevo Elemento
+            {editItem ? 'Editar Elemento' : 'Nuevo Elemento'}
           </h2>
           <button 
             onClick={onClose}
@@ -106,6 +115,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
                 name="name"
                 label="Nombre del Producto / Servicio *"
                 placeholder="Ej: Producto A o Servicio B"
+                defaultValue={editItem?.name || ''}
                 icon={<Package size={18} />}
                 required
                 autoFocus
@@ -115,12 +125,14 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
               name="sku"
               label="Código SKU"
               placeholder="Ej. FIL-001"
+              defaultValue={editItem?.sku || ''}
               icon={<Archive size={18} />}
             />
             <Input
               name="category"
               label="Categoría"
               placeholder="Ej. Frenos"
+              defaultValue={editItem?.category || ''}
               icon={<Tag size={18} />}
             />
           </div>
@@ -132,6 +144,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
               type="number"
               step="0.01"
               placeholder="0.00"
+              defaultValue={editItem?.base_price || ''}
               icon={<DollarSign size={18} />}
               required
             />
@@ -145,6 +158,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
                 label="Stock Inicial (Opcional)"
                 type="number"
                 placeholder="0"
+                defaultValue={editItem?.stock_quantity ?? ''}
                 icon={<Archive size={18} />}
               />
               
@@ -152,6 +166,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
                 <label className="text-xs font-bold text-slate-500 block mb-1">Unidad de Medida (UoM)</label>
                 <select
                   name="unit_of_measure"
+                  defaultValue={editItem?.metadata?.unit_of_measure || 'unidad'}
                   className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm focus:outline-hidden focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="unidad">📦 Unidad (unidad)</option>
@@ -180,7 +195,7 @@ export function CatalogModal({ isOpen, onClose, onSave }: CatalogModalProps) {
               className="w-full rounded-xl"
               disabled={isLoading}
             >
-              {isLoading ? 'Guardando...' : 'Añadir al Catálogo'}
+              {isLoading ? 'Guardando...' : (editItem ? 'Guardar Cambios' : 'Añadir al Catálogo')}
             </Button>
           </div>
         </form>
