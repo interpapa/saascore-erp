@@ -29,7 +29,8 @@ export async function processSecureCheckout(
   tenantId: string,
   actor: CheckoutActor,
   localizationCode: LocalizationCode = 'VE',
-  idempotencyKey?: string
+  idempotencyKey?: string,
+  chargeTaxes: boolean = true
 ) {
   try {
     // Rate Limiting Guard
@@ -151,7 +152,23 @@ export async function processSecureCheckout(
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 6: Motor Bimoneda e Impuestos Localizados
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const taxResult = calculateTaxes(subtotalDecimal.toNumber(), localizationCode, paymentMethod);
+    let taxResult;
+    if (chargeTaxes) {
+      taxResult = calculateTaxes(subtotalDecimal.toNumber(), localizationCode, paymentMethod);
+    } else {
+      taxResult = {
+        subtotal: subtotalDecimal.toNumber(),
+        taxAmount: 0,
+        total: subtotalDecimal.toNumber(),
+        details: {
+          taxRate: 0,
+          igtfRate: 0,
+          igtfAmount: 0,
+          baseIgtf: 0,
+          chargeTaxes: false
+        }
+      };
+    }
     const exchangeData = await getExchangeRate('VES', tenantId);
     const totalLocal = convertUSDToLocal(taxResult.total, exchangeData.rate);
 

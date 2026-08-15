@@ -38,6 +38,7 @@ export default function CajaPage() {
   // Ticket State
   const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
+  const [chargeTaxes, setChargeTaxes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [printedDoc, setPrintedDoc] = useState<any>(null);
@@ -136,7 +137,8 @@ export default function CajaPage() {
 
   // Cálculos Financieros Estándar (Sin impuestos específicos de un solo país hardcodeados)
   const subtotal = ticketLines.reduce((acc, l) => acc + (l.item.base_price || 0) * l.quantity, 0);
-  const total = subtotal; // Impuestos serán calculados por la localización configurada
+  const taxAmount = chargeTaxes ? subtotal * 0.16 : 0;
+  const total = subtotal + taxAmount;
 
   const handleCharge = async (status: 'draft' | 'invoiced') => {
     if (!currentTenant) {
@@ -164,13 +166,13 @@ export default function CajaPage() {
           issue_date: new Date().toISOString(),
           due_date: null,
           notes: null,
-          metadata: { payment_method: paymentMethod },
+          metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes },
           lines: ticketLines.map((l) => ({
             item_id: l.item.id,
             description: l.item.name,
             quantity: l.quantity,
             unit_price: l.item.base_price || 0,
-            tax_amount: 0,
+            tax_amount: chargeTaxes ? (l.item.base_price || 0) * 0.16 : 0,
           })),
         });
         toast({ variant: 'success', title: 'Borrador Guardado', description: 'El presupuesto ha sido registrado.' });
@@ -186,7 +188,10 @@ export default function CajaPage() {
           customerId,
           paymentMethod,
           currentTenant.id,
-          actor
+          actor,
+          'VE',
+          undefined,
+          chargeTaxes
         );
 
         if (!result.success) throw new Error(result.error);
@@ -459,13 +464,38 @@ export default function CajaPage() {
             </button>
           </div>
 
+          {/* Opción Cobrar IVA */}
+          <div className="flex items-center justify-between mb-4 bg-slate-950/40 p-3 rounded-xl border border-white/5">
+            <span className="text-xs text-slate-300 font-bold">Cobrar IVA (16%)</span>
+            <button
+              type="button"
+              onClick={() => setChargeTaxes(!chargeTaxes)}
+              className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${chargeTaxes ? 'bg-indigo-600' : 'bg-slate-700'}`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${chargeTaxes ? 'translate-x-4.5' : 'translate-x-0'}`}
+              />
+            </button>
+          </div>
+
+          <div className="space-y-1 mb-4 border-b border-white/5 pb-4">
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>Subtotal:</span>
+              <span className="font-semibold text-white">${subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>IVA (16%):</span>
+              <span className="font-semibold text-white">${taxAmount.toFixed(2)}</span>
+            </div>
+          </div>
+
           <div className="flex justify-between items-end mb-5">
             <div>
               <span className="text-slate-400 text-xs font-bold uppercase tracking-wider block">Total a Pagar</span>
               <span className="text-xs text-slate-400">{ticketLines.length} ítems en ticket</span>
             </div>
             <div className="text-right">
-              <span className="text-3xl font-black text-emerald-400">${subtotal.toFixed(2)}</span>
+              <span className="text-3xl font-black text-emerald-400">${total.toFixed(2)}</span>
             </div>
           </div>
 
