@@ -107,38 +107,43 @@ export async function getAppointmentsAction(
       const { data: docs, error: docErr } = await supabaseAdmin
         .from('documents')
         .select(`
-          *,
+          id, tenant_id, type, status, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at, updated_at, entity_id, document_number,
           entity:entities (id, name, phone, email)
         `)
         .eq('tenant_id', tenantId)
         .in('type', ['work_order', 'appointment'])
-        .order('issue_date', { ascending: true });
+        .order('created_at', { ascending: true });
 
       if (docErr) throw new Error(docErr.message);
 
-      const fallbackAppts: Appointment[] = (docs || []).map((doc: any) => ({
-        id: doc.id,
-        tenant_id: doc.tenant_id,
-        title: doc.metadata?.title || doc.notes || `Cita ${doc.document_number}`,
-        description: doc.metadata?.description || doc.notes || null,
-        client_id: doc.entity_id || null,
-        client_name: doc.entity?.name || doc.metadata?.client_name || 'Cliente',
-        client_phone: doc.entity?.phone || doc.metadata?.client_phone || null,
-        client_email: doc.entity?.email || null,
-        service_id: doc.metadata?.service_id || null,
-        service_name: doc.metadata?.service_name || 'Servicio General',
-        service_duration: doc.metadata?.duration_minutes || 60,
-        employee_id: doc.metadata?.employee_id || null,
-        employee_name: doc.metadata?.employee_name || 'Sin Asignar',
-        start_time: doc.issue_date || doc.created_at,
-        end_time: doc.due_date || new Date(new Date(doc.issue_date || doc.created_at).getTime() + 3600000).toISOString(),
-        status: mapDocStatusToApptStatus(doc.status),
-        notes: doc.notes,
-        price: doc.total_amount || 0,
-        metadata: doc.metadata || {},
-        created_at: doc.created_at,
-        updated_at: doc.updated_at,
-      }));
+      const fallbackAppts: Appointment[] = (docs || []).map((doc: any) => {
+        const issueDate = doc.issue_date || doc.metadata?.issue_date || doc.created_at;
+        const dueDate = doc.due_date || doc.metadata?.due_date || new Date(new Date(issueDate).getTime() + 3600000).toISOString();
+
+        return {
+          id: doc.id,
+          tenant_id: doc.tenant_id,
+          title: doc.metadata?.title || doc.notes || `Cita ${doc.document_number}`,
+          description: doc.metadata?.description || doc.notes || null,
+          client_id: doc.entity_id || null,
+          client_name: doc.entity?.name || doc.metadata?.client_name || 'Cliente',
+          client_phone: doc.entity?.phone || doc.metadata?.client_phone || null,
+          client_email: doc.entity?.email || null,
+          service_id: doc.metadata?.service_id || null,
+          service_name: doc.metadata?.service_name || 'Servicio General',
+          service_duration: doc.metadata?.duration_minutes || 60,
+          employee_id: doc.metadata?.employee_id || null,
+          employee_name: doc.metadata?.employee_name || 'Sin Asignar',
+          start_time: issueDate,
+          end_time: dueDate,
+          status: mapDocStatusToApptStatus(doc.status),
+          notes: doc.notes,
+          price: doc.total_amount || 0,
+          metadata: doc.metadata || {},
+          created_at: doc.created_at,
+          updated_at: doc.updated_at,
+        };
+      });
 
       return { success: true, appointments: filterAppointments(fallbackAppts, filter) };
     }
@@ -218,8 +223,6 @@ export async function createAppointmentAction(
           type: 'work_order',
           status: docStatus,
           document_number: `CIT-${Date.now().toString().slice(-6)}`,
-          issue_date: payload.start_time,
-          due_date: calculatedEndTime,
           subtotal_amount: payload.price || 0,
           tax_amount: 0,
           total_amount: payload.price || 0,
@@ -232,6 +235,8 @@ export async function createAppointmentAction(
             duration_minutes: payload.duration_minutes || 60,
             price: payload.price || 0,
             created_by: actor.email,
+            issue_date: payload.start_time,
+            due_date: calculatedEndTime,
             ...payload.metadata,
           },
         }])

@@ -99,29 +99,49 @@ export async function createDocumentAction(
       ? input.document_number 
       : await generateNextDocumentNumber(tenantId, input.type);
 
-    const { data: newDoc, error: docError } = await supabaseAdmin
+    let insertData: any = {
+      tenant_id: tenantId,
+      entity_id: input.entity_id || null,
+      type: input.type,
+      status: input.status || 'draft',
+      document_number: finalDocNumber,
+      subtotal_amount: subtotalDecimal.toNumber(),
+      tax_amount: taxDecimal.toNumber(),
+      total_amount: totalDecimal.toNumber(),
+      issue_date: input.issue_date || new Date().toISOString(),
+      due_date: input.due_date || null,
+      notes: input.notes || null,
+      metadata: {
+        ...input.metadata,
+        created_by: actor.email,
+      },
+    };
+
+    let { data: newDoc, error: docError } = await supabaseAdmin
       .from('documents')
-      .insert([
-        {
-          tenant_id: tenantId,
-          entity_id: input.entity_id || null,
-          type: input.type,
-          status: input.status || 'draft',
-          document_number: finalDocNumber,
-          subtotal_amount: subtotalDecimal.toNumber(),
-          tax_amount: taxDecimal.toNumber(),
-          total_amount: totalDecimal.toNumber(),
-          issue_date: input.issue_date || new Date().toISOString(),
-          due_date: input.due_date || null,
-          notes: input.notes || null,
-          metadata: {
-            ...input.metadata,
-            created_by: actor.email,
-          },
-        },
-      ])
+      .insert([insertData])
       .select()
       .single();
+
+    if (docError && (docError.message.includes('due_date') || docError.message.includes('column'))) {
+      // Fallback: If DB schema doesn't have issue_date / due_date columns, save them in metadata
+      delete insertData.issue_date;
+      delete insertData.due_date;
+      insertData.metadata = {
+        ...insertData.metadata,
+        issue_date: input.issue_date || new Date().toISOString(),
+        due_date: input.due_date || null,
+      };
+
+      const retry = await supabaseAdmin
+        .from('documents')
+        .insert([insertData])
+        .select()
+        .single();
+      
+      newDoc = retry.data;
+      docError = retry.error;
+    }
 
     if (docError) throw new Error('Error al crear documento: ' + docError.message);
 
@@ -170,21 +190,53 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
   try {
     if (!tenantId) return { success: true, documents: [] };
 
-    let query = supabaseAdmin
+    let selectFields = `
+      id, document_number, type, status, issue_date, due_date, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at,
+      entity:entities (id, name, type, tax_id, email, phone)
+    `;
+
+    let baseQuery = supabaseAdmin
       .from('documents')
-      .select(`
-        id, document_number, type, status, issue_date, due_date, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at,
-        entity:entities (id, name, type, tax_id, email, phone)
-      `)
+      .select(selectFields)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .range(0, limit - 1);
 
     if (type) {
-      query = query.eq('type', type);
+      baseQuery = baseQuery.eq('type', type);
     }
 
-    const { data: documents, error } = await query;
+    let { data: documents, error } = await baseQuery;
+
+    if (error && (error.message.includes('due_date') || error.message.includes('column'))) {
+      // Fallback: Query without due_date / issue_date columns
+      selectFields = `
+        id, document_number, type, status, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at,
+        entity:entities (id, name, type, tax_id, email, phone)
+      `;
+      const retryQuery = supabaseAdmin
+        .from('documents')
+        .select(selectFields)
+        .eq('tenant_id', tenantId)
+        .order('created_at', { ascending: false })
+        .range(0, limit - 1);
+      
+      const retry = await (type ? retryQuery.eq('type', type) : retryQuery);
+      
+      documents = (retry.data || []).map((doc: any) => ({
+        ...doc,
+        issue_date: doc.metadata?.issue_date || doc.created_at,
+        due_date: doc.metadata?.due_date || null,
+      }));
+      error = retry.error;
+    } else if (documents) {
+      // Map columns if they exist
+      documents = documents.map((doc: any) => ({
+        ...doc,
+        issue_date: doc.issue_date || doc.metadata?.issue_date || doc.created_at,
+        due_date: doc.due_date || doc.metadata?.due_date || null,
+      }));
+    }
 
     if (error) throw new Error(error.message);
 
