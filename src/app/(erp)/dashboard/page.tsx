@@ -135,6 +135,12 @@ export default function LauncherPage() {
     }
   ];
 
+  // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
+  const enabledModules = currentTenant?.metadata?.active_modules || [
+    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
+  ];
+  const filteredApps = apps.filter((app) => enabledModules.includes(app.id));
+
   return (
     <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
@@ -164,7 +170,7 @@ export default function LauncherPage() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest font-sans">Ecosistema de Módulos</h2>
-          <span className="text-xs text-slate-400 font-semibold font-sans">{apps.length} aplicaciones activas</span>
+          <span className="text-xs text-slate-400 font-semibold font-sans">{filteredApps.length} aplicaciones activas</span>
         </div>
 
         {/* 
@@ -174,7 +180,7 @@ export default function LauncherPage() {
           Contiene glifos vectoriales profesionales de Lucide con escalado elástico perfecto.
         */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-y-12 gap-x-8 justify-items-center">
-          {apps.map((app) => (
+          {filteredApps.map((app) => (
             <a
               href={app.href}
               key={app.id}
