@@ -3,6 +3,7 @@
 import React from 'react';
 import { useAuth } from '@/components/core/AuthProvider';
 import { useERPStore } from '@/store/useERPStore';
+import { LetterCascade } from '@/components/ui/LetterCascade';
 import { 
   Coins, 
   Users, 
@@ -144,7 +145,7 @@ export default function LauncherPage() {
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shadow-xs shrink-0">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
-            SaaSCore OS
+            <LetterCascade text="SaaSCore OS" className="text-3xl font-black" />
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1 font-sans">
             {currentTenant?.name || 'Configurando tu empresa...'}
