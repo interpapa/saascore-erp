@@ -233,3 +233,70 @@ export async function getItemsAction(tenantId: string, type?: ItemType, limit: n
   }
 }
 
+/**
+ * Ajuste rápido de inventario (sumar/restar stock) sin pasar por POs.
+ * Ideal para compras rápidas de mostrador sin proveedor formal o mermas.
+ */
+export async function adjustItemStockAction(
+  id: string,
+  quantityDelta: number,
+  tenantId: string,
+  actor: ActionActor
+) {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    // 1. Obtener item actual
+    const { data: item, error: findError } = await supabaseAdmin
+      .from('items')
+      .select('stock, stock_quantity')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (findError || !item) throw new Error('Ítem no encontrado para ajustar.');
+
+    const currentStock = item.stock !== undefined ? (item.stock || 0) : (item.stock_quantity || 0);
+    const newStock = Math.max(0, currentStock + quantityDelta);
+
+    // 2. Actualizar stock
+    let { error } = await supabaseAdmin
+      .from('items')
+      .update({ stock: newStock })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (error && (error.message.includes('stock') || error.message.includes('column'))) {
+      const retry = await supabaseAdmin
+        .from('items')
+        .update({ stock_quantity: newStock })
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+      error = retry.error;
+    }
+
+    if (error) throw new Error('Error al actualizar inventario: ' + error.message);
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'item.updated',
+      target_type: 'item',
+      target_id: id,
+      metadata: { action: 'stock_adjustment', delta: quantityDelta, newStock },
+    });
+
+    revalidatePath('/catalogo');
+    revalidatePath('/caja');
+
+    return { success: true, newStock };
+  } catch (err: any) {
+    console.error('[adjustItemStockAction Error]:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+

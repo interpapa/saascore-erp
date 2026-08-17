@@ -89,11 +89,6 @@ export function PurchaseOrderTab({
       }
     }
 
-    if (!selectedSupplierId) {
-      toast({ variant: 'error', title: 'Proveedor Requerido', description: 'Por favor, selecciona un proveedor de la lista antes de emitir la orden.' });
-      return;
-    }
-
     if (activeLines.length === 0) {
       toast({ variant: 'error', title: 'Sin Productos', description: 'Selecciona al menos un producto del catálogo e introduce la cantidad.' });
       return;
