@@ -10,6 +10,7 @@ import { useKeybindings } from '@/hooks/useKeybindings';
 import { useERPStore } from '@/store/useERPStore';
 import { Lock, LayoutGrid } from 'lucide-react';
 import Link from 'next/link';
+import { MobileDock } from '@/components/core/MobileDock';
 
 const routeToModuleId: Record<string, string> = {
   '/caja': 'caja',
@@ -49,7 +50,7 @@ export default function ERPLayout({
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <FloatingHeader />
-        <main className="flex-1 w-full pt-20">
+        <main className="flex-1 w-full pt-20 pb-24 md:pb-6">
           {isModuleDisabled ? (
             <div className="w-full max-w-xl mx-auto px-6 py-20 text-center space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 mx-auto shadow-sm">
@@ -94,6 +95,9 @@ export default function ERPLayout({
             </ErrorBoundary>
           )}
         </main>
+        
+        {/* Dock de navegación inferior móvil */}
+        <MobileDock />
       </div>
 
       <AICopilot />

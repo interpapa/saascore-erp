@@ -50,14 +50,14 @@ export function FloatingHeader() {
               : 'bg-white/40 dark:bg-slate-900/40 shadow-sm border-white/20 dark:border-white/5 backdrop-blur-md hover:bg-white/60 dark:hover:bg-slate-900/60'
           }`}
         >
-          {/* Breadcrumbs wrapped in Suspense */}
-          <div className="flex items-center pl-2 pr-1">
+          {/* Breadcrumbs wrapped in Suspense - Oculto en móviles */}
+          <div className="hidden md:flex items-center pl-2 pr-1">
             <Suspense fallback={<div className="text-xs text-slate-400">Cargando...</div>}>
               <Breadcrumbs />
             </Suspense>
           </div>
 
-          <div className="w-px h-6 bg-border mx-1" />
+          <div className="hidden md:block w-px h-6 bg-border mx-1" />
 
           {/* Búsqueda (Command Palette Trigger) */}
           <button
