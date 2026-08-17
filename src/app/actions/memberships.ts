@@ -26,8 +26,15 @@ function isMissingTableError(error: any): boolean {
 /**
  * Trae las mensualidades/membresías activas de un tenant con fallback JSONB automático.
  */
-export async function getMembershipsAction(tenantId: string) {
+export async function getMembershipsAction(tenantId: string, actor?: ActionActor) {
   try {
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', memberships: [] };
+      }
+    }
+    
     const db = supabaseAdmin || supabase;
 
     // 1. Intentar leer de la tabla física 'memberships'

@@ -60,17 +60,7 @@ export default function EquipoPage() {
   }, [currentTenant?.id]);
 
   useEffect(() => {
-    let isSubscribed = true;
-    const timer = setTimeout(() => {
-      if (isSubscribed) setIsLoading(false);
-    }, 2500);
-
     fetchEmployees();
-
-    return () => {
-      isSubscribed = false;
-      clearTimeout(timer);
-    };
   }, [fetchEmployees]);
 
   // Cargar logs al cambiar a la pestaña de auditoría
@@ -141,7 +131,7 @@ export default function EquipoPage() {
           )}
 
           {activeTab === 'asistencia' && (
-            <AttendanceTab employees={employees} />
+            <AttendanceTab employees={employees} tenantId={currentTenant?.id || ''} />
           )}
 
           {activeTab === 'nomina' && (

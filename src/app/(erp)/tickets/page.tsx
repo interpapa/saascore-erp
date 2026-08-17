@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, ClipboardList, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { getDocuments, createDocumentWithLines, updateDocumentStatus, Document } from '@/lib/api/documents';
+import { Document } from '@/lib/api/documents';
 import { TicketModal } from '@/components/tickets/TicketModal';
 import { TicketDrawer } from '@/components/tickets/TicketDrawer';
-import { useERPStore } from '@/store/useERPStore';
+import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
+import { useToast } from '@/components/core/ToastProvider';
+import { getDocumentsAction, updateDocumentStatusAction, createDocumentAction } from '@/app/actions/documents';
 
 const STATUS_PILLS: Record<string, { label: string; className: string; icon: React.ElementType }> = {
   draft:       { label: 'Pendiente',  className: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400',     icon: Clock },
@@ -20,19 +23,27 @@ const PRIORITY_DOTS: Record<string, string> = {
 };
 
 export default function TicketsPage() {
-  const { currentTenant } = useERPStore();
+  const currentTenant = useTenantResolver();
+  const actor = useActionActor();
+  const { toast } = useToast();
   const [tickets, setTickets] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Document | null>(null);
 
   const fetchTickets = async () => {
+    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
-      const data = await getDocuments('work_order');
-      setTickets(data);
-    } catch (err) {
+      const res = await getDocumentsAction(currentTenant.id, 'work_order');
+      if (res.success) {
+        setTickets(res.documents as Document[]);
+      } else {
+        toast({ variant: 'error', title: 'Error cargando tickets', description: res.error });
+      }
+    } catch (err: any) {
       console.error('Error cargando tickets:', err);
+      toast({ variant: 'error', title: 'Error cargando tickets' });
     } finally {
       setIsLoading(false);
     }
@@ -40,12 +51,11 @@ export default function TicketsPage() {
 
   useEffect(() => {
     fetchTickets();
-  }, []);
+  }, [currentTenant?.id]);
 
   const handleCreateTicket = async (formData: any) => {
-    if (!currentTenant) throw new Error('No hay empresa activa');
-    await createDocumentWithLines({
-      tenant_id: currentTenant.id,
+    if (!currentTenant?.id) throw new Error('No hay empresa activa');
+    const res = await createDocumentAction({
       entity_id: formData.entity_id,
       type: 'work_order',
       status: 'draft',
@@ -59,17 +69,30 @@ export default function TicketsPage() {
         priority: formData.priority,
       },
       lines: [],
-    });
-    await fetchTickets();
+    }, currentTenant.id, actor);
+    
+    if (res.success) {
+      toast({ variant: 'success', title: 'Ticket creado correctamente' });
+      await fetchTickets();
+    } else {
+      toast({ variant: 'error', title: 'Error creando ticket', description: res.error });
+      throw new Error(res.error);
+    }
   };
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
+    if (!currentTenant?.id) return;
     try {
-      await updateDocumentStatus(ticketId, newStatus as Document['status']);
-      setSelectedTicket(null);
-      await fetchTickets();
-    } catch (err) {
+      const res = await updateDocumentStatusAction(ticketId, newStatus as any, currentTenant.id, actor);
+      if (res.success) {
+        setSelectedTicket(null);
+        await fetchTickets();
+      } else {
+        toast({ variant: 'error', title: 'Error cambiando estado', description: res.error });
+      }
+    } catch (err: any) {
       console.error('Error cambiando estado:', err);
+      toast({ variant: 'error', title: 'Error cambiando estado' });
     }
   };
 

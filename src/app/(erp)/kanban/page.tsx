@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { Plus, GripVertical, Clock, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { getDocuments, updateDocumentStatus, Document } from '@/lib/api/documents';
+import { Document } from '@/lib/api/documents';
 import { TicketModal } from '@/components/tickets/TicketModal';
-import { useERPStore } from '@/store/useERPStore';
-import { createDocumentWithLines } from '@/lib/api/documents';
+import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
+import { useToast } from '@/components/core/ToastProvider';
+import { getDocumentsAction, updateDocumentStatusAction, createDocumentAction } from '@/app/actions/documents';
 
 const COLUMNS = [
   {
@@ -34,35 +36,49 @@ const COLUMNS = [
 const PRIORITY_LABELS: Record<string, string> = { high: '🔴', medium: '🟡', low: '🟢' };
 
 export default function KanbanPage() {
-  const { currentTenant } = useERPStore();
+  const currentTenant = useTenantResolver();
+  const actor = useActionActor();
+  const { toast } = useToast();
   const [tickets, setTickets] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [movingId, setMovingId] = useState<string | null>(null);
 
   const fetchTickets = async () => {
+    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
-      const data = await getDocuments('work_order');
-      setTickets(data);
-    } catch (err) {
+      const res = await getDocumentsAction(currentTenant.id, 'work_order');
+      if (res.success) {
+        setTickets(res.documents as Document[]);
+      } else {
+        toast({ variant: 'error', title: 'Error cargando tickets', description: res.error });
+      }
+    } catch (err: any) {
       console.error('Error loading kanban:', err);
+      toast({ variant: 'error', title: 'Error cargando tickets' });
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => { fetchTickets(); }, []);
+  useEffect(() => { fetchTickets(); }, [currentTenant?.id]);
 
   const moveCard = async (ticketId: string, newStatus: Document['status']) => {
+    if (!currentTenant?.id) return;
     // Optimistic update — actualizar UI inmediatamente
     setTickets(prev => prev.map(t => t.id === ticketId ? { ...t, status: newStatus } : t));
     setMovingId(ticketId);
     try {
-      await updateDocumentStatus(ticketId, newStatus);
-    } catch (err) {
+      const res = await updateDocumentStatusAction(ticketId, newStatus as any, currentTenant.id, actor);
+      if (!res.success) {
+        toast({ variant: 'error', title: 'Error actualizando estado', description: res.error });
+        await fetchTickets();
+      }
+    } catch (err: any) {
       // Rollback si falla
       console.error('Error moving card:', err);
+      toast({ variant: 'error', title: 'Error actualizando estado' });
       await fetchTickets();
     } finally {
       setMovingId(null);
@@ -70,9 +86,8 @@ export default function KanbanPage() {
   };
 
   const handleCreateTicket = async (formData: any) => {
-    if (!currentTenant) throw new Error('No hay empresa activa');
-    await createDocumentWithLines({
-      tenant_id: currentTenant.id,
+    if (!currentTenant?.id) throw new Error('No hay empresa activa');
+    const res = await createDocumentAction({
       entity_id: formData.entity_id,
       type: 'work_order',
       status: 'draft',
@@ -82,8 +97,15 @@ export default function KanbanPage() {
       notes: formData.description || null,
       metadata: { title: formData.title, description: formData.description, priority: formData.priority },
       lines: [],
-    });
-    await fetchTickets();
+    }, currentTenant.id, actor);
+
+    if (res.success) {
+      toast({ variant: 'success', title: 'Ticket creado correctamente' });
+      await fetchTickets();
+    } else {
+      toast({ variant: 'error', title: 'Error creando ticket', description: res.error });
+      throw new Error(res.error);
+    }
   };
 
   const ticketsByStatus = (status: string) => tickets.filter(t => t.status === status);

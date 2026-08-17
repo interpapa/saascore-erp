@@ -11,7 +11,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction } from '@/app/actions/entities';
 import { getDocumentsAction } from '@/app/actions/documents';
-import { getJournalEntriesAction, getIncomeStatementAction } from '@/app/actions/accounting';
+import { getIncomeStatementAction } from '@/app/actions/accounting';
 import { SkeletonCard, SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 
 /* ─────────────────────────────────────────────
@@ -241,10 +241,6 @@ export default function EstadisticasPage() {
         const issued = new Date(d.issue_date || d.created_at);
         return issued.getMonth() === now.getMonth() && issued.getFullYear() === now.getFullYear();
       });
-      const revenueThisMonth = thisMonth.reduce(
-        (sum: number, d: any) =>
-          sum + (d.lines || []).reduce((s: number, l: any) => s + l.quantity * l.unit_price, 0), 0
-      );
       const pendingInvoices = invoices.filter(
         (d: any) => d.status === 'in_progress' || d.status === 'draft'
       ).length;
@@ -265,7 +261,8 @@ export default function EstadisticasPage() {
       // ── Utilidad Neta (Contabilidad) ──
       const income = incomeRes.status === 'fulfilled' && (incomeRes.value as any).success
         ? (incomeRes.value as any) : null;
-      const netIncome = income?.netIncome ?? income?.net_income ?? 0;
+      const netIncome = income?.data?.netProfit ?? 0;
+      const revenueThisMonth = income?.data?.totalRevenue ?? 0;
 
       setData({
         totalItems,

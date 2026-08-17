@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Entity } from '@/lib/api/entities';
 import { useToast } from '@/components/core/ToastProvider';
 import { Clock, UserCheck, Play } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useActionActor } from '@/hooks/useActionActor';
+import { getAttendanceLogsAction, registerAttendanceAction } from '@/app/actions/attendance';
 
 interface AttendanceLog {
   id: string;
@@ -15,30 +17,83 @@ interface AttendanceLog {
 
 interface AttendanceTabProps {
   employees: Entity[];
+  tenantId: string;
 }
 
-export function AttendanceTab({ employees }: AttendanceTabProps) {
+export function AttendanceTab({ employees, tenantId }: AttendanceTabProps) {
+  const actor = useActionActor();
   const { toast } = useToast();
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(employees[0]?.id || '');
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
 
-  const handleLogAttendance = (type: 'entrada' | 'salida') => {
-    const emp = employees.find((e) => e.id === selectedEmployeeId) || employees[0];
-    const empName = emp ? emp.name : 'Empleado';
+  useEffect(() => {
+    if (!tenantId) return;
+    let isSubscribed = true;
+    getAttendanceLogsAction(tenantId).then(res => {
+      if (res.success && res.logs && isSubscribed) {
+        const mappedLogs = res.logs
+          .filter((l: any) => l.entity_type === 'employee')
+          .map((l: any) => {
+            const emp = employees.find(e => e.id === l.entity_id);
+            const tDate = new Date(l.timestamp);
+            return {
+              id: l.id,
+              employeeName: emp ? emp.name : 'Empleado Desconocido',
+              timestamp: tDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: l.log_type === 'check_in' ? 'entrada' : 'salida'
+            };
+          });
+        setAttendanceLogs(mappedLogs);
+      }
+    });
+    return () => { isSubscribed = false; }
+  }, [tenantId, employees]);
 
+  useEffect(() => {
+    if (employees.length > 0 && !selectedEmployeeId) {
+      setSelectedEmployeeId(employees[0].id);
+    }
+  }, [employees, selectedEmployeeId]);
+
+  const handleLogAttendance = async (type: 'entrada' | 'salida') => {
+    const emp = employees.find((e) => e.id === selectedEmployeeId) || employees[0];
+    if (!emp) return;
+    const empName = emp.name;
+
+    const optimisticTimestamp = new Date();
     const newLog: AttendanceLog = {
       id: String(Date.now()),
       employeeName: empName,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      timestamp: optimisticTimestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       type,
     };
 
-    setAttendanceLogs([newLog, ...attendanceLogs]);
-    toast({
-      variant: 'success',
-      title: type === 'entrada' ? 'Entrada Registrada' : 'Salida Registrada',
-      description: `${empName} marcó ${type} a las ${newLog.timestamp}.`,
-    });
+    setAttendanceLogs(prev => [newLog, ...prev]);
+    
+    const logType = type === 'entrada' ? 'check_in' : 'check_out';
+    const res = await registerAttendanceAction({
+      entity_id: emp.id,
+      entity_type: 'employee',
+      log_type: logType,
+    }, tenantId, actor);
+
+    if (res.success) {
+      toast({
+        variant: 'success',
+        title: type === 'entrada' ? 'Entrada Registrada' : 'Salida Registrada',
+        description: `${empName} marcó ${type} a las ${newLog.timestamp}.`,
+      });
+      if (res.log?.id) {
+        setAttendanceLogs(prev => prev.map(l => l.id === newLog.id ? { ...l, id: res.log.id } : l));
+      }
+    } else {
+      setAttendanceLogs(prev => prev.filter(l => l.id !== newLog.id));
+      toast({
+        variant: 'error',
+        title: 'Error de Marcaje',
+        description: res.error || 'Hubo un error al registrar la asistencia.',
+      });
+    }
   };
 
   return (

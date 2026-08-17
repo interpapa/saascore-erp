@@ -7,6 +7,8 @@ import { DEFAULT_CHART_OF_ACCOUNTS } from '@/lib/core/accounting/chartOfAccounts
 import { checkRateLimit } from '@/lib/core/rateLimiter';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { createKernelJournalEntry } from '@/lib/core/kernel/ledgerKernel';
+import { ActionActor } from './entities';
+import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import {
   FiscalPeriodFilter,
   JournalEntry,
@@ -85,9 +87,16 @@ function isMissingTableError(error: any): boolean {
  */
 export async function getJournalEntriesAction(
   tenantId: string,
-  filter?: FiscalPeriodFilter
+  filter?: FiscalPeriodFilter,
+  actor?: ActionActor
 ): Promise<JournalEntriesResult> {
   try {
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        throw new Error(securityCheck.error || 'Acceso denegado.');
+      }
+    }
     if (!tenantId) return { success: true, data: [] };
 
     // 1. Primary Attempt: Query 'journal_entries' joined with 'journal_entry_lines'
@@ -261,10 +270,18 @@ export async function getJournalEntriesAction(
  */
 export async function getTrialBalanceAction(
   tenantId: string,
-  filter?: FiscalPeriodFilter
+  filter?: FiscalPeriodFilter,
+  actor?: ActionActor
 ): Promise<TrialBalanceResult> {
   try {
-    const journalRes = await getJournalEntriesAction(tenantId, filter);
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', data: [], totals: { debit: 0, credit: 0 } };
+      }
+    }
+    
+    const journalRes = await getJournalEntriesAction(tenantId, filter, actor);
     if (!journalRes.success || !journalRes.data) {
       return { success: false, error: journalRes.error || 'Error al obtener asientos.' };
     }
@@ -336,10 +353,27 @@ export async function getTrialBalanceAction(
  */
 export async function getIncomeStatementAction(
   tenantId: string,
-  filter?: FiscalPeriodFilter
+  filter?: FiscalPeriodFilter,
+  actor?: ActionActor
 ): Promise<IncomeStatementResult> {
   try {
-    const trialRes = await getTrialBalanceAction(tenantId, filter);
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', data: {
+          period: filter || { preset: 'all' },
+          revenue: { rows: [], total: 0 },
+          costOfSales: { rows: [], total: 0 },
+          grossProfit: 0,
+          operatingExpenses: { rows: [], total: 0 },
+          operatingProfit: 0,
+          otherIncomeExpenses: { rows: [], total: 0 },
+          netProfit: 0
+        } };
+      }
+    }
+
+    const trialRes = await getTrialBalanceAction(tenantId, filter, actor);
     if (!trialRes.success || !trialRes.data) {
       return { success: false, error: trialRes.error || 'Error al consultar balance.' };
     }

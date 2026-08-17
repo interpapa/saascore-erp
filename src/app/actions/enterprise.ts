@@ -7,6 +7,8 @@ import { startImpersonationSession } from '@/lib/core/enterprise/impersonationEn
 import { checkRateLimit } from '@/lib/core/rateLimiter';
 import { UserRole } from '@/lib/rbac';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { ActionActor } from './entities';
+import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import {
   TenantBranch,
   TenantBranchesResult,
@@ -79,9 +81,17 @@ export async function startImpersonationAction(
  * Retrieves all registered branch entities for a multi-branch tenant matrix.
  */
 export async function getTenantBranchesAction(
-  tenantId: string
+  tenantId: string,
+  actor?: ActionActor
 ): Promise<TenantBranchesResult> {
   try {
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', data: [] };
+      }
+    }
+
     if (!tenantId) return { success: true, data: [] };
 
     const { data: rawBranches, error } = await supabaseAdmin
@@ -121,10 +131,18 @@ export async function getTenantBranchesAction(
  * Calculates real-time sales metrics and performance breakdown per branch in matrix.
  */
 export async function getBranchPerformanceAction(
-  tenantId: string
+  tenantId: string,
+  actor?: ActionActor
 ): Promise<BranchPerformanceResult> {
   try {
-    const branchesRes = await getTenantBranchesAction(tenantId);
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', data: [], globalMetrics: { totalRevenue: 0, activeBranches: 0, topBranchName: '' } };
+      }
+    }
+
+    const branchesRes = await getTenantBranchesAction(tenantId, actor);
     const branches = branchesRes.data || [];
 
     // Query sales documents

@@ -4,6 +4,8 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkPermission, UserRole } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { eventBus } from '@/lib/core/events/eventBus';
+import { ActionActor } from './entities';
+import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import Decimal from 'decimal.js';
 
 interface PaymentActor {
@@ -20,6 +22,11 @@ export async function recordDocumentPayment(
   referenceNumber?: string
 ) {
   try {
+    const securityCheck = await validateUserTenantAccess(actor as unknown as ActionActor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
     // 1. RBAC Verification
     if (!checkPermission(actor.role, 'finanzas')) {
       await writeAuditLog({

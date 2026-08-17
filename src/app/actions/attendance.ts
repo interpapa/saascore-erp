@@ -25,8 +25,15 @@ function isMissingTableError(error: any): boolean {
 /**
  * Trae los registros de asistencia con fallback JSONB automático.
  */
-export async function getAttendanceLogsAction(tenantId: string) {
+export async function getAttendanceLogsAction(tenantId: string, actor?: ActionActor) {
   try {
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', logs: [] };
+      }
+    }
+
     const db = supabaseAdmin || supabase;
 
     // 1. Intentar leer de la tabla física 'attendance_logs'

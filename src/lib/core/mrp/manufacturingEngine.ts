@@ -26,7 +26,8 @@ export async function processManufacturingOrder(
     const { data: dbItems, error: fetchErr } = await supabaseAdmin
       .from('items')
       .select('id, stock, cost, name')
-      .in('id', componentIds);
+      .in('id', componentIds)
+      .eq('tenant_id', payload.tenantId);
 
     if (fetchErr || !dbItems) throw new Error('Error verificando insumos en inventario.');
 
