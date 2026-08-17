@@ -196,7 +196,7 @@ export default function CatalogoPage() {
           <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5 font-sans">Gestión de inventario, repuestos y servicios</p>
         </div>
         {activeTab === 'items' && (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
             <ViewToggle storageKey="catalogo-view-mode" currentView={viewMode} onViewChange={setViewMode} />
             <button
               onClick={() => setIsModalOpen(true)}
@@ -338,8 +338,8 @@ export default function CatalogoPage() {
               })}
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-2xl overflow-hidden">
-              <table className="w-full text-left border-collapse">
+            <div className="bg-card border border-border rounded-2xl overflow-hidden overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[600px]">
                 <thead>
                   <tr className="border-b border-border bg-slate-50/50 dark:bg-slate-900/50 text-xs font-semibold text-slate-500">
                     <th className="p-4">SKU</th>

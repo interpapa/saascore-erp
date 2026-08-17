@@ -21,7 +21,7 @@ import {
   Sliders, 
   ShieldCheck,
   Sparkles 
-} from 'lucide-react';
+import Link from 'next/link';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
@@ -181,7 +181,7 @@ export default function LauncherPage() {
         */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-y-12 gap-x-8 justify-items-center">
           {filteredApps.map((app) => (
-            <a
+            <Link
               href={app.href}
               key={app.id}
               className="flex flex-col items-center group btn-haptic w-28"
@@ -204,7 +204,7 @@ export default function LauncherPage() {
               <span className="text-foreground font-semibold text-xs mt-3.5 text-center tracking-tight font-sans group-hover:text-primary transition-colors line-clamp-2 px-1">
                 {app.name}
               </span>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

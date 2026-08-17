@@ -8,8 +8,8 @@ export const AICopilot = () => {
 
   return (
     <>
-      {/* Botón Flotante */}
-      <div className={`fixed bottom-6 right-6 z-40 group transition-all duration-300 ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
+      {/* Botón Flotante (oculto en móviles para no solapar el MobileDock) */}
+      <div className={`fixed bottom-6 right-6 z-40 group transition-all duration-300 hidden md:block ${isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}`}>
         {/* Glow Backdrop */}
         <div className="absolute inset-0 bg-indigo-500/40 rounded-full blur-xl group-hover:bg-indigo-500/60 transition-colors duration-500 animate-pulse" />
 
