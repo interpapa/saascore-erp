@@ -194,6 +194,7 @@ export default function TicketsPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onSave={handleCreateTicket}
+        tenantId={currentTenant?.id}
       />
 
       <TicketDrawer

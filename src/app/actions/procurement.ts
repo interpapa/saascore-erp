@@ -6,10 +6,18 @@ import { checkRateLimit } from '@/lib/core/rateLimiter';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { revalidatePath } from 'next/cache';
 
+import { createDocumentAction } from '@/app/actions/documents';
+
 export interface CreatePOInput {
   supplier_id: string;
   total_amount: number;
   notes?: string;
+  lines?: Array<{
+    item_id: string;
+    description: string;
+    quantity: number;
+    unit_price: number;
+  }>;
 }
 
 export async function createPurchaseOrderAction(
@@ -28,31 +36,33 @@ export async function createPurchaseOrderAction(
       return { success: false, error: security.error || 'Acceso denegado a compras.' };
     }
 
-    const poNumber = `PO-${Date.now().toString().slice(-6)}`;
-
-    const { data: doc, error } = await supabaseAdmin
-      .from('documents')
-      .insert([{
-        tenant_id: tenantId,
-        entity_id: input.supplier_id,
+    const res = await createDocumentAction(
+      {
         type: 'purchase_order',
         status: 'draft',
-        document_number: poNumber,
-        total_amount: input.total_amount,
-        subtotal_amount: input.total_amount,
+        entity_id: input.supplier_id || null,
+        notes: input.notes || null,
         metadata: {
-          notes: input.notes || '',
-          created_by: actor.email,
+          total_amount: input.total_amount,
         },
-      }])
-      .select()
-      .single();
+        lines: (input.lines || []).map(l => ({
+          item_id: l.item_id,
+          description: l.description,
+          quantity: l.quantity,
+          unit_price: l.unit_price,
+          tax_amount: 0,
+        })),
+      },
+      tenantId,
+      actor as any
+    );
 
-    if (error) throw error;
+    if (!res.success) {
+      return { success: false, error: res.error || 'No se pudo crear la orden de compra.' };
+    }
 
     revalidatePath('/compras');
-
-    return { success: true, document: doc };
+    return { success: true, document: res.document };
   } catch (err: any) {
     console.error('[createPurchaseOrderAction Error]:', err.message);
     return { success: false, error: err.message };

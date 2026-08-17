@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react';
 import { X, ClipboardList, User, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
-import { getEntities, Entity } from '@/lib/api/entities';
+import { getEntitiesAction } from '@/app/actions/entities';
+import { Entity } from '@/lib/api/entities';
 
 interface TicketModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: any) => Promise<void>;
+  tenantId?: string;
 }
 
 const PRIORITIES = [
@@ -18,16 +20,18 @@ const PRIORITIES = [
   { value: 'high', label: 'Alta', color: 'text-red-600' },
 ];
 
-export function TicketModal({ isOpen, onClose, onSave }: TicketModalProps) {
+export function TicketModal({ isOpen, onClose, onSave, tenantId }: TicketModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [customers, setCustomers] = useState<Entity[]>([]);
 
   useEffect(() => {
-    if (isOpen) {
-      getEntities('customer').then(setCustomers).catch(console.error);
+    if (isOpen && tenantId) {
+      getEntitiesAction(tenantId, 'customer').then(res => {
+        if (res.success && res.entities) setCustomers(res.entities);
+      }).catch(console.error);
     }
-  }, [isOpen]);
+  }, [isOpen, tenantId]);
 
   if (!isOpen) return null;
 
