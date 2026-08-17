@@ -272,7 +272,7 @@ export function ChatInbox({
                 )}
                 <p className="flex items-center justify-center gap-1">
                   <MapPin size={12} />
-                  {conversation.metadata?.address || 'Av. Principal 123, Ciudad'}
+                  {conversation.metadata?.client_address || 'Sin dirección registrada'}
                 </p>
               </div>
             </div>
@@ -282,20 +282,30 @@ export function ChatInbox({
           <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-900/30 rounded-xl p-4 space-y-3">
             <div className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1">
               <Info size={12} />
-              <span>Estado de Cuenta</span>
+              <span>Estado de Cuenta CRM</span>
             </div>
             <div>
-              <div className="text-2xl font-extrabold text-amber-950 dark:text-amber-200">$150.00 USD</div>
-              <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 uppercase font-semibold">Saldo Pendiente (AR)</div>
+              <div className="text-2xl font-extrabold text-amber-950 dark:text-amber-200">
+                ${Number(conversation.metadata?.client_metadata?.total_debt || 0).toFixed(2)} USD
+              </div>
+              <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 uppercase font-semibold">Deuda Pendiente (Cuentas por Cobrar)</div>
             </div>
             <div className="space-y-1.5 border-t border-amber-200/50 dark:border-amber-900/30 pt-2">
               <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
-                <span>Facturas Activas:</span>
-                <span className="font-semibold text-foreground">3</span>
+                <span>Estado de Crédito:</span>
+                <span className={`font-bold text-[10px] uppercase px-2 py-0.5 rounded-full ${
+                  (conversation.metadata?.client_metadata?.total_debt || 0) > 0 
+                    ? 'bg-red-500/10 text-red-500' 
+                    : 'bg-emerald-500/10 text-emerald-500'
+                }`}>
+                  {(conversation.metadata?.client_metadata?.total_debt || 0) > 0 ? 'Con Deuda' : 'Al Día / Solvente'}
+                </span>
               </div>
               <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
-                <span>Última Compra:</span>
-                <span className="font-semibold text-foreground">08 Ago, 2026</span>
+                <span>Último contacto:</span>
+                <span className="font-semibold text-foreground">
+                  {new Date(conversation.last_activity).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                </span>
               </div>
             </div>
           </div>

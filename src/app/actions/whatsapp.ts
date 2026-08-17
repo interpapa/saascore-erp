@@ -54,6 +54,11 @@ export async function getConversationsAction(
         last_activity: c.last_activity,
         tags: c.metadata?.tags || [],
         status: c.status || 'active',
+        metadata: {
+          ...c.metadata,
+          client_metadata: c.client?.metadata || null,
+          client_address: c.client?.address || null,
+        }
       }));
 
       return { success: true, conversations: filterConversations(formatted, filter) };

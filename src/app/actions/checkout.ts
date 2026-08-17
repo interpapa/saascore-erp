@@ -90,13 +90,51 @@ export async function processSecureCheckout(
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 3: Inmutabilidad Fiscal (Snapshotting)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const { data: entityData, error: entityError } = await supabaseAdmin
+    let entityData: any = null;
+    
+    // Intentar buscar cliente real
+    const { data: realEntity } = await supabaseAdmin
       .from('entities')
       .select('*')
       .eq('id', entityId)
-      .single();
-    
-    if (entityError || !entityData) throw new Error('Cliente no encontrado');
+      .maybeSingle();
+
+    if (realEntity) {
+      entityData = realEntity;
+    } else {
+      // Fallback: Si no se encuentra (o es el ID del tenant), buscar o crear el "Cliente de Mostrador" genérico
+      const { data: counterEntity } = await supabaseAdmin
+        .from('entities')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .eq('type', 'customer')
+        .eq('name', 'Cliente de Mostrador')
+        .maybeSingle();
+
+      if (counterEntity) {
+        entityData = counterEntity;
+      } else {
+        // Crear cliente de mostrador por defecto
+        const { data: newCounter, error: createError } = await supabaseAdmin
+          .from('entities')
+          .insert([{
+            tenant_id: tenantId,
+            type: 'customer',
+            name: 'Cliente de Mostrador',
+            email: 'mostrador@saascore.com',
+            phone: 'N/A',
+            tax_id: 'J-GENERICO',
+            address: 'Venta de Mostrador',
+            status: 'active',
+            metadata: { total_debt: 0 }
+          }])
+          .select()
+          .single();
+
+        if (createError) throw new Error('No se pudo crear cliente genérico fallback: ' + createError.message);
+        entityData = newCounter;
+      }
+    }
 
     const customerSnapshot = {
       snapshot_name: entityData.name,
@@ -206,6 +244,13 @@ export async function processSecureCheckout(
           currency_local: exchangeData.currency,
           currency_symbol: exchangeData.symbol,
           total_local: totalLocal,
+          cart_lines: documentLines.map((line: any) => ({
+            description: line.description,
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            tax_amount: line.tax_amount,
+            total: new Decimal(line.unit_price).times(line.quantity).toNumber()
+          }))
         }
       }])
       .select()

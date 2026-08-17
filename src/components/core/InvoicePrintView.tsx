@@ -83,18 +83,32 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
           {/* Invoice Summary */}
           <div className="border border-slate-800 rounded-xl overflow-hidden print:border-gray-300">
             <div className="bg-slate-950/80 print:bg-gray-200 px-4 py-2.5 text-xs font-semibold text-slate-400 print:text-gray-700 grid grid-cols-4">
-              <span className="col-span-2">Concepto / Resumen</span>
-              <span className="text-right">Método</span>
-              <span className="text-right">Monto</span>
+              <span className="col-span-2">Concepto / Artículo</span>
+              <span className="text-right">Cantidad x P. Unit</span>
+              <span className="text-right">Total</span>
             </div>
-            <div className="p-4 text-sm space-y-2">
-              <div className="grid grid-cols-4 text-slate-200 print:text-black">
-                <span className="col-span-2 font-medium">Venta General POS</span>
-                <span className="text-right text-xs uppercase font-mono text-slate-400 print:text-gray-700">
-                  {metadata.payment_method || 'Contado'}
-                </span>
-                <span className="text-right font-bold">${Number(document.subtotal_amount || 0).toFixed(2)}</span>
-              </div>
+            <div className="p-4 text-sm space-y-3">
+              {metadata.cart_lines && metadata.cart_lines.length > 0 ? (
+                metadata.cart_lines.map((line: any, idx: number) => (
+                  <div key={idx} className="grid grid-cols-4 text-slate-200 print:text-black items-center text-xs">
+                    <span className="col-span-2 font-semibold text-white print:text-black">{line.description}</span>
+                    <span className="text-right font-mono text-slate-400 print:text-gray-700">
+                      {line.quantity} x ${Number(line.unit_price).toFixed(2)}
+                    </span>
+                    <span className="text-right font-bold text-slate-100 print:text-black">
+                      ${Number(line.total || (line.unit_price * line.quantity)).toFixed(2)}
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="grid grid-cols-4 text-slate-200 print:text-black items-center">
+                  <span className="col-span-2 font-medium">Venta General POS</span>
+                  <span className="text-right text-xs uppercase font-mono text-slate-400 print:text-gray-700">
+                    {metadata.payment_method || 'Contado'}
+                  </span>
+                  <span className="text-right font-bold">${Number(document.subtotal_amount || 0).toFixed(2)}</span>
+                </div>
+              )}
             </div>
           </div>
 

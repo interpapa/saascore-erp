@@ -28,6 +28,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
       full_name: (formData.get('full_name') as string) || (formData.get('name') as string),
       phone: (formData.get('phone') as string) || null,
       email: (formData.get('email') as string) || null,
+      tax_id: (formData.get('tax_id') as string) || null,
       address: (formData.get('address') as string) || null,
       total_debt: initialData ? initialData.metadata?.total_debt : 0
     };
@@ -82,6 +83,14 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
             required
             autoFocus
             defaultValue={initialData?.name}
+          />
+
+          <Input
+            name="tax_id"
+            label="Identificación Fiscal (RIF/NIF)"
+            placeholder="Ej. J-12345678-0"
+            icon={<User size={18} />}
+            defaultValue={initialData?.tax_id}
           />
 
           <Input
