@@ -29,6 +29,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${error ? 'border-red-500 focus:ring-red-500/20 focus:border-red-500' : ''}
               ${className}
             `}
+            onFocus={(e) => {
+              if (props.type === 'number' || props.inputMode === 'numeric') {
+                e.target.select();
+              }
+              if (props.onFocus) props.onFocus(e);
+            }}
             {...props}
           />
         </div>

@@ -5,8 +5,8 @@ import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
 import { getItemsAction, createItemAction, updateItemAction, deleteItemAction } from '@/app/actions/items';
 import { getAuditLogsAction } from '@/app/actions/audit';
-import { Item } from '@/lib/api/items';
-import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart, Activity } from 'lucide-react';
+import { QuickStockModal } from '@/components/ui/QuickStockModal';
+import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart, Activity, PackagePlus } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
@@ -22,6 +22,7 @@ type TabType = 'items' | 'audit';
 export default function CatalogoPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -198,6 +199,13 @@ export default function CatalogoPage() {
         {activeTab === 'items' && (
           <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
             <ViewToggle storageKey="catalogo-view-mode" currentView={viewMode} onViewChange={setViewMode} />
+            <button
+              onClick={() => setIsStockModalOpen(true)}
+              className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white btn-haptic flex items-center gap-2"
+            >
+              <PackagePlus size={18} />
+              Reponer Stock
+            </button>
             <button
               onClick={() => setIsModalOpen(true)}
               className="btn-base btn-primary btn-haptic flex items-center gap-2"
@@ -442,6 +450,13 @@ export default function CatalogoPage() {
           setIsModalOpen(true);
         }}
         onDelete={handleDeleteItem}
+      />
+
+      <QuickStockModal
+        isOpen={isStockModalOpen}
+        onClose={() => setIsStockModalOpen(false)}
+        onSuccess={fetchItems}
+        items={items}
       />
     </div>
   );

@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, User, Phone, Mail, MapPin } from 'lucide-react';
+import { X, User, Mail, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { PhoneInput } from '@/components/ui/PhoneInput';
 
 interface ClientModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ interface ClientModalProps {
 export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string>(initialData?.phone || '');
 
   if (!isOpen) return null;
 
@@ -26,7 +28,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
     const formData = new FormData(e.currentTarget);
     const clientData = {
       full_name: (formData.get('full_name') as string) || (formData.get('name') as string),
-      phone: (formData.get('phone') as string) || null,
+      phone: phone || (formData.get('phone') as string) || null,
       email: (formData.get('email') as string) || null,
       tax_id: (formData.get('tax_id') as string) || null,
       address: (formData.get('address') as string) || null,
@@ -93,13 +95,11 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
             defaultValue={initialData?.tax_id}
           />
 
-          <Input
-            name="phone"
-            label="Teléfono (WhatsApp)"
-            type="tel"
-            placeholder="+52 123 456 7890"
-            icon={<Phone size={18} />}
-            defaultValue={initialData?.phone}
+          <PhoneInput
+            label="Teléfono / WhatsApp"
+            value={phone}
+            onChange={setPhone}
+            placeholder="412 1234567"
           />
 
           <Input

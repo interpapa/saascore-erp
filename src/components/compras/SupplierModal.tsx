@@ -8,6 +8,8 @@ import { createEntityAction } from '@/app/actions/entities';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 
+import { PhoneInput } from '@/components/ui/PhoneInput';
+
 interface SupplierModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -19,6 +21,7 @@ export function SupplierModal({ isOpen, onClose, onSuccess }: SupplierModalProps
   const { session } = useERPStore();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState<string>('');
 
   if (!isOpen) return null;
 
@@ -49,7 +52,7 @@ export function SupplierModal({ isOpen, onClose, onSuccess }: SupplierModalProps
           type: 'supplier',
           name: supplierName,
           email: (form.get('email') as string) || null,
-          phone: (form.get('phone') as string) || null,
+          phone: phone || (form.get('phone') as string) || null,
           address: (form.get('address') as string) || null,
           tax_id: (form.get('tax_id') as string) || null,
           status: 'active',
@@ -109,11 +112,11 @@ export function SupplierModal({ isOpen, onClose, onSuccess }: SupplierModalProps
               label="RIF / Identificación Fiscal"
               placeholder="J-12345678-9"
             />
-            <Input
-              name="phone"
+            <PhoneInput
               label="Teléfono"
-              placeholder="+58 412..."
-              icon={<Phone size={18} />}
+              value={phone}
+              onChange={setPhone}
+              placeholder="412 1234567"
             />
           </div>
 

@@ -8,7 +8,9 @@ import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { createDocumentAction } from '@/app/actions/documents';
 import { InvoicePrintView } from '@/components/core/InvoicePrintView';
-import { Search, ShoppingCart, ShoppingBag, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2 } from 'lucide-react';
+import { QuickStockModal } from '@/components/ui/QuickStockModal';
+import { PhoneInput } from '@/components/ui/PhoneInput';
+import { Search, ShoppingCart, ShoppingBag, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2, PackagePlus } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
@@ -32,6 +34,7 @@ export default function CajaPage() {
 
   // Customer Modal State
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', tax_id: '' });
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   
@@ -238,15 +241,25 @@ export default function CajaPage() {
             </h2>
             <p className="text-xs text-slate-500 font-medium mt-0.5">Catálogo de productos y servicios en tiempo real</p>
           </div>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-            <input
-              type="text"
-              placeholder="Buscar por nombre o SKU..."
-              value={searchItem}
-              onChange={(e) => setSearchItem(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm font-medium text-foreground transition-all"
-            />
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => setIsStockModalOpen(true)}
+              className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 btn-haptic shrink-0"
+              title="Entrada rápida de stock"
+            >
+              <PackagePlus size={16} />
+              <span className="hidden sm:inline">Reponer Stock</span>
+            </button>
+            <div className="relative flex-1 sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar por nombre o SKU..."
+                value={searchItem}
+                onChange={(e) => setSearchItem(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 rounded-xl bg-background border border-border focus:outline-none focus:ring-2 focus:ring-primary/30 text-sm font-medium text-foreground transition-all"
+              />
+            </div>
           </div>
         </div>
 
@@ -569,17 +582,15 @@ export default function CajaPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Teléfono</label>
-                  <input
-                    type="text"
-                    placeholder="+56912345678"
+                <div className="col-span-2 sm:col-span-1">
+                  <PhoneInput
+                    label="Teléfono"
                     value={newCustomer.phone}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    onChange={(val) => setNewCustomer({ ...newCustomer, phone: val })}
+                    placeholder="412 1234567"
                   />
                 </div>
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Identificación Fiscal</label>
                   <input
                     type="text"
@@ -648,6 +659,17 @@ export default function CajaPage() {
           </div>
         </div>
       )}
+
+      <QuickStockModal
+        isOpen={isStockModalOpen}
+        onClose={() => setIsStockModalOpen(false)}
+        onSuccess={async () => {
+          if (!currentTenant?.id) return;
+          const itemsRes = await getItemsAction(currentTenant.id);
+          if (itemsRes?.success) setItems(itemsRes.items || []);
+        }}
+        items={items}
+      />
     </div>
   );
 }
