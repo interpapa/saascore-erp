@@ -5,6 +5,7 @@ import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
 import { getItemsAction, createItemAction, updateItemAction, deleteItemAction } from '@/app/actions/items';
 import { getAuditLogsAction } from '@/app/actions/audit';
+import { Item } from '@/lib/api/items';
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { Plus, Package, DollarSign, AlertTriangle, ShoppingCart, Activity, PackagePlus } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
