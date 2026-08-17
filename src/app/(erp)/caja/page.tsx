@@ -6,7 +6,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { processSecureCheckout } from '@/app/actions/checkout';
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
-import { createDocumentWithLines } from '@/lib/api/documents';
+import { createDocumentAction } from '@/app/actions/documents';
 import { InvoicePrintView } from '@/components/core/InvoicePrintView';
 import { Search, ShoppingCart, ShoppingBag, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2 } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -156,25 +156,36 @@ export default function CajaPage() {
         ? (customers[0]?.id || currentTenant.id) 
         : selectedCustomer;
 
+      const actor = {
+        email: session?.userEmail || 'admin@saascore.com',
+        role: session?.role || ('owner' as const),
+      };
+
       if (status === 'draft') {
-        await createDocumentWithLines({
-          tenant_id: currentTenant.id,
-          entity_id: customerId,
-          type: 'quote',
-          status: 'draft',
-          document_number: `PRES-${Date.now().toString().slice(-6)}`,
-          issue_date: new Date().toISOString(),
-          due_date: null,
-          notes: null,
-          metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes },
-          lines: ticketLines.map((l) => ({
-            item_id: l.item.id,
-            description: l.item.name,
-            quantity: l.quantity,
-            unit_price: l.item.base_price || 0,
-            tax_amount: chargeTaxes ? (l.item.base_price || 0) * 0.16 : 0,
-          })),
-        });
+        const res = await createDocumentAction(
+          {
+            entity_id: customerId,
+            type: 'quote',
+            status: 'draft',
+            document_number: `COT-${Date.now().toString().slice(-6)}`,
+            issue_date: new Date().toISOString(),
+            due_date: null,
+            notes: null,
+            metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes },
+            lines: ticketLines.map((l) => ({
+              item_id: l.item.id,
+              description: l.item.name,
+              quantity: l.quantity,
+              unit_price: l.item.base_price || 0,
+              tax_amount: chargeTaxes ? (l.item.base_price || 0) * 0.16 : 0,
+            })),
+          },
+          currentTenant.id,
+          actor
+        );
+
+        if (!res.success) throw new Error(res.error);
+
         toast({ variant: 'success', title: 'Borrador Guardado', description: 'El presupuesto ha sido registrado.' });
       } else {
         const cartPayload = ticketLines.map((l) => ({ itemId: l.item.id, quantity: l.quantity }));

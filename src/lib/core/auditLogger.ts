@@ -31,8 +31,27 @@ export interface AuditEntry {
   metadata?: Record<string, any>; // Contexto adicional (montos, estados anteriores, etc.)
 }
 
+const CRITICAL_AUDIT_ACTIONS = [
+  'invoice.created',
+  'invoice.voided',
+  'payment.recorded',
+  'payroll.processed',
+  'permission.denied',
+  'login.failed'
+];
+
 export async function writeAuditLog(entry: AuditEntry): Promise<void> {
   try {
+    const isCritical = CRITICAL_AUDIT_ACTIONS.includes(entry.action);
+    const enableVerbose = entry.metadata?.enable_verbose_audit === true;
+
+    // Si no es un evento crítico de seguridad/finanzas y no se ha solicitado registro detallado,
+    // desviamos el log a la consola del servidor Next.js para optimizar almacenamiento en Supabase.
+    if (!isCritical && !enableVerbose) {
+      console.log(`[AUDIT ROUTINE LOG]: ${entry.actor_email} (${entry.actor_role}) -> ${entry.action} on ${entry.target_type} (${entry.target_id || 'N/A'})`);
+      return;
+    }
+
     const { error } = await supabaseAdmin
       .from('audit_logs')
       .insert([{
