@@ -16,6 +16,7 @@ const routeToModuleId: Record<string, string> = {
   '/caja': 'caja',
   '/clientes': 'clientes',
   '/catalogo': 'catalogo',
+  '/estadisticas': 'estadisticas',
   '/compras': 'compras',
   '/contabilidad': 'contabilidad',
   '/calendario': 'calendario',
@@ -23,7 +24,8 @@ const routeToModuleId: Record<string, string> = {
   '/kanban': 'kanban',
   '/equipo': 'equipo',
   '/franquicias': 'franquicias',
-  '/integraciones': 'integraciones'
+  '/integraciones': 'integraciones',
+  '/apps': 'apps'
 };
 
 export default function ERPLayout({
