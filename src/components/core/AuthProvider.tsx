@@ -103,11 +103,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isPublic = isPublicRoute(pathname);
 
+    // Solo redirigir si el usuario NO está autenticado y está en ruta privada
     if (!session && !isPublic) {
       router.push('/login');
-    } else if (session && !session.tenantId && pathname !== '/onboarding') {
+    } 
+    // Solo redirigir a onboarding si falta el tenantId y no está ya en onboarding
+    else if (session && !session.tenantId && pathname !== '/onboarding') {
       router.push('/onboarding');
-    } else if (session && session.tenantId && (isPublic || pathname === '/onboarding')) {
+    } 
+    // Solo redirigir a dashboard si está en /login o /onboarding teniendo sesión
+    else if (session && session.tenantId && (pathname === '/login' || pathname === '/onboarding')) {
       router.push('/dashboard');
     }
   }, [session, isLoading, pathname, router]);

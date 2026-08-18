@@ -79,7 +79,7 @@ export default function ERPLayout({
               </div>
             </div>
           ) : (
-            <ErrorBoundary key={pathname} moduleName="este módulo">
+            <ErrorBoundary moduleName="este módulo">
               <Suspense 
                 fallback={
                   <div className="w-full max-w-6xl mx-auto px-6 py-12 flex justify-center items-center">

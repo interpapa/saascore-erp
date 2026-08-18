@@ -18,9 +18,11 @@ export interface SessionData {
 interface ERPState {
   session: SessionData | null;
   currentTenant: Tenant | null;
+  hasHydrated: boolean;
   
   setSession: (session: SessionData | null) => void;
   setCurrentTenant: (tenant: Tenant | null) => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useERPStore = create<ERPState>()(
@@ -28,13 +30,18 @@ export const useERPStore = create<ERPState>()(
     (set) => ({
       session: null,
       currentTenant: null,
+      hasHydrated: false,
       
       setSession: (session) => set({ session }),
       setCurrentTenant: (tenant) => set({ currentTenant: tenant }),
+      setHasHydrated: (hasHydrated) => set({ hasHydrated }),
     }),
     {
       name: 'saascore-erp-storage',
       storage: createJSONStorage(() => localStorage),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
