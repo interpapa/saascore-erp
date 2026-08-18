@@ -68,7 +68,17 @@ export async function processSecureCheckout(
     }
 
     if (!cart.length || !entityId || !tenantId) {
-      throw new Error('Datos incompletos para el checkout');
+      return { success: false, error: 'Datos insuficientes para procesar la transacción.' };
+    }
+
+    // Validación de estrés: Evitar cantidades negativas, NaN o extremadamente gigantes
+    for (const item of cart) {
+      if (!item.itemId || typeof item.quantity !== 'number' || isNaN(item.quantity) || item.quantity <= 0) {
+        return { success: false, error: `Cantidad inválida para el producto ID: ${item.itemId || 'desconocido'}` };
+      }
+      if (item.quantity > 1000000) {
+        return { success: false, error: 'La cantidad por ítem no puede superar 1,000,000 de unidades.' };
+      }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
