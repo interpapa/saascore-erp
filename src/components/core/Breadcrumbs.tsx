@@ -141,12 +141,12 @@ export function Breadcrumbs() {
                   {crumb.label}
                 </span>
               ) : (
-                <a
+                <Link
                   href={crumb.href}
                   className="text-sm font-medium text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors truncate max-w-[100px]"
                 >
                   {crumb.label}
-                </a>
+                </Link>
               )}
             </span>
           );
@@ -156,12 +156,12 @@ export function Breadcrumbs() {
       {/* ── Mobile: first + … + last ─────────────────────────────────────── */}
       <div className="flex sm:hidden items-center gap-1 min-w-0 relative">
         {/* First crumb (Launcher) */}
-        <a
+        <Link
           href={crumbs[0].href}
           className="text-sm font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors shrink-0"
         >
           {crumbs[0].label}
-        </a>
+        </Link>
 
         {isMobileCollapsed && (
           <>
@@ -179,14 +179,14 @@ export function Breadcrumbs() {
               {collapseOpen && (
                 <div className="absolute top-full mt-1.5 left-0 z-40 bg-card border border-border rounded-xl shadow-xl py-1 min-w-[160px] animate-in fade-in zoom-in-95 duration-150">
                   {middleCrumbs.map((crumb) => (
-                    <a
+                    <Link
                       key={crumb.href}
                       href={crumb.href}
                       onClick={() => setCollapseOpen(false)}
                       className="block px-4 py-2 text-sm font-medium text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
                       {crumb.label}
-                    </a>
+                    </Link>
                   ))}
                 </div>
               )}

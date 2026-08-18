@@ -45,30 +45,10 @@ export class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error('[ErrorBoundary caught error]:', error, info.componentStack);
-
-    // Auto-heal stale bundle chunk load errors from Vercel deployments
-    const errorMsg = error?.message || '';
-    const isChunkError = 
-      errorMsg.includes('ChunkLoadError') || 
-      errorMsg.includes('Loading chunk') ||
-      errorMsg.includes('Failed to fetch') ||
-      errorMsg.includes('Dynamically imported module');
-
-    if (isChunkError && typeof window !== 'undefined') {
-      const alreadyReloaded = sessionStorage.getItem('auto_reloaded_chunk');
-      if (!alreadyReloaded) {
-        sessionStorage.setItem('auto_reloaded_chunk', 'true');
-        window.location.reload();
-      }
-    }
   }
 
   private handleRetry = () => {
     this.setState({ hasError: false, errorMessage: '' });
-    if (typeof window !== 'undefined') {
-      sessionStorage.removeItem('auto_reloaded_chunk');
-      window.location.reload();
-    }
   };
 
   render() {
