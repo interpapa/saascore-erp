@@ -15,15 +15,15 @@ export function AmbientBackground() {
     <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none select-none transition-colors duration-700 bg-[#F8FAFC] dark:bg-[#080E1A]">
       
       {/* 
-        Luces Ambientales Suaves (Eye-Comfort Pastel Blurs)
-        Reducimos la intensidad y la opacidad (opacity-25 en light, opacity-20 en dark)
-        para eliminar la fatiga visual por colores neón intensos.
+        Luces Ambientales Orgánicas (Cyan, Purple & Pink)
+        Devolvemos los colores vivos (cyan, fucsia y púrpura) con una opacidad equilibrada (45%)
+        para que los destellos de color se vean claramente sin enceguecer.
       */}
-      <div className="absolute top-[-5%] left-[-5%] w-[55%] h-[55%] rounded-full filter blur-[120px] dark:blur-[160px] opacity-30 dark:opacity-20 animate-blob bg-slate-300 dark:bg-indigo-950 transition-all duration-1000"></div>
+      <div className="absolute top-[-5%] left-[-5%] w-[55%] h-[55%] rounded-full filter blur-[110px] dark:blur-[140px] opacity-45 dark:opacity-50 animate-blob bg-cyan-400 dark:bg-indigo-900 transition-all duration-1000"></div>
       
-      <div className="absolute top-[25%] right-[-5%] w-[45%] h-[45%] rounded-full filter blur-[120px] dark:blur-[160px] opacity-25 dark:opacity-20 animate-blob animation-delay-2000 bg-indigo-200 dark:bg-slate-900 transition-all duration-1000"></div>
+      <div className="absolute top-[25%] right-[-5%] w-[45%] h-[45%] rounded-full filter blur-[110px] dark:blur-[140px] opacity-45 dark:opacity-50 animate-blob animation-delay-2000 bg-purple-400 dark:bg-purple-900 transition-all duration-1000"></div>
       
-      <div className="absolute bottom-[-5%] left-[15%] w-[55%] h-[55%] rounded-full filter blur-[120px] dark:blur-[160px] opacity-30 dark:opacity-20 animate-blob animation-delay-4000 bg-blue-200 dark:bg-indigo-950 transition-all duration-1000"></div>
+      <div className="absolute bottom-[-5%] left-[15%] w-[55%] h-[55%] rounded-full filter blur-[110px] dark:blur-[140px] opacity-50 dark:opacity-50 animate-blob animation-delay-4000 bg-pink-400 dark:bg-blue-900 transition-all duration-1000"></div>
 
       {/* 
         Grid Textura Arquitectónica 
