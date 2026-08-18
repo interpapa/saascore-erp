@@ -76,9 +76,9 @@
 
 /* ── Dark Theme ── */
 .dark {
-  --background: #080E1A;
+  --background: #0F172A;
   --foreground: #F1F5F9;
-  --card: #111827;
+  --card: #1E293B;
   --card-foreground: #F1F5F9;
   --border: #1F2D45;
   --border-subtle: #162035;
