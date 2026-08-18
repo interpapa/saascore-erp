@@ -19,7 +19,9 @@ export type AuditAction =
   | 'journal_entry.created'
   | 'login.success'
   | 'login.failed'
-  | 'permission.denied';
+  | 'permission.denied'
+  | 'cash_session.opened'
+  | 'cash_session.closed';
 
 export interface AuditEntry {
   tenant_id: string;

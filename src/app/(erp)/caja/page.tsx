@@ -61,14 +61,16 @@ export default function CajaPage() {
       if (!currentTenant?.id) return;
       try {
         setLoadingData(true);
-        const [itemsRes, customersRes] = await Promise.all([
+        const [itemsRes, customersRes, cashRes] = await Promise.all([
           getItemsAction(currentTenant.id),
           getEntitiesAction(currentTenant.id, 'customer'),
+          getCashSessionStatusAction(currentTenant.id)
         ]);
 
         if (isSubscribed) {
           if (itemsRes?.success) setItems(itemsRes.items || []);
           if (customersRes?.success) setCustomers(customersRes.entities || []);
+          if (cashRes?.success) setCashSessionStatus(cashRes.session || null);
         }
       } catch (err) {
         console.error('Error cargando POS:', err);
@@ -263,11 +265,15 @@ export default function CajaPage() {
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <button
               onClick={() => setIsCashModalOpen(true)}
-              className="btn-base bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 btn-haptic shrink-0"
-              title="Apertura y Cierre Z de Caja"
+              className={`btn-base text-white text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 btn-haptic shrink-0 ${
+                cashSessionStatus ? 'bg-rose-600 hover:bg-rose-700' : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
+              title={cashSessionStatus ? "Cerrar Caja" : "Apertura de Caja"}
             >
               <Wallet size={16} />
-              <span className="hidden sm:inline">Cierre Z / Arqueo</span>
+              <span className="hidden sm:inline">
+                {cashSessionStatus ? `Caja Abierta ($${(cashSessionStatus.expectedCash || cashSessionStatus.initialAmount).toFixed(2)})` : 'Abrir Caja'}
+              </span>
             </button>
             <button
               onClick={() => setIsStockModalOpen(true)}
@@ -729,8 +735,14 @@ export default function CajaPage() {
       <CashRegisterModal
         isOpen={isCashModalOpen}
         onClose={() => setIsCashModalOpen(false)}
-        onSuccess={() => {
-          toast({ variant: 'success', title: 'Sesión de Caja Actualizada' });
+        tenantId={currentTenant?.id || ''}
+        actor={{ email: session?.userEmail || 'admin@saascore.com', role: session?.role || 'owner' }}
+        currentSession={cashSessionStatus}
+        onSuccess={async () => {
+          if (currentTenant?.id) {
+            const res = await getCashSessionStatusAction(currentTenant.id);
+            if (res?.success) setCashSessionStatus(res.session || null);
+          }
         }}
       />
     </div>

@@ -16,6 +16,7 @@ export interface CashSession {
   closedBy?: string;
   countedCash?: number;
   expectedCash?: number;
+  salesCashInSession?: number;
   difference?: number;
   notes?: string;
 }

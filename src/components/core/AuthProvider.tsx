@@ -15,6 +15,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Rutas que NO requieren autenticación
 const PUBLIC_ROUTES = ['/login'];
+const isPublicRoute = (path: string) => PUBLIC_ROUTES.includes(path) || path.startsWith('/c/');
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { session, setSession, setCurrentTenant } = useERPStore();
@@ -100,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isLoading) return;
 
-    const isPublic = PUBLIC_ROUTES.includes(pathname);
+    const isPublic = isPublicRoute(pathname);
 
     if (!session && !isPublic) {
       router.push('/login');
