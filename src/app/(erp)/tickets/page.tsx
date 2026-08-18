@@ -32,9 +32,9 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Document | null>(null);
 
   const fetchTickets = async () => {
-    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
+      if (!currentTenant?.id) return;
       const res = await getDocumentsAction(currentTenant.id, 'work_order');
       if (res.success) {
         setTickets(res.documents as Document[]);

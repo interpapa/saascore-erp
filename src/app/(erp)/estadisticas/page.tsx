@@ -177,16 +177,15 @@ function fmt(n: number): string {
    Página principal
 ───────────────────────────────────────────── */
 export default function EstadisticasPage() {
-  const router = useRouter();
-  const { currentTenant } = useERPStore();
+  const currentTenant = useTenantResolver();
   const [data, setData] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const load = useCallback(async () => {
-    if (!currentTenant?.id) return;
-    setIsLoading(true);
     try {
+      setIsLoading(true);
+      if (!currentTenant?.id) return;
       const tenantId = currentTenant.id;
 
       // Cargar en paralelo para máxima velocidad

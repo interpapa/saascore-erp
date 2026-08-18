@@ -38,9 +38,9 @@ export default function WhatsAppPage() {
 
   // Fetch conversations from Server Action
   const loadConversations = useCallback(async () => {
-    if (!currentTenant?.id) return;
     try {
       setIsLoadingConvs(true);
+      if (!currentTenant?.id) return;
       const res = await getConversationsAction(currentTenant.id, filter);
       if (res?.success && res.conversations) {
         setConversations(res.conversations);

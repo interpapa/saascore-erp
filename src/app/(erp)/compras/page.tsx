@@ -31,9 +31,9 @@ export default function ComprasPage() {
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   const loadData = useCallback(async () => {
-    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
+      if (!currentTenant?.id) return;
       const [suppliersRes, posRes, itemsRes] = await Promise.all([
         getEntitiesAction(currentTenant.id, 'supplier', 50),
         getDocumentsAction(currentTenant.id, 'purchase_order', 50),

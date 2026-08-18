@@ -94,9 +94,9 @@ export default function ContabilidadPage() {
   }, [period, router]);
 
   const fetchAccountingData = useCallback(async () => {
-    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
+      if (!currentTenant?.id) return;
       const [journalRes, trialRes, incomeRes] = await Promise.all([
         getJournalEntriesAction(currentTenant.id, period),
         getTrialBalanceAction(currentTenant.id, period),
@@ -109,8 +109,8 @@ export default function ContabilidadPage() {
         setTrialTotals(trialRes.totals || { debit: 0, credit: 0 });
       }
       if (incomeRes.success) setIncomeStatement(incomeRes.data);
-    } catch (error) {
-      console.error('Error cargando contabilidad:', error);
+    } catch (err) {
+      console.error('Error cargando contabilidad:', err);
     } finally {
       setIsLoading(false);
     }

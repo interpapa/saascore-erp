@@ -25,9 +25,9 @@ export default function EquipoPage() {
   const [activeTab, setActiveTab] = useState<TabType>('directorio');
 
   const fetchEmployees = useCallback(async () => {
-    if (!currentTenant?.id) return;
     try {
       setIsLoading(true);
+      if (!currentTenant?.id) return;
       const res = await getEntitiesAction(currentTenant.id, 'employee', 50);
       if (res?.success) {
         setEmployees((res.entities as any) || []);

@@ -56,10 +56,12 @@ export default function ClientesPage() {
     toast({ variant: 'success', title: 'Reporte Exportado', description: 'El directorio de clientes se ha descargado en formato CSV.' });
   };
 
+  const currentTenant = useTenantResolver();
+
   const fetchClients = async () => {
-    if (!currentTenant) return;
     try {
       setIsLoading(true);
+      if (!currentTenant?.id) return;
       const result = await getEntitiesAction(currentTenant.id, 'customer');
       if (result.success && result.entities) {
         setClients(result.entities as any);

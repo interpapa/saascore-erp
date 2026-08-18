@@ -45,9 +45,9 @@ export default function CatalogoPage() {
   };
 
   const fetchItems = async () => {
-    if (!activeTenant) return;
     try {
       setIsLoading(true);
+      if (!activeTenant?.id) return;
       const res = await getItemsAction(activeTenant.id);
       if (res.success && res.items) {
         setItems(res.items as any);

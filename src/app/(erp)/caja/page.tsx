@@ -58,9 +58,9 @@ export default function CajaPage() {
     }, 2500);
 
     async function loadData() {
-      if (!currentTenant?.id) return;
       try {
         setLoadingData(true);
+        if (!currentTenant?.id) return;
         const [itemsRes, customersRes, cashRes] = await Promise.all([
           getItemsAction(currentTenant.id),
           getEntitiesAction(currentTenant.id, 'customer'),
