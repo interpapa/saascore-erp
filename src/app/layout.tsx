@@ -23,6 +23,8 @@ export const metadata: Metadata = {
   }
 };
 
+import { ChunkErrorListener } from '@/components/core/ChunkErrorListener';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -35,6 +37,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-300">
+        <ChunkErrorListener />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <AuthProvider>
             <TenantProvider>
