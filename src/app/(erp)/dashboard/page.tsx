@@ -152,7 +152,7 @@ export default function LauncherPage() {
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shadow-xs shrink-0">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
-            <LetterCascade text="SaaSCore OS" className="text-3xl font-black" />
+            <span className="text-3xl font-black text-foreground">SaaSCore OS</span>
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1 font-sans">
             {currentTenant?.name || 'Configurando tu empresa...'}
@@ -176,9 +176,8 @@ export default function LauncherPage() {
 
         {/* 
           Grilla tipo Launchpad / iPhone optimizada.
-          Squircles de tamaño 80px (w-20 h-20, rounded-[24px]) con bordes finos,
-          brillo interior 3D y sombras arrojadas realistas (iOS/macOS Big Sur style).
-          Contiene glifos vectoriales profesionales de Lucide con escalado elástico perfecto.
+          Squircles de tamaño 80px (w-20 h-20, rounded-[24px]) con bordes finos.
+          Sin sombras pesadas en móvil (shadow-none) y brillo 3D en escritorio.
         */}
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-y-12 gap-x-8 justify-items-center">
           {filteredApps.map((app) => (
@@ -187,12 +186,12 @@ export default function LauncherPage() {
               key={app.id}
               className="flex flex-col items-center group btn-haptic w-28"
             >
-              {/* Contenedor Squircle Premium con Efecto de Brillo y Sombra Interior */}
+              {/* Contenedor Squircle Premium: Limpio sin sombra en móvil (shadow-none), 3D en escritorio */}
               <div 
                 className={`
                   w-20 h-20 rounded-[24px] bg-gradient-to-br ${app.gradient}
                   flex items-center justify-center border border-white/15
-                  shadow-[inset_0_1.5px_3px_rgba(255,255,255,0.4),_0_8px_20px_rgba(0,0,0,0.25)]
+                  shadow-none sm:shadow-[inset_0_1.5px_3px_rgba(255,255,255,0.4),_0_8px_20px_rgba(0,0,0,0.25)]
                   transition-all duration-350 ease-out
                   group-hover:scale-105 group-hover:-translate-y-1.5
                   group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.45),_inset_0_2px_4px_rgba(255,255,255,0.6)]

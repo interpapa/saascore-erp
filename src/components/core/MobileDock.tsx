@@ -60,28 +60,21 @@ export function MobileDock() {
               href={item.href}
               className="flex flex-col items-center justify-center relative w-12 h-12 rounded-2xl transition-all btn-haptic"
             >
-              <motion.div
-                animate={{
-                  scale: isActive ? 1.15 : 1,
-                  y: isActive ? -3 : 0
-                }}
-                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                className={`flex items-center justify-center ${isActive ? 'text-primary' : 'text-slate-500 dark:text-slate-400'}`}
+              <div
+                className={`flex items-center justify-center transition-transform duration-200 ${
+                  isActive ? 'scale-110 -translate-y-0.5 text-primary font-bold' : 'text-slate-500 dark:text-slate-400'
+                }`}
               >
                 <IconComponent size={22} strokeWidth={isActive ? 2.5 : 2} />
-              </motion.div>
+              </div>
 
-              <span className={`text-[9px] font-bold mt-1 tracking-tight ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`}>
+              <span className={`text-[9px] font-bold mt-0.5 tracking-tight transition-colors ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`}>
                 {item.label}
               </span>
 
-              {/* Indicador / Bombilla activa de base */}
+              {/* Indicador de base activa */}
               {isActive && (
-                <motion.div
-                  layoutId="activeIndicator"
-                  className="absolute -bottom-1.5 w-1.5 h-1.5 rounded-full bg-primary"
-                  transition={{ type: 'spring', stiffness: 350, damping: 25 }}
-                />
+                <div className="absolute -bottom-1 w-1.5 h-1.5 rounded-full bg-primary transition-all duration-200" />
               )}
             </Link>
           );
