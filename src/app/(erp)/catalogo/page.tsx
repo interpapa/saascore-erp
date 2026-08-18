@@ -14,6 +14,7 @@ import { useToast } from '@/components/core/ToastProvider';
 import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
 import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { CSVImportModal } from '@/components/catalog/CSVImportModal';
 import { useRouter } from 'next/navigation';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
@@ -24,6 +25,7 @@ export default function CatalogoPage() {
   const [items, setItems] = useState<Item[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [isCsvModalOpen, setIsCsvModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -206,6 +208,12 @@ export default function CatalogoPage() {
             >
               <PackagePlus size={18} />
               Reponer Stock
+            </button>
+            <button
+              onClick={() => setIsCsvModalOpen(true)}
+              className="btn-base bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 dark:hover:bg-emerald-500/30 btn-haptic flex items-center gap-2"
+            >
+              Importar Excel / CSV
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -458,6 +466,12 @@ export default function CatalogoPage() {
         onClose={() => setIsStockModalOpen(false)}
         onSuccess={fetchItems}
         items={items}
+      />
+
+      <CSVImportModal
+        isOpen={isCsvModalOpen}
+        onClose={() => setIsCsvModalOpen(false)}
+        onSuccess={fetchItems}
       />
     </div>
   );

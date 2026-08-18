@@ -30,7 +30,8 @@ export async function processSecureCheckout(
   actor: CheckoutActor,
   localizationCode: LocalizationCode = 'VE',
   idempotencyKey?: string,
-  chargeTaxes: boolean = true
+  chargeTaxes: boolean = true,
+  paymentBreakdown?: Array<{ method: 'cash' | 'card' | 'transfer'; amount: number }>
 ) {
   try {
     // Rate Limiting Guard
@@ -235,7 +236,8 @@ export async function processSecureCheckout(
         metadata: {
           localization: localizationCode,
           tax_details: taxResult.details,
-          payment_method: paymentMethod,
+          payment_method: paymentBreakdown ? 'mixed' : paymentMethod,
+          ...(paymentBreakdown ? { payments: paymentBreakdown } : {}),
           timestamp_sealed: new Date().toISOString(),
           customer_snapshot: customerSnapshot,
           idempotency_key: idempotencyKey || null,

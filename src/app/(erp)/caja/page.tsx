@@ -7,6 +7,8 @@ import { processSecureCheckout } from '@/app/actions/checkout';
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { createDocumentAction } from '@/app/actions/documents';
+import { getCashSessionStatusAction, CashSession } from '@/app/actions/cashRegister';
+import { CashRegisterModal } from '@/components/caja/CashRegisterModal';
 import { InvoicePrintView } from '@/components/core/InvoicePrintView';
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { PhoneInput } from '@/components/ui/PhoneInput';
@@ -32,15 +34,18 @@ export default function CajaPage() {
   const [filterType, setFilterType] = useState<'all' | 'product' | 'service'>('all');
   const [filterCategory, setFilterCategory] = useState<string>('all');
 
-  // Customer Modal State
+  // Customer & Cash Register Modal State
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
+  const [isCashModalOpen, setIsCashModalOpen] = useState(false);
+  const [cashSessionStatus, setCashSessionStatus] = useState<CashSession | null>(null);
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', tax_id: '' });
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   
   // Ticket State
   const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'mixed'>('cash');
+  const [mixedPayments, setMixedPayments] = useState({ cash: 0, card: 0, transfer: 0 });
   const [chargeTaxes, setChargeTaxes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -142,6 +147,7 @@ export default function CajaPage() {
   const subtotal = ticketLines.reduce((acc, l) => acc + (l.item.base_price || 0) * l.quantity, 0);
   const taxAmount = chargeTaxes ? subtotal * 0.16 : 0;
   const total = subtotal + taxAmount;
+  const remainingToAssign = total - (mixedPayments.cash + mixedPayments.card + mixedPayments.transfer);
 
   const handleCharge = async (status: 'draft' | 'invoiced') => {
     if (!currentTenant) {
@@ -164,6 +170,18 @@ export default function CajaPage() {
         role: session?.role || ('owner' as const),
       };
 
+      if (paymentMethod === 'mixed' && Math.abs(remainingToAssign) > 0.01) {
+        toast({ variant: 'warning', title: 'Pago Incompleto', description: 'El desglose de pago mixto debe sumar el total exacto.' });
+        setIsSaving(false);
+        return;
+      }
+
+      const paymentBreakdown = paymentMethod === 'mixed' ? [
+        ...(mixedPayments.cash > 0 ? [{ method: 'cash' as const, amount: mixedPayments.cash }] : []),
+        ...(mixedPayments.card > 0 ? [{ method: 'card' as const, amount: mixedPayments.card }] : []),
+        ...(mixedPayments.transfer > 0 ? [{ method: 'transfer' as const, amount: mixedPayments.transfer }] : []),
+      ] : undefined;
+
       if (status === 'draft') {
         const res = await createDocumentAction(
           {
@@ -174,7 +192,7 @@ export default function CajaPage() {
             issue_date: new Date().toISOString(),
             due_date: null,
             notes: null,
-            metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes },
+            metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes, payments: paymentBreakdown },
             lines: ticketLines.map((l) => ({
               item_id: l.item.id,
               description: l.item.name,
@@ -205,7 +223,8 @@ export default function CajaPage() {
           actor,
           'VE',
           undefined,
-          chargeTaxes
+          chargeTaxes,
+          paymentBreakdown
         );
 
         if (!result.success) throw new Error(result.error);
@@ -242,6 +261,14 @@ export default function CajaPage() {
             <p className="text-xs text-slate-500 font-medium mt-0.5">Catálogo de productos y servicios en tiempo real</p>
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
+            <button
+              onClick={() => setIsCashModalOpen(true)}
+              className="btn-base bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 btn-haptic shrink-0"
+              title="Apertura y Cierre Z de Caja"
+            >
+              <Wallet size={16} />
+              <span className="hidden sm:inline">Cierre Z / Arqueo</span>
+            </button>
             <button
               onClick={() => setIsStockModalOpen(true)}
               className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 btn-haptic shrink-0"
@@ -486,7 +513,35 @@ export default function CajaPage() {
             >
               🏦 Transferencia
             </button>
+            <button
+              onClick={() => setPaymentMethod('mixed')}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                paymentMethod === 'mixed' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              🔄 Mixto
+            </button>
           </div>
+
+          {paymentMethod === 'mixed' && (
+            <div className="bg-slate-950/40 p-3 rounded-xl border border-white/5 mb-4 space-y-2">
+              <div className="text-xs text-slate-300 font-bold mb-2">
+                Desglose (Falta: <span className={remainingToAssign > 0.01 ? 'text-rose-400' : remainingToAssign < -0.01 ? 'text-rose-400' : 'text-emerald-400'}>${remainingToAssign.toFixed(2)}</span>)
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 w-20">💵 Efectivo:</span>
+                <input type="number" min="0" step="0.01" value={mixedPayments.cash || ''} onChange={e => setMixedPayments({...mixedPayments, cash: Number(e.target.value)})} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 w-20">💳 Tarjeta:</span>
+                <input type="number" min="0" step="0.01" value={mixedPayments.card || ''} onChange={e => setMixedPayments({...mixedPayments, card: Number(e.target.value)})} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none" />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 w-20">🏦 Transf.:</span>
+                <input type="number" min="0" step="0.01" value={mixedPayments.transfer || ''} onChange={e => setMixedPayments({...mixedPayments, transfer: Number(e.target.value)})} className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white focus:outline-none" />
+              </div>
+            </div>
+          )}
 
           {/* Opción Cobrar IVA */}
           <div className="flex items-center justify-between mb-4 bg-slate-950/40 p-3 rounded-xl border border-white/5">
@@ -669,6 +724,14 @@ export default function CajaPage() {
           if (itemsRes?.success) setItems(itemsRes.items || []);
         }}
         items={items}
+      />
+
+      <CashRegisterModal
+        isOpen={isCashModalOpen}
+        onClose={() => setIsCashModalOpen(false)}
+        onSuccess={() => {
+          toast({ variant: 'success', title: 'Sesión de Caja Actualizada' });
+        }}
       />
     </div>
   );
