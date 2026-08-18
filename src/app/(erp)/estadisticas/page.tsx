@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
+import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction } from '@/app/actions/entities';
 import { getDocumentsAction } from '@/app/actions/documents';
@@ -177,6 +178,7 @@ function fmt(n: number): string {
    Página principal
 ───────────────────────────────────────────── */
 export default function EstadisticasPage() {
+  const router = useRouter();
   const currentTenant = useTenantResolver();
   const [data, setData] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
