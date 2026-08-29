@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuth } from '@/components/core/AuthProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { LetterCascade } from '@/components/ui/LetterCascade';
@@ -23,6 +23,7 @@ import {
   Sparkles 
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
@@ -142,7 +143,15 @@ export default function LauncherPage() {
   ];
   const filteredApps = apps.filter((app) => enabledModules.includes(app.id));
 
-  return (
+  // Prefetch all module routes after login
+  useEffect(() => {
+    if (!currentTenant) return;
+    // Prefetch each enabled module to avoid stale chunk errors
+    filteredApps.forEach((app) => {
+      router.prefetch(app.href);
+    });
+  }, [currentTenant, filteredApps]);
+
     <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
       {/* Header Bar */}
