@@ -349,6 +349,9 @@ export async function processSecureCheckout(
       timestamp: new Date().toISOString()
     });
 
+    newDoc.customer = entityData;
+    newDoc.lines = linesToInsert;
+
     return { success: true, document: newDoc };
 
   } catch (error: any) {

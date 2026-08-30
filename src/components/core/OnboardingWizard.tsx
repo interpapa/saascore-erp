@@ -28,7 +28,7 @@ export const OnboardingWizard = () => {
         
         {/* Header Decorativo */}
         <div className="h-32 bg-gradient-to-br from-indigo-600 to-blue-700 relative flex items-center justify-center">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+          <div className="absolute inset-0 opacity-10" style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/cubes.png')" }}></div>
           <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30 shadow-lg text-white">
             <Rocket size={32} />
           </div>

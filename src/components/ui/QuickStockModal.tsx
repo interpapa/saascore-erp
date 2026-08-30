@@ -64,7 +64,12 @@ export function QuickStockModal({
           title: 'Stock Actualizado',
           description: `Se agregaron +${quantityToAdd} unidades. Nuevo stock: ${res.newStock} uds.`
         });
-        onSuccess();
+                  onSuccess();
+          // Refresh UI to reflect updated stock
+          if (typeof window !== 'undefined') {
+            window.location.reload();
+          }
+          onClose();
         onClose();
       } else {
         toast({ variant: 'error', title: 'Error al actualizar', description: res.error });

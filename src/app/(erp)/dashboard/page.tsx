@@ -28,6 +28,7 @@ import { useRouter } from 'next/navigation';
 export default function LauncherPage() {
   const { signOut } = useAuth();
   const { currentTenant } = useERPStore();
+  const router = useRouter();
 
   const apps = [
     { 
@@ -152,7 +153,8 @@ export default function LauncherPage() {
     });
   }, [currentTenant, filteredApps]);
 
-    <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
+    return (
+        <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 border-b border-border/60 pb-8">

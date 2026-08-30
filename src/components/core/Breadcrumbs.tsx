@@ -107,11 +107,11 @@ export function Breadcrumbs() {
   const params = searchParams ? new URLSearchParams(searchParams.toString()) : undefined;
   const crumbs = buildCrumbs(pathname, params);
 
+  const [collapseOpen, setCollapseOpen] = useState(false);
+
   // If only one crumb (we are on /dashboard), render nothing — the header
   // is already on the Launcher and doesn't need a "back" breadcrumb.
   if (crumbs.length <= 1) return null;
-
-  const [collapseOpen, setCollapseOpen] = useState(false);
 
   // On mobile: show first + last; hide middle crumbs behind a "..." button
   const isMobileCollapsed = crumbs.length > 2;

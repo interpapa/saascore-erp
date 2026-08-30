@@ -9,11 +9,12 @@ import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { createDocumentAction } from '@/app/actions/documents';
 import { getCashSessionStatusAction, CashSession } from '@/app/actions/cashRegister';
 import { CashRegisterModal } from '@/components/caja/CashRegisterModal';
-import { InvoicePrintView } from '@/components/core/InvoicePrintView';
+// import { InvoicePrintView } from '@/components/core/InvoicePrintView'; // Removed due to custom PDF generation
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { Search, ShoppingCart, ShoppingBag, User, Plus, Minus, Trash2, Wallet, FileText, CheckCircle2, PackagePlus } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { getBankAccountsAction } from '@/app/actions/bankAccounts';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
 
@@ -49,7 +50,14 @@ export default function CajaPage() {
   const [chargeTaxes, setChargeTaxes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [printedDoc, setPrintedDoc] = useState<any>(null);
+  // New: Bank accounts and delivery details
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
+  const [deliveryDate, setDeliveryDate] = useState<string>('');
+  const [deliveryContact, setDeliveryContact] = useState<string>('');
+  const [deliveryPhone, setDeliveryPhone] = useState<string>('');
+
 
   useEffect(() => {
     let isSubscribed = true;
@@ -61,16 +69,21 @@ export default function CajaPage() {
       try {
         setLoadingData(true);
         if (!currentTenant?.id) return;
-        const [itemsRes, customersRes, cashRes] = await Promise.all([
+        const [itemsRes, customersRes, cashRes, bankRes] = await Promise.all([
           getItemsAction(currentTenant.id),
           getEntitiesAction(currentTenant.id, 'customer'),
-          getCashSessionStatusAction(currentTenant.id)
+          getCashSessionStatusAction(currentTenant.id),
+          getBankAccountsAction(currentTenant.id),
         ]);
 
         if (isSubscribed) {
           if (itemsRes?.success) setItems(itemsRes.items || []);
           if (customersRes?.success) setCustomers(customersRes.entities || []);
           if (cashRes?.success) setCashSessionStatus(cashRes.session || null);
+          if (bankRes?.success && bankRes.accounts?.length) {
+            setBankAccounts(bankRes.accounts);
+            setSelectedBankAccountId(bankRes.accounts[0].id);
+          }
         }
       } catch (err) {
         console.error('Error cargando POS:', err);
@@ -194,7 +207,7 @@ export default function CajaPage() {
             issue_date: new Date().toISOString(),
             due_date: null,
             notes: null,
-            metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes, payments: paymentBreakdown },
+            metadata: { payment_method: paymentMethod, charge_taxes: chargeTaxes, payments: paymentBreakdown, depositAccountId: selectedBankAccountId, delivery: { address: deliveryAddress, date: deliveryDate, contact: deliveryContact, phone: deliveryPhone } },
             lines: ticketLines.map((l) => ({
               item_id: l.item.id,
               description: l.item.name,
@@ -209,7 +222,51 @@ export default function CajaPage() {
 
         if (!res.success) throw new Error(res.error);
 
-        toast({ variant: 'success', title: 'Borrador Guardado', description: 'El presupuesto ha sido registrado.' });
+        if (res.document) {
+          try {
+            const doc = new jsPDF();
+            const d = res.document;
+            const customerObj = customers.find(c => c.id === customerId);
+            doc.text(`Presupuesto ${d.document_number ?? ''}`, 10, 10);
+            doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 10, 20);
+            doc.text(`Cliente: ${customerObj?.name ?? ''}`, 10, 30);
+            let y = 40;
+            ticketLines.forEach((line: any, idx: number) => {
+              const text = `${idx + 1}. ${line.item.name} - ${line.quantity} x ${line.item.base_price}`;
+              doc.text(text, 10, y);
+              y += 10;
+            });
+            // Datos de Pago (Bank Account)
+            if (selectedBankAccountId && bankAccounts?.length) {
+              const acc = bankAccounts.find(a => a.id === selectedBankAccountId);
+              if (acc) {
+                doc.text('Datos de Pago:', 10, y); y += 10;
+                doc.text(`Banco: ${acc.bank_name ?? ''}`, 10, y); y += 10;
+                doc.text(`Tipo de Cuenta: ${acc.account_type ?? ''}`, 10, y); y += 10;
+                doc.text(`Número: ${acc.account_number ?? ''}`, 10, y); y += 10;
+                if (acc.holder_name) { doc.text(`Titular: ${acc.holder_name}`, 10, y); y += 10; }
+                if (acc.notes) { doc.text(`Notas: ${acc.notes}`, 10, y); y += 10; }
+              }
+            }
+            // Datos de Entrega (Delivery)
+            if (deliveryAddress) {
+              doc.text('Datos de Entrega:', 10, y); y += 10;
+              doc.text(`Dirección: ${deliveryAddress}`, 10, y); y += 10;
+              if (deliveryDate) { doc.text(`Fecha: ${deliveryDate}`, 10, y); y += 10; }
+              if (deliveryContact) { doc.text(`Contacto: ${deliveryContact}`, 10, y); y += 10; }
+              if (deliveryPhone) { doc.text(`Teléfono: ${deliveryPhone}`, 10, y); y += 10; }
+            }
+            doc.save(`presupuesto-${d.document_number ?? Date.now()}.pdf`);
+          } catch (err) {
+            toast({
+              variant: 'error',
+              title: 'Error PDF',
+              description: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+
+        toast({ variant: 'success', title: 'Borrador Guardado', description: 'El presupuesto ha sido registrado y descargado.' });
       } else {
         const cartPayload = ticketLines.map((l) => ({ itemId: l.item.id, quantity: l.quantity }));
         const actor = {
@@ -232,7 +289,28 @@ export default function CajaPage() {
         if (!result.success) throw new Error(result.error);
 
         if (result.document) {
-          setPrintedDoc(result.document);
+          // Generate PDF using jsPDF
+          try {
+            const doc = new jsPDF();
+            const d = result.document;
+            doc.text(`Factura ${d.document_number ?? ''}`, 10, 10);
+            doc.text(`Fecha: ${d.created_at ?? ''}`, 10, 20);
+            doc.text(`Cliente: ${d.customer?.name ?? ''}`, 10, 30);
+            const lines = d.lines ?? [];
+            let y = 40;
+            lines.forEach((line: any, idx: number) => {
+              const text = `${idx + 1}. ${line.description ?? ''} - ${line.quantity ?? ''} x ${line.unit_price ?? ''}`;
+              doc.text(text, 10, y);
+              y += 10;
+            });
+            doc.save(`factura-${d.document_number ?? Date.now()}.pdf`);
+          } catch (err) {
+            toast({
+              variant: 'error',
+              title: 'PDF generation failed',
+              description: err instanceof Error ? err.message : String(err),
+            });
+          }
         }
         toast({ variant: 'success', title: '¡Venta Exitosa!', description: `Factura ${result.document?.document_number || ''} generada.` });
       }
@@ -549,19 +627,55 @@ export default function CajaPage() {
             </div>
           )}
 
-          {/* Opción Cobrar IVA */}
-          <div className="flex items-center justify-between mb-4 bg-slate-950/40 p-3 rounded-xl border border-white/5">
-            <span className="text-xs text-slate-300 font-bold">Cobrar IVA (16%)</span>
-            <button
-              type="button"
-              onClick={() => setChargeTaxes(!chargeTaxes)}
-              className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${chargeTaxes ? 'bg-indigo-600' : 'bg-slate-700'}`}
+          {/* Datos de Pago (Cuenta) */}
+          <div className="mb-4">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Cuenta para depósito</label>
+            <select
+              value={selectedBankAccountId}
+              onChange={e => setSelectedBankAccountId(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             >
-              <span
-                className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${chargeTaxes ? 'translate-x-4.5' : 'translate-x-0'}`}
-              />
-            </button>
+              {bankAccounts.map(acc => (
+                <option key={acc.id} value={acc.id}>
+                  {acc.bank_name} - {acc.account_number?.slice(-4)}
+                </option>
+              ))}
+            </select>
           </div>
+          {/* Datos de Entrega */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Dirección de entrega</label>
+            <input
+              type="text"
+              placeholder="Calle, número, ciudad"
+              value={deliveryAddress}
+              onChange={e => setDeliveryAddress(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Fecha de entrega</label>
+            <input
+              type="date"
+              value={deliveryDate}
+              onChange={e => setDeliveryDate(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Contacto</label>
+            <input
+              type="text"
+              placeholder="Nombre del contacto"
+              value={deliveryContact}
+              onChange={e => setDeliveryContact(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl px-3.5 py-2 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Teléfono</label>
+            <PhoneInput
+              label=""
+              value={deliveryPhone}
+              onChange={val => setDeliveryPhone(val)}
+              placeholder="444 1234567"
+            />
+          </div>
+
 
           <div className="space-y-1 mb-4 border-b border-white/5 pb-4">
             <div className="flex justify-between text-xs text-slate-400">
@@ -605,10 +719,6 @@ export default function CajaPage() {
         </div>
 
       </div>
-
-      {printedDoc && (
-        <InvoicePrintView document={printedDoc} onClose={() => setPrintedDoc(null)} />
-      )}
 
       {isCustomerModalOpen && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">

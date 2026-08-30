@@ -263,7 +263,37 @@ export async function adjustItemStockAction(
     const newStock = Math.max(0, currentStock + quantityDelta);
 
     // 2. Actualizar stock
+        // 2. Actualizar stock con fallback y registrar cuál columna se usó
+    let stockFieldUsed = 'stock';
     let { error } = await supabaseAdmin
+      .from('items')
+      .update({ stock: newStock })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (error && (error.message.includes('stock') || error.message.includes('column'))) {
+      // Intentar con stock_quantity
+      const retryQty = await supabaseAdmin
+        .from('items')
+        .update({ stock_quantity: newStock })
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+      error = retryQty.error;
+      if (!error) stockFieldUsed = 'stock_quantity';
+    }
+
+    if (error && (error.message.includes('quantity') || error.message.includes('column'))) {
+      // Intentar con columna genérica quantity
+      const retryQuantity = await supabaseAdmin
+        .from('items')
+        .update({ quantity: newStock })
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+      error = retryQuantity.error;
+      if (!error) stockFieldUsed = 'quantity';
+    }
+
+    if (error) throw new Error('Error al actualizar inventario: ' + error.message);
       .from('items')
       .update({ stock: newStock })
       .eq('id', id)
