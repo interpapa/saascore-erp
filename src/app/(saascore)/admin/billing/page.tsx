@@ -6,6 +6,7 @@ import { ArrowLeft, Users, DollarSign, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
+import { EmptyState } from '@/components/core/EmptyState';
 export const dynamic = 'force-dynamic';
 
 export default function BillingAdminPage() {
