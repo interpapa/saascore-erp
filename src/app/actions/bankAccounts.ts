@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { ActionActor } from '@/lib/core/types';
+import { ActionActor } from '@/app/actions/entities';
 
 export interface BankAccount {
   id: string;
