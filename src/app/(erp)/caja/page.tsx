@@ -17,7 +17,7 @@ import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { getBankAccountsAction } from '@/app/actions/bankAccounts';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
-
+import { jsPDF } from 'jspdf';
 export default function CajaPage() {
   const currentTenant = useTenantResolver();
   const searchParams = useSearchParams();
