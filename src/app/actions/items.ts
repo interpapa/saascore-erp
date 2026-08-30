@@ -294,10 +294,7 @@ export async function adjustItemStockAction(
     }
 
     if (error) throw new Error('Error al actualizar inventario: ' + error.message);
-      .from('items')
-      .update({ stock: newStock })
-      .eq('id', id)
-      .eq('tenant_id', tenantId);
+
 
     if (error && (error.message.includes('stock') || error.message.includes('column'))) {
       const retry = await supabaseAdmin
