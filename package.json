@@ -9,8 +9,6 @@
     "lint": "eslint",
     "deploy": "npx vercel --prod --yes --token $VERCEL_TOKEN"
   },
-
-  },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
     "decimal.js": "^10.6.0",
