@@ -263,13 +263,15 @@ export async function adjustItemStockAction(
     const newStock = Math.max(0, currentStock + quantityDelta);
 
     // 2. Actualizar stock
-        // 2. Actualizar stock con fallback y registrar cuál columna se usó
+    // 2. Actualizar stock con fallback y registrar cuál columna se usó
     let stockFieldUsed = 'stock';
-    let { error } = await supabaseAdmin
+    let error: any = null;
+    const result = await supabaseAdmin
       .from('items')
       .update({ stock: newStock })
       .eq('id', id)
       .eq('tenant_id', tenantId);
+    error = result.error;
 
     if (error && (error.message.includes('stock') || error.message.includes('column'))) {
       // Intentar con stock_quantity
@@ -296,16 +298,9 @@ export async function adjustItemStockAction(
     if (error) throw new Error('Error al actualizar inventario: ' + error.message);
 
 
-    if (error && (error.message.includes('stock') || error.message.includes('column'))) {
-      const retry = await supabaseAdmin
-        .from('items')
-        .update({ stock_quantity: newStock })
-        .eq('id', id)
-        .eq('tenant_id', tenantId);
-      error = retry.error;
-    }
 
-    if (error) throw new Error('Error al actualizar inventario: ' + error.message);
+
+
 
     await writeAuditLog({
       tenant_id: tenantId,
