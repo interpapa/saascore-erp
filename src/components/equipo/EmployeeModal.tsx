@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 interface EmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => Promise<void>;
+  onSave: (data: unknown) => Promise<void>;
 }
 
 export function EmployeeModal({ isOpen, onClose, onSave }: EmployeeModalProps) {
@@ -40,8 +40,8 @@ export function EmployeeModal({ isOpen, onClose, onSave }: EmployeeModalProps) {
     try {
       await onSave(data);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar el empleado');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar el empleado');
     } finally {
       setIsLoading(false);
     }

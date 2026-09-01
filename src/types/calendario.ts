@@ -16,7 +16,7 @@ export interface Service {
   category?: string | null;
   color?: string | null;
   is_active: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -31,7 +31,7 @@ export interface Employee {
   avatar_url?: string | null;
   specialties?: string[];
   is_active: boolean;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -56,7 +56,7 @@ export interface Appointment {
   notes?: string | null;
   price?: number;
   location?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -86,7 +86,7 @@ export interface CreateAppointmentInput {
   notes?: string | null;
   price?: number;
   location?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface UpdateAppointmentInput extends Partial<CreateAppointmentInput> {

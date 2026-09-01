@@ -10,7 +10,7 @@ interface CatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (item: CreateItemInput) => Promise<void>;
-  editItem?: any | null;
+  editItem?: unknown | null;
 }
 
 export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModalProps) {
@@ -20,8 +20,10 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
 
   useEffect(() => {
     if (editItem) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setItemType(editItem.type);
     } else {
+       
       setItemType('product');
     }
   }, [editItem, isOpen]);
@@ -54,8 +56,8 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
     try {
       await onSave(itemData);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar el ítem');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar el ítem');
     } finally {
       setIsLoading(false);
     }

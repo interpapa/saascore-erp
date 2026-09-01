@@ -6,7 +6,7 @@ export interface Tenant {
   id: string;
   name: string;
   blocked: boolean;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 export interface SessionData {

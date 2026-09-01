@@ -9,7 +9,7 @@ interface CashRegisterModalProps {
   isOpen: boolean;
   onClose: () => void;
   tenantId: string;
-  actor: { email: string; role: any };
+  actor: { email: string; role: unknown };
   currentSession: CashSession | null;
   onSuccess: () => void;
 }
@@ -30,8 +30,11 @@ export function CashRegisterModal({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitialAmount(0);
+       
       setCountedCash(0);
+       
       setNotes('');
     }
   }, [isOpen]);
@@ -64,8 +67,8 @@ export function CashRegisterModal({
           throw new Error(res.error);
         }
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error', description: err.message || 'Error al procesar la caja.' });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error', description: (err as Error).message || 'Error al procesar la caja.' });
     } finally {
       setIsLoading(false);
     }

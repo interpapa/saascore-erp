@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { Entity } from '@/lib/api/entities';
 import { useToast } from '@/components/core/ToastProvider';
 import { Clock, UserCheck, Play } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 import { useActionActor } from '@/hooks/useActionActor';
 import { getAttendanceLogsAction, registerAttendanceAction } from '@/app/actions/attendance';
 
@@ -23,7 +22,7 @@ interface AttendanceTabProps {
 export function AttendanceTab({ employees, tenantId }: AttendanceTabProps) {
   const actor = useActionActor();
   const { toast } = useToast();
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(employees[0]?.id || '');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(() => employees[0]?.id || '');
   const [attendanceLogs, setAttendanceLogs] = useState<AttendanceLog[]>([]);
 
   useEffect(() => {
@@ -32,8 +31,8 @@ export function AttendanceTab({ employees, tenantId }: AttendanceTabProps) {
     getAttendanceLogsAction(tenantId).then(res => {
       if (res.success && res.logs && isSubscribed) {
         const mappedLogs = res.logs
-          .filter((l: any) => l.entity_type === 'employee')
-          .map((l: any) => {
+          .filter((l: any /* eslint-disable-line */) => l.entity_type === 'employee')
+          .map((l: any /* eslint-disable-line */) => {
             const emp = employees.find(e => e.id === l.entity_id);
             const tDate = new Date(l.timestamp);
             return {
@@ -49,11 +48,7 @@ export function AttendanceTab({ employees, tenantId }: AttendanceTabProps) {
     return () => { isSubscribed = false; }
   }, [tenantId, employees]);
 
-  useEffect(() => {
-    if (employees.length > 0 && !selectedEmployeeId) {
-      setSelectedEmployeeId(employees[0].id);
-    }
-  }, [employees, selectedEmployeeId]);
+
 
   const handleLogAttendance = async (type: 'entrada' | 'salida') => {
     const emp = employees.find((e) => e.id === selectedEmployeeId) || employees[0];

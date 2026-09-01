@@ -1,7 +1,7 @@
 'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { checkPermission, UserRole } from '@/lib/rbac';
+import { UserRole } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { revalidatePath } from 'next/cache';
@@ -21,7 +21,7 @@ export interface CreateEntityInput {
   tax_id?: string | null;
   address?: string | null;
   status?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export async function createEntityAction(
@@ -76,9 +76,9 @@ export async function createEntityAction(
     revalidatePath('/franquicias');
 
     return { success: true, entity: newEntity };
-  } catch (err: any) {
-    console.error('[createEntityAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[createEntityAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -117,9 +117,9 @@ export async function updateEntityAction(
     revalidatePath('/franquicias');
 
     return { success: true, entity: updatedEntity };
-  } catch (err: any) {
-    console.error('[updateEntityAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[updateEntityAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -156,9 +156,9 @@ export async function deleteEntityAction(
     revalidatePath('/franquicias');
 
     return { success: true };
-  } catch (err: any) {
-    console.error('[deleteEntityAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[deleteEntityAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -183,9 +183,9 @@ export async function getEntitiesAction(tenantId: string, type?: EntityType, lim
     if (error) throw new Error(error.message);
 
     return { success: true, entities: entities || [] };
-  } catch (err: any) {
-    console.error('[getEntitiesAction Error]:', err.message);
-    return { success: false, error: err.message, entities: [] };
+  } catch (err: unknown) {
+    console.error('[getEntitiesAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, entities: [] };
   }
 }
 

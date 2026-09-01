@@ -19,7 +19,7 @@ type TabType = 'directorio' | 'asistencia' | 'nomina' | 'audit';
 export default function EquipoPage() {
   const currentTenant = useTenantResolver();
   const [employees, setEmployees] = useState<Entity[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('directorio');
@@ -48,7 +48,7 @@ export default function EquipoPage() {
       if (res.success) {
         // Filtrar del lado del cliente por acciones de equipo (employee, payroll)
         const teamLogs = res.logs.filter(
-          (l: any) => l.action.includes('payroll') || l.action.includes('entity') || l.action.includes('employee')
+          (l: unknown) => l.action.includes('payroll') || l.action.includes('entity') || l.action.includes('employee')
         );
         setAuditLogs(teamLogs.length > 0 ? teamLogs : res.logs);
       }

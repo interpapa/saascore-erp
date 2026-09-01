@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import {
   type AnimationOptions,
   motion,
@@ -9,7 +9,7 @@ import {
 } from "framer-motion";
 
 // Helper cn ligero integrado para evitar dependencias de importación
-function cn(...classes: any[]) {
+function cn(...classes: unknown[]) {
   return classes.filter(Boolean).join(" ");
 }
 

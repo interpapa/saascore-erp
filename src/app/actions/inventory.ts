@@ -66,9 +66,9 @@ export async function processInventoryReceiptAction(
     if (updateErr) throw updateErr;
 
     return { success: true, item: updatedItem, avco };
-  } catch (err: any) {
-    console.error('[processInventoryReceiptAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[processInventoryReceiptAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 

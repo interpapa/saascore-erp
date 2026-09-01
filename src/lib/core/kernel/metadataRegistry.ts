@@ -39,7 +39,7 @@ class MetadataRegistry {
   /**
    * Construye un esquema Zod dinámico para validar los campos ingresados.
    */
-  public buildSchema(tenantId: string, target: EntityTarget): z.ZodObject<any> {
+  public buildSchema(tenantId: string, target: EntityTarget): z.ZodObject<Record<string, z.ZodTypeAny>> {
     const fields = this.getFields(tenantId, target);
     const shape: Record<string, z.ZodTypeAny> = {};
 
@@ -80,17 +80,20 @@ class MetadataRegistry {
   /**
    * Valida un objeto metadata contra el registro del tenant.
    */
-  public validate(tenantId: string, target: EntityTarget, metadata: Record<string, any>): { valid: boolean; data?: any; error?: string } {
+  public validate(tenantId: string, target: EntityTarget, metadata: Record<string, unknown>): { valid: boolean; data?: unknown; error?: string } {
     try {
       const schema = this.buildSchema(tenantId, target);
       const parsed = schema.parse(metadata);
       return { valid: true, data: parsed };
-    } catch (err: any) {
-      if (err && Array.isArray(err.issues)) {
-        const msg = err.issues.map((i: any) => i.message).join(', ');
-        return { valid: false, error: msg };
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'issues' in err) {
+        const issues = (err as Record<string, unknown>).issues;
+        if (Array.isArray(issues)) {
+          const msg = issues.map((i: unknown) => (i as Record<string, string>).message).join(', ');
+          return { valid: false, error: msg };
+        }
       }
-      return { valid: false, error: err.message || 'Error de validación de metadatos' };
+      return { valid: false, error: (err as Error).message || 'Error de validación de metadatos' };
     }
   }
 }

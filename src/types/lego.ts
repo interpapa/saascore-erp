@@ -7,7 +7,7 @@ export interface LegoPieceDNA {
   type: LegoPieceType;
   span?: 'full' | 'half'; // Controla si ocupa toda la pantalla o la mitad (Bento Grid)
   colSpan?: number;        // Alternativa numérica de span para LegoStudio
-  config: any; // Configuración específica de cada ladrillo (títulos, campos a mostrar)
+  config: unknown; // Configuración específica de cada ladrillo (títulos, campos a mostrar)
   dataSource?: string; // Nombre del origen de datos simulado o real
   isLocked?: boolean; // Bloqueo legal/fiscal: Si es true, el usuario no puede editar su config en LegoStudio
 }

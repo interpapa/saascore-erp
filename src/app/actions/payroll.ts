@@ -12,7 +12,7 @@ interface PayrollActor {
 
 export async function processPayroll(
   tenantId: string,
-  employees: any[],
+  employees: unknown[],
   actor: PayrollActor
 ) {
   try {
@@ -78,9 +78,9 @@ export async function processPayroll(
 
       // Generar asiento contable por el gasto de nómina
       try {
-        await generateJournalEntryForPayroll(payrollDoc as any, tenantId);
+        await generateJournalEntryForPayroll(payrollDoc as unknown, tenantId);
         payrollResults.push({ employee: emp.name, amount: biweeklyPay, status: 'success' });
-      } catch (err) {
+      } catch (_err) {
         payrollResults.push({ employee: emp.name, amount: biweeklyPay, status: 'accounting_error' });
       }
     }
@@ -107,7 +107,7 @@ export async function processPayroll(
 
     return { success: true, processed: payrollResults.length, details: payrollResults };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('SERVER ACTION ERROR (payroll):', error.message);
     return { success: false, error: error.message };
   }

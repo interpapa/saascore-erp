@@ -77,8 +77,8 @@ export async function processFXRevaluation(
         journalEntryId: entryResult.entryId,
       },
     };
-  } catch (err: any) {
-    console.error('[FXRevaluationEngine Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[FXRevaluationEngine Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

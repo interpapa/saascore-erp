@@ -62,8 +62,8 @@ export default function ConfiguracionPage() {
 
       setIsSuccess(true);
       setTimeout(() => setIsSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar la configuración');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar la configuración');
     } finally {
       setIsLoading(false);
     }

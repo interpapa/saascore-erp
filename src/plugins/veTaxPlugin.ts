@@ -17,7 +17,9 @@ export const veTaxPlugin: SaaSPlugin = {
   enabled: false, // Disabled by default for neutral tenant tax configuration
 
   filters: {
-    'checkout:tax_calculation': (payload) => {
+    'checkout:tax_calculation': (payloadObj) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const payload = payloadObj as Record<string, any>;
       // Example: If payment method is foreign currency (cash_usd), apply IGTF 3%
       if (payload.paymentMethod === 'cash_usd') {
         payload.extraTaxes = payload.extraTaxes || [];

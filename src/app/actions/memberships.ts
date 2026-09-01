@@ -12,11 +12,11 @@ export interface MembershipInput {
   next_billing_date: string;
   notification_days_before?: number;
   max_sessions_per_cycle?: number | null;
-  schedule_rules?: any;
+  schedule_rules?: unknown;
   status?: 'active' | 'paused' | 'expired';
 }
 
-function isMissingTableError(error: any): boolean {
+function isMissingTableError(error: unknown): boolean {
   if (!error) return false;
   const code = error.code || '';
   const msg = error.message || '';
@@ -61,7 +61,7 @@ export async function getMembershipsAction(tenantId: string, actor?: ActionActor
     }
 
     throw new Error(error?.message || 'Error al consultar mensualidades.');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[getMembershipsAction Error]:', error.message);
     return { success: false, error: error.message, memberships: [] };
   }
@@ -138,7 +138,7 @@ export async function createMembershipAction(
     }
 
     throw new Error(error?.message || 'Error al guardar membresía.');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[createMembershipAction Error]:', error.message);
     return { success: false, error: error.message };
   }

@@ -9,7 +9,7 @@ interface AvailablePiece {
   type: LegoPieceDNA['type'];
   name: string;
   icon: React.ReactNode;
-  defaultConfig: any;
+  defaultConfig: unknown;
 }
 
 const CATALOG: AvailablePiece[] = [
@@ -112,13 +112,14 @@ export function LegoStudio({ initialLayout, onSave, onClose }: LegoStudioProps) 
     setSelectedIndex(index + dir);
   };
 
-  const updateConfig = (key: string, value: any) => {
+  const updateConfig = (key: string, value: unknown) => {
     if (selectedIndex === null) return;
     const newLayout = [...layout];
+    const prevConfig = newLayout[selectedIndex].config as Record<string, unknown>;
     newLayout[selectedIndex] = {
       ...newLayout[selectedIndex],
       config: {
-        ...newLayout[selectedIndex].config,
+        ...prevConfig,
         [key]: value
       }
     };
@@ -258,7 +259,7 @@ export function LegoStudio({ initialLayout, onSave, onClose }: LegoStudioProps) 
                       <label className="text-xs font-bold text-slate-500 uppercase">Título Visual</label>
                       <input 
                         type="text" 
-                        value={selectedPiece.config.title || ''}
+                        value={(selectedPiece.config as Record<string, string>).title || ''}
                         onChange={(e) => updateConfig('title', e.target.value)}
                         className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 font-medium text-sm focus:outline-none focus:border-primary transition-colors"
                         placeholder="Ej: Últimas Ventas"

@@ -9,8 +9,8 @@ import { PhoneInput } from '@/components/ui/PhoneInput';
 interface ClientModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (client: any) => Promise<void>;
-  initialData?: any;
+  onSave: (client: unknown) => Promise<void>;
+  initialData?: unknown;
 }
 
 export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModalProps) {
@@ -38,8 +38,8 @@ export function ClientModal({ isOpen, onClose, onSave, initialData }: ClientModa
     try {
       await onSave(clientData);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar el cliente');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar el cliente');
     } finally {
       setIsLoading(false);
     }

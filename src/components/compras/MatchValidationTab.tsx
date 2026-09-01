@@ -7,7 +7,7 @@ import { useToast } from '@/components/core/ToastProvider';
 import { ShieldCheck, CheckCircle2, AlertTriangle, FileCheck, ArrowRight } from 'lucide-react';
 
 interface MatchValidationTabProps {
-  purchaseOrders: any[];
+  purchaseOrders: unknown[];
   tenantId: string;
 }
 
@@ -19,7 +19,7 @@ export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidation
   const [goodsReceiptAmt, setGoodsReceiptAmt] = useState<number>(0);
   const [billNumber, setBillNumber] = useState('');
   const [billAmt, setBillAmt] = useState<number>(0);
-  const [matchResult, setMatchResult] = useState<any>(null);
+  const [matchResult, setMatchResult] = useState<unknown>(null);
   const [isValidating, setIsValidating] = useState(false);
 
   const handleSelectPo = (poId: string) => {
@@ -81,8 +81,8 @@ export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidation
       } else if (res.error) {
         toast({ variant: 'error', title: 'Error', description: res.error });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error de servidor', description: err.message });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error de servidor', description: (err as Error).message });
     } finally {
       setIsValidating(false);
     }
@@ -180,7 +180,7 @@ export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidation
             {!matchResult ? (
               <div className="text-center py-12 text-slate-400 space-y-2">
                 <ShieldCheck size={36} className="mx-auto opacity-30" />
-                <p className="text-xs font-semibold">Selecciona una orden de compra y presiona "Ejecutar Validación"</p>
+                <p className="text-xs font-semibold">Selecciona una orden de compra y presiona &quot;Ejecutar Validación&quot;</p>
               </div>
             ) : (
               <div className="space-y-4">

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, PackagePlus, AlertCircle } from 'lucide-react';
+import { X, PackagePlus } from 'lucide-react';
 import { adjustItemStockAction } from '@/app/actions/items';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -11,7 +11,7 @@ interface QuickStockModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  items: any[];
+  items: unknown[];
   initialItemId?: string;
 }
 
@@ -74,8 +74,8 @@ export function QuickStockModal({
       } else {
         toast({ variant: 'error', title: 'Error al actualizar', description: res.error });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error de conexión', description: err.message });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error de conexión', description: (err as Error).message });
     } finally {
       setIsSubmitting(false);
     }
@@ -108,11 +108,14 @@ export function QuickStockModal({
               className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
             >
               <option value="">-- Seleccionar de catálogo --</option>
-              {items.filter(i => i.type === 'product').map((i) => (
-                <option key={i.id} value={i.id}>
-                  {i.name} ({i.stock ?? i.stock_quantity ?? 0} disp.)
-                </option>
-              ))}
+              {items.filter((i: unknown) => (i as Record<string, unknown>).type === 'product').map((itemObj: unknown) => {
+                const i = itemObj as { id: string; name: string; stock?: number; stock_quantity?: number };
+                return (
+                  <option key={i.id} value={i.id}>
+                    {i.name} ({i.stock ?? i.stock_quantity ?? 0} disp.)
+                  </option>
+                );
+              })}
             </select>
           </div>
 

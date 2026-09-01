@@ -63,8 +63,8 @@ export function BranchModal({ isOpen, onClose, onSuccess }: BranchModalProps) {
       if (!res.success) throw new Error(res.error);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al registrar la sucursal');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al registrar la sucursal');
     } finally {
       setIsLoading(false);
     }

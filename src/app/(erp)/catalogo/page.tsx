@@ -31,7 +31,7 @@ export default function CatalogoPage() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [viewMode, setViewMode] = useViewPreference('catalogo-view-mode', 'grid');
   const [activeTab, setActiveTab] = useState<TabType>('items');
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   const activeTenant = useTenantResolver();
@@ -86,7 +86,7 @@ export default function CatalogoPage() {
     }
   }, [activeTab, loadAuditLogs]);
 
-  const handleSaveItem = async (data: any) => {
+  const handleSaveItem = async (data: unknown) => {
     if (!activeTenant) return;
 
     if (editingItem) {
@@ -115,13 +115,13 @@ export default function CatalogoPage() {
         } else {
           toast({ variant: 'warning', title: 'Error al actualizar', description: res.error || 'No se pudieron guardar los cambios.' });
         }
-      } catch (err: any) {
-        toast({ variant: 'error', title: 'Error de red', description: err.message });
+      } catch (err: unknown) {
+        toast({ variant: 'error', title: 'Error de red', description: (err as Error).message });
       }
     } else {
       // MODO CREACIÓN
       const tempId = `temp_${Date.now()}`;
-      const newItem: any = {
+      const newItem: unknown = {
         id: tempId,
         type: data.type,
         name: data.name,
@@ -158,7 +158,7 @@ export default function CatalogoPage() {
           toast({ variant: 'success', title: 'Producto Creado', description: `"${data.name}" se guardó en el catálogo.` });
           fetchItems();
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         toast({ variant: 'info', title: 'Modo Offline', description: 'Ítem guardado localmente en esta sesión.' });
       }
     }
@@ -175,8 +175,8 @@ export default function CatalogoPage() {
       } else {
         toast({ variant: 'warning', title: 'Error al eliminar', description: res.error || 'No se pudo eliminar el ítem.' });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error', description: err.message });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error', description: (err as Error).message });
     }
   };
 

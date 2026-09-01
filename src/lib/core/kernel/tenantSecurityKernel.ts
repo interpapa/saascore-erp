@@ -1,7 +1,7 @@
 /**
  * SaaSCore ERP Kernel - Security & Multi-Tenant Guard
  * 
- * Capa inmutable del núcleo para validación de acceso multi-tenant y RBAC.
+ * Capa inmutable del nÃºcleo para validaciÃ³n de acceso multi-tenant y RBAC.
  */
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -28,8 +28,8 @@ export async function validateKernelAccess(
       return { authorized: true };
     }
 
-    // Verificar vinculación en la relación user_tenants
-    const { data: userLink, error } = await supabaseAdmin
+    // Verificar vinculaciÃ³n en la relaciÃ³n user_tenants
+    const { error } = await supabaseAdmin
       .from('user_tenants')
       .select('id')
       .eq('tenant_id', tenantId)
@@ -40,7 +40,7 @@ export async function validateKernelAccess(
     }
 
     // Verificar permiso granular si se requiere uno específico
-    if (requiredPermission && !checkPermission(actor.role, requiredPermission as any)) {
+    if (requiredPermission && !checkPermission(actor.role, requiredPermission as string)) {
       await writeAuditLog({
         tenant_id: tenantId,
         actor_email: actor.email,
@@ -53,8 +53,9 @@ export async function validateKernelAccess(
     }
 
     return { authorized: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[TenantSecurityKernel Exception]:', err);
     return { authorized: false, error: 'Error en la verificación de seguridad del Kernel.' };
   }
 }
+

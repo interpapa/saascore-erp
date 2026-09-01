@@ -37,9 +37,9 @@ export async function getAgingReportAction(
     }
 
     return await calculateAgingReport(tenantId, type);
-  } catch (err: any) {
-    console.error('[getAgingReportAction Error]:', err.message);
-    return { success: false, error: err.message, data: [], summary: { total: 0, overdue: 0 } };
+  } catch (err: unknown) {
+    console.error('[getAgingReportAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, data: [], summary: { total: 0, overdue: 0 } };
   }
 }
 
@@ -51,8 +51,8 @@ export async function getChartOfAccountsAction(tenantId: string, actor: KernelAc
     }
 
     return { success: true, accounts: DEFAULT_CHART_OF_ACCOUNTS };
-  } catch (err: any) {
-    return { success: false, error: err.message, accounts: [] };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message, accounts: [] };
   }
 }
 
@@ -69,12 +69,12 @@ export async function runFXRevaluationAction(
     }
 
     return await processFXRevaluation(tenantId, totalUSDReceivables, historicalRate);
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }
 
-function isMissingTableError(error: any): boolean {
+function isMissingTableError(error: unknown): boolean {
   if (!error) return false;
   const code = error.code || '';
   const msg = error.message || '';
@@ -114,10 +114,10 @@ export async function getJournalEntriesAction(
     }
 
     const { data: dbEntries, error } = await query;
-    const entriesList = dbEntries as any[] | null;
+    const entriesList = dbEntries as unknown[] | null;
 
     if (!error && entriesList && entriesList.length > 0) {
-      const formatted: JournalEntry[] = entriesList.map((e: any) => ({
+      const formatted: JournalEntry[] = entriesList.map((e: unknown) => ({
         id: e.id,
         tenant_id: e.tenant_id,
         document_id: e.document_id,
@@ -127,7 +127,7 @@ export async function getJournalEntriesAction(
         total_debit: Number(e.total_debit || 0),
         total_credit: Number(e.total_credit || 0),
         status: e.status || 'posted',
-        lines: (e.lines || []).map((l: any) => ({
+        lines: (e.lines || []).map((l: unknown) => ({
           id: l.id,
           journal_entry_id: l.journal_entry_id,
           account_code: l.account_code,
@@ -158,7 +158,7 @@ export async function getJournalEntriesAction(
       const synthesized: JournalEntry[] = [];
       let entryIdx = 1;
 
-      (docs || []).forEach((doc: any) => {
+      (docs || []).forEach((doc: unknown) => {
         const subtotal = Number(doc.subtotal_amount || doc.total_amount || 0);
         const tax = Number(doc.tax_amount || 0);
         const total = Number(doc.total_amount || subtotal + tax);
@@ -259,9 +259,9 @@ export async function getJournalEntriesAction(
     }
 
     throw new Error(error?.message || 'Error al consultar el Libro Mayor.');
-  } catch (err: any) {
-    console.error('[getJournalEntriesAction Error]:', err.message);
-    return { success: false, error: err.message, data: [] };
+  } catch (err: unknown) {
+    console.error('[getJournalEntriesAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, data: [] };
   }
 }
 
@@ -342,9 +342,9 @@ export async function getTrialBalanceAction(
         credit: Math.round(totalCredit * 100) / 100,
       },
     };
-  } catch (err: any) {
-    console.error('[getTrialBalanceAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[getTrialBalanceAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -434,9 +434,9 @@ export async function getIncomeStatementAction(
     };
 
     return { success: true, data: report };
-  } catch (err: any) {
-    console.error('[getIncomeStatementAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[getIncomeStatementAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -491,9 +491,9 @@ export async function createJournalEntryAction(
       description: payload.description,
       lines: formattedLines,
     });
-  } catch (err: any) {
-    console.error('[createJournalEntryAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[createJournalEntryAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 

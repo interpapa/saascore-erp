@@ -1,37 +1,30 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { LegoModuleDNA, LegoPieceDNA } from '@/types/lego';
 import { StatGrid } from './StatGrid';
 import { ListFeed } from './ListFeed';
 
 interface LegoEngineProps {
   dna: LegoModuleDNA;
-  customData?: Record<string, any[]>;
-  onPieceAction?: (pieceId: string, item: any) => void;
+  customData?: Record<string, unknown[]>;
+  onPieceAction?: (pieceId: string, item: unknown) => void;
 }
 
 export const LegoEngine: React.FC<LegoEngineProps> = ({ dna, customData, onPieceAction }) => {
-  const [moduleData, setModuleData] = useState<Record<string, any[]>>({});
-
-  useEffect(() => {
-    const dataMap: Record<string, any[]> = {};
-    
-    if (dna && dna.layout) {
-      for (const piece of dna.layout) {
-        if (piece.dataSource) {
-          // Usamos customData si está disponible, sino un array vacío o un dummy stat
-          if (customData && customData[piece.dataSource]) {
-            dataMap[piece.id] = customData[piece.dataSource];
-          } else {
-            // Fallback gracefully si no hay datos
-            // Si es stat-grid devolvemos un dummy object para que no se quede loading por siempre
-            dataMap[piece.id] = piece.type === 'stat-grid' ? [{ dummy: true }] : [];
-          }
-        }
+const [moduleData] = useState<Record<string, unknown[]>>(() => {
+  const dataMap: Record<string, unknown[]> = {};
+  if (dna && dna.layout) {
+    for (const piece of dna.layout) {
+      if (piece.dataSource) {
+        dataMap[piece.id] = (customData && customData[piece.dataSource])
+          ? customData[piece.dataSource]
+          : piece.type === 'stat-grid'
+          ? [{ dummy: true }]
+          : [];
       }
     }
-    
-    setModuleData(dataMap);
-  }, [dna, customData]);
+  }
+  return dataMap;
+});
 
   const renderPiece = (piece: LegoPieceDNA) => {
     const data = moduleData[piece.id] || [];

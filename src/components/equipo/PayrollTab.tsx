@@ -2,15 +2,21 @@
 
 import { useState } from 'react';
 import { Entity } from '@/lib/api/entities';
+import { CreditCard, ArrowRight } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { processPayrollDisbursementAction } from '@/app/actions/hrms';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
-import { CreditCard, Sparkles, ArrowRight } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
 
 interface PayrollTabProps {
   employees: Entity[];
   tenantId: string;
+}
+
+interface PayrollResult {
+  success: boolean;
+  summary?: { processedCount: number };
+  error?: string;
 }
 
 export function PayrollTab({ employees, tenantId }: PayrollTabProps) {
@@ -54,18 +60,20 @@ export function PayrollTab({ employees, tenantId }: PayrollTabProps) {
         tenantId,
         actor
       );
+      
+      const result = res as unknown as PayrollResult;
 
-      if (res.success) {
+      if (result.success) {
         toast({
           variant: 'success',
           title: 'Nómina Procesada',
-          description: `Dispersión de sueldos para ${(res as any).summary?.processedCount || employees.length} empleados completada exitosamente.`,
+          description: `Dispersión de sueldos para ${result.summary?.processedCount || employees.length} empleados completada exitosamente.`,
         });
       } else {
-        toast({ variant: 'error', title: 'Error al procesar nómina', description: (res as any).error || 'Error desconocido' });
+        toast({ variant: 'error', title: 'Error al procesar nómina', description: result.error || 'Error desconocido' });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error de servidor', description: err.message });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error de servidor', description: (err as Error).message });
     } finally {
       setIsProcessing(false);
     }
@@ -123,11 +131,11 @@ export function PayrollTab({ employees, tenantId }: PayrollTabProps) {
                 const base = Number(emp.metadata?.base_salary || 450);
                 const net = calculateNetSalary(emp);
                 return (
-                  <tr key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                  <tr key={(emp as any).id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
                     <td className="p-4 font-bold text-foreground">
-                      {emp.name}
+                      {(emp as any).name}
                       <span className="block text-[11px] font-normal text-slate-400">
-                        {emp.metadata?.role_title || 'Empleado'}
+                        {(emp as any).metadata?.role_title || 'Empleado'}
                       </span>
                     </td>
                     <td className="p-4 text-right font-mono">${base.toFixed(2)}</td>

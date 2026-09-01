@@ -9,7 +9,7 @@ export async function createTenant(userId: string, userEmail: string, businessNa
     const cleanEmail = (userEmail || '').trim().toLowerCase();
 
     // 1. Crear el Tenant con permisos de servidor
-    let insertTenant: any = {
+    let insertTenant: unknown = {
       name: businessName,
       is_active: true,
       currency: 'USD',
@@ -47,7 +47,7 @@ export async function createTenant(userId: string, userEmail: string, businessNa
     if (tenantError) throw new Error('Error al crear la empresa: ' + tenantError.message);
 
     // 2. Vincular el Usuario con el Tenant en user_tenants
-    let linkData: any = {
+    let linkData: unknown = {
       user_email: cleanEmail,
       tenant_id: tenant.id,
       role: 'owner'
@@ -77,12 +77,12 @@ export async function createTenant(userId: string, userEmail: string, businessNa
 
     revalidatePath('/dashboard');
     return { success: true, tenant };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }
 
-export async function updateTenantSettings(tenantId: string, name: string, metadata: any) {
+export async function updateTenantSettings(tenantId: string, name: string, metadata: unknown) {
   try {
     const db = supabaseAdmin || supabase;
     const { data: tenant, error } = await db
@@ -100,7 +100,7 @@ export async function updateTenantSettings(tenantId: string, name: string, metad
     revalidatePath('/configuracion');
     revalidatePath('/dashboard');
     return { success: true, tenant };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }
@@ -115,7 +115,7 @@ export async function getAllTenants() {
 
     if (error) throw new Error('Error fetching tenants: ' + error.message);
     return { success: true, tenants };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }
@@ -144,7 +144,7 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
     revalidatePath('/admin');
     revalidatePath('/admin/billing');
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }
@@ -159,7 +159,7 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     }
 
     // 1. Buscar relación user_tenants por email
-    let userTenantsRes = await db
+    const userTenantsRes = await db
       .from('user_tenants')
       .select('tenant_id, role, created_at')
       .ilike('user_email', cleanEmail)
@@ -220,7 +220,7 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       tenant,
       role: userTenant.role
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, tenant: null, role: null, error: error.message };
   }
 }

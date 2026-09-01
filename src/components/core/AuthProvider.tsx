@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useERPStore } from '@/store/useERPStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
@@ -23,6 +23,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(!session);
   const router = useRouter();
   const pathname = usePathname();
+
+  const handleSessionSync = useCallback(async (user: { email?: string; id?: string } | null | undefined) => {
+    if (!user || !user.email) return;
+
+    try {
+      // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
+      const result = await getUserTenant(user.email, user.id);
+
+      if (result.success && result.tenant) {
+        setCurrentTenant({
+          id: result.tenant.id,
+          name: result.tenant.name,
+          blocked: !result.tenant.is_active,
+          metadata: result.tenant.metadata
+        });
+        setSession({
+          userEmail: user.email,
+          role: (result.role as 'owner' | 'admin' | 'user') || 'owner',
+          tenantId: result.tenant.id
+        });
+        return;
+      }
+
+      // Usuario sin empresa, va al onboarding
+      setSession({
+        userEmail: user.email,
+        role: 'owner',
+        tenantId: ''
+      });
+      setCurrentTenant(null);
+    } catch (err) {
+      console.error('Error sincronizando sesión:', err);
+    }
+  }, [setCurrentTenant, setSession]);
 
   useEffect(() => {
     let mounted = true;
@@ -62,41 +96,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [handleSessionSync, router, setCurrentTenant, setSession]);
 
-  const handleSessionSync = async (user: any) => {
-    if (!user || !user.email) return;
 
-    try {
-      // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
-      const result = await getUserTenant(user.email, user.id);
-
-      if (result.success && result.tenant) {
-        setCurrentTenant({
-          id: result.tenant.id,
-          name: result.tenant.name,
-          blocked: !result.tenant.is_active,
-          metadata: result.tenant.metadata
-        });
-        setSession({
-          userEmail: user.email,
-          role: (result.role as any) || 'owner',
-          tenantId: result.tenant.id
-        });
-        return;
-      }
-
-      // Usuario sin empresa, va al onboarding
-      setSession({
-        userEmail: user.email,
-        role: 'owner',
-        tenantId: ''
-      });
-      setCurrentTenant(null);
-    } catch (err) {
-      console.error('Error sincronizando sesión:', err);
-    }
-  };
 
   useEffect(() => {
     if (isLoading) return;

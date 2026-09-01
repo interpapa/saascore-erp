@@ -38,7 +38,6 @@ export function CalendarFilters({
   filterState,
   onFilterChange,
   employees,
-  services,
   onOpenCreateModal,
 }: CalendarFiltersProps) {
   // Navigation handlers

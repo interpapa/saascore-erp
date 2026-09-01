@@ -55,7 +55,7 @@ export async function bulkImportItemsAction(
       const batch = validatedItems.slice(i, i + batchSize);
       
       const insertData = batch.map(item => {
-        const { stock, ...rest } = item;
+        const { ...rest } = item;
         return rest; // Default using stock_quantity for modern schema
       });
 
@@ -100,8 +100,8 @@ export async function bulkImportItemsAction(
     
     return { success: true, count: insertedCount };
 
-  } catch (err: any) {
-    console.error('[bulkImportItemsAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[bulkImportItemsAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

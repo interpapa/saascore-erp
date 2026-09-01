@@ -42,8 +42,8 @@ class WorkerQueue {
 
     try {
       await task.handler();
-    } catch (err: any) {
-      console.error(`[WorkerQueue] Error ejecutando tarea "${task.name}" (${task.id}):`, err.message);
+    } catch (err: unknown) {
+      console.error(`[WorkerQueue] Error ejecutando tarea "${task.name}" (${task.id}):`, (err as Error).message);
       if (task.retriesLeft > 0) {
         task.retriesLeft -= 1;
         console.warn(`[WorkerQueue] Reintentando tarea "${task.name}". Intentos restantes: ${task.retriesLeft}`);

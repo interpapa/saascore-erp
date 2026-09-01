@@ -42,7 +42,7 @@ export function registerWebhook(
 export async function dispatchOutboundWebhook(
   eventName: string,
   tenantId: string,
-  payload: Record<string, any>
+  payload: Record<string, unknown>
 ): Promise<{ dispatchedCount: number }> {
   const activeSubs = subscriptions.filter(
     s => s.tenantId === tenantId && s.isActive && s.events.includes(eventName)
@@ -64,11 +64,11 @@ export async function dispatchOutboundWebhook(
           timestamp: new Date().toISOString(),
           data: payload,
         }),
-      }).catch((err) => console.warn(`[OutboundWebhook] Error enviando a ${sub.targetUrl}:`, err.message));
+      }).catch((err) => console.warn(`[OutboundWebhook] Error enviando a ${sub.targetUrl}:`, (err as Error).message));
 
       dispatchedCount++;
-    } catch (err: any) {
-      console.error(`[OutboundWebhook Exception] URL ${sub.targetUrl}:`, err.message);
+    } catch (err: unknown) {
+      console.error(`[OutboundWebhook Exception] URL ${sub.targetUrl}:`, (err as Error).message);
     }
   }
 

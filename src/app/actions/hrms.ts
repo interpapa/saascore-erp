@@ -27,9 +27,9 @@ export async function processPayrollDisbursementAction(
       periodName,
       employees,
     });
-  } catch (err: any) {
-    console.error('[processPayrollDisbursementAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[processPayrollDisbursementAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -47,7 +47,7 @@ export async function assignAssetAction(
     }
 
     return assignAssetToEmployee(asset, employeeId, employeeName);
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }

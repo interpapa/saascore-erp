@@ -37,7 +37,7 @@ export async function createItemAction(
       throw new Error('Empresa y Nombre de ítem son requeridos.');
     }
 
-    let insertData: any = {
+    const insertData: unknown = {
       tenant_id: tenantId,
       type: input.type,
       sku: input.sku || null,
@@ -86,7 +86,7 @@ export async function createItemAction(
     revalidatePath('/caja');
 
     return { success: true, item: newItem };
-  } catch (err: any) {
+  } catch (err: unknown) {
     const errorMsg = err?.message || 'Error de red al conectar con el servidor (Failed to fetch).';
     console.error('[createItemAction Error]:', errorMsg);
     return { success: false, error: errorMsg };
@@ -127,9 +127,9 @@ export async function updateItemAction(
     revalidatePath('/caja');
 
     return { success: true, item: updatedItem };
-  } catch (err: any) {
-    console.error('[updateItemAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[updateItemAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -174,9 +174,9 @@ export async function deleteItemAction(
     revalidatePath('/caja');
 
     return { success: true };
-  } catch (err: any) {
-    console.error('[deleteItemAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[deleteItemAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -220,16 +220,16 @@ export async function getItemsAction(tenantId: string, type?: ItemType, limit: n
     if (error) throw new Error(error.message);
 
     // Map `stock` or `stock_quantity` safely to `stock_quantity` for interface compatibility
-    const mappedItems = (items || []).map((item: any) => ({
+    const mappedItems = (items || []).map((item: unknown) => ({
       ...item,
       stock: item.stock !== undefined ? item.stock : item.stock_quantity,
       stock_quantity: item.stock_quantity !== undefined ? item.stock_quantity : (item.stock ?? 0),
     }));
 
     return { success: true, items: mappedItems };
-  } catch (err: any) {
-    console.error('[getItemsAction Error]:', err.message);
-    return { success: false, error: err.message, items: [] };
+  } catch (err: unknown) {
+    console.error('[getItemsAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, items: [] };
   }
 }
 
@@ -264,8 +264,8 @@ export async function adjustItemStockAction(
 
     // 2. Actualizar stock
     // 2. Actualizar stock con fallback y registrar cuál columna se usó
-    let stockFieldUsed = 'stock';
-    let error: any = null;
+    let _stockFieldUsed = 'stock';
+    let error: unknown = null;
     const result = await supabaseAdmin
       .from('items')
       .update({ stock: newStock })
@@ -316,9 +316,9 @@ export async function adjustItemStockAction(
     revalidatePath('/caja');
 
     return { success: true, newStock };
-  } catch (err: any) {
-    console.error('[adjustItemStockAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[adjustItemStockAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 

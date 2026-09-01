@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, User, Phone, Mail, MapPin, DollarSign, Calendar, Edit3, Trash2, Clock, CreditCard, ChevronRight } from 'lucide-react';
+import { X, Phone, Mail, MapPin, DollarSign, Edit3, Trash2, ChevronRight } from 'lucide-react';
 import { Entity } from '@/lib/api/entities';
 import { UISlot } from '@/components/core/UISlot';
 
@@ -19,6 +19,7 @@ export function ClientDrawer({ client, isOpen, onClose, onEdit, onDelete }: Clie
 
   React.useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setConfirmDelete(false);
     }
   }, [isOpen]);

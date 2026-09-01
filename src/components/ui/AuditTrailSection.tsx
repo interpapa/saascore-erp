@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Calendar, User, Clock, FileText, ArrowRight, ShieldCheck, HelpCircle } from 'lucide-react';
+import { User, Clock, FileText, HelpCircle } from 'lucide-react';
 
 interface AuditLogItem {
   id: string;
@@ -11,7 +11,7 @@ interface AuditLogItem {
   action: string;
   target_type: string;
   target_id?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 interface AuditTrailSectionProps {
@@ -28,7 +28,7 @@ interface AuditTrailSectionProps {
 export function AuditTrailSection({ logs, isLoading = false }: AuditTrailSectionProps) {
   
   // Traducir acciones técnicas a lenguaje de negocio comprensible
-  const getActionLabel = (action: string, metadata?: Record<string, any>) => {
+  const getActionLabel = (action: string, metadata?: Record<string, unknown>) => {
     switch (action) {
       case 'invoice.created':
         return `Creó la factura por ${metadata?.amount ? `$${metadata.amount}` : 'monto no especificado'}`;

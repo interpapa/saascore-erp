@@ -10,8 +10,6 @@ import {
   ChevronRight,
   CheckCircle2,
   AlertCircle,
-  FileText,
-  Clock,
   Ban,
 } from 'lucide-react';
 

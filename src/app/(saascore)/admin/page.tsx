@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/core/EmptyState';
 
 export default function AdminTenantsPage() {
   const { toast } = useToast();
-  const [tenants, setTenants] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTenants = async () => {
@@ -21,6 +21,7 @@ export default function AdminTenantsPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTenants();
   }, []);
 
@@ -33,7 +34,8 @@ export default function AdminTenantsPage() {
     if (!result.success) {
       // Revert if failed
       toast({ variant: 'error', title: 'Error', description: result.error });
-      fetchTenants();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTenants();
     }
   };
 

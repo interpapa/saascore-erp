@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Phone, ChevronDown } from 'lucide-react';
 
 export interface CountryCode {
@@ -61,19 +61,8 @@ export function PhoneInput({
     return value;
   });
 
-  useEffect(() => {
-    if (!value) {
-      setPhoneNumber('');
-      return;
-    }
-    const matched = COUNTRIES.find(c => value.startsWith(c.dialCode));
-    if (matched) {
-      setSelectedCountry(matched);
-      setPhoneNumber(value.replace(matched.dialCode, '').trim());
-    } else {
-      setPhoneNumber(value);
-    }
-  }, [value]);
+  // Sincronización de valor externo eliminada; el componente gestiona su propio estado interno.
+
 
   const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const country = COUNTRIES.find(c => c.code === e.target.value) || COUNTRIES[0];

@@ -26,8 +26,8 @@ export default function CajaPage() {
 
   const clientParam = searchParams.get('client') || searchParams.get('client_id');
 
-  const [items, setItems] = useState<any[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [items, setItems] = useState<unknown[]>([]);
+  const [customers, setCustomers] = useState<unknown[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
   const [searchItem, setSearchItem] = useState('');
@@ -44,14 +44,14 @@ export default function CajaPage() {
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   
   // Ticket State
-  const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
+  const [ticketLines, setTicketLines] = useState<{ item: unknown; quantity: number }[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'mixed'>('cash');
   const [mixedPayments, setMixedPayments] = useState({ cash: 0, card: 0, transfer: 0 });
   const [chargeTaxes, setChargeTaxes] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   // New: Bank accounts and delivery details
-  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<unknown[]>([]);
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
   const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [deliveryDate, setDeliveryDate] = useState<string>('');
@@ -114,7 +114,7 @@ export default function CajaPage() {
     });
   }, [items, searchItem, filterType, filterCategory]);
 
-  const addLine = (item: any) => {
+  const addLine = (item: unknown) => {
     const existing = ticketLines.find((l) => l.item.id === item.id);
     if (item.type === 'product') {
       const stockVal = item.stock ?? item.stock_quantity ?? 0;
@@ -231,7 +231,7 @@ export default function CajaPage() {
             doc.text(`Fecha: ${new Date().toLocaleDateString()}`, 10, 20);
             doc.text(`Cliente: ${customerObj?.name ?? ''}`, 10, 30);
             let y = 40;
-            ticketLines.forEach((line: any, idx: number) => {
+            ticketLines.forEach((line: unknown, idx: number) => {
               const text = `${idx + 1}. ${line.item.name} - ${line.quantity} x ${line.item.base_price}`;
               doc.text(text, 10, y);
               y += 10;
@@ -261,7 +261,7 @@ export default function CajaPage() {
             toast({
               variant: 'error',
               title: 'Error PDF',
-              description: err instanceof Error ? err.message : String(err),
+              description: err instanceof Error ? (err as Error).message : String(err),
             });
           }
         }
@@ -298,7 +298,7 @@ export default function CajaPage() {
             doc.text(`Cliente: ${d.customer?.name ?? ''}`, 10, 30);
             const lines = d.lines ?? [];
             let y = 40;
-            lines.forEach((line: any, idx: number) => {
+            lines.forEach((line: unknown, idx: number) => {
               const text = `${idx + 1}. ${line.description ?? ''} - ${line.quantity ?? ''} x ${line.unit_price ?? ''}`;
               doc.text(text, 10, y);
               y += 10;
@@ -308,7 +308,7 @@ export default function CajaPage() {
             toast({
               variant: 'error',
               title: 'PDF generation failed',
-              description: err instanceof Error ? err.message : String(err),
+              description: err instanceof Error ? (err as Error).message : String(err),
             });
           }
         }
@@ -320,7 +320,7 @@ export default function CajaPage() {
         setSuccess(false);
         setTicketLines([]);
       }, 2500);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({ variant: 'error', title: 'Error en Checkout', description: error.message });
     } finally {
       setIsSaving(false);
@@ -816,8 +816,8 @@ export default function CajaPage() {
                     } else {
                       toast({ variant: 'error', title: 'Error al guardar', description: res.error || 'Ocurrió un error inesperado.' });
                     }
-                  } catch (err: any) {
-                    toast({ variant: 'error', title: 'Error', description: err.message });
+                  } catch (err: unknown) {
+                    toast({ variant: 'error', title: 'Error', description: (err as Error).message });
                   } finally {
                     setIsSavingCustomer(false);
                   }

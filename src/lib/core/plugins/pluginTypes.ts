@@ -16,8 +16,8 @@ export type ActionHookName =
   | 'customer:created'
   | 'system:boot';
 
-export type FilterHandler<T = any> = (payload: T) => Promise<T> | T;
-export type ActionHandler<T = any> = (payload: T) => Promise<void> | void;
+export type FilterHandler<T = unknown> = (payload: T) => Promise<T> | T;
+export type ActionHandler<T = unknown> = (payload: T) => Promise<void> | void;
 
 export interface UIExtension {
   id: string;

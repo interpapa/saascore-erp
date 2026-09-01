@@ -40,7 +40,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
     const supplierId = form.get('supplier_id') as string;
     const concept = form.get('concept') as string;
     const totalAmount = parseFloat(form.get('total') as string) || 0;
-    const status = form.get('status') as any;
+    const status = form.get('status') as 'draft' | 'issued' | 'paid' | 'cancelled';
 
     if (!supplierId || !concept || totalAmount <= 0) {
       setError('Por favor complete todos los campos obligatorios correctamente.');
@@ -75,8 +75,8 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
       
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar la orden de compra');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar la orden de compra');
     } finally {
       setIsLoading(false);
     }

@@ -10,7 +10,7 @@ export async function getAuditLogsAction(
   tenantId: string,
   targetType?: string,
   limit = 40
-): Promise<{ success: boolean; logs: any[]; error?: string }> {
+): Promise<{ success: boolean; logs: unknown[]; error?: string }> {
   try {
     if (!tenantId) {
       return { success: false, logs: [], error: 'El Tenant ID es requerido.' };
@@ -35,8 +35,8 @@ export async function getAuditLogsAction(
     }
 
     return { success: true, logs: data || [] };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[getAuditLogsAction Exception]:', err);
-    return { success: false, logs: [], error: err.message };
+    return { success: false, logs: [], error: (err as Error).message };
   }
 }

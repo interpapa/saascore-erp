@@ -14,7 +14,7 @@ import {
   Service
 } from '@/types/calendario';
 
-function isMissingTableError(error: any): boolean {
+function isMissingTableError(error: unknown): boolean {
   if (!error) return false;
   const code = error.code || '';
   const msg = error.message || '';
@@ -40,12 +40,12 @@ export async function getAppointmentsAction(
 
     if (!error && appts) {
       // Gather unique IDs to fetch related records in batch, bypassing PostgreSQL schema foreign key relationship checks
-      const clientIds = Array.from(new Set(appts.map((a: any) => a.client_id).filter(Boolean)));
-      const employeeIds = Array.from(new Set(appts.map((a: any) => a.employee_id).filter(Boolean)));
-      const serviceIds = Array.from(new Set(appts.map((a: any) => a.service_id).filter(Boolean)));
+      const clientIds = Array.from(new Set(appts.map((a: unknown) => a.client_id).filter(Boolean)));
+      const employeeIds = Array.from(new Set(appts.map((a: unknown) => a.employee_id).filter(Boolean)));
+      const serviceIds = Array.from(new Set(appts.map((a: unknown) => a.service_id).filter(Boolean)));
 
       const allEntityIds = [...clientIds, ...employeeIds];
-      const entitiesMap: Record<string, any> = {};
+      const entitiesMap: Record<string, unknown> = {};
       if (allEntityIds.length > 0) {
         const { data: entities } = await supabaseAdmin
           .from('entities')
@@ -58,7 +58,7 @@ export async function getAppointmentsAction(
         }
       }
 
-      const itemsMap: Record<string, any> = {};
+      const itemsMap: Record<string, unknown> = {};
       if (serviceIds.length > 0) {
         const { data: items } = await supabaseAdmin
           .from('items')
@@ -71,7 +71,7 @@ export async function getAppointmentsAction(
         }
       }
 
-      const formatted: Appointment[] = appts.map((a: any) => {
+      const formatted: Appointment[] = appts.map((a: unknown) => {
         const client = a.client_id ? entitiesMap[a.client_id] : null;
         const employee = a.employee_id ? entitiesMap[a.employee_id] : null;
         const service = a.service_id ? itemsMap[a.service_id] : null;
@@ -116,7 +116,7 @@ export async function getAppointmentsAction(
 
       if (docErr) throw new Error(docErr.message);
 
-      const fallbackAppts: Appointment[] = (docs || []).map((doc: any) => {
+      const fallbackAppts: Appointment[] = (docs || []).map((doc: unknown) => {
         const issueDate = doc.issue_date || doc.metadata?.issue_date || doc.created_at;
         const dueDate = doc.due_date || doc.metadata?.due_date || new Date(new Date(issueDate).getTime() + 3600000).toISOString();
 
@@ -149,9 +149,9 @@ export async function getAppointmentsAction(
     }
 
     throw new Error(error?.message || 'Error al obtener citas.');
-  } catch (err: any) {
-    console.error('[getAppointmentsAction Error]:', err.message);
-    return { success: false, error: err.message, appointments: [] };
+  } catch (err: unknown) {
+    console.error('[getAppointmentsAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, appointments: [] };
   }
 }
 
@@ -279,9 +279,9 @@ export async function createAppointmentAction(
     }
 
     throw new Error(error?.message || 'Error al crear la cita.');
-  } catch (err: any) {
-    console.error('[createAppointmentAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[createAppointmentAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -367,9 +367,9 @@ export async function updateAppointmentStatusAction(
     }
 
     throw new Error(error?.message || 'Error al actualizar el estado de la cita.');
-  } catch (err: any) {
-    console.error('[updateAppointmentStatusAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[updateAppointmentStatusAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 

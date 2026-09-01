@@ -1,5 +1,10 @@
 import { supabase } from '@/lib/supabase';
 
+interface EntityMetadata {
+  // Future explicit fields
+  [key: string]: unknown;
+}
+
 export interface Entity {
   id: string;
   tenant_id: string | null;
@@ -9,7 +14,7 @@ export interface Entity {
   phone: string | null;
   tax_id: string | null;
   address: string | null;
-  metadata: Record<string, any>;
+  metadata: EntityMetadata;
   status: string;
   created_at: string;
   updated_at: string;

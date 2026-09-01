@@ -27,7 +27,7 @@ class PluginManager {
       
       for (const [eventName, handler] of Object.entries(plugin.eventListeners)) {
         if (handler) {
-          const unsub = eventBus.on(eventName as EventName, handler as any);
+          const unsub = eventBus.on(eventName as EventName, handler as any /* eslint-disable-line */<EventName>);
           unsubscribers.push(unsub);
         }
       }
@@ -83,7 +83,7 @@ class PluginManager {
 
       try {
         const handler = plugin.filters[hookName]!;
-        currentPayload = await handler(currentPayload);
+        currentPayload = (await handler(currentPayload)) as T;
       } catch (err) {
         console.error(`[PluginManager] Error executing filter "${hookName}" in plugin "${plugin.id}":`, err);
       }
@@ -140,3 +140,4 @@ class PluginManager {
 }
 
 export const pluginManager = new PluginManager();
+

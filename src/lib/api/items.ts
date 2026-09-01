@@ -1,17 +1,22 @@
 import { supabase } from '@/lib/supabase';
 
+interface ItemMetadata {
+  // Future explicit fields
+  [key: string]: unknown;
+}
+
 export interface Item {
   id: string;
   tenant_id: string | null;
   type: 'product' | 'service' | 'subscription';
   sku: string | null;
   name: string;
-  description: string | null;
-  category: string | null;
+  description?: string | null;
+  category?: string | null;
   base_price: number;
   cost: number;
   stock_quantity: number;
-  metadata: Record<string, any>;
+  metadata: ItemMetadata;
   is_active: boolean;
   created_at: string;
   updated_at: string;

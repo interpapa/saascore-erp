@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, Tag, DollarSign, Archive, Check, TrendingUp, AlertTriangle } from 'lucide-react';
+import { X, Package, DollarSign, Archive, Check, AlertTriangle } from 'lucide-react';
 import { Item } from '@/lib/api/items';
 
 interface CatalogDrawerProps {
@@ -15,6 +15,7 @@ export function CatalogDrawer({ item, isOpen, onClose, onEdit, onDelete }: Catal
 
   useEffect(() => {
     if (!isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShowConfirmDelete(false);
     }
   }, [isOpen]);
@@ -124,7 +125,7 @@ export function CatalogDrawer({ item, isOpen, onClose, onEdit, onDelete }: Catal
               {showConfirmDelete ? (
                 <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 space-y-3 animate-in fade-in duration-200">
                   <p className="text-xs text-red-600 dark:text-red-400 font-bold text-center">
-                    ¿Estás seguro de que deseas eliminar "{item.name}"? Esta acción es irreversible.
+                    ¿Estás seguro de que deseas eliminar &quot;{item.name}&quot;? Esta acción es irreversible.
                   </p>
                   <div className="flex gap-2">
                     <button

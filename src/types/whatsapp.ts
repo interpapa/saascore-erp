@@ -32,7 +32,7 @@ export interface Message {
     name?: string;
     size_bytes?: number;
   }>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at?: string;
 }
 
@@ -50,7 +50,7 @@ export interface Conversation {
   tags: CustomerTag[];
   status: 'active' | 'archived' | 'blocked';
   assigned_agent_email?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -68,5 +68,5 @@ export interface SendMessageInput {
   client_phone: string;
   text: string;
   attachments?: Array<{ url: string; type: 'image' | 'document' | 'audio'; name?: string }>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

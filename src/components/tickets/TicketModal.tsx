@@ -10,7 +10,7 @@ import { Entity } from '@/lib/api/entities';
 interface TicketModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => Promise<void>;
+  onSave: (data: unknown) => Promise<void>;
   tenantId?: string;
 }
 
@@ -57,8 +57,8 @@ export function TicketModal({ isOpen, onClose, onSave, tenantId }: TicketModalPr
     try {
       await onSave(data);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar la orden');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar la orden');
     } finally {
       setIsLoading(false);
     }

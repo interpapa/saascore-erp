@@ -34,7 +34,7 @@ export interface CreateDocumentActionInput {
   issue_date?: string;
   due_date?: string | null;
   notes?: string | null;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   lines: DocumentLineInput[];
 }
 
@@ -65,7 +65,7 @@ async function generateNextDocumentNumber(tenantId: string, type: DocumentType):
     const nextSeq = (count || 0) + 1;
     const formattedSeq = String(nextSeq).padStart(6, '0');
     return `${prefix}-${formattedSeq}`;
-  } catch (err) {
+  } catch (_err) {
     const fallbackSeq = String(Date.now()).slice(-6);
     return `${prefix}-${fallbackSeq}`;
   }
@@ -77,7 +77,7 @@ export async function createDocumentAction(
   actor: ActionActor
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    const securityCheck = await validateUserTenantAccess(tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
@@ -99,7 +99,7 @@ export async function createDocumentAction(
       ? input.document_number 
       : await generateNextDocumentNumber(tenantId, input.type);
 
-    let insertData: any = {
+    const insertData: unknown = {
       tenant_id: tenantId,
       entity_id: input.entity_id || null,
       type: input.type,
@@ -182,9 +182,9 @@ export async function createDocumentAction(
     revalidatePath('/contabilidad');
 
     return { success: true, document: newDoc };
-  } catch (err: any) {
-    console.error('[createDocumentAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[createDocumentAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -225,7 +225,7 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
       
       const retry = await (type ? retryQuery.eq('type', type) : retryQuery);
       
-      documents = (retry.data || []).map((doc: any) => ({
+      documents = (retry.data || []).map((doc: unknown) => ({
         ...doc,
         issue_date: doc.metadata?.issue_date || doc.created_at,
         due_date: doc.metadata?.due_date || null,
@@ -234,7 +234,7 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
       error = retry.error;
     } else if (documents) {
       // Map columns if they exist
-      documents = documents.map((doc: any) => ({
+      documents = documents.map((doc: unknown) => ({
         ...doc,
         issue_date: doc.issue_date || doc.metadata?.issue_date || doc.created_at,
         due_date: doc.due_date || doc.metadata?.due_date || null,
@@ -245,9 +245,9 @@ export async function getDocumentsAction(tenantId: string, type?: DocumentType, 
     if (error) throw new Error(error.message);
 
     return { success: true, documents: documents || [] };
-  } catch (err: any) {
-    console.error('[getDocumentsAction Error]:', err.message);
-    return { success: false, error: err.message, documents: [] };
+  } catch (err: unknown) {
+    console.error('[getDocumentsAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, documents: [] };
   }
 }
 
@@ -275,8 +275,8 @@ export async function updateDocumentStatusAction(
     revalidatePath('/contabilidad');
 
     return { success: true, document: updatedDoc };
-  } catch (err: any) {
-    console.error('[updateDocumentStatusAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[updateDocumentStatusAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

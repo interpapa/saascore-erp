@@ -5,7 +5,7 @@ import React from 'react';
 export interface UISlotExtension {
   id: string;
   slotName: string;
-  component: React.ComponentType<{ context?: any }>;
+  component: React.ComponentType<{ context?: unknown }>;
   priority?: number;
 }
 
@@ -24,7 +24,7 @@ interface UISlotProps {
   /** Nombre único del Slot de inyección (ej. "crm.client_drawer.actions", "pos.checkout.header") */
   name: string;
   /** Contexto de datos pasado al componente inyectado */
-  context?: any;
+  context?: unknown;
   /** Contenido por defecto renderizado si el slot está vacío */
   children?: React.ReactNode;
   className?: string;

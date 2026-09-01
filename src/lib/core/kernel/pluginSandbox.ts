@@ -28,8 +28,8 @@ export async function executeInSandbox<T>(
 
     const result = await Promise.race([Promise.resolve(fn()), timeoutPromise]);
     return { success: true, result };
-  } catch (err: any) {
-    console.error(`[PluginSandbox Error] Plugin "${options.pluginId}" falló en "${options.actionName}":`, err.message);
+  } catch (err: unknown) {
+    console.error(`[PluginSandbox Error] Plugin "${options.pluginId}" falló en "${options.actionName}":`, (err as Error).message);
 
     // Registrar falla sin romper el flujo principal
     writeAuditLog({
@@ -39,9 +39,9 @@ export async function executeInSandbox<T>(
       action: 'permission.denied',
       target_type: 'plugin',
       target_id: options.pluginId,
-      metadata: { action: options.actionName, error: err.message },
+      metadata: { action: options.actionName, error: (err as Error).message },
     }).catch(() => {});
 
-    return { success: false, error: err.message };
+    return { success: false, error: (err as Error).message };
   }
 }

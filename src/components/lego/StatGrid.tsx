@@ -4,21 +4,29 @@ import { LegoPieceDNA } from '@/types/lego';
 
 interface StatGridProps {
   dna: LegoPieceDNA;
-  data: any[]; // Mock data inyectada por el motor
+  data: unknown[]; // Mock data inyectada por el motor
 }
 
-const icons: Record<string, any> = {
+interface MetricConfig {
+  icon: string;
+  colorClass: string;
+  label: string;
+  format?: string;
+  value: string;
+}
+
+const icons: Record<string, React.ElementType> = {
   Users,
   DollarSign,
   Activity
 };
 
 export const StatGrid: React.FC<StatGridProps> = ({ dna, data }) => {
-  const { metrics } = dna.config;
+  const { metrics } = dna.config as { metrics: MetricConfig[] };
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      {metrics.map((metric: any, index: number) => {
+      {metrics.map((metric: MetricConfig, index: number) => {
         const Icon = icons[metric.icon] || Activity;
         return (
           <div key={index} className="bg-white/70 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/80 dark:border-white/10 rounded-[24px] p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] flex flex-col h-full hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:-translate-y-1">

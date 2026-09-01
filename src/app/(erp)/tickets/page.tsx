@@ -41,7 +41,7 @@ export default function TicketsPage() {
       } else {
         toast({ variant: 'error', title: 'Error cargando tickets', description: res.error });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error cargando tickets:', err);
       toast({ variant: 'error', title: 'Error cargando tickets' });
     } finally {
@@ -53,7 +53,7 @@ export default function TicketsPage() {
     fetchTickets();
   }, [currentTenant?.id]);
 
-  const handleCreateTicket = async (formData: any) => {
+  const handleCreateTicket = async (formData: unknown) => {
     if (!currentTenant?.id) throw new Error('No hay empresa activa');
     const res = await createDocumentAction({
       entity_id: formData.entity_id,
@@ -90,7 +90,7 @@ export default function TicketsPage() {
       } else {
         toast({ variant: 'error', title: 'Error cambiando estado', description: res.error });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error cambiando estado:', err);
       toast({ variant: 'error', title: 'Error cambiando estado' });
     }

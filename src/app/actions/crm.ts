@@ -24,8 +24,8 @@ export async function getCRMPipelineSummaryAction(
 
     const summary = summarizePipeline(opportunities);
     return { success: true, summary };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -42,8 +42,8 @@ export async function getMRRMetricsAction(
 
     const metrics = summarizeSubscriptions(subscriptions);
     return { success: true, metrics };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -62,7 +62,7 @@ export async function generateB2BPortalLinkAction(
     const link = `/portal/${token}`;
 
     return { success: true, token, link };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }

@@ -9,7 +9,7 @@ export interface TenantBranch {
   manager_name: string | null;
   manager_email?: string | null;
   status: 'active' | 'inactive' | 'pending';
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }

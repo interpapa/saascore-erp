@@ -1,4 +1,4 @@
-// src/app/(saascore)/reservas/page.tsx
+"use client";
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/core/ToastProvider';
 import { getAvailableSlots, createReservation } from '@/lib/reservations';

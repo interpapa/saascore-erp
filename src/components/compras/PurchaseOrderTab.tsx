@@ -5,12 +5,12 @@ import { Entity } from '@/lib/api/entities';
 import { createDocumentAction } from '@/app/actions/documents';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
-import { ShoppingCart, Plus, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShoppingCart, Plus, AlertCircle } from 'lucide-react';
 
 interface PurchaseOrderTabProps {
-  purchaseOrders: any[];
+  purchaseOrders: unknown[];
   suppliers: Entity[];
-  catalogItems: any[];
+  catalogItems: unknown[];
   tenantId: string;
   onRefresh: () => void;
 }
@@ -73,7 +73,7 @@ export function PurchaseOrderTab({
   const handleCreatePO = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let activeLines = [...poLines];
+    const activeLines = [...poLines];
     
     // Si hay un producto seleccionado en los inputs del formulario rápido, agregarlo automáticamente como línea
     if (selectedItemId) {
@@ -142,8 +142,8 @@ export function PurchaseOrderTab({
       } else {
         toast({ variant: 'error', title: 'Atención', description: sanitizeUserError(res.error || 'No se pudo crear la orden de compra.') });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Atención', description: sanitizeUserError(err.message) });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Atención', description: sanitizeUserError((err as Error).message) });
     } finally {
       setIsSubmitting(false);
     }

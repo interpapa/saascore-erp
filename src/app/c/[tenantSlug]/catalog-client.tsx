@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from 'react';
-import { ShoppingCart, Search, Plus, Minus, Store, MessageCircle, Info } from 'lucide-react';
+import { Search, Plus, Minus, Store, MessageCircle, Info } from 'lucide-react';
 
 export interface Item {
   id: string;
@@ -10,14 +10,14 @@ export interface Item {
   category: string;
   base_price: number;
   stock_quantity: number;
-  metadata: any;
+  metadata: Record<string, unknown>;
 }
 
 export interface Tenant {
   id: string;
   name: string;
   phone?: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface CartItem extends Item {
@@ -100,7 +100,8 @@ export default function CatalogClient({ tenant, items }: { tenant: Tenant, items
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center">
               {tenant.metadata?.logo_url ? (
-                <img src={tenant.metadata.logo_url} alt="Logo" className="w-10 h-10 rounded-full object-cover" />
+                /* eslint-disable-next-line @next/next/no-img-element */
+<img src={tenant.metadata.logo_url} alt="Logo" className="w-10 h-10 rounded-full object-cover" />
               ) : (
                 <Store size={20} />
               )}
@@ -174,7 +175,8 @@ export default function CatalogClient({ tenant, items }: { tenant: Tenant, items
                   <div className="flex space-x-4">
                     <div className="w-20 h-20 bg-gray-100 rounded-xl flex-shrink-0 flex items-center justify-center">
                       {item.metadata?.image_url ? (
-                        <img src={item.metadata.image_url} alt={item.name} className="w-full h-full object-cover rounded-xl" />
+                        /* eslint-disable-next-line @next/next/no-img-element */
+<img src={item.metadata.image_url} alt={item.name} className="w-full h-full object-cover rounded-xl" />
                       ) : (
                         <Store className="text-gray-400" size={24} />
                       )}

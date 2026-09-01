@@ -16,7 +16,7 @@ interface CSVImportModalProps {
 
 export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [previewRows, setPreviewRows] = useState<any[]>([]);
+  const [previewRows, setPreviewRows] = useState<unknown[]>([]);
   const [parsedItems, setParsedItems] = useState<BulkImportItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,15 +70,15 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
       }
 
       const parsed: BulkImportItem[] = [];
-      const previews: any[] = [];
+      const previews: unknown[] = [];
 
       for (let i = 1; i < lines.length; i++) {
         // Parse CSV line handling quotes properly
         const rowText = lines[i];
-        let row = [];
+        const row = [];
         let inQuotes = false;
         let currentValue = '';
-        for (let char of rowText) {
+        for (const char of rowText) {
           if (char === '"') {
             inQuotes = !inQuotes;
           } else if (char === ',' && !inQuotes) {
@@ -131,8 +131,8 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
       setParsedItems(parsed);
       setPreviewRows(previews);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || 'Error procesando el archivo CSV.');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error procesando el archivo CSV.');
       setParsedItems([]);
       setPreviewRows([]);
     }
@@ -205,13 +205,13 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
         });
         setError(res.error || 'Error al importar.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast({
         title: 'Error',
-        description: err.message,
+        description: (err as Error).message,
         variant: 'error'
       });
-      setError(err.message);
+      setError((err as Error).message);
     } finally {
       setIsLoading(false);
     }

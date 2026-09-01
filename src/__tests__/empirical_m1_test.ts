@@ -32,7 +32,7 @@ try {
       }
     });
   }
-} catch (e: any) {
+} catch (e: unknown) {
   logErr('Failed to load env: ' + e.message);
 }
 
@@ -108,7 +108,7 @@ async function runEmpiricalTests() {
       'Chart of Accounts node 2.1.02.02 renamed to neutral title',
       `Got: ${accountNode?.name}`
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
     assert(false, 'Tax Engine Exception', e.message);
   }
 
@@ -140,7 +140,7 @@ async function runEmpiricalTests() {
     // 2.6 Update status missing ID
     const badUpdate = await updateAppointmentStatusAction('', 'completed', TEST_TENANT_ID, TEST_ACTOR);
     assert(badUpdate.success === false, 'updateAppointmentStatusAction rejects empty ID');
-  } catch (e: any) {
+  } catch (e: unknown) {
     assert(false, 'Appointments Action Exception', e.message);
   }
 
@@ -168,7 +168,7 @@ async function runEmpiricalTests() {
     const unauthActor: ActionActor = { email: 'hack@evil.com', role: 'seller' };
     const unauthSend = await sendMessageAction({ conversation_id: 'c1', text: 'Hello', client_phone: '+15551234567' }, TEST_TENANT_ID, unauthActor);
     assert(unauthSend.success === false, 'sendMessageAction blocks unauthorized tenant actor');
-  } catch (e: any) {
+  } catch (e: unknown) {
     assert(false, 'WhatsApp Action Exception', e.message);
   }
 
@@ -209,7 +209,7 @@ async function runEmpiricalTests() {
     // 4.4 Income Statement (Estado de Resultados)
     const incomeRes = await getIncomeStatementAction(TEST_TENANT_ID);
     assert(incomeRes.success === true && Boolean(incomeRes.data), 'getIncomeStatementAction returns valid report', `Error returned: ${incomeRes.error}`);
-  } catch (e: any) {
+  } catch (e: unknown) {
     assert(false, 'Accounting Action Exception', e.message);
   }
 
@@ -228,7 +228,7 @@ async function runEmpiricalTests() {
       assert(typeof perfRes.globalMetrics.totalRevenue === 'number', 'Branch performance returns global metrics totalRevenue');
       assert(typeof perfRes.globalMetrics.activeBranches === 'number', 'Branch performance returns global metrics activeBranches');
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     assert(false, 'Enterprise Action Exception', e.message);
   }
 
@@ -243,6 +243,6 @@ async function runEmpiricalTests() {
 }
 
 runEmpiricalTests().catch((err) => {
-  logErr('Fatal test harness failure: ' + err.message);
+  logErr('Fatal test harness failure: ' + (err as Error).message);
   process.exit(1);
 });

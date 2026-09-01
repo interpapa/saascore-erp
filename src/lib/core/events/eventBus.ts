@@ -15,7 +15,7 @@ export interface SaleCompletedPayload {
     quantity: number;
     unitPrice: number;
   }>;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -44,7 +44,7 @@ export interface AuditLoggedPayload {
   actorId: string;
   action: string;
   resource: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -60,7 +60,7 @@ export type EventName = keyof DomainEvents;
 export type EventHandler<T extends EventName> = (payload: DomainEvents[T]) => Promise<void> | void;
 
 class EventBus {
-  private listeners: Map<EventName, Set<EventHandler<any>>> = new Map();
+  private listeners: Map<EventName, Set<(payload: unknown) => void | Promise<void>>> = new Map();
 
   /**
    * Subscribe a plugin or module listener to a domain event.
@@ -69,11 +69,11 @@ class EventBus {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
-    this.listeners.get(event)!.add(handler);
+    this.listeners.get(event)!.add(handler as (payload: unknown) => void | Promise<void>);
 
     // Return unsubscribe function
     return () => {
-      this.listeners.get(event)?.delete(handler);
+      this.listeners.get(event)?.delete(handler as (payload: unknown) => void | Promise<void>);
     };
   }
 

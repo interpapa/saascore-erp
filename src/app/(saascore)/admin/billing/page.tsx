@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 export default function BillingAdminPage() {
   const { toast } = useToast();
   const { session } = useERPStore();
-  const [tenants, setTenants] = useState<any[]>([]);
+  const [tenants, setTenants] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTenants = async () => {

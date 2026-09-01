@@ -51,9 +51,13 @@ export function AppointmentModal({
   useEffect(() => {
     if (isOpen) {
       const d = initialDate || new Date();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDateStr(toYYYYMMDD(d));
+       
       setTimeStr(initialTime || '09:00');
+       
       setTitle('');
+       
       setServiceId('');
       setClientId(initialClientId || '');
       setEmployeeId('');
@@ -108,8 +112,8 @@ export function AppointmentModal({
       });
 
       onClose();
-    } catch (err: any) {
-      setFormError(err.message || 'Error al agendar cita.');
+    } catch (err: unknown) {
+      setFormError((err as Error).message || 'Error al agendar cita.');
     } finally {
       setIsSubmitting(false);
     }

@@ -48,7 +48,7 @@ export async function getExchangeRate(
         };
       }
     }
-  } catch (err) {
+  } catch {
     // Fallback to default
   }
 

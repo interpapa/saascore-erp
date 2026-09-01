@@ -49,6 +49,7 @@ export function CreateJournalEntryModal({
   // Reset form when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line
       setEntryDate(new Date().toISOString().slice(0, 10));
       setDescription('');
       setLines([
@@ -56,7 +57,7 @@ export function CreateJournalEntryModal({
         { id: '2', account_code: imputableAccounts[1]?.code || '4.1.01', debit: '0', credit: '0', description: '' },
       ]);
     }
-  }, [isOpen]);
+  }, [isOpen, imputableAccounts]);
 
   if (!isOpen) return null;
 

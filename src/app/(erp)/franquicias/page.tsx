@@ -29,8 +29,8 @@ export default function FranquiciasPage() {
 
       if (invoicesRes.success) {
         const totalRev = invoicesRes.documents
-          .filter((doc: any) => doc.status === 'invoiced' || doc.status === 'paid')
-          .reduce((sum: number, doc: any) => sum + (doc.total_amount || 0), 0);
+          .filter((doc: unknown) => doc.status === 'invoiced' || doc.status === 'paid')
+          .reduce((sum: number, doc: unknown) => sum + (doc.total_amount || 0), 0);
         setGlobalRevenue(totalRev);
       }
 

@@ -1,20 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Rocket, Upload, CheckCircle2 } from 'lucide-react';
 
-export const OnboardingWizard = () => {
-  const [isVisible, setIsVisible] = useState(false);
-  const [step, setStep] = useState(1);
-
-  useEffect(() => {
-    // Verificar si ya se completó el onboarding
-    const isCompleted = localStorage.getItem('saascore_onboarding_completed');
-    if (!isCompleted) {
-      setIsVisible(true);
+export default function OnboardingWizard() {
+  const [isVisible, setIsVisible] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return !localStorage.getItem('saascore_onboarding_completed');
     }
-  }, []);
-
+    return false;
+  });
+  const [step, setStep] = useState(1);
   const handleComplete = () => {
     localStorage.setItem('saascore_onboarding_completed', 'true');
     setIsVisible(false);

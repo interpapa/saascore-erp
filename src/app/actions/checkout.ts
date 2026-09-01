@@ -101,7 +101,7 @@ export async function processSecureCheckout(
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 3: Inmutabilidad Fiscal (Snapshotting)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let entityData: any = null;
+    let entityData: unknown = null;
     
     // Intentar buscar cliente real
     const { data: realEntity } = await supabaseAdmin
@@ -256,7 +256,7 @@ export async function processSecureCheckout(
           currency_local: exchangeData.currency,
           currency_symbol: exchangeData.symbol,
           total_local: totalLocal,
-          cart_lines: documentLines.map((line: any) => ({
+          cart_lines: documentLines.map((line: unknown) => ({
             description: line.description,
             quantity: line.quantity,
             unit_price: line.unit_price,
@@ -296,7 +296,7 @@ export async function processSecureCheckout(
         const itemStock = realItem ? (realItem.stock !== undefined ? realItem.stock : realItem.stock_quantity) : null;
         if (realItem && itemStock !== null && itemStock !== undefined) {
           const newStock = Math.max(0, itemStock - cartItem.quantity);
-          let { error: updateErr } = await supabaseAdmin.from('items').update({ stock: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
+          const { error: updateErr } = await supabaseAdmin.from('items').update({ stock: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
           if (updateErr && (updateErr.message.includes('stock') || updateErr.message.includes('column'))) {
             // Fallback: If DB schema uses stock_quantity instead of stock
             await supabaseAdmin.from('items').update({ stock_quantity: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
@@ -314,7 +314,7 @@ export async function processSecureCheckout(
     // CAPA 9: Asientos Contables (Partida Doble)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     try {
-      await generateJournalEntryForInvoice(newDoc as any, tenantId);
+      await generateJournalEntryForInvoice(newDoc as unknown, tenantId);
     } catch (journalError) {
       console.warn('Factura guardada pero falló asiento contable:', journalError);
     }
@@ -354,7 +354,7 @@ export async function processSecureCheckout(
 
     return { success: true, document: newDoc };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('SERVER ACTION ERROR (checkout):', error.message);
     return { success: false, error: error.message };
   }

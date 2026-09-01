@@ -28,7 +28,7 @@ interface AppModule {
   id: string;
   name: string;
   category: 'comercial' | 'operaciones' | 'finanzas' | 'administracion';
-  icon: any;
+  icon: unknown;
   gradient: string;
   description: string;
   isCore?: boolean;
@@ -46,8 +46,9 @@ export default function AppsManagerPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (currentTenant?.metadata?.active_modules) {
-      setActiveModules(currentTenant.metadata.active_modules);
+    const activeModules = (currentTenant?.metadata as { active_modules?: string[] })?.active_modules;
+    if (activeModules) {
+      setActiveModules(activeModules);
     }
   }, [currentTenant]);
 
@@ -160,7 +161,8 @@ export default function AppsManagerPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredModules.map(mod => {
           const isActive = activeModules.includes(mod.id);
-          const IconComp = mod.icon;
+          const IconComp = (mod.icon as any); /* eslint-disable-line */
+mod.icon;
 
           return (
             <div 

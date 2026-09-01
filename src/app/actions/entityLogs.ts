@@ -11,10 +11,10 @@ export interface EntityLogInput {
   title: string;
   details: string;
   status?: 'active' | 'resolved' | 'info_only';
-  metadata?: any;
+  metadata?: unknown;
 }
 
-function isMissingTableError(error: any): boolean {
+function isMissingTableError(error: unknown): boolean {
   if (!error) return false;
   const code = error.code || '';
   const msg = error.message || '';
@@ -53,7 +53,7 @@ export async function getEntityLogsAction(entityId: string, tenantId: string) {
     }
 
     throw new Error(error?.message || 'Error al consultar bitácora.');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[getEntityLogsAction Error]:', error.message);
     return { success: false, error: error.message, logs: [] };
   }
@@ -130,7 +130,7 @@ export async function createEntityLogAction(
     }
 
     throw new Error(error?.message || 'Error al guardar bitácora.');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[createEntityLogAction Error]:', error.message);
     return { success: false, error: error.message };
   }

@@ -32,7 +32,7 @@ export default function ClientesPage() {
   const [viewMode, setViewMode] = useViewPreference('clientes-view-mode', 'grid');
   const [selectedClient, setSelectedClient] = useState<Entity | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('clients');
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   const actor = {
@@ -98,7 +98,7 @@ export default function ClientesPage() {
     }
   }, [activeTab, loadAuditLogs]);
 
-  const handleCreateClient = async (data: any) => {
+  const handleCreateClient = async (data: unknown) => {
     if (!currentTenant) return;
 
     if (clientToEdit) {
@@ -123,7 +123,7 @@ export default function ClientesPage() {
       }
     } else {
       const tempId = `temp_client_${Date.now()}`;
-      const newClient: any = {
+      const newClient: unknown = {
         id: tempId,
         type: 'customer',
         name: data.full_name,

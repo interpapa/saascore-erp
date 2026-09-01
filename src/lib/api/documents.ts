@@ -10,7 +10,12 @@ export interface DocumentLine {
   tax_amount: number;
   subtotal?: number;
   total?: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
+}
+
+interface DocumentMetadata {
+  // Extend in the future with explicit fields
+  [key: string]: unknown;
 }
 
 export interface Document {
@@ -24,14 +29,14 @@ export interface Document {
   total_amount: number;
   issue_date: string;
   due_date: string | null;
-  metadata: Record<string, any>;
+  metadata?: DocumentMetadata;
   notes: string | null;
   created_at: string;
   updated_at: string;
   
   // Joins
   lines?: DocumentLine[];
-  entity?: any;
+  entity?: unknown;
 }
 
 export type CreateDocumentInput = Omit<Document, 'id' | 'created_at' | 'updated_at' | 'subtotal_amount' | 'total_amount' | 'tax_amount'> & {
@@ -48,12 +53,9 @@ export async function createDocumentWithLines(data: CreateDocumentInput) {
   const total_amount = subtotal_amount + tax_amount;
 
   // Adaptar el tipo de documento según compatibilidad de base de datos
-  let finalType = docData.type;
-  if (finalType === 'quote') {
-    finalType = 'quotation' as any; // schema_v1 usa 'quotation'
-  }
+  const finalType = docData.type === 'quote' ? 'quotation' : docData.type;
 
-  let insertData: any = {
+  const insertData = {
     ...docData,
     type: finalType,
     subtotal_amount,
@@ -70,7 +72,7 @@ export async function createDocumentWithLines(data: CreateDocumentInput) {
 
   if (docError && (docError.message.includes('due_date') || docError.message.includes('issue_date') || docError.message.includes('notes') || docError.message.includes('column'))) {
     // Fallback A: If DB schema is missing issue_date / due_date / notes columns (schema_v1)
-    const cleanInsert = { ...insertData };
+    const cleanInsert = { ...insertData } as Record<string, unknown>;
     delete cleanInsert.issue_date;
     delete cleanInsert.due_date;
     delete cleanInsert.notes;
@@ -95,14 +97,14 @@ export async function createDocumentWithLines(data: CreateDocumentInput) {
   if (docError && (docError.message.includes('constraint') || docError.message.includes('type'))) {
     // Fallback B: If DB fails due to document type CHECK constraints (e.g. quote, service_order, etc.)
     // Store type: 'invoice' (always supported) and save real type in metadata
-    const cleanInsert = { ...insertData };
-    delete cleanInsert.issue_date;
-    delete cleanInsert.due_date;
-    delete cleanInsert.notes;
+    const cleanInsertFallback = { ...insertData } as Record<string, unknown>;
+    delete cleanInsertFallback.issue_date;
+    delete cleanInsertFallback.due_date;
+    delete cleanInsertFallback.notes;
     
-    cleanInsert.type = 'invoice';
-    cleanInsert.metadata = {
-      ...cleanInsert.metadata,
+    cleanInsertFallback.type = 'invoice';
+    cleanInsertFallback.metadata = {
+      ...(cleanInsertFallback.metadata as object),
       real_type: docData.type,
       issue_date: docData.issue_date,
       due_date: docData.due_date,
@@ -111,7 +113,7 @@ export async function createDocumentWithLines(data: CreateDocumentInput) {
 
     const retry = await supabase
       .from('documents')
-      .insert([cleanInsert])
+      .insert([cleanInsertFallback])
       .select()
       .single();
     

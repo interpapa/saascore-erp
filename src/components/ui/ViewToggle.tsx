@@ -75,17 +75,16 @@ export function ViewToggle({
  *   const [view, setView] = useViewPreference('catalogo-view');
  */
 export function useViewPreference(storageKey: string, defaultView: ViewMode = 'grid') {
-  const [view, setView] = React.useState<ViewMode>(defaultView);
-
-  // Leer desde localStorage al montar (solo en cliente)
-  React.useEffect(() => {
+  // Estado con inicializador perezoso que lee de localStorage (si existe)
+  const [view, setView] = React.useState<ViewMode>(() => {
     try {
       const saved = localStorage.getItem(storageKey) as ViewMode | null;
-      if (saved === 'grid' || saved === 'list') setView(saved);
+      if (saved === 'grid' || saved === 'list') return saved;
     } catch {
-      // localStorage no disponible (SSR, incógnito estricto)
+      // Ignorar errores de localStorage
     }
-  }, [storageKey]);
+    return defaultView;
+  });
 
   const handleViewChange = React.useCallback(
     (newView: ViewMode) => {

@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { TrialBalanceRow } from '@/types/accounting';
 import { EmptyState } from '@/components/core/EmptyState';
-import { Scale, Search, CheckCircle2, AlertCircle, Layers } from 'lucide-react';
+import { Scale, Search, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface TrialBalanceTableProps {
   rows: TrialBalanceRow[];

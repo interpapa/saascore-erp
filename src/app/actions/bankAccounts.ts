@@ -19,9 +19,9 @@ export async function getBankAccountsAction(tenantId: string) {
       .eq('tenant_id', tenantId);
     if (error) throw error;
     return { success: true, accounts: data as BankAccount[] };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[getBankAccountsAction]', err);
-    return { success: false, error: err.message };
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -37,8 +37,8 @@ export async function createBankAccountAction(
       .single();
     if (error) throw error;
     return { success: true, account: data as BankAccount };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[createBankAccountAction]', err);
-    return { success: false, error: err.message };
+    return { success: false, error: (err as Error).message };
   }
 }

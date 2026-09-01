@@ -54,7 +54,7 @@ export default function KanbanPage() {
       } else {
         toast({ variant: 'error', title: 'Error cargando tickets', description: res.error });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading kanban:', err);
       toast({ variant: 'error', title: 'Error cargando tickets' });
     } finally {
@@ -75,7 +75,7 @@ export default function KanbanPage() {
         toast({ variant: 'error', title: 'Error actualizando estado', description: res.error });
         await fetchTickets();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback si falla
       console.error('Error moving card:', err);
       toast({ variant: 'error', title: 'Error actualizando estado' });
@@ -85,7 +85,7 @@ export default function KanbanPage() {
     }
   };
 
-  const handleCreateTicket = async (formData: any) => {
+  const handleCreateTicket = async (formData: unknown) => {
     if (!currentTenant?.id) throw new Error('No hay empresa activa');
     const res = await createDocumentAction({
       entity_id: formData.entity_id,

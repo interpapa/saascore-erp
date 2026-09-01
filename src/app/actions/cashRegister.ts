@@ -77,7 +77,7 @@ export async function getCashSessionStatusAction(tenantId: string, actor?: Actio
         salesCashInSession
       }
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }
@@ -143,7 +143,7 @@ export async function openCashSessionAction(initialAmount: number, tenantId: str
     revalidatePath('/pos');
 
     return { success: true, session: newSession };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }
@@ -171,7 +171,7 @@ export async function closeCashSessionAction(
       throw new Error('Empresa no encontrada.');
     }
 
-    let sessions: CashSession[] = tenant.metadata?.cash_sessions || [];
+    const sessions: CashSession[] = tenant.metadata?.cash_sessions || [];
     const sessionIndex = sessions.findIndex(s => s.id === sessionId && s.status === 'open');
 
     if (sessionIndex === -1) {
@@ -250,7 +250,7 @@ export async function closeCashSessionAction(
     revalidatePath('/pos');
 
     return { success: true, session: sessions[sessionIndex] };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return { success: false, error: error.message };
   }
 }

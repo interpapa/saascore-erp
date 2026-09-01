@@ -54,8 +54,8 @@ export function SupplierTab({ suppliers, tenantId, onRefresh }: SupplierTabProps
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo guardar el proveedor.' });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error de servidor', description: err.message });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error de servidor', description: (err as Error).message });
     } finally {
       setIsSubmitting(false);
     }

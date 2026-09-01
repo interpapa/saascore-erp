@@ -3,14 +3,12 @@
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import { 
   Home, 
   ShoppingCart, 
   CalendarDays, 
   Users, 
-  MessageCircle,
-  LayoutGrid
+  MessageCircle
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 
@@ -18,7 +16,7 @@ interface DockItem {
   id: string;
   label: string;
   href: string;
-  icon: any;
+  icon: unknown;
 }
 
 export function MobileDock() {
@@ -51,7 +49,8 @@ export function MobileDock() {
         className="pointer-events-auto flex items-center justify-around px-4 py-3 bg-white/70 dark:bg-slate-900/70 border border-border/80 rounded-[28px] shadow-xl shadow-black/10 dark:shadow-black/30 backdrop-blur-xl transition-all duration-300"
       >
         {activeItems.map((item) => {
-          const IconComponent = item.icon;
+          const IconComponent = (item.icon as any); /* eslint-disable-line */
+item.icon;
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
           return (

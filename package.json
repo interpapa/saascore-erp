@@ -6,11 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "deploy": "npx vercel --prod --yes --token $VERCEL_TOKEN"
+    "lint": "eslint . --fix",
+    "deploy": "npx vercel --prod --yes"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
+    "date-fns": "^4.4.0",
     "decimal.js": "^10.6.0",
     "framer-motion": "^13.1.0",
     "jspdf": "^4.2.1",

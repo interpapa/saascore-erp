@@ -67,8 +67,8 @@ export async function createKernelJournalEntry(payload: JournalEntryPayload): Pr
     }
 
     return { success: true, entryId: header.id };
-  } catch (err: any) {
-    console.error('[LedgerKernel Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[LedgerKernel Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

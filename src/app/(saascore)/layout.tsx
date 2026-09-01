@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { Crown, Database, Users, ShieldAlert, Activity } from 'lucide-react';
+import { Crown, Database, ShieldAlert, Activity } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SaaSCoreLayout({ children }: { children: ReactNode }) {

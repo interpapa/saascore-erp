@@ -54,7 +54,7 @@ export async function createPurchaseOrderAction(
         })),
       },
       tenantId,
-      actor as any
+      actor as unknown
     );
 
     if (!res.success) {
@@ -63,9 +63,9 @@ export async function createPurchaseOrderAction(
 
     revalidatePath('/compras');
     return { success: true, document: res.document };
-  } catch (err: any) {
-    console.error('[createPurchaseOrderAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[createPurchaseOrderAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -84,7 +84,7 @@ export async function verify3WayMatchAction(
 
     const matchResult = validate3WayMatch(po, receipt, bill);
     return { success: true, matchResult };
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }

@@ -56,8 +56,8 @@ export async function startImpersonationSession(
     });
 
     return { success: true, session };
-  } catch (err: any) {
-    console.error('[startImpersonationSession Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[startImpersonationSession Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

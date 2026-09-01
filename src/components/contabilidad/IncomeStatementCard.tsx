@@ -3,7 +3,7 @@
 import React from 'react';
 import { IncomeStatementReport } from '@/types/accounting';
 import { EmptyState } from '@/components/core/EmptyState';
-import { FileText, TrendingUp, TrendingDown, DollarSign, PieChart, Layers } from 'lucide-react';
+import { FileText, TrendingUp, TrendingDown, PieChart } from 'lucide-react';
 
 interface IncomeStatementCardProps {
   report?: IncomeStatementReport;

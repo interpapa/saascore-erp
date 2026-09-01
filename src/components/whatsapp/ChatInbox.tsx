@@ -249,7 +249,7 @@ export function ChatInbox({
       </div>
 
       {showProfilePanel && (
-        <div className="w-80 border-l border-border bg-card p-5 space-y-5 overflow-y-auto hidden lg:block">
+        <div className="w-80 border-l border-slate-200 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50 p-5 overflow-y-auto hidden lg:block custom-scrollbar">
           {/* Resumen del Cliente */}
           <div className="text-center space-y-3">
             <div className="w-16 h-16 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xl font-bold flex items-center justify-center mx-auto">
@@ -272,7 +272,7 @@ export function ChatInbox({
                 )}
                 <p className="flex items-center justify-center gap-1">
                   <MapPin size={12} />
-                  {conversation.metadata?.client_address || 'Sin dirección registrada'}
+                  {(conversation.metadata?.client_address as string) || 'Sin dirección registrada'}
                 </p>
               </div>
             </div>
@@ -286,7 +286,7 @@ export function ChatInbox({
             </div>
             <div>
               <div className="text-2xl font-extrabold text-amber-950 dark:text-amber-200">
-                ${Number(conversation.metadata?.client_metadata?.total_debt || 0).toFixed(2)} USD
+                ${Number(((conversation.metadata?.client_metadata as { total_debt?: number }) || {}).total_debt || 0).toFixed(2)} USD
               </div>
               <div className="text-[10px] text-amber-700/80 dark:text-amber-400/80 uppercase font-semibold">Deuda Pendiente (Cuentas por Cobrar)</div>
             </div>
@@ -294,11 +294,11 @@ export function ChatInbox({
               <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">
                 <span>Estado de Crédito:</span>
                 <span className={`font-bold text-[10px] uppercase px-2 py-0.5 rounded-full ${
-                  (conversation.metadata?.client_metadata?.total_debt || 0) > 0 
+                  (((conversation.metadata?.client_metadata as { total_debt?: number }) || {}).total_debt || 0) > 0 
                     ? 'bg-red-500/10 text-red-500' 
                     : 'bg-emerald-500/10 text-emerald-500'
                 }`}>
-                  {(conversation.metadata?.client_metadata?.total_debt || 0) > 0 ? 'Con Deuda' : 'Al Día / Solvente'}
+                  {(((conversation.metadata?.client_metadata as { total_debt?: number }) || {}).total_debt || 0) > 0 ? 'Con Deuda' : 'Al Día / Solvente'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs text-slate-600 dark:text-slate-400">

@@ -210,15 +210,15 @@ export default function EstadisticasPage() {
       // ── Items / Inventario ──
       const items = itemsRes.status === 'fulfilled' && itemsRes.value.success
         ? itemsRes.value.items : [];
-      const products = items.filter((i: any) => i.type === 'product');
+      const products = items.filter((i: unknown) => i.type === 'product');
       const totalItems = products.length;
       const totalInventoryValue = products.reduce(
-        (sum: number, i: any) => sum + (i.base_price || 0) * (i.stock_quantity || 0), 0
+        (sum: number, i: unknown) => sum + (i.base_price || 0) * (i.stock_quantity || 0), 0
       );
       const lowStockAlerts: AlertRow[] = products
-        .filter((i: any) => (i.stock_quantity || 0) <= 5)
+        .filter((i: unknown) => (i.stock_quantity || 0) <= 5)
         .slice(0, 8)
-        .map((i: any) => ({
+        .map((i: unknown) => ({
           id: i.id,
           name: i.name,
           stock: i.stock_quantity || 0,
@@ -230,29 +230,29 @@ export default function EstadisticasPage() {
         ? clientsRes.value.entities : [];
       const totalClients = clients.length;
       const totalDebt = clients.reduce(
-        (sum: number, c: any) => sum + (c.metadata?.total_debt || 0), 0
+        (sum: number, c: unknown) => sum + (c.metadata?.total_debt || 0), 0
       );
-      const activeClients = clients.filter((c: any) => c.status === 'active').length;
+      const activeClients = clients.filter((c: unknown) => c.status === 'active').length;
 
       // ── Facturas (ventas) ──
       const invoices = invoicesRes.status === 'fulfilled' && invoicesRes.value.success
         ? invoicesRes.value.documents : [];
       const now = new Date();
-      const thisMonth = invoices.filter((d: any) => {
+      const thisMonth = invoices.filter((d: unknown) => {
         const issued = new Date(d.issue_date || d.created_at);
         return issued.getMonth() === now.getMonth() && issued.getFullYear() === now.getFullYear();
       });
       const pendingInvoices = invoices.filter(
-        (d: any) => d.status === 'in_progress' || d.status === 'draft'
+        (d: unknown) => d.status === 'in_progress' || d.status === 'draft'
       ).length;
 
       // ── Órdenes de Compra ──
       const pos = posRes.status === 'fulfilled' && posRes.value.success
         ? posRes.value.documents : [];
-      const openPOs = pos.filter((d: any) => d.status !== 'paid' && d.status !== 'annulled');
+      const openPOs = pos.filter((d: unknown) => d.status !== 'paid' && d.status !== 'annulled');
       const totalPOsValue = openPOs.reduce(
-        (sum: number, d: any) =>
-          sum + (d.lines || []).reduce((s: number, l: any) => s + l.quantity * l.unit_price, 0), 0
+        (sum: number, d: unknown) =>
+          sum + (d.lines || []).reduce((s: number, l: unknown) => s + l.quantity * l.unit_price, 0), 0
       );
 
       // ── Empleados ──

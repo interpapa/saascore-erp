@@ -71,8 +71,8 @@ export default function IntegracionesPage() {
       } else {
         throw new Error(res.error || 'Error desconocido');
       }
-    } catch (err: any) {
-      setError(`No se pudo actualizar ${integrationId}: ${err.message}`);
+    } catch (err: unknown) {
+      setError(`No se pudo actualizar ${integrationId}: ${(err as Error).message}`);
     } finally {
       setIsLoading(null);
     }

@@ -21,7 +21,7 @@ export interface CSVImportResult<T> {
 /**
  * Parsea el texto plano CSV a un array de objetos según el mapeo de columnas configurado.
  */
-export function processCSVMapping<T = Record<string, any>>(
+export function processCSVMapping<T = Record<string, unknown>>(
   csvRawContent: string,
   mappings: ColumnMapping[]
 ): CSVImportResult<T> {
@@ -40,7 +40,7 @@ export function processCSVMapping<T = Record<string, any>>(
 
   dataRows.forEach((rowStr, idx) => {
     const values = rowStr.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-    const itemObj: Record<string, any> = {};
+    const itemObj: Record<string, unknown> = {};
 
     mappings.forEach(map => {
       const colIndex = headers.indexOf(map.csvHeader);

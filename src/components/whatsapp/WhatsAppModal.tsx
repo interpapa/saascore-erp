@@ -8,7 +8,7 @@ import { Entity } from '@/lib/api/entities';
 interface WhatsAppModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSend: (data: any) => Promise<void>;
+  onSend: (data: unknown) => Promise<void>;
   clients: Entity[];
 }
 
@@ -54,8 +54,8 @@ export function WhatsAppModal({ isOpen, onClose, onSend, clients }: WhatsAppModa
         message: message.trim()
       });
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al enviar el mensaje');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al enviar el mensaje');
     } finally {
       setIsLoading(false);
     }

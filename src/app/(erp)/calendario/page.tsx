@@ -91,7 +91,7 @@ export default function CalendarioPage() {
       }
 
       if (empRes.success) {
-        const mappedEmps: Employee[] = (empRes.entities || []).map((e: any) => ({
+        const mappedEmps: Employee[] = (empRes.entities || []).map((e: unknown) => ({
           id: e.id,
           tenant_id: e.tenant_id,
           name: e.name,
@@ -108,7 +108,7 @@ export default function CalendarioPage() {
       }
 
       if (srvRes.success) {
-        const mappedServices: Service[] = (srvRes.items || []).map((s: any) => ({
+        const mappedServices: Service[] = (srvRes.items || []).map((s: unknown) => ({
           id: s.id,
           tenant_id: s.tenant_id,
           name: s.name,
@@ -119,7 +119,7 @@ export default function CalendarioPage() {
         }));
         setServices(mappedServices);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[CalendarioPage Fetch Error]:', err);
       toast({
         variant: 'error',
@@ -193,12 +193,12 @@ export default function CalendarioPage() {
           description: res.error || 'No se pudo guardar la cita.',
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAppointments((prev) => prev.filter((a) => a.id !== optimisticId));
       toast({
         variant: 'error',
         title: 'Error inesperado',
-        description: err.message || 'Ocurrió un error al procesar la cita.',
+        description: (err as Error).message || 'Ocurrió un error al procesar la cita.',
       });
     }
   };
@@ -237,14 +237,14 @@ export default function CalendarioPage() {
           description: res.error || 'No se pudo actualizar el estado.',
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setAppointments((prev) =>
         prev.map((a) => (a.id === id ? { ...a, status: oldStatus } : a))
       );
       toast({
         variant: 'error',
         title: 'Error inesperado',
-        description: err.message || 'Error al actualizar el estado.',
+        description: (err as Error).message || 'Error al actualizar el estado.',
       });
     }
   };

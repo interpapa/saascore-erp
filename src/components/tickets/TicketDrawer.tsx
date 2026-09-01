@@ -1,8 +1,13 @@
 'use client';
 
-import { X, User, ClipboardList, Calendar, AlertTriangle, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
+import { X, User, AlertTriangle, CheckCircle2, Clock, ChevronRight } from 'lucide-react';
 import { Document } from '@/lib/api/documents';
 import { Button } from '@/components/ui/Button';
+
+interface TicketEntity {
+  name?: string;
+  phone?: string;
+}
 
 interface TicketDrawerProps {
   ticket: Document | null;
@@ -45,8 +50,8 @@ export function TicketDrawer({ ticket, isOpen, onClose, onStatusChange }: Ticket
               <StatusIcon size={12} />
               {status.label}
             </div>
-            <h2 className="text-lg font-black text-foreground leading-tight">{meta.title || 'Orden de Trabajo'}</h2>
-            <p className="text-sm text-slate-500 font-medium mt-1">#{ticket.document_number}</p>
+            <h2 className="text-lg font-black text-foreground leading-tight">{(meta.title as string) || 'Orden de Trabajo'}</h2>
+            <p className="text-sm text-slate-500 font-medium mt-1">#{(ticket as any).document_number}</p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0">
             <X size={20} />
@@ -62,9 +67,9 @@ export function TicketDrawer({ ticket, isOpen, onClose, onStatusChange }: Ticket
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cliente</p>
-              <p className="text-sm font-bold text-foreground">{(ticket.entity as any)?.name || 'Sin cliente'}</p>
-              {(ticket.entity as any)?.phone && (
-                <p className="text-xs text-slate-500">{(ticket.entity as any).phone}</p>
+              <p className="text-sm font-bold text-foreground">{(ticket.entity as TicketEntity)?.name || 'Sin cliente'}</p>
+              {(ticket.entity as TicketEntity)?.phone && (
+                <p className="text-xs text-slate-500">{(ticket.entity as TicketEntity).phone}</p>
               )}
             </div>
           </div>
@@ -73,7 +78,7 @@ export function TicketDrawer({ ticket, isOpen, onClose, onStatusChange }: Ticket
           {meta.description && (
             <div>
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Problema Reportado</h3>
-              <p className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl leading-relaxed">{meta.description}</p>
+              <p className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl leading-relaxed">{(meta.description as string)}</p>
             </div>
           )}
 
@@ -82,7 +87,7 @@ export function TicketDrawer({ ticket, isOpen, onClose, onStatusChange }: Ticket
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Detalles</h3>
             <div className="space-y-2">
               {[
-                { label: 'Prioridad', value: meta.priority === 'high' ? '🔴 Alta' : meta.priority === 'low' ? '🟢 Baja' : '🟡 Media' },
+                { label: 'Prioridad', value: (meta.priority as string) === 'high' ? '🔴 Alta' : (meta.priority as string) === 'low' ? '🟢 Baja' : '🟡 Media' },
                 { label: 'Creado', value: new Date(ticket.created_at).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) },
               ].map(item => (
                 <div key={item.label} className="flex justify-between text-sm py-2 border-b border-border/50 last:border-0">

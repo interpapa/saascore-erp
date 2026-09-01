@@ -44,7 +44,7 @@ export default function ContabilidadPage() {
   const [isLoading, setIsLoading] = useState(true);
   
   // Audit Logs States
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   // Filters & Tabs
@@ -124,7 +124,7 @@ export default function ContabilidadPage() {
       const res = await getAuditLogsAction(currentTenant.id, 'document', 40);
       if (res.success) {
         const accountingLogs = res.logs.filter(
-          (l: any) => l.action.includes('journal_entry') || l.action.includes('invoice')
+          (l: unknown) => l.action.includes('journal_entry') || l.action.includes('invoice')
         );
         setAuditLogs(accountingLogs.length > 0 ? accountingLogs : res.logs);
       }
@@ -145,7 +145,7 @@ export default function ContabilidadPage() {
     }
   }, [activeTab, loadAuditLogs]);
 
-  const handleCreateJournalEntry = async (payload: any) => {
+  const handleCreateJournalEntry = async (payload: unknown) => {
     if (!currentTenant?.id) return;
     try {
       setIsSubmittingEntry(true);
@@ -157,7 +157,7 @@ export default function ContabilidadPage() {
       } else {
         toast({ variant: 'error', title: 'Error al registrar asiento', description: res.error });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({ variant: 'error', title: 'Error de servidor', description: error.message });
     } finally {
       setIsSubmittingEntry(false);
@@ -170,11 +170,11 @@ export default function ContabilidadPage() {
         exportToCSV(
           `libro_diario_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'ID Asiento', accessor: (r: any) => r.id },
-            { header: 'Fecha', accessor: (r: any) => new Date(r.date).toLocaleDateString() },
-            { header: 'Número Doc', accessor: (r: any) => r.document_number || '' },
-            { header: 'Referencia', accessor: (r: any) => r.reference || '' },
-            { header: 'Concepto / Glosa', accessor: (r: any) => r.concept },
+            { header: 'ID Asiento', accessor: (r: unknown) => r.id },
+            { header: 'Fecha', accessor: (r: unknown) => new Date(r.date).toLocaleDateString() },
+            { header: 'Número Doc', accessor: (r: unknown) => r.document_number || '' },
+            { header: 'Referencia', accessor: (r: unknown) => r.reference || '' },
+            { header: 'Concepto / Glosa', accessor: (r: unknown) => r.concept },
           ],
           journalEntries
         );
@@ -182,13 +182,13 @@ export default function ContabilidadPage() {
         exportToCSV(
           `balance_comprobacion_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'Código Cuenta', accessor: (r: any) => r.account_code },
-            { header: 'Nombre Cuenta', accessor: (r: any) => r.account_name },
-            { header: 'Tipo', accessor: (r: any) => r.account_type },
-            { header: 'Mov. Débito ($)', accessor: (r: any) => r.period_debit },
-            { header: 'Mov. Crédito ($)', accessor: (r: any) => r.period_credit },
-            { header: 'Saldo Débito ($)', accessor: (r: any) => r.final_debit },
-            { header: 'Saldo Crédito ($)', accessor: (r: any) => r.final_credit },
+            { header: 'Código Cuenta', accessor: (r: unknown) => r.account_code },
+            { header: 'Nombre Cuenta', accessor: (r: unknown) => r.account_name },
+            { header: 'Tipo', accessor: (r: unknown) => r.account_type },
+            { header: 'Mov. Débito ($)', accessor: (r: unknown) => r.period_debit },
+            { header: 'Mov. Crédito ($)', accessor: (r: unknown) => r.period_credit },
+            { header: 'Saldo Débito ($)', accessor: (r: unknown) => r.final_debit },
+            { header: 'Saldo Crédito ($)', accessor: (r: unknown) => r.final_credit },
           ],
           trialBalance
         );
@@ -205,8 +205,8 @@ export default function ContabilidadPage() {
         exportToCSV(
           `estado_resultados_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'Concepto', accessor: (r: any) => r.concepto },
-            { header: 'Monto ($)', accessor: (r: any) => r.monto },
+            { header: 'Concepto', accessor: (r: unknown) => r.concepto },
+            { header: 'Monto ($)', accessor: (r: unknown) => r.monto },
           ],
           rows
         );

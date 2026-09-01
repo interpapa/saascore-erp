@@ -24,9 +24,9 @@ export default function ComprasPage() {
 
   // Data State
   const [suppliers, setSuppliers] = useState<Entity[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
-  const [catalogItems, setCatalogItems] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<unknown[]>([]);
+  const [catalogItems, setCatalogItems] = useState<unknown[]>([]);
+  const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
@@ -60,7 +60,7 @@ export default function ComprasPage() {
         // Filtrar del lado del cliente por si hay otras entidades,
         // o mostrar todo el flujo de documentos de compras
         const purchaseLogs = res.logs.filter(
-          (l: any) => l.action.includes('invoice') || l.action.includes('payment') || l.action.includes('entity')
+          (l: unknown) => l.action.includes('invoice') || l.action.includes('payment') || l.action.includes('entity')
         );
         setAuditLogs(purchaseLogs.length > 0 ? purchaseLogs : res.logs);
       }

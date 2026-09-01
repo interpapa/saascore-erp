@@ -45,7 +45,7 @@ export async function calculateAgingReport(
 
     for (const doc of docs || []) {
       if (!doc.entity_id) continue;
-      const entityName = (doc.entities as any)?.name || 'Desconocido';
+      const entityName = (doc.entities as { name?: string } | undefined)?.name ?? 'Desconocido';
       const docDate = new Date(doc.created_at).getTime();
       const ageDays = Math.floor((now - docDate) / (1000 * 60 * 60 * 24));
       const amount = Number(doc.total_amount || 0);
@@ -90,8 +90,8 @@ export async function calculateAgingReport(
         overdue: Number(grandOverdue.toFixed(2)),
       },
     };
-  } catch (err: any) {
-    console.error('[AgingEngine Error]:', err.message);
-    return { success: false, data: [], summary: { total: 0, overdue: 0 }, error: err.message };
+  } catch (err: unknown) {
+    console.error('[AgingEngine Error]:', (err as Error).message);
+    return { success: false, data: [], summary: { total: 0, overdue: 0 }, error: (err as Error).message };
   }
 }

@@ -82,8 +82,8 @@ export async function processPayroll(
         journalEntryId: journalResult.entryId,
       },
     };
-  } catch (err: any) {
-    console.error('[processPayroll Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[processPayroll Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Building2, User, Phone, MapPin, AlertTriangle } from 'lucide-react';
+import { X, Building2, User, MapPin, AlertTriangle } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { createEntityAction } from '@/app/actions/entities';
@@ -65,8 +65,8 @@ export function SupplierModal({ isOpen, onClose, onSuccess }: SupplierModalProps
       if (!res.success) throw new Error(res.error);
       onSuccess();
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Error al guardar el proveedor');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Error al guardar el proveedor');
     } finally {
       setIsLoading(false);
     }

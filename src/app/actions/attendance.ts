@@ -12,10 +12,10 @@ export interface AttendanceInput {
   log_type: 'check_in' | 'check_out' | 'class_attendance';
   status?: 'present' | 'absent' | 'excused' | 'no_show';
   reference_id?: string | null;
-  metadata?: any;
+  metadata?: unknown;
 }
 
-function isMissingTableError(error: any): boolean {
+function isMissingTableError(error: unknown): boolean {
   if (!error) return false;
   const code = error.code || '';
   const msg = error.message || '';
@@ -60,7 +60,7 @@ export async function getAttendanceLogsAction(tenantId: string, actor?: ActionAc
     }
 
     throw new Error(error?.message || 'Error al consultar asistencia.');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[getAttendanceLogsAction Error]:', error.message);
     return { success: false, error: error.message, logs: [] };
   }
@@ -85,7 +85,7 @@ export async function registerAttendanceAction(
     if (payload.entity_type === 'customer' && payload.log_type === 'class_attendance') {
       const { memberships } = await getMembershipsAction(tenantId);
       const activeMship = (memberships || []).find(
-        (m: any) => m.client_id === payload.entity_id && m.status === 'active'
+        (m: unknown) => m.client_id === payload.entity_id && m.status === 'active'
       );
 
       if (activeMship) {
@@ -164,7 +164,7 @@ export async function registerAttendanceAction(
     }
 
     throw new Error(error?.message || 'Error al guardar registro de asistencia.');
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[registerAttendanceAction Error]:', error.message);
     return { success: false, error: error.message };
   }
@@ -173,7 +173,7 @@ export async function registerAttendanceAction(
 /**
  * Helper interno para guardar el incremento del uso de la membresía.
  */
-async function updateMembershipCount(mship: any, tenantId: string) {
+async function updateMembershipCount(mship: unknown, tenantId: string) {
   try {
     const db = supabaseAdmin || supabase;
     const { error } = await db
@@ -192,7 +192,7 @@ async function updateMembershipCount(mship: any, tenantId: string) {
 
       const currentMetadata = tenant?.metadata || {};
       const list = currentMetadata.memberships || [];
-      const updated = list.map((m: any) => (m.id === mship.id ? mship : m));
+      const updated = list.map((m: unknown) => (m.id === mship.id ? mship : m));
 
       const { error: updateError } = await db
         .from('tenants')
@@ -209,7 +209,7 @@ async function updateMembershipCount(mship: any, tenantId: string) {
     }
 
     throw new Error(error.message);
-  } catch (err: any) {
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
   }
 }

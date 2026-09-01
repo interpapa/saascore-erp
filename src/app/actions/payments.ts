@@ -137,7 +137,7 @@ export async function recordDocumentPayment(
       isFullyPaid 
     };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('SERVER ACTION ERROR (recordDocumentPayment):', error.message);
     return { success: false, error: error.message };
   }

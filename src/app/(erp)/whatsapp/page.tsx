@@ -48,7 +48,7 @@ export default function WhatsAppPage() {
           setActiveConvId(res.conversations[0].id);
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[WhatsAppPage loadConversations Error]:', err);
     } finally {
       setIsLoadingConvs(false);
@@ -64,7 +64,7 @@ export default function WhatsAppPage() {
       if (res?.success && res.messages) {
         setMessages(res.messages);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[WhatsAppPage loadMessages Error]:', err);
     } finally {
       setIsLoadingMsgs(false);
@@ -85,7 +85,7 @@ export default function WhatsAppPage() {
         if (isSubscribed && custRes?.success && custRes.entities) {
           setClients(custRes.entities as Entity[]);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('[WhatsAppPage loadData Error]:', err);
       } finally {
         if (isSubscribed) setIsLoadingConvs(false);

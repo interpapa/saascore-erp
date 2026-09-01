@@ -30,7 +30,7 @@ export interface AuditEntry {
   action: AuditAction;
   target_type: string;      // 'document', 'item', 'entity', etc.
   target_id?: string;       // ID del recurso afectado
-  metadata?: Record<string, any>; // Contexto adicional (montos, estados anteriores, etc.)
+  metadata?: Record<string, unknown>; // TODO: definir tipo preciso
 }
 
 const CRITICAL_AUDIT_ACTIONS = [

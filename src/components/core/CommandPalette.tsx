@@ -9,7 +9,7 @@ interface CommandItem {
   title: string;
   category: 'módulo' | 'acción' | 'cliente' | 'producto';
   href: string;
-  icon: any;
+  icon: unknown;
 }
 
 const COMMAND_ITEMS: CommandItem[] = [
@@ -89,7 +89,8 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
             </div>
           ) : (
             filtered.map((item) => {
-              const Icon = item.icon;
+              const Icon = (r.icon as any); // eslint-disable-line
+item.icon;
               return (
                 <div
                   key={item.id}

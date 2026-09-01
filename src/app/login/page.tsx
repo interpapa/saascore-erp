@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLogin, setIsLogin] = useState(true);
@@ -18,7 +17,9 @@ export default function LoginPage() {
   useEffect(() => {
     if (countdown === null) return;
     if (countdown <= 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCountdown(null);
+       
       setError(null);
       return;
     }
@@ -46,7 +47,7 @@ export default function LoginPage() {
             // El AuthProvider detectará la sesión activa y redirigirá al dashboard
           }
         }
-      } catch (e) {
+      } catch (_err) {
         // Ignorar fallos de red durante el polling
       }
     }, 3000);
@@ -88,8 +89,8 @@ export default function LoginPage() {
         }
       }
       // Redirección manejada por el AuthProvider
-    } catch (err: any) {
-      let rawMessage = err.message || 'Error en la autenticación';
+    } catch (err: unknown) {
+      const rawMessage = (err as Error).message || 'Error en la autenticación';
       
       // Intentar extraer segundos de rate limit
       if (rawMessage.toLowerCase().includes('rate limit') || rawMessage.toLowerCase().includes('too many requests') || rawMessage.toLowerCase().includes('seconds')) {

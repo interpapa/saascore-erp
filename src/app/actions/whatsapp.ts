@@ -9,12 +9,11 @@ import {
   Conversation,
   CustomerTag,
   Message,
-  QuickReply,
   SendMessageInput,
   WhatsAppFilterState
 } from '@/types/whatsapp';
 
-function isMissingTableError(error: any): boolean {
+function isMissingTableError(error: unknown): boolean {
   if (!error) return false;
   const code = error.code || '';
   const msg = error.message || '';
@@ -42,7 +41,7 @@ export async function getConversationsAction(
       .order('last_activity', { ascending: false });
 
     if (!error && convs) {
-      const formatted: Conversation[] = convs.map((c: any) => ({
+      const formatted: Conversation[] = convs.map((c: unknown) => ({
         id: c.id,
         tenant_id: c.tenant_id,
         client_id: c.client_id,
@@ -78,9 +77,9 @@ export async function getConversationsAction(
 
       const conversationMap = new Map<string, Conversation>();
 
-      (logs || []).forEach((log: any) => {
+      (logs || []).forEach((log: unknown) => {
         const entityId = log.entity_id || log.document_number || 'unknown';
-        const client = (customers || []).find((c: any) => c.id === log.entity_id);
+        const client = (customers || []).find((c: unknown) => c.id === log.entity_id);
 
         if (!conversationMap.has(entityId)) {
           const rawTags: string[] = client?.metadata?.tags || [];
@@ -118,7 +117,7 @@ export async function getConversationsAction(
       });
 
       // Include registered customers who don't have messages yet
-      (customers || []).forEach((cust: any) => {
+      (customers || []).forEach((cust: unknown) => {
         if (!conversationMap.has(cust.id)) {
           const rawTags: string[] = cust.metadata?.tags || [];
           const tags: CustomerTag[] = rawTags.map((t) => ({
@@ -148,9 +147,9 @@ export async function getConversationsAction(
     }
 
     throw new Error(error?.message || 'Error al obtener conversaciones.');
-  } catch (err: any) {
-    console.error('[getConversationsAction Error]:', err.message);
-    return { success: false, error: err.message, conversations: [] };
+  } catch (err: unknown) {
+    console.error('[getConversationsAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, conversations: [] };
   }
 }
 
@@ -188,7 +187,7 @@ export async function getMessagesAction(
 
       if (docErr) throw new Error(docErr.message);
 
-      const messages: Message[] = (logs || []).map((log: any) => ({
+      const messages: Message[] = (logs || []).map((log: unknown) => ({
         id: log.id,
         conversation_id: conversationId,
         tenant_id: log.tenant_id,
@@ -205,9 +204,9 @@ export async function getMessagesAction(
     }
 
     throw new Error(error?.message || 'Error al obtener mensajes.');
-  } catch (err: any) {
-    console.error('[getMessagesAction Error]:', err.message);
-    return { success: false, error: err.message, messages: [] };
+  } catch (err: unknown) {
+    console.error('[getMessagesAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message, messages: [] };
   }
 }
 
@@ -321,9 +320,9 @@ export async function sendMessageAction(
     }
 
     throw new Error(error?.message || 'Error al enviar el mensaje de WhatsApp.');
-  } catch (err: any) {
-    console.error('[sendMessageAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[sendMessageAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -388,9 +387,9 @@ export async function updateCustomerTagAction(
 
     revalidatePath('/whatsapp');
     return { success: true, tags };
-  } catch (err: any) {
-    console.error('[updateCustomerTagAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[updateCustomerTagAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -433,9 +432,9 @@ export async function updateConversationStatusAction(
 
     revalidatePath('/whatsapp');
     return { success: true };
-  } catch (err: any) {
-    console.error('[updateConversationStatusAction Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[updateConversationStatusAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 
@@ -459,7 +458,7 @@ function filterConversations(list: Conversation[], filter?: WhatsAppFilterState)
       if (!nameMatch && !phoneMatch) return false;
     }
     if (filter.tag_id && filter.tag_id !== 'all') {
-      const hasTag = c.tags.some((t: any) => typeof t === 'string' ? t === filter.tag_id : (t?.id === filter.tag_id || t?.name === filter.tag_id));
+      const hasTag = c.tags.some((t: unknown) => typeof t === 'string' ? t === filter.tag_id : (t?.id === filter.tag_id || t?.name === filter.tag_id));
       if (!hasTag) return false;
     }
     if (filter.unread_only && c.unread_count === 0) return false;

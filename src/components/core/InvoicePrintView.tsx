@@ -1,21 +1,25 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Printer, CheckCircle2, ShieldCheck, FileText, X } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Printer, ShieldCheck, FileText, X } from 'lucide-react';
+
+const now = Date.now();
 
 interface InvoicePrintViewProps {
-  document: any;
+  document: unknown;
   onClose: () => void;
 }
 
 export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
   const [printFormat, setPrintFormat] = useState<'letter' | 'thermal'>('letter');
+  const doc = document as { created_at?: string; metadata?: Record<string, unknown>; document_number?: string; subtotal_amount?: number; tax_amount?: number; total_amount?: number; id?: string };
+  const printedDate = useMemo(() => new Date(doc?.created_at || now), [doc?.created_at]);
   
-  if (!document) return null;
+  if (!doc) return null;
 
-  const metadata = document.metadata || {};
-  const customer = metadata.customer_snapshot || {};
-  const taxDetails = metadata.tax_details || {};
+  const metadata = (doc.metadata as Record<string, unknown>) || {};
+  const customer = (metadata.customer_snapshot as Record<string, unknown>) || {};
+  const taxDetails = (metadata.tax_details as Record<string, unknown>) || {};
 
   const handlePrint = () => {
     window.print();
@@ -79,10 +83,10 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
               </div>
               <div className="text-right">
                 <span className="text-xs font-semibold uppercase px-2.5 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded print:border-black print:text-black">
-                  {document.document_number}
+                  {doc.document_number}
                 </span>
                 <p className="text-xs text-slate-400 print:text-gray-600 mt-2">
-                  Fecha: {new Date(document.created_at || Date.now()).toLocaleDateString()}
+                  Fecha: {printedDate.toLocaleDateString()}
                 </p>
               </div>
             </div>
@@ -110,7 +114,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
               </div>
               <div className="p-4 text-sm space-y-3">
                 {metadata.cart_lines && metadata.cart_lines.length > 0 ? (
-                  metadata.cart_lines.map((line: any, idx: number) => (
+                  metadata.cart_lines.map((line: Record<string, any>, idx: number) => (
                     <div key={idx} className="grid grid-cols-4 text-slate-200 print:text-black items-center text-xs">
                       <span className="col-span-2 font-semibold text-white print:text-black">{line.description}</span>
                       <span className="text-right font-mono text-slate-400 print:text-gray-700">
@@ -127,7 +131,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
                     <span className="text-right text-xs uppercase font-mono text-slate-400 print:text-gray-700">
                       {metadata.payment_method || 'Contado'}
                     </span>
-                    <span className="text-right font-bold">${Number(document.subtotal_amount || 0).toFixed(2)}</span>
+                    <span className="text-right font-bold">${Number(doc.subtotal_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -140,22 +144,22 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
                   <ShieldCheck className="w-4 h-4" />
                   <span>Factura Sellada Inmutablemente</span>
                 </div>
-                <p className="font-mono text-[10px]">ID: {document.id}</p>
+                <p className="font-mono text-[10px]">ID: {doc.id}</p>
                 <p className="font-mono text-[10px]">Emisor: {metadata.processed_by || 'Sistema ERP'}</p>
               </div>
 
               <div className="w-72 space-y-1.5 text-right text-xs">
                 <div className="flex justify-between text-slate-400 print:text-gray-600">
                   <span>Subtotal:</span>
-                  <span className="font-mono text-slate-200 print:text-black">${Number(document.subtotal_amount || 0).toFixed(2)} USD</span>
+                  <span className="font-mono text-slate-200 print:text-black">${Number(doc.subtotal_amount || 0).toFixed(2)} USD</span>
                 </div>
                 <div className="flex justify-between text-slate-400 print:text-gray-600">
                   <span>Impuesto ({((taxDetails.taxRate || 0) * 100).toFixed(0)}%):</span>
-                  <span className="font-mono text-slate-200 print:text-black">${Number(document.tax_amount || 0).toFixed(2)} USD</span>
+                  <span className="font-mono text-slate-200 print:text-black">${Number(doc.tax_amount || 0).toFixed(2)} USD</span>
                 </div>
                 <div className="flex justify-between text-base font-bold text-white print:text-black pt-2 border-t border-slate-800 print:border-gray-400">
                   <span>Total USD:</span>
-                  <span className="font-mono text-indigo-400 print:text-black">${Number(document.total_amount || 0).toFixed(2)} USD</span>
+                  <span className="font-mono text-indigo-400 print:text-black">${Number(doc.total_amount || 0).toFixed(2)} USD</span>
                 </div>
                 {metadata.total_local && (
                   <div className="flex justify-between text-xs font-bold text-emerald-400 print:text-gray-800 pt-1">
@@ -176,8 +180,8 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
             <div className="text-center pb-2 border-b border-dashed border-slate-600 print:border-black">
               <h1 className="text-sm font-black uppercase tracking-wider">SaaSCORE ERP</h1>
               <p className="mt-1">Comprobante Fiscal</p>
-              <p className="mt-0.5">Factura: {document.document_number}</p>
-              <p>Fecha: {new Date(document.created_at || Date.now()).toLocaleString()}</p>
+              <p className="mt-0.5">Factura: {doc.document_number}</p>
+              <p>Fecha: {printedDate.toLocaleString()}</p>
             </div>
             
             <div className="py-2 border-b border-dashed border-slate-600 print:border-black space-y-0.5">
@@ -192,7 +196,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
               </div>
               <div className="space-y-1">
                 {metadata.cart_lines && metadata.cart_lines.length > 0 ? (
-                  metadata.cart_lines.map((line: any, idx: number) => (
+                  metadata.cart_lines.map((line: Record<string, any>, idx: number) => (
                     <div key={idx} className="flex justify-between items-start">
                       <span className="pr-2">{line.quantity}x {line.description}</span>
                       <span>${Number(line.total || (line.unit_price * line.quantity)).toFixed(2)}</span>
@@ -201,7 +205,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
                 ) : (
                   <div className="flex justify-between items-start">
                     <span className="pr-2">1x Venta General POS</span>
-                    <span>${Number(document.subtotal_amount || 0).toFixed(2)}</span>
+                    <span>${Number(doc.subtotal_amount || 0).toFixed(2)}</span>
                   </div>
                 )}
               </div>
@@ -210,15 +214,15 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
             <div className="py-2 border-b border-dashed border-slate-600 print:border-black space-y-1">
               <div className="flex justify-between">
                 <span>SUBTOTAL:</span>
-                <span>${Number(document.subtotal_amount || 0).toFixed(2)}</span>
+                <span>${Number(doc.subtotal_amount || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span>IVA ({((taxDetails.taxRate || 0) * 100).toFixed(0)}%):</span>
-                <span>${Number(document.tax_amount || 0).toFixed(2)}</span>
+                <span>${Number(doc.tax_amount || 0).toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-xs mt-1 pt-1 border-t border-dashed border-slate-700 print:border-gray-400">
                 <span>TOTAL USD:</span>
-                <span>${Number(document.total_amount || 0).toFixed(2)}</span>
+                <span>${Number(doc.total_amount || 0).toFixed(2)}</span>
               </div>
               {metadata.total_local && (
                 <div className="flex justify-between font-bold text-xs mt-1">
@@ -234,7 +238,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
               <p>Pago: {metadata.payment_method === 'mixed' ? 'Mixto' : metadata.payment_method}</p>
               {metadata.payments && metadata.payments.length > 0 && (
                 <div className="text-[8px] text-left mt-1 border border-slate-700 print:border-gray-400 p-1">
-                  {metadata.payments.map((p: any, i: number) => (
+                  {metadata.payments.map((p: Record<string, any>, i: number) => (
                     <div key={i} className="flex justify-between">
                       <span className="uppercase">{p.method}:</span>
                       <span>${p.amount.toFixed(2)}</span>
@@ -242,7 +246,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
                   ))}
                 </div>
               )}
-              <p className="mt-2 text-[8px] truncate">Ref: {document.id}</p>
+              <p className="mt-2 text-[8px] truncate">Ref: {doc.id}</p>
             </div>
           </div>
         )}

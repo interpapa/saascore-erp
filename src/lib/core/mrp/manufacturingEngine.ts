@@ -88,8 +88,8 @@ export async function processManufacturingOrder(
       moNumber,
       totalCost: explosion.totalProductionCost,
     };
-  } catch (err: any) {
-    console.error('[processManufacturingOrder Error]:', err.message);
-    return { success: false, error: err.message };
+  } catch (err: unknown) {
+    console.error('[processManufacturingOrder Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }

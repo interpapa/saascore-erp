@@ -5,7 +5,7 @@ import { Entity } from '@/lib/api/entities';
 import { createEntityAction } from '@/app/actions/entities';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
-import { Users, Plus, Award, Briefcase, Mail, Phone } from 'lucide-react';
+import { Users, Plus, Briefcase, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -58,8 +58,8 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo guardar el empleado.' });
       }
-    } catch (err: any) {
-      toast({ variant: 'error', title: 'Error de servidor', description: err.message });
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error de servidor', description: (err as Error).message });
     } finally {
       setIsSaving(false);
     }
@@ -97,10 +97,10 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {employees.map((emp) => (
-            <div key={emp.id} className="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-indigo-500/30 transition-all space-y-4">
+            <div key={(emp as any).id} className="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-indigo-500/30 transition-all space-y-4">
               <div className="flex items-start justify-between">
                 <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base border border-indigo-500/20">
-                  {emp.name.slice(0, 2).toUpperCase()}
+                  {(emp as any).name.slice(0, 2).toUpperCase()}
                 </div>
                 <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                   Activo
@@ -108,18 +108,18 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
               </div>
 
               <div>
-                <h3 className="font-bold text-foreground text-sm tracking-tight">{emp.name}</h3>
+                <h3 className="font-bold text-foreground text-sm tracking-tight">{(emp as any).name}</h3>
                 <p className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1.5 mt-0.5">
                   <Briefcase size={13} className="text-indigo-500" />
-                  {emp.metadata?.role_title || 'Empleado General'}
+                  {(emp as any).metadata?.role_title || 'Empleado General'}
                 </p>
               </div>
 
               <div className="pt-3 border-t border-border space-y-1.5 text-xs text-slate-500">
-                {emp.email && (
+                {(emp as any).email && (
                   <div className="flex items-center gap-2">
                     <Mail size={13} className="text-slate-400" />
-                    <span className="truncate">{emp.email}</span>
+                    <span className="truncate">{(emp as any).email}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between pt-1">

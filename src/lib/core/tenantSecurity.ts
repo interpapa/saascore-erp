@@ -7,7 +7,6 @@
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { UserRole } from '@/lib/rbac';
-import { writeAuditLog } from '@/lib/core/auditLogger';
 
 export interface SecurityActor {
   email: string;
@@ -29,7 +28,7 @@ export async function validateUserTenantAccess(
     }
 
     // Query user_tenants relation to confirm authorization
-    const { data: userLink, error } = await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from('user_tenants')
       .select('*')
       .eq('tenant_id', tenantId)
@@ -41,7 +40,7 @@ export async function validateUserTenantAccess(
     }
 
     return { authorized: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[TenantSecurity Exception]:', err);
     return { authorized: false, error: 'Error de verificación de permisos multi-tenant.' };
   }
