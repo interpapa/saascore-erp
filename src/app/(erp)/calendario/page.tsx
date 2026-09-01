@@ -91,7 +91,7 @@ export default function CalendarioPage() {
       }
 
       if (empRes.success) {
-        const mappedEmps: Employee[] = (empRes.entities || []).map((e: unknown) => ({
+        const mappedEmps: Employee[] = (empRes.entities || []).map((e: any) => ({
           id: e.id,
           tenant_id: e.tenant_id,
           name: e.name,
@@ -108,7 +108,7 @@ export default function CalendarioPage() {
       }
 
       if (srvRes.success) {
-        const mappedServices: Service[] = (srvRes.items || []).map((s: unknown) => ({
+        const mappedServices: Service[] = (srvRes.items || []).map((s: any) => ({
           id: s.id,
           tenant_id: s.tenant_id,
           name: s.name,

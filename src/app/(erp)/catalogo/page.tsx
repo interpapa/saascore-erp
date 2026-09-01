@@ -86,7 +86,7 @@ export default function CatalogoPage() {
     }
   }, [activeTab, loadAuditLogs]);
 
-  const handleSaveItem = async (data: unknown) => {
+  const handleSaveItem = async (data: any) => {
     if (!activeTenant) return;
 
     if (editingItem) {

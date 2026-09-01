@@ -264,7 +264,7 @@ export async function adjustItemStockAction(
 
     // 2. Actualizar stock
     // 2. Actualizar stock con fallback y registrar cuál columna se usó
-    let _stockFieldUsed = 'stock';
+    const _stockFieldUsed = 'stock';
     let error: unknown = null;
     const result = await supabaseAdmin
       .from('items')

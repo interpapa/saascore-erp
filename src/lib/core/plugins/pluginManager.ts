@@ -27,7 +27,7 @@ class PluginManager {
       
       for (const [eventName, handler] of Object.entries(plugin.eventListeners)) {
         if (handler) {
-          const unsub = eventBus.on(eventName as EventName, handler as any /* eslint-disable-line */<EventName>);
+          const unsub = eventBus.on(eventName as EventName, handler as any); // eslint-disable-line
           unsubscribers.push(unsub);
         }
       }

@@ -34,7 +34,7 @@ export default function AdminTenantsPage() {
     if (!result.success) {
       // Revert if failed
       toast({ variant: 'error', title: 'Error', description: result.error });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
     fetchTenants();
     }
   };
