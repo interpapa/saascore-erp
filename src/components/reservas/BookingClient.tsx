@@ -121,24 +121,31 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
     setIsSubmitting(true);
     setErrorMessage('');
 
-    const result = await processBookingAction({
-      tenantId: tenant.id,
-      barberId: selectedBarber.id,
-      barberName: selectedBarber.name,
-      date: selectedDate,
-      time: selectedTime, // this is value24
-      firstName: customerName,
-      lastName: customerLastName,
-    });
+    try {
+      const result = await processBookingAction({
+        tenantId: tenant.id,
+        barberId: selectedBarber.id,
+        barberName: selectedBarber.name,
+        date: selectedDate,
+        time: selectedTime, // this is value24
+        firstName: customerName,
+        lastName: customerLastName,
+      });
 
-    setIsSubmitting(false);
+      setIsSubmitting(false);
 
-    if (!result.success) {
-      setErrorMessage(result.error || 'Ocurrió un error inesperado');
+      if (!result?.success) {
+        setErrorMessage(result?.error || 'Ocurrió un error inesperado');
+        return;
+      }
+
+      setSuccessMessage('¡Reserva confirmada con éxito!');
+    } catch (err: any) {
+      console.error('Error Calling Server Action:', err);
+      setIsSubmitting(false);
+      setErrorMessage(err.message || 'Error de red o de servidor al enviar la reserva.');
       return;
     }
-
-    setSuccessMessage('¡Reserva confirmada con éxito!');
 
     // Read whatsapp config or use fallbacks
     const phone = settings.whatsappNumber || "5804245642100"; 
