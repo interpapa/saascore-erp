@@ -30,7 +30,15 @@ export function BookingConfigModal({
 
   useEffect(() => {
     if (tenant?.metadata?.booking_settings) {
-      setSettings({ ...defaultSettings, ...tenant.metadata.booking_settings });
+      const dbSettings = tenant.metadata.booking_settings;
+      setSettings({
+        openDays: Array.isArray(dbSettings.openDays) ? dbSettings.openDays : defaultSettings.openDays,
+        startHour: dbSettings.startHour || defaultSettings.startHour,
+        endHour: dbSettings.endHour || defaultSettings.endHour,
+        intervalMinutes: dbSettings.intervalMinutes || defaultSettings.intervalMinutes,
+        whatsappNumber: dbSettings.whatsappNumber || defaultSettings.whatsappNumber,
+        whatsappMessageTemplate: dbSettings.whatsappMessageTemplate || defaultSettings.whatsappMessageTemplate
+      });
     }
   }, [tenant]);
 
