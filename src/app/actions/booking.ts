@@ -55,12 +55,7 @@ export async function processBookingAction(formData: unknown) {
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         status: 'scheduled',
-        metadata: { 
-          source: 'public_web', 
-          ip_address: ip,
-          client_name: fullName,
-          employee_name: cleanData.barberName
-        }
+        notes: `Reserva Pública - Cliente: ${fullName}`
       });
 
     if (error) {

@@ -82,7 +82,7 @@ export async function getAppointmentsAction(
           title: a.title,
           description: a.description,
           client_id: a.client_id,
-          client_name: client?.name || a.client_name || a.metadata?.client_name,
+          client_name: client?.name || a.client_name || a.metadata?.client_name || (a.notes?.includes('Cliente: ') ? a.notes.split('Cliente: ')[1] : undefined),
           client_phone: client?.phone || a.client_phone || a.metadata?.client_phone,
           client_email: client?.email,
           service_id: a.service_id,
@@ -192,7 +192,6 @@ export async function createAppointmentAction(
         notes: payload.notes || null,
         price: payload.price || 0,
         location: payload.location || null,
-        metadata: payload.metadata || {},
       }])
       .select()
       .single();
