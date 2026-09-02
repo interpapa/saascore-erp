@@ -75,8 +75,11 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
     endHour: tenant.metadata?.booking_settings?.endHour || '18:00',
     intervalMinutes: tenant.metadata?.booking_settings?.intervalMinutes || 30,
     whatsappNumber: tenant.metadata?.booking_settings?.whatsappNumber || "5804245642100",
-    whatsappMessageTemplate: tenant.metadata?.booking_settings?.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{barbero}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.',
+    resourceName: tenant.metadata?.booking_settings?.resourceName || 'Profesional',
+    whatsappMessageTemplate: tenant.metadata?.booking_settings?.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{profesional}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.',
   };
+
+  const resourceName = settings.resourceName;
 
   const [step, setStep] = useState(1);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
@@ -158,7 +161,7 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
     
     // Replace magic variables
     const text = template
-      .replace(/{{barbero}}/g, selectedBarber.name)
+      .replace(/{{profesional}}/g, selectedBarber.name)
       .replace(/{{fecha}}/g, selectedDate)
       .replace(/{{hora}}/g, readableTime || '')
       .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`);
@@ -186,12 +189,12 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
           <div className="flex flex-col h-full">
             <div className="bg-[#0B3B24] pt-12 pb-8 px-6 shadow-md z-10 md:pt-16">
               <h1 className="text-white text-3xl font-black mb-1">{tenant.name}</h1>
-              <p className="text-emerald-100/80 text-sm">Selecciona con quién quieres agendar hoy</p>
+              <p className="text-emerald-100/80 text-sm">Selecciona tu {resourceName.toLowerCase()} para agendar hoy</p>
             </div>
             
             <div className="p-5 space-y-4 flex-1 overflow-y-auto bg-white/50">
               {employees.length === 0 && (
-                 <p className="text-center text-slate-400 mt-10">No hay profesionales disponibles.</p>
+                 <p className="text-center text-slate-400 mt-10">No hay opciones disponibles en este momento.</p>
               )}
               {employees.map(barber => (
                 <button

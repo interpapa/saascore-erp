@@ -24,8 +24,9 @@ export function BookingConfigModal({
     startHour: '09:00',
     endHour: '18:00',
     intervalMinutes: 30,
-    whatsappNumber: '', // Ej: 584241234567
-    whatsappMessageTemplate: '¡Hola! Quiero confirmar mi reserva con {{barbero}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.'
+    whatsappNumber: '', 
+    resourceName: 'Profesional',
+    whatsappMessageTemplate: '¡Hola! Quiero confirmar mi reserva con {{profesional}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.'
   };
 
   const [settings, setSettings] = useState(defaultSettings);
@@ -40,6 +41,7 @@ export function BookingConfigModal({
           endHour: dbSettings.endHour || defaultSettings.endHour,
           intervalMinutes: dbSettings.intervalMinutes || defaultSettings.intervalMinutes,
           whatsappNumber: dbSettings.whatsappNumber || defaultSettings.whatsappNumber,
+          resourceName: dbSettings.resourceName || defaultSettings.resourceName,
           whatsappMessageTemplate: dbSettings.whatsappMessageTemplate || defaultSettings.whatsappMessageTemplate
         });
       } else {
@@ -94,23 +96,36 @@ export function BookingConfigModal({
           <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 space-y-4">
             <h3 className="font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
-              Notificaciones de WhatsApp
+              Comunicaciones y Textos
             </h3>
             
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Número de Teléfono (Con código de país, sin el +)</label>
-              <input 
-                type="text" 
-                placeholder="Ej: 584241234567"
-                value={settings.whatsappNumber || ''}
-                onChange={e => setSettings({...settings, whatsappNumber: e.target.value})}
-                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Terminología del Recurso</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: Barbero, Cancha, Médico"
+                  value={settings.resourceName || ''}
+                  onChange={e => setSettings({...settings, resourceName: e.target.value})}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">WhatsApp del Negocio</label>
+                <input 
+                  type="text" 
+                  placeholder="Ej: 584241234567"
+                  value={settings.whatsappNumber || ''}
+                  onChange={e => setSettings({...settings, whatsappNumber: e.target.value})}
+                  className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Mensaje Automático del Cliente</label>
-              <p className="text-[10px] text-slate-500 mb-2">Variables mágicas permitidas: <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{barbero}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{fecha}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{hora}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{cliente}}"}</code></p>
+              <p className="text-[10px] text-slate-500 mb-2">Variables mágicas permitidas: <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{profesional}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{fecha}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{hora}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{cliente}}"}</code></p>
               <textarea 
                 rows={3}
                 value={settings.whatsappMessageTemplate}
