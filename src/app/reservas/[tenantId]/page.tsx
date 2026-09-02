@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import BookingClient from '@/components/reservas/BookingClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ReservasPublicPage({ params }: { params: { tenantId: string } }) {
   const { tenantId } = params;
 
@@ -9,14 +11,19 @@ export default async function ReservasPublicPage({ params }: { params: { tenantI
     return notFound();
   }
 
-  // 1. Fetch Tenant Name
-  const { data: tenant } = await supabaseAdmin
+  // 1. Fetch Tenant Name and Metadata
+  const { data: tenant, error: tenantError } = await supabaseAdmin
     .from('tenants')
-    .select('id, name')
+    .select('id, name, metadata')
     .eq('id', tenantId)
     .single();
 
+  if (tenantError) {
+    console.error(`Error buscando empresa con ID ${tenantId}:`, tenantError);
+  }
+
   if (!tenant) {
+    console.error(`Empresa no encontrada para el ID: ${tenantId}`);
     return notFound();
   }
 
