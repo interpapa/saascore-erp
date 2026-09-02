@@ -14,8 +14,16 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Rutas que NO requieren autenticación
-const PUBLIC_ROUTES = ['/login'];
-const isPublicRoute = (path: string) => PUBLIC_ROUTES.includes(path) || path.startsWith('/c/');
+const PUBLIC_ROUTES = ['/login', '/reservar-demo'];
+
+// Comprueba si la ruta es pública o es una de las rutas base permitidas sin sesión
+const isPublicRoute = (path: string) => {
+  if (PUBLIC_ROUTES.includes(path)) return true;
+  // Permitir todas las rutas dinámicas bajo /reservas/
+  if (path.startsWith('/reservas/')) return true;
+  if (path.startsWith('/c/')) return true;
+  return false;
+};
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { session, setSession, setCurrentTenant } = useERPStore();
