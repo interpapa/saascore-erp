@@ -69,11 +69,13 @@ const GENERATE_TIMES = (start: string, end: string, interval: number) => {
 
 export default function BookingClient({ tenant, employees }: { tenant: Tenant, employees: Employee[] }) {
   // Read settings from tenant or use defaults
-  const settings = tenant.metadata?.booking_settings || {
-    openDays: [1, 2, 3, 4, 5, 6],
-    startHour: '09:00',
-    endHour: '18:00',
-    intervalMinutes: 30
+  const settings = {
+    openDays: tenant.metadata?.booking_settings?.openDays || [1, 2, 3, 4, 5, 6],
+    startHour: tenant.metadata?.booking_settings?.startHour || '09:00',
+    endHour: tenant.metadata?.booking_settings?.endHour || '18:00',
+    intervalMinutes: tenant.metadata?.booking_settings?.intervalMinutes || 30,
+    whatsappNumber: tenant.metadata?.booking_settings?.whatsappNumber || "5804245642100",
+    whatsappMessageTemplate: tenant.metadata?.booking_settings?.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{barbero}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.',
   };
 
   const [step, setStep] = useState(1);
@@ -148,8 +150,8 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
     }
 
     // Read whatsapp config or use fallbacks
-    const phone = settings.whatsappNumber || "5804245642100"; 
-    const template = settings.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{barbero}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.';
+    const phone = settings.whatsappNumber; 
+    const template = settings.whatsappMessageTemplate;
     
     // Find the readable time to send to WhatsApp
     const readableTime = allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime;
