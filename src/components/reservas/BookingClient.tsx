@@ -163,7 +163,11 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
       .replace(/{{hora}}/g, readableTime || '')
       .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`);
 
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    // Si el comercio no tiene configurado un número, intentamos enviarlo sin número para que la persona lo escoja de su agenda
+    const url = phone 
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+      
     setTimeout(() => {
       window.open(url, '_blank');
       setStep(1);

@@ -40,13 +40,13 @@ export async function processBookingAction(formData: unknown) {
     const cleanData = bookingSchema.parse(formData);
     const fullName = `${cleanData.firstName} ${cleanData.lastName}`;
     
-    // Calcular el timestamp exacto en UTC
-    const startDateTime = new Date(`${cleanData.date}T${cleanData.time}:00`);
+    // Forzar UTC para evitar problemas de zona horaria en el servidor de Vercel
+    const startDateTime = new Date(`${cleanData.date}T${cleanData.time}:00Z`);
     // Por ahora, asumimos una duración estándar de 45 minutos (hasta que hagamos el panel de config)
     const endDateTime = new Date(startDateTime.getTime() + 45 * 60000);
 
     // INSERCIÓN REAL EN LA BASE DE DATOS
-    const { data, error } = await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from('appointments')
       .insert({
         tenant_id: cleanData.tenantId,
@@ -58,9 +58,7 @@ export async function processBookingAction(formData: unknown) {
         end_time: endDateTime.toISOString(),
         status: 'scheduled',
         metadata: { source: 'public_web', ip_address: ip }
-      })
-      .select()
-      .single();
+      });
 
     if (error) {
       console.error('[Booking Error]:', error);
@@ -84,16 +82,39 @@ export async function processBookingAction(formData: unknown) {
 // NUEVA FUNCIÓN PARA LEER HORAS OCUPADAS (SERVER ACTION)
 export async function getBookedTimesAction(tenantId: string, employeeId: string, date: string) {
   try {
+    // Buscamos todo el día forzando UTC para coincidir con cómo guardamos
+    const startDate = new Date(`${date}T00:00:00Z`);
+    const endDate = new Date(`${date}T23:59:59Z`);
+
     const { data, error } = await supabaseAdmin
-      .rpc('get_booked_times_public', {
-        p_tenant_id: tenantId,
-        p_employee_id: employeeId,
-        p_date: date
-      });
+      .from('appointments')
+      .select('start_time, end_time')
+      .eq('tenant_id', tenantId)
+      .eq('employee_id', employeeId)
+      .gte('start_time', startDate.toISOString())
+      .lte('start_time', endDate.toISOString())
+      .in('status', ['scheduled', 'confirmed']);
       
     if (error) throw error;
-    // La función devuelve un arreglo de { booked_time: "10:00:00" }
-    return { success: true, bookedTimes: data.map((r: any) => r.booked_time.substring(0, 5)) };
+    
+    // Extraemos todos los intervalos (cada 15 min) que están ocupados por citas
+    const bookedTimesSet = new Set<string>();
+    
+    data.forEach((r: any) => {
+       let current = new Date(r.start_time).getTime();
+       const end = new Date(r.end_time || (current + 45 * 60000)).getTime();
+       
+       // Marcar cada bloque de 15 minutos dentro de la cita como ocupado
+       while (current < end) {
+         const d = new Date(current);
+         const hh = d.getUTCHours().toString().padStart(2, '0');
+         const mm = d.getUTCMinutes().toString().padStart(2, '0');
+         bookedTimesSet.add(`${hh}:${mm}`);
+         current += 15 * 60000;
+       }
+    });
+
+    return { success: true, bookedTimes: Array.from(bookedTimesSet) };
   } catch (error) {
     console.error('Error fetching booked times:', error);
     return { success: false, bookedTimes: [] };
