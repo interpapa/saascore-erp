@@ -73,7 +73,7 @@ export async function processBookingAction(formData: unknown) {
       if (error.code === '23505' || error.message.includes('unique_appointment_slot')) {
          return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado. Por favor elige otro.' };
       }
-      return { success: false, error: 'Ocurrió un error al guardar la reserva en el servidor.' };
+      return { success: false, error: `Error DB: ${error.message}` };
     }
 
     return { success: true, message: 'Reserva procesada exitosamente.', appointment: data };
