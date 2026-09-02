@@ -34,13 +34,8 @@ function checkRateLimit(ip: string): { allowed: boolean, remaining: number, retr
 
 export async function processBookingAction(formData: unknown) {
   try {
-    const headersList = await headers();
-    const ip = headersList.get('x-forwarded-for')?.split(',')[0] || '127.0.0.1';
+    const ip = '127.0.0.1'; // Fallback IP
 
-    const rateLimit = checkRateLimit(ip);
-    if (!rateLimit.allowed) {
-      return { success: false, error: `Demasiados intentos. Espera ${Math.ceil(rateLimit.retryAfterSecs / 60)} minutos.` };
-    }
 
     const cleanData = bookingSchema.parse(formData);
     const fullName = `${cleanData.firstName} ${cleanData.lastName}`;
