@@ -4,11 +4,18 @@ import BookingClient from '@/components/reservas/BookingClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ReservasPublicPage({ params }: { params: { tenantId: string } }) {
-  const { tenantId } = params;
+export default async function ReservasPublicPage({ params }: { params: Promise<{ tenantId: string }> | { tenantId: string } }) {
+  // Await params for Next.js 15+ compatibility
+  const resolvedParams = await params;
+  const { tenantId } = resolvedParams;
 
   if (!tenantId) {
-    return notFound();
+    return (
+      <div className="p-10 bg-red-50 text-red-900 min-h-screen">
+        <h1 className="text-2xl font-bold mb-4">Error de Depuración</h1>
+        <p>tenantId is undefined</p>
+      </div>
+    );
   }
 
   // 1. Fetch Tenant Name and Metadata
@@ -18,13 +25,16 @@ export default async function ReservasPublicPage({ params }: { params: { tenantI
     .eq('id', tenantId)
     .single();
 
-  if (tenantError) {
-    console.error(`Error buscando empresa con ID ${tenantId}:`, tenantError);
-  }
-
-  if (!tenant) {
-    console.error(`Empresa no encontrada para el ID: ${tenantId}`);
-    return notFound();
+  if (tenantError || !tenant) {
+    return (
+      <div className="p-10 bg-red-50 text-red-900 min-h-screen">
+        <h1 className="text-2xl font-bold mb-4">Error de Depuración (Solo para el Admin)</h1>
+        <p><strong>ID buscado:</strong> {tenantId}</p>
+        <p><strong>Error de Supabase:</strong> {tenantError?.message || 'Ningún error, pero devolvió null'}</p>
+        <p><strong>Código de error:</strong> {tenantError?.code}</p>
+        <p><strong>Detalles:</strong> {tenantError?.details}</p>
+      </div>
+    );
   }
 
   // 2. Fetch Barbers (Employees) for this tenant
