@@ -159,6 +159,9 @@ export async function getJournalEntriesAction(
       let entryIdx = 1;
 
       (docs || []).forEach((doc: unknown) => {
+        // Ignorar cotizaciones y citas que no representan movimientos financieros reales
+        if (doc.type === 'quote' || doc.type === 'appointment' || doc.type === 'work_order') return;
+
         const subtotal = Number(doc.subtotal_amount || doc.total_amount || 0);
         const tax = Number(doc.tax_amount || 0);
         const total = Number(doc.total_amount || subtotal + tax);

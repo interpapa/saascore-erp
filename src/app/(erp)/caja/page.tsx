@@ -45,6 +45,22 @@ export default function CajaPage() {
   
   // Ticket State
   const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
+  
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('saascore_pos_cart');
+      if (stored) {
+        setTicketLines(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Error loading cart', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('saascore_pos_cart', JSON.stringify(ticketLines));
+  }, [ticketLines]);
+
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'mixed'>('cash');
   const [mixedPayments, setMixedPayments] = useState({ cash: 0, card: 0, transfer: 0 });
   const [chargeTaxes, setChargeTaxes] = useState(true);

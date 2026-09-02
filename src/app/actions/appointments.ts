@@ -278,6 +278,10 @@ export async function createAppointmentAction(
       };
     }
 
+    if (error?.message?.includes('unique_appointment_slot') || error?.code === '23505') {
+      throw new Error('El profesional ya tiene una cita agendada en este horario exacto. Selecciona otra hora.');
+    }
+
     throw new Error(error?.message || 'Error al crear la cita.');
   } catch (err: unknown) {
     console.error('[createAppointmentAction Error]:', (err as Error).message);

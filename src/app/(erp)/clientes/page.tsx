@@ -313,8 +313,15 @@ export default function ClientesPage() {
                         Agendar
                       </button>
                       <button
-                        onClick={() => router.push(`/whatsapp?client=${client.id}`)}
-                        className="flex flex-col items-center gap-1 text-[10px] font-bold text-white hover:text-success transition-colors btn-haptic"
+                        onClick={() => {
+                          if (client.phone && client.phone !== 'Sin teléfono') {
+                            router.push(`/whatsapp?client=${client.id}`);
+                          } else {
+                            toast({ variant: 'warning', title: 'Sin número', description: 'Este cliente no tiene teléfono registrado.' });
+                          }
+                        }}
+                        className={`flex flex-col items-center gap-1 text-[10px] font-bold transition-colors btn-haptic ${(!client.phone || client.phone === 'Sin teléfono') ? 'text-slate-500/50 cursor-not-allowed' : 'text-white hover:text-success'}`}
+                        title={(!client.phone || client.phone === 'Sin teléfono') ? 'Sin teléfono' : 'Chat CRM'}
                       >
                         <MessageSquare size={18} />
                         Chat CRM
@@ -378,9 +385,16 @@ export default function ClientesPage() {
                               <Calendar size={14} />
                             </button>
                             <button
-                              onClick={() => router.push(`/whatsapp?client=${client.id}`)}
-                              className="btn-base btn-ghost btn-sm"
-                              title="WhatsApp Chat"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (client.phone && client.phone !== 'Sin teléfono') {
+                                  router.push(`/whatsapp?client=${client.id}`);
+                                } else {
+                                  toast({ variant: 'warning', title: 'Sin número', description: 'Este cliente no tiene teléfono registrado.' });
+                                }
+                              }}
+                              className={`btn-base btn-sm ${(!client.phone || client.phone === 'Sin teléfono') ? 'text-slate-300 dark:text-slate-700 cursor-not-allowed' : 'btn-ghost'}`}
+                              title={(!client.phone || client.phone === 'Sin teléfono') ? "Sin teléfono" : "WhatsApp Chat"}
                             >
                               <MessageSquare size={14} />
                             </button>

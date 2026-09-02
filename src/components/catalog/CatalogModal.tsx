@@ -144,6 +144,7 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
               name="base_price"
               label="Precio de Venta ($) *"
               type="number"
+              min="0"
               step="0.01"
               placeholder="0.00"
               defaultValue={editItem?.base_price || ''}
@@ -159,6 +160,7 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
                 name="stock_quantity"
                 label="Stock Inicial (Opcional)"
                 type="number"
+                min="0"
                 placeholder="0"
                 defaultValue={editItem?.stock_quantity ?? ''}
                 icon={<Archive size={18} />}
