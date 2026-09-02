@@ -199,13 +199,26 @@ export function AppointmentDetailsModal({
                 </button>
               )}
 
-              {appointment.status !== 'completed' && (
+              {appointment.status !== 'completed' ? (
                 <button
                   disabled={isUpdating}
                   onClick={() => handleStatusChange('completed')}
                   className="px-3 py-2 rounded-xl text-xs font-bold border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/10 transition-all flex items-center justify-center gap-1.5"
                 >
                   <CheckCircle2 size={14} /> Completar
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (appointment.client_id) {
+                      window.location.href = `/caja?client=${appointment.client_id}&amount=${appointment.price || 0}&desc=Cobro Cita: ${appointment.title}`;
+                    } else {
+                      window.location.href = `/caja?amount=${appointment.price || 0}&desc=Cobro Cita: ${appointment.title}`;
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white shadow-md hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
+                >
+                  <DollarSign size={14} /> Cobrar en Caja
                 </button>
               )}
 

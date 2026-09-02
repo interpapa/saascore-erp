@@ -60,7 +60,7 @@ export default function ClientesPage() {
     try {
       setIsLoading(true);
       if (!currentTenant?.id) return;
-      const result = await getEntitiesAction(currentTenant.id, 'customer');
+      const result = await getEntitiesAction(currentTenant.id, 'customer', 50, actor);
       if (result.success && result.entities) {
         setClients(result.entities as any);
       }

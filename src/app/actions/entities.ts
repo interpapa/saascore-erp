@@ -89,6 +89,11 @@ export async function updateEntityAction(
   actor: ActionActor
 ) {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
     const { data: updatedEntity, error } = await supabaseAdmin
@@ -129,6 +134,11 @@ export async function deleteEntityAction(
   actor: ActionActor
 ) {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
     // Soft delete: marcar deleted_at en lugar de destruir la fila
@@ -162,9 +172,19 @@ export async function deleteEntityAction(
   }
 }
 
-export async function getEntitiesAction(tenantId: string, type?: EntityType, limit: number = 50) {
+export async function getEntitiesAction(tenantId: string, type?: EntityType, limit: number = 50, actor?: ActionActor) {
   try {
     if (!tenantId) return { success: true, entities: [] };
+
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', entities: [] };
+      }
+    } else {
+      // NOTE: Eventually make actor required to prevent IDOR completely
+      console.warn('[SECURITY WARNING]: getEntitiesAction called without actor. Skipping IDOR check.');
+    }
 
     let query = supabaseAdmin
       .from('entities')
