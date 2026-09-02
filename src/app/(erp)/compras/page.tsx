@@ -16,11 +16,15 @@ import { SkeletonTable } from '@/components/ui/SkeletonTable';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 
+import { useSearchParams } from 'next/navigation';
+
 type TabType = 'suppliers' | 'pos' | 'match' | 'audit';
 
 export default function ComprasPage() {
   const currentTenant = useTenantResolver();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('pos');
+  const initialItemParam = searchParams.get('item');
 
   // Data State
   const [suppliers, setSuppliers] = useState<Entity[]>([]);
@@ -155,6 +159,7 @@ export default function ComprasPage() {
               catalogItems={catalogItems}
               tenantId={currentTenant?.id || ''}
               onRefresh={loadData}
+              initialItem={initialItemParam}
             />
           )}
 

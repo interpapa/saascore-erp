@@ -46,6 +46,9 @@ export default function CajaPage() {
   // Ticket State
   const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
   
+  const amountParam = searchParams.get('amount');
+  const descParam = searchParams.get('desc');
+
   useEffect(() => {
     try {
       const stored = localStorage.getItem('saascore_pos_cart');
@@ -56,6 +59,28 @@ export default function CajaPage() {
       console.error('Error loading cart', e);
     }
   }, []);
+
+  // Leer cobros pendientes desde el Calendario
+  useEffect(() => {
+    if (amountParam && descParam) {
+      const amt = Number(amountParam);
+      if (amt > 0) {
+        setTicketLines(prev => {
+          const customId = 'custom-' + descParam.replace(/\s+/g, '-').toLowerCase();
+          if (prev.some(l => l.item.id === customId)) return prev;
+          
+          const syntheticItem = {
+            id: customId,
+            name: descParam,
+            base_price: amt,
+            type: 'service',
+            category: 'Citas',
+          };
+          return [...prev, { item: syntheticItem, quantity: 1 }];
+        });
+      }
+    }
+  }, [amountParam, descParam]);
 
   useEffect(() => {
     localStorage.setItem('saascore_pos_cart', JSON.stringify(ticketLines));

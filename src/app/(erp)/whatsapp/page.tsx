@@ -19,10 +19,14 @@ import { ChatInbox } from '@/components/whatsapp/ChatInbox';
 import { WhatsAppModal } from '@/components/whatsapp/WhatsAppModal';
 import { useActionActor } from '@/hooks/useActionActor';
 
+import { useSearchParams } from 'next/navigation';
+
 export default function WhatsAppPage() {
   const { currentTenant } = useERPStore();
   const actor = useActionActor();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const initialClientParam = searchParams.get('client');
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
@@ -44,7 +48,14 @@ export default function WhatsAppPage() {
       const res = await getConversationsAction(currentTenant.id, filter);
       if (res?.success && res.conversations) {
         setConversations(res.conversations);
-        if (!activeConvId && res.conversations.length > 0) {
+        if (initialClientParam) {
+          const existingConv = res.conversations.find((c: any) => c.client_id === initialClientParam);
+          if (existingConv) {
+            setActiveConvId(existingConv.id);
+          } else {
+            setIsModalOpen(true);
+          }
+        } else if (!activeConvId && res.conversations.length > 0) {
           setActiveConvId(res.conversations[0].id);
         }
       }
@@ -366,6 +377,7 @@ export default function WhatsAppPage() {
         onClose={() => setIsModalOpen(false)}
         onSend={handleModalSendMessage}
         clients={clients}
+        initialClientId={initialClientParam}
       />
     </div>
   );

@@ -13,6 +13,7 @@ interface PurchaseOrderTabProps {
   catalogItems: unknown[];
   tenantId: string;
   onRefresh: () => void;
+  initialItem?: string | null;
 }
 
 export function PurchaseOrderTab({
@@ -21,6 +22,7 @@ export function PurchaseOrderTab({
   catalogItems,
   tenantId,
   onRefresh,
+  initialItem,
 }: PurchaseOrderTabProps) {
   const actor = useActionActor();
   const { toast } = useToast();
@@ -39,6 +41,17 @@ export function PurchaseOrderTab({
   const [selectedItemId, setSelectedItemId] = useState('');
   const [itemQty, setItemQty] = useState(1);
   const [itemCost, setItemCost] = useState(0);
+
+  useEffect(() => {
+    if (initialItem && catalogItems.length > 0 && !isModalOpen) {
+      const item = catalogItems.find((i: any) => i.id === initialItem);
+      if (item) {
+        setIsModalOpen(true);
+        setSelectedItemId(initialItem);
+        setItemCost(item.cost || item.base_price || 0);
+      }
+    }
+  }, [initialItem, catalogItems]);
 
   const handleAddLine = () => {
     if (!selectedItemId) return;

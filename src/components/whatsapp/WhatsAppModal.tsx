@@ -10,12 +10,21 @@ interface WhatsAppModalProps {
   onClose: () => void;
   onSend: (data: unknown) => Promise<void>;
   clients: Entity[];
+  initialClientId?: string | null;
 }
 
-export function WhatsAppModal({ isOpen, onClose, onSend, clients }: WhatsAppModalProps) {
+export function WhatsAppModal({ isOpen, onClose, onSend, clients, initialClientId }: WhatsAppModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<Entity | null>(null);
+
+  // Initialize selected client
+  React.useEffect(() => {
+    if (initialClientId && clients.length > 0) {
+      const c = clients.find(x => x.id === initialClientId);
+      if (c) setSelectedClient(c);
+    }
+  }, [initialClientId, clients]);
 
   if (!isOpen) return null;
 
@@ -95,6 +104,7 @@ export function WhatsAppModal({ isOpen, onClose, onSend, clients }: WhatsAppModa
             </label>
             <select
               name="entity_id"
+              defaultValue={initialClientId || ''}
               onChange={(e) => setSelectedClient(clients.find(c => c.id === e.target.value) || null)}
               className="w-full bg-background border border-input rounded-xl px-4 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all appearance-none"
             >
