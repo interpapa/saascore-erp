@@ -108,7 +108,7 @@ export class ErrorBoundary extends React.Component<
           <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
             Tuvimos un problema al cargar <span className="font-semibold">{moduleName}</span>. Se ha actualizado la versión del sistema.
           </p>
-          {process.env.NODE_ENV === 'development' && this.state.errorMessage && (
+          {this.state.errorMessage && (
             <p className="text-[11px] font-mono text-rose-500 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/20 rounded-lg px-3 py-2 mt-2 text-left break-all">
               {this.state.errorMessage}
             </p>

@@ -110,7 +110,7 @@ export function BookingConfigModal({
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Mensaje Automático del Cliente</label>
-              <p className="text-[10px] text-slate-500 mb-2">Variables mágicas permitidas: <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{barbero}}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{fecha}}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{hora}}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{cliente}}</code></p>
+              <p className="text-[10px] text-slate-500 mb-2">Variables mágicas permitidas: <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{barbero}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{fecha}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{hora}}"}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{"{{cliente}}"}</code></p>
               <textarea 
                 rows={3}
                 value={settings.whatsappMessageTemplate}
