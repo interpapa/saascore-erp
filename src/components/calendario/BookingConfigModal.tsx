@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { updateTenantSettings } from '@/app/actions/tenant';
+import { updateBookingConfigAction } from '@/app/actions/booking';
 import { useToast } from '@/components/core/ToastProvider';
 
 export function BookingConfigModal({ 
@@ -41,8 +41,7 @@ export function BookingConfigModal({
 
   const handleSave = async () => {
     setIsSaving(true);
-    const newMetadata = { ...tenant.metadata, booking_settings: settings };
-    const result = await updateTenantSettings(tenant.id, tenant.name, newMetadata);
+    const result = await updateBookingConfigAction(tenant.id, settings);
     
     if (result.success) {
       toast({ variant: 'success', title: 'Configuración Guardada', description: 'Los horarios públicos han sido actualizados.' });

@@ -104,3 +104,36 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
     return { success: false, bookedTimes: [] };
   }
 }
+
+// NUEVA FUNCIÓN PARA ACTUALIZAR SOLO LA CONFIGURACIÓN DE RESERVAS
+export async function updateBookingConfigAction(tenantId: string, settings: any) {
+  try {
+    // 1. Obtener la metadata actual para no sobreescribir otros datos
+    const { data: tenant, error: fetchError } = await supabaseAdmin
+      .from('tenants')
+      .select('metadata')
+      .eq('id', tenantId)
+      .single();
+      
+    if (fetchError) throw fetchError;
+    
+    // 2. Fusionar la metadata actual con la nueva configuración
+    const newMetadata = {
+      ...(tenant.metadata || {}),
+      booking_settings: settings
+    };
+    
+    // 3. Guardar en la base de datos
+    const { error: updateError } = await supabaseAdmin
+      .from('tenants')
+      .update({ metadata: newMetadata })
+      .eq('id', tenantId);
+      
+    if (updateError) throw updateError;
+    
+    return { success: true };
+  } catch (error: any) {
+    console.error('[Settings Update Error]:', error);
+    return { success: false, error: error.message };
+  }
+}
