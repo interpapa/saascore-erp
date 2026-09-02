@@ -21,14 +21,16 @@ export function BookingConfigModal({
     openDays: [1, 2, 3, 4, 5, 6], // Lunes a Sábado
     startHour: '09:00',
     endHour: '18:00',
-    intervalMinutes: 30
+    intervalMinutes: 30,
+    whatsappNumber: '', // Ej: 584241234567
+    whatsappMessageTemplate: '¡Hola! Quiero confirmar mi reserva con {{barbero}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.'
   };
 
   const [settings, setSettings] = useState(defaultSettings);
 
   useEffect(() => {
     if (tenant?.metadata?.booking_settings) {
-      setSettings(tenant.metadata.booking_settings);
+      setSettings({ ...defaultSettings, ...tenant.metadata.booking_settings });
     }
   }, [tenant]);
 
@@ -61,17 +63,49 @@ export function BookingConfigModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl w-full max-w-lg overflow-hidden border border-slate-200 dark:border-slate-800">
-        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 overflow-y-auto py-10">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl w-full max-w-xl overflow-hidden border border-slate-200 dark:border-slate-800 my-auto">
+        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center sticky top-0 bg-white dark:bg-slate-900 z-10">
           <div>
             <h2 className="text-xl font-black text-slate-800 dark:text-white">Configuración de Reservas</h2>
-            <p className="text-xs font-medium text-slate-500">Ajusta cómo se ven los horarios en tu página pública</p>
+            <p className="text-xs font-medium text-slate-500">Ajusta tu página pública y notificaciones</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-700 bg-slate-100 p-2 rounded-full">✕</button>
         </div>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+          
+          {/* Contacto WhatsApp */}
+          <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-800/50 space-y-4">
+            <h3 className="font-bold text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              Notificaciones de WhatsApp
+            </h3>
+            
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Número de Teléfono (Con código de país, sin el +)</label>
+              <input 
+                type="text" 
+                placeholder="Ej: 584241234567"
+                value={settings.whatsappNumber || ''}
+                onChange={e => setSettings({...settings, whatsappNumber: e.target.value})}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Mensaje Automático del Cliente</label>
+              <p className="text-[10px] text-slate-500 mb-2">Variables mágicas permitidas: <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{barbero}}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{fecha}}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{hora}}</code> <code className="bg-emerald-100 text-emerald-700 px-1 rounded">{{cliente}}</code></p>
+              <textarea 
+                rows={3}
+                value={settings.whatsappMessageTemplate}
+                onChange={e => setSettings({...settings, whatsappMessageTemplate: e.target.value})}
+                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+          </div>
+
+          <hr className="border-slate-100 dark:border-slate-800" />
           
           {/* Días Laborables */}
           <div>
@@ -130,7 +164,7 @@ export function BookingConfigModal({
 
         </div>
 
-        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800">
+        <div className="p-6 bg-slate-50 dark:bg-slate-800/50 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 sticky bottom-0">
           <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">Cancelar</button>
           <button 
             disabled={isSaving}

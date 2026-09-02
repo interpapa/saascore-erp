@@ -140,10 +140,20 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
 
     setSuccessMessage('¡Reserva confirmada con éxito!');
 
-    const phone = "5804245642100"; 
+    // Read whatsapp config or use fallbacks
+    const phone = settings.whatsappNumber || "5804245642100"; 
+    const template = settings.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{barbero}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.';
+    
     // Find the readable time to send to WhatsApp
     const readableTime = allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime;
-    const text = `¡Hola! Acabo de hacer una reserva web con ${selectedBarber.name} para el día ${selectedDate} a las ${readableTime}. Mi nombre es ${customerName} ${customerLastName}.`;
+    
+    // Replace magic variables
+    const text = template
+      .replace(/{{barbero}}/g, selectedBarber.name)
+      .replace(/{{fecha}}/g, selectedDate)
+      .replace(/{{hora}}/g, readableTime || '')
+      .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`);
+
     const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
     setTimeout(() => {
       window.open(url, '_blank');
