@@ -50,14 +50,17 @@ export async function processBookingAction(formData: unknown) {
       .from('appointments')
       .insert({
         tenant_id: cleanData.tenantId,
-        client_name: fullName,
         employee_id: cleanData.barberId,
-        employee_name: cleanData.barberName,
         title: `Cita Web - ${fullName}`,
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         status: 'scheduled',
-        metadata: { source: 'public_web', ip_address: ip }
+        metadata: { 
+          source: 'public_web', 
+          ip_address: ip,
+          client_name: fullName,
+          employee_name: cleanData.barberName
+        }
       });
 
     if (error) {
@@ -147,7 +150,7 @@ export async function updateBookingConfigAction(tenantId: string, settings: any)
       
     if (updateError) throw updateError;
     
-    return { success: true };
+    return { success: true, metadata: newMetadata };
   } catch (error: any) {
     console.error('[Settings Update Error]:', error);
     return { success: false, error: error.message };

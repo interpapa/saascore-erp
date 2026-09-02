@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { updateBookingConfigAction } from '@/app/actions/booking';
 import { useToast } from '@/components/core/ToastProvider';
+import { useERPStore } from '@/store/useERPStore';
 
 export function BookingConfigModal({ 
   isOpen, 
@@ -14,6 +15,7 @@ export function BookingConfigModal({
   tenant: any 
 }) {
   const { toast } = useToast();
+  const { setCurrentTenant } = useERPStore();
   const [isSaving, setIsSaving] = useState(false);
   
   // Default values
@@ -29,18 +31,22 @@ export function BookingConfigModal({
   const [settings, setSettings] = useState(defaultSettings);
 
   useEffect(() => {
-    if (tenant?.metadata?.booking_settings) {
-      const dbSettings = tenant.metadata.booking_settings;
-      setSettings({
-        openDays: Array.isArray(dbSettings.openDays) ? dbSettings.openDays : defaultSettings.openDays,
-        startHour: dbSettings.startHour || defaultSettings.startHour,
-        endHour: dbSettings.endHour || defaultSettings.endHour,
-        intervalMinutes: dbSettings.intervalMinutes || defaultSettings.intervalMinutes,
-        whatsappNumber: dbSettings.whatsappNumber || defaultSettings.whatsappNumber,
-        whatsappMessageTemplate: dbSettings.whatsappMessageTemplate || defaultSettings.whatsappMessageTemplate
-      });
+    if (isOpen) {
+      if (tenant?.metadata?.booking_settings) {
+        const dbSettings = tenant.metadata.booking_settings;
+        setSettings({
+          openDays: Array.isArray(dbSettings.openDays) ? dbSettings.openDays : defaultSettings.openDays,
+          startHour: dbSettings.startHour || defaultSettings.startHour,
+          endHour: dbSettings.endHour || defaultSettings.endHour,
+          intervalMinutes: dbSettings.intervalMinutes || defaultSettings.intervalMinutes,
+          whatsappNumber: dbSettings.whatsappNumber || defaultSettings.whatsappNumber,
+          whatsappMessageTemplate: dbSettings.whatsappMessageTemplate || defaultSettings.whatsappMessageTemplate
+        });
+      } else {
+        setSettings(defaultSettings);
+      }
     }
-  }, [tenant]);
+  }, [isOpen, tenant]);
 
   if (!isOpen) return null;
 
@@ -53,7 +59,8 @@ export function BookingConfigModal({
     setIsSaving(true);
     const result = await updateBookingConfigAction(tenant.id, settings);
     
-    if (result.success) {
+    if (result.success && result.metadata) {
+      setCurrentTenant({ ...tenant, metadata: result.metadata });
       toast({ variant: 'success', title: 'Configuración Guardada', description: 'Los horarios públicos han sido actualizados.' });
       onClose();
     } else {
