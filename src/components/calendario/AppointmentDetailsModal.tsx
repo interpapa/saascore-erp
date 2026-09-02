@@ -99,7 +99,7 @@ export function AppointmentDetailsModal({
       onClose();
     } catch (err) {
       console.error('Error al actualizar estado:', err);
-    } font: {
+    } finally {
       setIsUpdating(false);
     }
   };
