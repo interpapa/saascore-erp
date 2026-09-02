@@ -101,6 +101,11 @@ export async function updateItemAction(
   actor: ActionActor
 ) {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
     const { data: updatedItem, error } = await supabaseAdmin
@@ -139,6 +144,11 @@ export async function deleteItemAction(
   actor: ActionActor
 ) {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
     // Soft delete: preservar historial e integridad contable/fiscal
@@ -180,9 +190,16 @@ export async function deleteItemAction(
   }
 }
 
-export async function getItemsAction(tenantId: string, type?: ItemType, limit: number = 50) {
+export async function getItemsAction(tenantId: string, type?: ItemType, limit: number = 50, actor?: ActionActor) {
   try {
     if (!tenantId) return { success: true, items: [] };
+
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', items: [] };
+      }
+    }
 
     let selectFields = 'id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at';
     let baseQuery = supabaseAdmin
