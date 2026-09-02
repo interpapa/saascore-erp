@@ -17,10 +17,11 @@ import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 type TabType = 'suppliers' | 'pos' | 'match' | 'audit';
 
-export default function ComprasPage() {
+function ComprasPageContent() {
   const currentTenant = useTenantResolver();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('pos');
@@ -183,5 +184,17 @@ export default function ComprasPage() {
       )}
 
     </div>
+  );
+}
+
+export default function ComprasPage() {
+  return (
+    <Suspense fallback={
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <SkeletonTable rows={5} columns={4} />
+      </div>
+    }>
+      <ComprasPageContent />
+    </Suspense>
   );
 }

@@ -18,7 +18,7 @@ import { getBankAccountsAction } from '@/app/actions/bankAccounts';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
 import { jsPDF } from 'jspdf';
-export default function CajaPage() {
+function CajaPageContent() {
   const currentTenant = useTenantResolver();
   const searchParams = useSearchParams();
   const { session } = useERPStore();
@@ -830,72 +830,86 @@ export default function CajaPage() {
                 type="button"
                 disabled={isSavingCustomer || !newCustomer.name}
                 onClick={async () => {
-                  if (!currentTenant) return;
+                  if (!newCustomer.name || !currentTenant) return;
                   setIsSavingCustomer(true);
                   try {
-                    const actor = {
-                      email: session?.userEmail || 'admin@saascore.com',
-                      role: session?.role || ('owner' as const),
-                    };
                     const res = await createEntityAction(
                       {
                         type: 'customer',
                         name: newCustomer.name,
-                        email: newCustomer.email || null,
-                        phone: newCustomer.phone || null,
-                        tax_id: newCustomer.tax_id || null,
+                        email: newCustomer.email,
+                        phone: newCustomer.phone,
+                        tax_id: newCustomer.tax_id,
+                        status: 'active',
                       },
                       currentTenant.id,
-                      actor
+                      { email: session?.userEmail || 'admin', role: session?.role || 'owner' }
                     );
                     if (res.success && res.entity) {
-                      setCustomers([res.entity, ...customers]);
+                      toast({ variant: 'success', title: 'Cliente Creado', description: 'Seleccionado automáticamente.' });
+                      setCustomers([...customers, res.entity]);
                       setSelectedCustomer(res.entity.id);
                       setIsCustomerModalOpen(false);
                       setNewCustomer({ name: '', email: '', phone: '', tax_id: '' });
-                      toast({ variant: 'success', title: 'Cliente creado', description: `Se registró a ${res.entity.name} con éxito.` });
                     } else {
-                      toast({ variant: 'error', title: 'Error al guardar', description: res.error || 'Ocurrió un error inesperado.' });
+                      toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo crear.' });
                     }
-                  } catch (err: unknown) {
-                    toast({ variant: 'error', title: 'Error', description: (err as Error).message });
+                  } catch (e: unknown) {
+                    toast({ variant: 'error', title: 'Error', description: (e as Error).message });
                   } finally {
                     setIsSavingCustomer(false);
                   }
                 }}
-                className="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-black transition-colors disabled:opacity-50"
+                className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground py-2.5 rounded-xl text-sm font-bold btn-haptic disabled:opacity-50"
               >
-                {isSavingCustomer ? 'Guardando...' : 'Guardar'}
+                {isSavingCustomer ? 'Guardando...' : 'Guardar y Usar'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      <QuickStockModal
-        isOpen={isStockModalOpen}
-        onClose={() => setIsStockModalOpen(false)}
-        onSuccess={async () => {
-          if (!currentTenant?.id) return;
-          const itemsRes = await getItemsAction(currentTenant.id);
-          if (itemsRes?.success) setItems(itemsRes.items || []);
-        }}
-        items={items}
-      />
+      {isStockModalOpen && currentTenant && (
+        <QuickStockModal
+          isOpen={isStockModalOpen}
+          onClose={() => setIsStockModalOpen(false)}
+          items={items.filter(i => i.type === 'product')}
+          tenantId={currentTenant.id}
+          onSuccess={() => {
+            getItemsAction(currentTenant.id).then(res => {
+              if (res.success) setItems(res.items || []);
+            });
+          }}
+        />
+      )}
 
-      <CashRegisterModal
-        isOpen={isCashModalOpen}
-        onClose={() => setIsCashModalOpen(false)}
-        tenantId={currentTenant?.id || ''}
-        actor={{ email: session?.userEmail || 'admin@saascore.com', role: session?.role || 'owner' }}
-        currentSession={cashSessionStatus}
-        onSuccess={async () => {
-          if (currentTenant?.id) {
-            const res = await getCashSessionStatusAction(currentTenant.id);
-            if (res?.success) setCashSessionStatus(res.session || null);
-          }
-        }}
-      />
+      {isCashModalOpen && currentTenant && (
+        <CashRegisterModal
+          isOpen={isCashModalOpen}
+          onClose={() => setIsCashModalOpen(false)}
+          tenantId={currentTenant.id}
+          currentSession={cashSessionStatus || undefined}
+          onSuccess={() => {
+            getCashSessionStatusAction(currentTenant.id).then(res => {
+              if (res.success) setCashSessionStatus(res.session || null);
+            });
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+import { Suspense } from 'react';
+
+export default function CajaPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[500px]">
+        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    }>
+      <CajaPageContent />
+    </Suspense>
   );
 }

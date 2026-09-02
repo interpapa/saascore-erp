@@ -21,7 +21,7 @@ import { useActionActor } from '@/hooks/useActionActor';
 
 import { useSearchParams } from 'next/navigation';
 
-export default function WhatsAppPage() {
+function WhatsAppPageContent() {
   const { currentTenant } = useERPStore();
   const actor = useActionActor();
   const { toast } = useToast();
@@ -380,5 +380,15 @@ export default function WhatsAppPage() {
         initialClientId={initialClientParam}
       />
     </div>
+  );
+}
+
+import { Suspense } from 'react';
+
+export default function WhatsAppPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[500px]">Cargando...</div>}>
+      <WhatsAppPageContent />
+    </Suspense>
   );
 }
