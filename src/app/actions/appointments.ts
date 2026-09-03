@@ -34,8 +34,7 @@ export async function getAppointmentsAction(
     // 1. Primary Attempt: Query custom 'appointments' table
     const { data: appts, error } = await supabaseAdmin
       .from('appointments')
-      // Excluimos la columna inexistente 'title'
-      .select('id, tenant_id, description, client_id, service_id, employee_id, start_time, end_time, status, notes, price, metadata, created_at, updated_at')
+      .select('*')
       .eq('tenant_id', tenantId)
       .order('start_time', { ascending: true });
 

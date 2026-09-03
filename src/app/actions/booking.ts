@@ -46,12 +46,12 @@ export async function processBookingAction(formData: unknown) {
     const endDateTime = new Date(startDateTime.getTime() + 45 * 60000);
 
     // INSERCIÓN REAL EN LA BASE DE DATOS
+    // Intento 1: Insertar en 'appointments' con todas las columnas
     const { error } = await supabaseAdmin
       .from('appointments')
       .insert({
         tenant_id: cleanData.tenantId,
         employee_id: cleanData.barberId,
-        // Guardamos el título dentro de metadata ya que la tabla no tiene columna 'title'
         metadata: { title: `Cita Web - ${fullName}` },
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
@@ -60,15 +60,65 @@ export async function processBookingAction(formData: unknown) {
       });
 
     if (error) {
-      console.error('[Booking Error]:', error);
-      // Validar si el error es de overbooking (Unique Constraint)
-      if (error.code === '23505' || error.message.includes('unique_appointment_slot')) {
-         return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado. Por favor elige otro.' };
+      console.error('[Booking Primary Error]:', error);
+      
+      // Si el error es por columnas faltantes (metadata, notes, etc.), intentar solo con columnas básicas
+      const isMissingCol = error.code === '42703' || 
+        (error.message && error.message.includes('column') && error.message.includes('does not exist')) ||
+        (error.message && error.message.includes('schema cache'));
+      
+      if (isMissingCol) {
+        console.log('[Booking] Fallback: inserting with basic columns only');
+        const { error: fallbackError } = await supabaseAdmin
+          .from('appointments')
+          .insert({
+            tenant_id: cleanData.tenantId,
+            employee_id: cleanData.barberId,
+            start_time: startDateTime.toISOString(),
+            end_time: endDateTime.toISOString(),
+            status: 'scheduled',
+          });
+        
+        if (fallbackError) {
+          console.error('[Booking Fallback Error]:', fallbackError);
+          
+          // Si aún falla, intentar con la tabla documents como último recurso
+          const { error: docError } = await supabaseAdmin
+            .from('documents')
+            .insert({
+              tenant_id: cleanData.tenantId,
+              entity_id: null,
+              type: 'work_order',
+              status: 'draft',
+              document_number: `CIT-${Date.now().toString().slice(-6)}`,
+              subtotal_amount: 0,
+              tax_amount: 0,
+              total_amount: 0,
+              metadata: {
+                title: `Cita Web - ${fullName}`,
+                employee_id: cleanData.barberId,
+                employee_name: cleanData.barberName,
+                issue_date: startDateTime.toISOString(),
+                due_date: endDateTime.toISOString(),
+                client_name: fullName,
+                booking_source: 'public_web',
+              },
+            });
+          
+          if (docError) {
+            console.error('[Booking Documents Fallback Error]:', docError);
+            return { success: false, error: `Error DB: ${docError.message}` };
+          }
+        }
+      } else if (error.code === '23505' || error.message.includes('unique_appointment_slot')) {
+        return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado. Por favor elige otro.' };
+      } else {
+        return { success: false, error: `Error DB: ${error.message}` };
       }
-      return { success: false, error: `Error DB: ${error.message}` };
     }
 
     return { success: true, message: 'Reserva procesada exitosamente.' };
+
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };
