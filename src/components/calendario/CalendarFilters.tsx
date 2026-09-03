@@ -102,12 +102,12 @@ export function CalendarFilters({
     <div className="bg-card border border-border p-4 sm:p-5 rounded-3xl shadow-sm space-y-4">
       {/* Top Row: View Switcher, Period Nav & CTA */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        {/* Left: View Mode Segmented Control */}
-        <div className="flex items-center gap-3">
-          <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl flex items-center gap-1 border border-border">
+        {/* Left: View Mode Segmented Control & Title */}
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-3 w-full lg:w-auto">
+          <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl flex items-center justify-between sm:justify-start gap-1 border border-border w-full sm:w-auto">
             <button
               onClick={() => onViewModeChange('day')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`flex-1 sm:flex-none justify-center px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 viewMode === 'day'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-foreground'
@@ -118,7 +118,7 @@ export function CalendarFilters({
             </button>
             <button
               onClick={() => onViewModeChange('week')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`flex-1 sm:flex-none justify-center px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 viewMode === 'week'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-foreground'
@@ -129,7 +129,7 @@ export function CalendarFilters({
             </button>
             <button
               onClick={() => onViewModeChange('month')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`flex-1 sm:flex-none justify-center px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 viewMode === 'month'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-foreground'
@@ -141,13 +141,13 @@ export function CalendarFilters({
           </div>
 
           {/* Period Title */}
-          <h2 className="text-lg sm:text-xl font-black text-foreground capitalize tracking-tight">
+          <h2 className="text-base sm:text-lg md:text-xl font-black text-foreground capitalize tracking-tight w-full text-center sm:text-left truncate">
             {getPeriodTitle()}
           </h2>
         </div>
 
         {/* Right: Date Navigation & Primary CTA */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full lg:w-auto">
           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-border">
             <button
               onClick={handlePrev}
@@ -173,10 +173,10 @@ export function CalendarFilters({
 
           <button
             onClick={onOpenCreateModal}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic shrink-0"
+            className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic shrink-0"
           >
             <Plus size={16} />
-            Agendar Cita
+            Agendar
           </button>
         </div>
       </div>
