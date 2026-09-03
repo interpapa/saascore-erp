@@ -105,8 +105,11 @@ export async function updateTenantSettings(tenantId: string, name: string, metad
   }
 }
 
-export async function getAllTenants() {
+export async function getAllTenants(callerEmail: string) {
   try {
+    if (callerEmail?.toLowerCase() !== 'interpapadavid2811@gmail.com') {
+      return { success: false, tenants: [], error: 'No autorizado' };
+    }
     const db = supabaseAdmin || supabase;
     const { data: tenants, error } = await db
       .from('tenants')
@@ -120,8 +123,11 @@ export async function getAllTenants() {
   }
 }
 
-export async function toggleTenantStatus(tenantId: string, newStatus: 'active' | 'suspended') {
+export async function toggleTenantStatus(tenantId: string, newStatus: 'active' | 'suspended', callerEmail: string) {
   try {
+    if (callerEmail?.toLowerCase() !== 'interpapadavid2811@gmail.com') {
+      throw new Error('No autorizado.');
+    }
     const db = supabaseAdmin || supabase;
     const is_active = newStatus === 'active';
     
@@ -157,6 +163,8 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     if (!cleanEmail) {
       return { success: false, tenant: null, role: null };
     }
+
+    const isSuperAdmin = cleanEmail.toLowerCase() === 'interpapadavid2811@gmail.com';
 
     // 1. Buscar relación user_tenants por email
     const userTenantsRes = await db
@@ -199,6 +207,9 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     }
 
     if (utError || !userTenants || userTenants.length === 0) {
+      if (isSuperAdmin) {
+        return { success: true, tenant: null, role: 'superadmin' };
+      }
       return { success: false, tenant: null, role: null };
     }
 
@@ -212,13 +223,17 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       .maybeSingle();
 
     if (tError || !tenant) {
+      // Si es superadmin pero no tiene tenant, devolver null en tenant pero role superadmin
+      if (isSuperAdmin) {
+        return { success: true, tenant: null, role: 'superadmin' };
+      }
       return { success: false, tenant: null, role: null };
     }
 
     return {
       success: true,
       tenant,
-      role: userTenant.role
+      role: isSuperAdmin ? 'superadmin' : userTenant.role
     };
   } catch (error: unknown) {
     return { success: false, tenant: null, role: null, error: error.message };

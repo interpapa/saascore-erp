@@ -16,8 +16,9 @@ export default function BillingAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTenants = async () => {
+    if (!session?.userEmail) return;
     setIsLoading(true);
-    const result = await getAllTenants();
+    const result = await getAllTenants(session.userEmail);
     if (result.success && result.tenants) {
       setTenants(result.tenants);
     }
@@ -25,14 +26,17 @@ export default function BillingAdminPage() {
   };
 
   useEffect(() => {
-    fetchTenants();
-  }, []);
+    if (session?.userEmail) {
+      fetchTenants();
+    }
+  }, [session?.userEmail]);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
+    if (!session?.userEmail) return;
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
     setTenants(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
     
-    const result = await toggleTenantStatus(id, newStatus);
+    const result = await toggleTenantStatus(id, newStatus, session.userEmail);
     if (!result.success) {
       toast({ variant: 'error', title: 'Error', description: result.error });
       fetchTenants();

@@ -5,15 +5,18 @@ import { Shield, Ban, CheckCircle2, MoreVertical, CreditCard } from 'lucide-reac
 import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
+import { useERPStore } from '@/store/useERPStore';
 
 export default function AdminTenantsPage() {
+  const { session } = useERPStore();
   const { toast } = useToast();
   const [tenants, setTenants] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTenants = async () => {
+    if (!session?.userEmail) return;
     setIsLoading(true);
-    const result = await getAllTenants();
+    const result = await getAllTenants(session.userEmail);
     if (result.success && result.tenants) {
       setTenants(result.tenants);
     }
@@ -21,21 +24,23 @@ export default function AdminTenantsPage() {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchTenants();
-  }, []);
+    if (session?.userEmail) {
+      fetchTenants();
+    }
+  }, [session?.userEmail]);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
+    if (!session?.userEmail) return;
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
     // Optimistic UI
     setTenants(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
     
-    const result = await toggleTenantStatus(id, newStatus);
+    const result = await toggleTenantStatus(id, newStatus, session.userEmail);
     if (!result.success) {
       // Revert if failed
       toast({ variant: 'error', title: 'Error', description: result.error });
        
-    fetchTenants();
+      fetchTenants();
     }
   };
 

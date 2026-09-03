@@ -1,8 +1,29 @@
-import { ReactNode } from 'react';
+'use client';
+
+import { ReactNode, useEffect, useState } from 'react';
 import { Crown, Database, ShieldAlert, Activity } from 'lucide-react';
 import Link from 'next/link';
+import { useERPStore } from '@/store/useERPStore';
+import { useRouter } from 'next/navigation';
 
 export default function SaaSCoreLayout({ children }: { children: ReactNode }) {
+  const { session } = useERPStore();
+  const router = useRouter();
+  const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Evitar parpadeos o redirecciones en el lado del servidor
+    if (session?.role === 'superadmin') {
+      setIsAuthorized(true);
+    } else {
+      setIsAuthorized(false);
+      router.replace('/dashboard');
+    }
+  }, [session, router]);
+
+  if (isAuthorized === null) return null; // Cargando
+  if (!isAuthorized) return null; // Redirigiendo
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 flex font-sans">
       
