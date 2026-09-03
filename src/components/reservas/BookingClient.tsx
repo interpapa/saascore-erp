@@ -11,7 +11,7 @@ const GENERATE_DATES = (openDays: number[]) => {
   const dates = [];
   const today = new Date();
   const dayNames = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
-  let i = 0;
+  const i = 0;
   let attempts = 0; // Para evitar bucles infinitos
   
   // Genera los próximos 14 días laborables

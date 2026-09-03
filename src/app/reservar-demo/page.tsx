@@ -93,7 +93,7 @@ export default function ReservarDemo() {
 
   return (
     <div className="min-h-screen bg-[#F9F6F0] md:bg-slate-200 flex justify-center items-center font-sans text-slate-800 md:p-8">
-      <div className="w-full h-full md:h-[850px] max-w-md bg-[#F9F6F0] relative shadow-2xl flex flex-col md:rounded-[2.5rem] overflow-hidden border border-slate-200/50">
+      <div className="w-full h-full md:h-[850px] max-w-2xl bg-[#F9F6F0] relative shadow-2xl flex flex-col md:rounded-[2.5rem] overflow-hidden border border-slate-200/50">
         
         {/* PANTALLA 1: SELECCIÓN DE BARBERO */}
         {step === 1 && (
