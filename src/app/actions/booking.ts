@@ -51,7 +51,8 @@ export async function processBookingAction(formData: unknown) {
       .insert({
         tenant_id: cleanData.tenantId,
         employee_id: cleanData.barberId,
-        title: `Cita Web - ${fullName}`,
+        // Guardamos el título dentro de metadata ya que la tabla no tiene columna 'title'
+        metadata: { title: `Cita Web - ${fullName}` },
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         status: 'scheduled',
