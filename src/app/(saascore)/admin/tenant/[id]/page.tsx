@@ -118,7 +118,7 @@ export default function TenantAdminPage() {
 
     const result = await updateTenantAdminAction(tenant.id, updates, session.userEmail);
     if (result.success) {
-      toast({ title: 'Guardado', description: 'Configuración actualizada exitosamente.' });
+      toast({ variant: 'success', title: 'Guardado', description: 'Configuración actualizada exitosamente.' });
     } else {
       toast({ variant: 'error', title: 'Error', description: result.error });
     }
@@ -137,7 +137,7 @@ export default function TenantAdminPage() {
     setIsSaving(true);
     const result = await deleteTenantAdminAction(tenant.id, session.userEmail);
     if (result.success) {
-      toast({ title: 'Eliminado', description: 'La empresa fue borrada de la base de datos.' });
+      toast({ variant: 'success', title: 'Eliminado', description: 'La empresa fue borrada de la base de datos.' });
       router.replace('/admin');
     } else {
       toast({ variant: 'error', title: 'Error al eliminar', description: result.error });
