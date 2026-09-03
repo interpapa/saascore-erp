@@ -265,7 +265,7 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
       return { success: false, error: 'No autorizado' };
     }
     const db = supabaseAdmin || supabase;
-    const { data: tenant, error } = await db
+    let { data: tenant, error } = await db
       .from('tenants')
       .update({
         name: updates.name,
@@ -275,6 +275,26 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
       .eq('id', tenantId)
       .select()
       .single();
+
+    if (error && (error.message.includes('active_modules') || error.message.includes('column'))) {
+      // Fallback: Si no existe active_modules en la BD, lo guardamos temporalmente dentro de metadata
+      const fallbackMetadata = {
+        ...(updates.metadata || {}),
+        active_modules: updates.active_modules
+      };
+      const retry = await db
+        .from('tenants')
+        .update({
+          name: updates.name,
+          metadata: fallbackMetadata
+        })
+        .eq('id', tenantId)
+        .select()
+        .single();
+      
+      tenant = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
     return { success: true, tenant };
