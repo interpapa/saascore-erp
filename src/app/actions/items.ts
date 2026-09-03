@@ -159,10 +159,11 @@ export async function deleteItemAction(
       .eq('tenant_id', tenantId);
 
     if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
-      // Fallback: Hard delete if soft-delete column does not exist
+      // Fallback: Si no existe la columna deleted_at, lo marcamos como inactivo (is_active: false)
+      // NUNCA hacer un DELETE físico si ya tiene ventas, para evitar el error de foreign key.
       const retry = await supabaseAdmin
         .from('items')
-        .delete()
+        .update({ is_active: false })
         .eq('id', id)
         .eq('tenant_id', tenantId);
       error = retry.error;
@@ -223,6 +224,7 @@ export async function getItemsAction(tenantId: string, type?: ItemType, limit: n
         .from('items')
         .select(selectFields)
         .eq('tenant_id', tenantId)
+        .neq('is_active', false) // Excluir los marcados como inactivos (soft delete alternativo)
         .order('created_at', { ascending: false })
         .range(0, limit - 1);
       
