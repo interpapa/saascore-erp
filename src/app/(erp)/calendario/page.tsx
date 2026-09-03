@@ -73,6 +73,8 @@ export default function CalendarioPage() {
 
   const actor = useActionActor();
 
+  const bookableEmployees = employees.filter(e => e.bookable);
+
   // Fetch Data Function
   const fetchData = useCallback(async () => {
     if (!currentTenant) return;
@@ -104,6 +106,7 @@ export default function CalendarioPage() {
           phone: e.phone,
           role: e.metadata?.role || 'Empleado',
           is_active: e.status === 'active',
+          bookable: e.metadata?.bookable !== false,
         }));
         setEmployees(mappedEmps);
       }
@@ -315,7 +318,7 @@ export default function CalendarioPage() {
         onDateChange={setCurrentDate}
         filterState={filterState}
         onFilterChange={setFilterState}
-        employees={employees}
+        employees={bookableEmployees}
         services={services}
         onOpenCreateModal={() => {
           setSelectedDateForCreate(null);
@@ -328,7 +331,7 @@ export default function CalendarioPage() {
         viewMode={viewMode}
         currentDate={currentDate}
         appointments={appointments}
-        employees={employees}
+        employees={bookableEmployees}
         isLoading={isLoading}
         onSelectAppointment={handleSelectAppointment}
         onSelectDateSlot={handleSelectDateSlot}
@@ -346,7 +349,7 @@ export default function CalendarioPage() {
           setSelectedDateForCreate(null);
         }}
         onSave={handleCreateAppointment}
-        employees={employees}
+        employees={bookableEmployees}
         services={services}
         clients={clients}
         initialDate={selectedDateForCreate}

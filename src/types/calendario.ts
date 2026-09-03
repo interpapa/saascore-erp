@@ -31,6 +31,7 @@ export interface Employee {
   avatar_url?: string | null;
   specialties?: string[];
   is_active: boolean;
+  bookable?: boolean;
   metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
