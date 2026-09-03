@@ -42,14 +42,6 @@ export default function SaaSCoreLayout({ children }: { children: ReactNode }) {
             <Database size={18} />
             Tenants (Clientes)
           </Link>
-          <Link href="/admin/audits" className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl font-medium transition-all">
-            <ShieldAlert size={18} />
-            Auditoría Legal
-          </Link>
-          <Link href="/admin/metrics" className="flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-white/5 rounded-xl font-medium transition-all">
-            <Activity size={18} />
-            Rendimiento
-          </Link>
         </nav>
 
         <div className="p-4 border-t border-white/10">
