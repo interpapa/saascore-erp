@@ -11,7 +11,7 @@ const bookingSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de fecha inválido'),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Formato de hora inválido'),
   firstName: z.string().min(2, 'El nombre debe tener al menos 2 letras').max(50).trim(),
-  lastName: z.string().min(2, 'El apellido debe tener al menos 2 letras').max(50).trim(),
+  lastName: z.string().max(50).trim().optional().or(z.literal('')),
 });
 
 const rateLimitCache = new Map<string, { count: number, resetAt: number }>();
@@ -38,10 +38,11 @@ export async function processBookingAction(formData: unknown) {
 
 
     const cleanData = bookingSchema.parse(formData);
-    const fullName = `${cleanData.firstName} ${cleanData.lastName}`;
+    const fullName = `${cleanData.firstName} ${cleanData.lastName || ''}`.trim();
     
-    // Forzar UTC para evitar problemas de zona horaria en el servidor de Vercel
-    const startDateTime = new Date(`${cleanData.date}T${cleanData.time}:00Z`);
+    // Usamos el offset de Venezuela/Chile (-04:00) en lugar de Z (UTC) 
+    // para que la hora en la base de datos coincida con la hora local del negocio.
+    const startDateTime = new Date(`${cleanData.date}T${cleanData.time}:00-04:00`);
     // Por ahora, asumimos una duración estándar de 45 minutos (hasta que hagamos el panel de config)
     const endDateTime = new Date(startDateTime.getTime() + 45 * 60000);
 
@@ -131,9 +132,9 @@ export async function processBookingAction(formData: unknown) {
 // NUEVA FUNCIÓN PARA LEER HORAS OCUPADAS (SERVER ACTION)
 export async function getBookedTimesAction(tenantId: string, employeeId: string, date: string) {
   try {
-    // Buscamos todo el día forzando UTC para coincidir con cómo guardamos
-    const startDate = new Date(`${date}T00:00:00Z`);
-    const endDate = new Date(`${date}T23:59:59Z`);
+    // Buscamos todo el día con el offset local (-04:00) para traer citas del día correcto
+    const startDate = new Date(`${date}T00:00:00-04:00`);
+    const endDate = new Date(`${date}T23:59:59-04:00`);
 
     const { data, error } = await supabaseAdmin
       .from('appointments')
@@ -156,8 +157,15 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
        // Marcar cada bloque de 15 minutos dentro de la cita como ocupado
        while (current < end) {
          const d = new Date(current);
-         const hh = d.getUTCHours().toString().padStart(2, '0');
-         const mm = d.getUTCMinutes().toString().padStart(2, '0');
+         // Convertimos de vuelta usando -04:00 para mostrar correctamente en la UI local
+         // Una forma simple es ajustar el timestamp localmente para extraer la hora:
+         // Si el servidor (Vercel) está en UTC, getTime() da los milisegundos absolutos.
+         // Para sacar la hora en -04:00, restamos 4 horas (14400000 ms) y usamos getUTCHours()
+         const offsetMs = -4 * 60 * 60 * 1000;
+         const localD = new Date(d.getTime() + offsetMs);
+         
+         const hh = localD.getUTCHours().toString().padStart(2, '0');
+         const mm = localD.getUTCMinutes().toString().padStart(2, '0');
          bookedTimesSet.add(`${hh}:${mm}`);
          current += 15 * 60000;
        }

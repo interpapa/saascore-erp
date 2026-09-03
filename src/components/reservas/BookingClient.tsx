@@ -112,7 +112,7 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
   };
 
   const handleConfirm = async () => {
-    if (!selectedTime || !customerName || !customerLastName || !selectedBarber) return;
+    if (!selectedTime || !customerName || !selectedBarber) return;
     
     setIsSubmitting(true);
     setErrorMessage('');
@@ -144,18 +144,19 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
     }
 
     const phone = settings.whatsappNumber; 
-    const template = settings.whatsappMessageTemplate;
+    const template = tenant.metadata?.booking_settings?.whatsappMessageTemplate || 'Hola *{{cliente}}*, quiero confirmar la reserva con {{profesional}} para el día {{fecha}} a las {{hora}}.';
     const readableTime = allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime;
     
     const text = template
       .replace(/{{profesional}}/g, selectedBarber.name)
       .replace(/{{fecha}}/g, selectedDate)
       .replace(/{{hora}}/g, readableTime || '')
-      .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`);
+      .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`.trim());
 
-    const url = phone 
-      ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    const url = cleanPhone 
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(text)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
       
     setTimeout(() => {
       window.open(url, '_blank');
@@ -343,11 +344,11 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
                     </div>
                   )}
                   <button
-                    disabled={!selectedTime || !customerName || !customerLastName || isSubmitting || !!successMessage}
+                    disabled={!selectedTime || !customerName || isSubmitting || !!successMessage}
                     onClick={handleConfirm}
                     className="w-full sm:w-auto sm:min-w-[280px] bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[#0B3B24] disabled:opacity-70 py-4 px-8 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
                   >
-                    {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerLastName) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
+                    {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
                   </button>
                 </section>
               </div>
@@ -366,11 +367,11 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
                 </div>
               )}
               <button
-                disabled={!selectedTime || !customerName || !customerLastName || isSubmitting || !!successMessage}
+                disabled={!selectedTime || !customerName || isSubmitting || !!successMessage}
                 onClick={handleConfirm}
                 className="w-full bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[#0B3B24] disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
               >
-                {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerLastName) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
+                {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName) ? 'Ingresa tu nombre' : 'Confirmar Reserva'}
               </button>
             </div>
           </div>
