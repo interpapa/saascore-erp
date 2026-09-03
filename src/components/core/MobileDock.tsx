@@ -8,7 +8,13 @@ import {
   ShoppingCart, 
   CalendarDays, 
   Users, 
-  MessageCircle
+  MessageCircle,
+  LayoutGrid,
+  Briefcase,
+  ShoppingBag,
+  Package,
+  FileText,
+  TrendingUp
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 
@@ -29,20 +35,31 @@ export function MobileDock() {
     ? currentTenant.active_modules 
     : fallbackModules;
 
-  // Elementos del Dock de navegación core
+  // Preferencia del usuario o fallback (Dashboard siempre se fuerza luego)
+  const dockPreferences = (currentTenant?.metadata?.mobile_dock_modules as string[]) || ['caja', 'calendario', 'clientes', 'whatsapp'];
+
+  // Todos los posibles módulos
   const allItems: DockItem[] = [
     { id: 'dashboard', label: 'Inicio', href: '/dashboard', icon: Home },
     { id: 'caja', label: 'Caja POS', href: '/caja', icon: ShoppingCart },
-    { id: 'calendario', label: 'Agenda', href: '/calendario', icon: CalendarDays },
+    { id: 'calendario', label: 'Citas', href: '/calendario', icon: CalendarDays },
     { id: 'clientes', label: 'CRM', href: '/clientes', icon: Users },
     { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
+    { id: 'kanban', label: 'Kanban', href: '/kanban', icon: LayoutGrid },
+    { id: 'equipo', label: 'Personal', href: '/equipo', icon: Briefcase },
+    { id: 'compras', label: 'Compras', href: '/compras', icon: ShoppingBag },
+    { id: 'catalogo', label: 'Catálogo', href: '/catalogo', icon: Package },
+    { id: 'contabilidad', label: 'Contabilidad', href: '/contabilidad', icon: FileText },
+    { id: 'estadisticas', label: 'Estadísticas', href: '/estadisticas', icon: TrendingUp },
   ];
 
-  // Filtramos la barra del Dock basándonos en los módulos activos
-  // Nota: 'dashboard' (Inicio) siempre está disponible como base
-  const activeItems = allItems.filter(item => 
-    item.id === 'dashboard' || enabledModules.includes(item.id)
-  );
+  // Filtramos la barra del Dock: 
+  // 1. Siempre incluir 'dashboard'
+  // 2. Incluir los IDs que estén en dockPreferences y también en enabledModules
+  const activeItems = allItems.filter(item => {
+    if (item.id === 'dashboard') return true;
+    return dockPreferences.includes(item.id) && enabledModules.includes(item.id);
+  });
 
   return (
     <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-md md:hidden pointer-events-none">

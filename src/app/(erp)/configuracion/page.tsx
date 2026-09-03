@@ -3,10 +3,23 @@
 import { useState, useEffect } from 'react';
 import { useERPStore } from '@/store/useERPStore';
 import { updateTenantSettings } from '@/app/actions/tenant';
-import { ArrowLeft, Save, Building2, Globe, Image as ImageIcon, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Save, Building2, Globe, Image as ImageIcon, AlertTriangle, CheckCircle2, Smartphone } from 'lucide-react';
 import Link from 'next/link';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+
+const AVAILABLE_MODULES = [
+  { id: 'caja', name: 'Caja POS' },
+  { id: 'calendario', name: 'Citas y Turnos' },
+  { id: 'clientes', name: 'CRM (Clientes)' },
+  { id: 'whatsapp', name: 'WhatsApp' },
+  { id: 'kanban', name: 'Kanban' },
+  { id: 'equipo', name: 'Personal' },
+  { id: 'compras', name: 'Compras' },
+  { id: 'catalogo', name: 'Catálogo' },
+  { id: 'contabilidad', name: 'Contabilidad' },
+  { id: 'estadisticas', name: 'Estadísticas' },
+];
 
 export default function ConfiguracionPage() {
   const { currentTenant, setCurrentTenant } = useERPStore();
@@ -19,7 +32,8 @@ export default function ConfiguracionPage() {
     name: '',
     currency: 'USD',
     language: 'es',
-    logo_url: ''
+    logo_url: '',
+    mobile_dock_modules: [] as string[]
   });
 
   useEffect(() => {
@@ -28,10 +42,25 @@ export default function ConfiguracionPage() {
         name: currentTenant.name || '',
         currency: currentTenant.metadata?.currency || 'USD',
         language: currentTenant.metadata?.language || 'es',
-        logo_url: currentTenant.metadata?.logo_url || ''
+        logo_url: currentTenant.metadata?.logo_url || '',
+        mobile_dock_modules: (currentTenant.metadata?.mobile_dock_modules as string[]) || ['caja', 'calendario', 'clientes', 'whatsapp']
       });
     }
   }, [currentTenant]);
+
+  const toggleDockModule = (moduleId: string) => {
+    setFormData(prev => {
+      const isSelected = prev.mobile_dock_modules.includes(moduleId);
+      if (isSelected) {
+        return { ...prev, mobile_dock_modules: prev.mobile_dock_modules.filter(m => m !== moduleId) };
+      } else {
+        if (prev.mobile_dock_modules.length >= 5) {
+          return prev; // MAX 5 items
+        }
+        return { ...prev, mobile_dock_modules: [...prev.mobile_dock_modules, moduleId] };
+      }
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +75,8 @@ export default function ConfiguracionPage() {
         ...currentTenant.metadata,
         currency: formData.currency,
         language: formData.language,
-        logo_url: formData.logo_url
+        logo_url: formData.logo_url,
+        mobile_dock_modules: formData.mobile_dock_modules
       };
 
       const result = await updateTenantSettings(currentTenant.id, formData.name, metadata);
@@ -68,6 +98,9 @@ export default function ConfiguracionPage() {
       setIsLoading(false);
     }
   };
+
+  // Filtrar los módulos que el tenant tiene activos realmente
+  const tenantActiveModules = currentTenant?.active_modules || ['caja', 'calendario', 'clientes', 'whatsapp', 'catalogo'];
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -165,6 +198,44 @@ export default function ConfiguracionPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Sección: Navegación Móvil */}
+        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm">
+          <h2 className="text-lg font-bold text-foreground mb-2 flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <Smartphone size={16} />
+            </div>
+            Navegación Móvil (Acceso Rápido)
+          </h2>
+          <p className="text-xs font-medium text-slate-500 mb-6 max-w-2xl">
+            Selecciona hasta 5 módulos para que aparezcan en la barra de navegación inferior en tu teléfono. El botón de Inicio siempre estará incluido por defecto.
+          </p>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            {AVAILABLE_MODULES.filter(m => tenantActiveModules.includes(m.id)).map(module => {
+              const isSelected = formData.mobile_dock_modules.includes(module.id);
+              return (
+                <div 
+                  key={module.id}
+                  onClick={() => toggleDockModule(module.id)}
+                  className={`cursor-pointer p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                    isSelected 
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-300' 
+                      : 'border-border bg-background text-slate-600 dark:text-slate-400 hover:border-indigo-300'
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center mb-1 ${isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300 dark:border-slate-700'}`}>
+                    {isSelected && <CheckCircle2 size={12} className="text-white" />}
+                  </div>
+                  <span className="text-xs font-bold text-center">{module.name}</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-xs text-indigo-500 font-bold mt-4">
+            Seleccionados: {formData.mobile_dock_modules.length} de 5
+          </p>
         </div>
 
         <div className="flex justify-end pt-4">
