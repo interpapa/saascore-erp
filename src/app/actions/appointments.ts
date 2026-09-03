@@ -102,8 +102,18 @@ export async function getAppointmentsAction(
       return { success: true, appointments: filterAppointments(formatted, filter) };
     }
 
-    // 2. Fallback: Query 'documents' table (work_order / appointment)
-    if (error && isMissingTableError(error)) {
+function isMissingColumnError(error: unknown): boolean {
+  if (!error) return false;
+  const code = (error as any).code || '';
+  const msg = (error as any).message || '';
+  return code === '42703' || msg.includes('column') && msg.includes('does not exist');
+}
+
+// Existing fallback condition updated
+// Replace line 106-108 condition
+// Original: if (error && isMissingTableError(error)) {
+// New:
+if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
       const { data: docs, error: docErr } = await supabaseAdmin
         .from('documents')
         .select(`
@@ -181,7 +191,8 @@ export async function createAppointmentAction(
       .from('appointments')
       .insert([{
         tenant_id: tenantId,
-        title: payload.title,
+        // Guardamos el título dentro de metadata, ya que la tabla no tiene columna 'title'
+        metadata: { ...(payload.metadata || {}), title: payload.title },
         description: payload.description || null,
         client_id: payload.client_id || null,
         service_id: payload.service_id || null,
@@ -330,7 +341,7 @@ export async function updateAppointmentStatusAction(
     }
 
     // 2. Fallback: Update 'documents' table
-    if (error && isMissingTableError(error)) {
+    if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
       const docStatus = mapApptStatusToDocStatus(status);
       const { data: updatedDoc, error: docErr } = await supabaseAdmin
         .from('documents')
