@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Shield, Ban, CheckCircle2, MoreVertical, CreditCard } from 'lucide-react';
-import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
+import { Shield, Ban, CheckCircle2, MoreVertical, CreditCard, Trash2 } from 'lucide-react';
+import { getAllTenants, toggleTenantStatus, deleteTenantAdminAction } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
 import { useERPStore } from '@/store/useERPStore';
@@ -33,15 +33,27 @@ export default function AdminTenantsPage() {
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (!session?.userEmail) return;
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
-    // Optimistic UI
+    // Actualización optimista
     setTenants(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
     
     const result = await toggleTenantStatus(id, newStatus, session.userEmail);
     if (!result.success) {
-      // Revert if failed
       toast({ variant: 'error', title: 'Error', description: result.error });
-       
-      fetchTenants();
+      fetchTenants(); // Revertir
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!session?.userEmail) return;
+    if (!window.confirm('¿Seguro que quieres borrar a esta empresa de Supabase por completo?')) return;
+
+    setTenants(prev => prev.filter(t => t.id !== id));
+    const result = await deleteTenantAdminAction(id, session.userEmail);
+    if (result.success) {
+      toast({ title: 'Eliminado', description: 'Empresa borrada.' });
+    } else {
+      toast({ variant: 'error', title: 'Error', description: result.error });
+      fetchTenants(); // Revertir
     }
   };
 
@@ -127,17 +139,23 @@ export default function AdminTenantsPage() {
                   <div className="flex items-center justify-end gap-2">
                     <button 
                       onClick={() => handleToggleStatus(tenant.id, tenant.status)}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-all border btn-haptic ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
                         tenant.status === 'active' 
-                          ? 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500 hover:text-white' 
-                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500 hover:text-white'
+                          ? 'bg-rose-500/10 text-rose-500 hover:bg-rose-500/20' 
+                          : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
                       }`}
                     >
-                      {tenant.status === 'active' ? 'Suspender Acceso' : 'Reactivar'}
+                      {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
                     </button>
-                    <Link href={`/admin/tenant/${tenant.id}`} className="px-4 py-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-colors">
+                    <Link href={`/admin/tenant/${tenant.id}`} className="px-4 py-1.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-colors">
                       Gestionar
                     </Link>
+                    <button 
+                      onClick={() => handleDelete(tenant.id)}
+                      className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </td>
               </tr>

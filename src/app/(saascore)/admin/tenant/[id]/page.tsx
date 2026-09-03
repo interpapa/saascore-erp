@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
-import { getTenantByIdAdmin, updateTenantAdminAction } from '@/app/actions/tenant';
-import { ArrowLeft, Save, ShieldCheck, ToggleLeft, ToggleRight, LayoutTemplate, Briefcase, ChevronDown, ChevronRight, Settings2 } from 'lucide-react';
+import { getTenantByIdAdmin, updateTenantAdminAction, deleteTenantAdminAction } from '@/app/actions/tenant';
+import { ArrowLeft, Save, ShieldCheck, ToggleLeft, ToggleRight, LayoutTemplate, Briefcase, ChevronDown, ChevronRight, Settings2, Trash2 } from 'lucide-react';
 import { useToast } from '@/components/core/ToastProvider';
 import Link from 'next/link';
 
@@ -125,6 +125,26 @@ export default function TenantAdminPage() {
     setIsSaving(false);
   };
 
+  const handleDelete = async () => {
+    if (!session?.userEmail) return;
+    
+    // Doble confirmación por seguridad
+    const confirm1 = window.confirm(`¿Estás seguro de que quieres ELIMINAR permanentemente a "${tenant.name}"?`);
+    if (!confirm1) return;
+    const confirm2 = window.confirm(`CUIDADO: Esto borrará la empresa y no se puede deshacer. ¿Proceder?`);
+    if (!confirm2) return;
+
+    setIsSaving(true);
+    const result = await deleteTenantAdminAction(tenant.id, session.userEmail);
+    if (result.success) {
+      toast({ title: 'Eliminado', description: 'La empresa fue borrada de la base de datos.' });
+      router.replace('/admin');
+    } else {
+      toast({ variant: 'error', title: 'Error al eliminar', description: result.error });
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64 text-slate-400">
@@ -153,13 +173,23 @@ export default function TenantAdminPage() {
             <p className="text-slate-400 font-mono text-[10px] sm:text-xs mt-1 truncate">ID: {tenant.id}</p>
           </div>
         </div>
-        <button 
-          onClick={handleSave}
-          disabled={isSaving}
-          className="w-full sm:w-auto justify-center bg-rose-500 hover:bg-rose-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm shrink-0"
-        >
-          {isSaving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
-        </button>
+        <div className="flex w-full sm:w-auto gap-2">
+          <button 
+            onClick={handleDelete}
+            disabled={isSaving}
+            className="w-12 sm:w-auto flex justify-center items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all shrink-0"
+            title="Eliminar Empresa"
+          >
+            <Trash2 size={18} />
+          </button>
+          <button 
+            onClick={handleSave}
+            disabled={isSaving}
+            className="flex-1 sm:flex-none justify-center bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+          >
+            {isSaving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
+          </button>
+        </div>
       </div>
 
       {/* Datos Generales */}

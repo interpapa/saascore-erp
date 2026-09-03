@@ -282,3 +282,21 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
     return { success: false, error: (err as Error).message };
   }
 }
+
+export async function deleteTenantAdminAction(tenantId: string, callerEmail: string) {
+  try {
+    if (callerEmail?.toLowerCase() !== 'interpapadavid2811@gmail.com') {
+      return { success: false, error: 'No autorizado' };
+    }
+    const db = supabaseAdmin || supabase;
+    const { error } = await db
+      .from('tenants')
+      .delete()
+      .eq('id', tenantId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
