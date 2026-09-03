@@ -320,7 +320,10 @@ export function CalendarGrid({
           </div>
         </div>
       </div>
-      // -------------------------
+    );
+  };
+  
+  // -------------------------
   // RENDER: MONTH VIEW
   // -------------------------
   const renderMonthView = () => {
