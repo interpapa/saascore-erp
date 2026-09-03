@@ -132,9 +132,13 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             const isBookable = emp.metadata?.bookable !== false;
             
             return (
-              <div key={emp.id} className="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-indigo-500/30 transition-all space-y-4">
+              <div 
+                key={emp.id} 
+                onClick={() => openEditModal(emp)}
+                className="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-indigo-500/50 hover:shadow-md transition-all space-y-4 cursor-pointer group"
+              >
                 <div className="flex items-start justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base border border-indigo-500/20">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base border border-indigo-500/20 group-hover:scale-105 transition-transform">
                     {emp.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div className="flex flex-col items-end gap-1">
@@ -148,7 +152,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 </div>
 
                 <div>
-                  <h3 className="font-bold text-foreground text-sm tracking-tight">{emp.name}</h3>
+                  <h3 className="font-bold text-foreground text-sm tracking-tight group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{emp.name}</h3>
                   <p className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1.5 mt-0.5">
                     <Briefcase size={13} className="text-indigo-500" />
                     {(emp.metadata?.role_title as string) || 'Empleado General'}
@@ -162,6 +166,12 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       <span className="truncate">{emp.email}</span>
                     </div>
                   )}
+                  {emp.phone && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-[13px] text-center text-[10px] font-black text-slate-400">📞</span>
+                      <span className="truncate">{emp.phone}</span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-slate-400 font-medium">Sueldo Base:</span>
                     <span className="font-mono font-bold text-foreground text-xs">
@@ -172,10 +182,9 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 
                 <div className="pt-2">
                   <button 
-                    onClick={() => openEditModal(emp)}
-                    className="w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl text-xs font-bold transition-colors text-slate-600 dark:text-slate-300"
+                    className="w-full py-2 bg-slate-100 dark:bg-slate-800 group-hover:bg-indigo-500 group-hover:text-white rounded-xl text-xs font-bold transition-colors text-slate-600 dark:text-slate-300"
                   >
-                    Editar Datos
+                    Ver Ficha Técnica
                   </button>
                 </div>
               </div>
@@ -189,7 +198,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-foreground mb-4">
-              {editingId ? 'Editar Empleado' : 'Registrar Nuevo Empleado'}
+              {editingId ? 'Ficha Técnica del Empleado' : 'Registrar Nuevo Empleado'}
             </h3>
             
             <form onSubmit={handleSaveEmployee} className="space-y-4">
@@ -201,13 +210,22 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 placeholder="Ej. Carlos Mendoza"
               />
 
-              <Input
-                label="Correo Electrónico"
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="carlos@empresa.com"
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <Input
+                  label="Teléfono"
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="+1 234 567 890"
+                />
+                <Input
+                  label="Correo Electrónico"
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="carlos@empresa.com"
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <Input
