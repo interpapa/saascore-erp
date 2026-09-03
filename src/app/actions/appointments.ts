@@ -118,7 +118,7 @@ if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
       const { data: docs, error: docErr } = await supabaseAdmin
         .from('documents')
         .select(`
-          id, tenant_id, type, status, subtotal_amount, tax_amount, total_amount, notes, metadata, created_at, updated_at, entity_id, document_number,
+          id, tenant_id, type, status, subtotal_amount, tax_amount, total_amount, metadata, created_at, updated_at, entity_id, document_number,
           entity:entities (id, name, phone, email)
         `)
         .eq('tenant_id', tenantId)

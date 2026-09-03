@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Scissors, Clock } from 'lucide-react';
+import { ArrowLeft, Scissors, Clock, Calendar, User, ChevronRight } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
 
 type Tenant = { id: string, name: string, metadata?: any };
@@ -11,15 +11,12 @@ const GENERATE_DATES = (openDays: number[]) => {
   const dates = [];
   const today = new Date();
   const dayNames = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
-  const i = 0;
-  let attempts = 0; // Para evitar bucles infinitos
+  let attempts = 0;
   
-  // Genera los próximos 14 días laborables
   while (dates.length < 14 && attempts < 60) {
     const d = new Date(today);
     d.setDate(today.getDate() + attempts);
     
-    // Si el día está dentro de los permitidos por el dueño
     if (openDays.includes(d.getDay())) {
       dates.push({
         dateObj: d,
@@ -33,26 +30,22 @@ const GENERATE_DATES = (openDays: number[]) => {
   return dates;
 };
 
-// Convierte 'HH:mm' a minutos
 const parseTime = (time: string) => {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
 };
 
-// Convierte minutos a 'HH:mm' y formato AM/PM
 const formatTime = (minutes: number) => {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   const hr24 = h.toString().padStart(2, '0');
   const min = m.toString().padStart(2, '0');
-  
-  // Formato 12 horas AM/PM
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12 = h % 12 || 12;
   
   return {
-    value24: `${hr24}:${min}`, // Para la BD
-    label12: `${h12}:${min} ${ampm}` // Para mostrar al usuario
+    value24: `${hr24}:${min}`,
+    label12: `${h12}:${min} ${ampm}`
   };
 };
 
@@ -68,7 +61,6 @@ const GENERATE_TIMES = (start: string, end: string, interval: number) => {
 };
 
 export default function BookingClient({ tenant, employees }: { tenant: Tenant, employees: Employee[] }) {
-  // Read settings from tenant or use defaults
   const settings = {
     openDays: tenant.metadata?.booking_settings?.openDays || [1, 2, 3, 4, 5, 6],
     startHour: tenant.metadata?.booking_settings?.startHour || '09:00',
@@ -99,7 +91,6 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Cuando cambia la fecha o el barbero, buscar los horarios ocupados
   useEffect(() => {
     async function fetchTimes() {
       if (!selectedBarber || !selectedDate) return;
@@ -132,7 +123,7 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
         barberId: selectedBarber.id,
         barberName: selectedBarber.name,
         date: selectedDate,
-        time: selectedTime, // this is value24
+        time: selectedTime,
         firstName: customerName,
         lastName: customerLastName,
       });
@@ -152,21 +143,16 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
       return;
     }
 
-    // Read whatsapp config or use fallbacks
     const phone = settings.whatsappNumber; 
     const template = settings.whatsappMessageTemplate;
-    
-    // Find the readable time to send to WhatsApp
     const readableTime = allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime;
     
-    // Replace magic variables
     const text = template
       .replace(/{{profesional}}/g, selectedBarber.name)
       .replace(/{{fecha}}/g, selectedDate)
       .replace(/{{hora}}/g, readableTime || '')
       .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`);
 
-    // Si el comercio no tiene configurado un número, intentamos enviarlo sin número para que la persona lo escoja de su agenda
     const url = phone 
       ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}`
       : `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -182,131 +168,195 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
   };
 
   return (
-    <div className="min-h-screen bg-[#F9F6F0] md:bg-slate-200 flex justify-center items-center font-sans text-slate-800 md:p-8">
-      <div className="w-full h-full md:h-[850px] max-w-md bg-[#F9F6F0] relative shadow-2xl flex flex-col md:rounded-[2.5rem] overflow-hidden border border-slate-200/50">
-        
-        {step === 1 && (
-          <div className="flex flex-col h-full">
-            <div className="bg-[#0B3B24] pt-12 pb-8 px-6 shadow-md z-10 md:pt-16">
-              <h1 className="text-white text-3xl font-black mb-1">{tenant.name}</h1>
-              <p className="text-emerald-100/80 text-sm">Selecciona tu {resourceName.toLowerCase()} para agendar hoy</p>
-            </div>
-            
-            <div className="p-5 space-y-4 flex-1 overflow-y-auto bg-white/50">
-              {employees.length === 0 && (
-                 <p className="text-center text-slate-400 mt-10">No hay opciones disponibles en este momento.</p>
-              )}
-              {employees.map(barber => (
-                <button
-                  key={barber.id}
-                  onClick={() => handleBarberSelect(barber)}
-                  className="w-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[#0B3B24]/30 hover:shadow-md text-left transition-all active:scale-95 flex flex-col"
-                >
-                  <div className="bg-[#eaf4ed] p-5 relative w-full">
-                    <h2 className="text-2xl font-black text-[#0B3B24]">{barber.name}</h2>
-                  </div>
-                  <div className="p-4 flex items-center gap-2 text-slate-500 w-full bg-white">
-                    <Scissors size={16} />
-                    <span className="text-sm font-medium">{barber.role || 'Profesional'}</span>
-                  </div>
-                </button>
-              ))}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-sans text-slate-800">
+      
+      {/* ===== STEP 1: Seleccionar Profesional ===== */}
+      {step === 1 && (
+        <div className="min-h-screen flex flex-col">
+          {/* Hero Banner */}
+          <div className="bg-[#0B3B24] px-6 py-12 md:px-12 md:py-16 lg:py-20">
+            <div className="max-w-5xl mx-auto">
+              <h1 className="text-white text-3xl md:text-5xl font-black mb-2 tracking-tight">{tenant.name}</h1>
+              <p className="text-emerald-100/80 text-sm md:text-lg max-w-lg">
+                Selecciona tu {resourceName.toLowerCase()} para agendar hoy
+              </p>
             </div>
           </div>
-        )}
+          
+          {/* Employee Cards */}
+          <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
+            <div className="max-w-5xl mx-auto">
+              {employees.length === 0 && (
+                <p className="text-center text-slate-400 mt-10 text-lg">No hay opciones disponibles en este momento.</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                {employees.map(barber => (
+                  <button
+                    key={barber.id}
+                    onClick={() => handleBarberSelect(barber)}
+                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[#0B3B24]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col"
+                  >
+                    <div className="bg-[#eaf4ed] p-6 relative w-full">
+                      <h2 className="text-xl md:text-2xl font-black text-[#0B3B24]">{barber.name}</h2>
+                    </div>
+                    <div className="p-4 flex items-center justify-between w-full bg-white">
+                      <div className="flex items-center gap-2 text-slate-500">
+                        <Scissors size={16} />
+                        <span className="text-sm font-medium">{barber.role || 'Profesional'}</span>
+                      </div>
+                      <ChevronRight size={18} className="text-slate-300 group-hover:text-[#0B3B24] transition-colors" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-        {step === 2 && (
-          <div className="flex flex-col h-full relative">
-            <div className="bg-[#0B3B24] pt-10 pb-5 px-5 shadow-md shrink-0 md:pt-12">
-              <div className="flex items-center gap-4">
-                <button onClick={() => setStep(1)} className="p-2.5 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
-                  <ArrowLeft size={20} />
-                </button>
-                <div className="text-white">
-                  <h2 className="text-xl font-black leading-tight">{selectedBarber?.name}</h2>
-                  <p className="text-xs text-emerald-200 font-medium">{selectedBarber?.role || 'Profesional'}</p>
+      {/* ===== STEP 2: Seleccionar Fecha, Hora y Datos ===== */}
+      {step === 2 && (
+        <div className="min-h-screen flex flex-col lg:flex-row">
+          {/* Sidebar / Top Bar */}
+          <div className="bg-[#0B3B24] px-6 py-8 lg:w-80 lg:min-h-screen lg:py-12 lg:px-8 shrink-0">
+            <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-6">
+              <button onClick={() => setStep(1)} className="p-2.5 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
+                <ArrowLeft size={20} />
+              </button>
+              <div className="text-white">
+                <h2 className="text-xl lg:text-2xl font-black leading-tight">{selectedBarber?.name}</h2>
+                <p className="text-xs lg:text-sm text-emerald-200 font-medium">{selectedBarber?.role || 'Profesional'}</p>
+              </div>
+            </div>
+            
+            {/* Summary panel — visible only on desktop sidebar */}
+            <div className="hidden lg:block mt-10 space-y-4">
+              <div className="bg-white/10 rounded-xl p-4">
+                <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">Fecha seleccionada</p>
+                <p className="text-white font-bold">{selectedDate || '—'}</p>
+              </div>
+              {selectedTime && (
+                <div className="bg-white/10 rounded-xl p-4">
+                  <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">Hora seleccionada</p>
+                  <p className="text-white font-bold">
+                    {allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime}
+                  </p>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 flex flex-col">
+            <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 md:py-10 pb-40 lg:pb-10">
+              <div className="max-w-3xl mx-auto space-y-8">
+                
+                {/* Dates */}
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
+                    <Calendar size={14} /> 1. Fecha
+                  </h3>
+                  <div className="flex flex-wrap gap-3">
+                    {dates.map((d, i) => {
+                      const isSelected = selectedDate === d.fullDate;
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => { setSelectedDate(d.fullDate); setSelectedTime(null); }}
+                          className={`shrink-0 w-[4.5rem] h-20 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
+                            isSelected 
+                              ? 'bg-[#0B3B24] border-[#0B3B24] text-white shadow-md scale-105' 
+                              : 'bg-white border-slate-100 text-slate-500 hover:border-[#0B3B24]/30'
+                          }`}
+                        >
+                          <span className={`text-[10px] font-bold ${isSelected ? 'text-emerald-300' : 'text-slate-400'}`}>{d.dayName}</span>
+                          <span className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-[#0B3B24]'}`}>{d.dayNum}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                {/* Time slots */}
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
+                    <Clock size={14}/> 2. Horario {isLoadingTimes && <span className="text-emerald-500 animate-pulse text-[10px]">(Cargando...)</span>}
+                  </h3>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                    {allTimes.map((time, i) => {
+                      const isSelected = selectedTime === time.value24;
+                      const isAvailable = !bookedTimes.includes(time.value24);
+                      
+                      return (
+                        <button
+                          key={i}
+                          disabled={!isAvailable || isLoadingTimes}
+                          onClick={() => setSelectedTime(time.value24)}
+                          className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                            !isAvailable 
+                              ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
+                              : isSelected 
+                                ? 'bg-[#eaf4ed] border-emerald-500 text-emerald-800 shadow-sm scale-105'
+                                : 'bg-white border-slate-100 text-[#0B3B24] hover:border-[#0B3B24]/30 shadow-sm'
+                          }`}
+                        >
+                          {time.label12}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                {/* Customer Data */}
+                <section>
+                  <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
+                    <User size={14} /> 3. Tus Datos
+                  </h3>
+                  <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="Tu Nombre" 
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[#0B3B24] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[#0B3B24] focus:ring-1 focus:ring-[#0B3B24] transition-all"
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Tu Apellido" 
+                      value={customerLastName}
+                      onChange={(e) => setCustomerLastName(e.target.value)}
+                      className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[#0B3B24] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[#0B3B24] focus:ring-1 focus:ring-[#0B3B24] transition-all"
+                    />
+                  </div>
+                </section>
+
+                {/* Confirmation — Desktop inline */}
+                <section className="hidden lg:block">
+                  {errorMessage && (
+                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl border border-red-100 text-center">
+                      {errorMessage}
+                    </div>
+                  )}
+                  {successMessage && (
+                    <div className="mb-4 p-3 bg-emerald-50 text-emerald-600 text-sm font-bold rounded-xl border border-emerald-100 text-center">
+                      {successMessage} Redirigiendo a WhatsApp...
+                    </div>
+                  )}
+                  <button
+                    disabled={!selectedTime || !customerName || !customerLastName || isSubmitting || !!successMessage}
+                    onClick={handleConfirm}
+                    className="w-full sm:w-auto sm:min-w-[280px] bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[#0B3B24] disabled:opacity-70 py-4 px-8 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
+                  >
+                    {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerLastName) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
+                  </button>
+                </section>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pb-40 bg-white/50">
-              <div className="p-5">
-                <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3">1. Fecha</h3>
-                <div className="flex overflow-x-auto gap-3 pb-2 snap-x hide-scrollbar">
-                  {dates.map((d, i) => {
-                    const isSelected = selectedDate === d.fullDate;
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => { setSelectedDate(d.fullDate); setSelectedTime(null); }}
-                        className={`snap-start shrink-0 w-[4.5rem] h-20 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
-                          isSelected 
-                            ? 'bg-[#0B3B24] border-[#0B3B24] text-white shadow-md transform scale-105' 
-                            : 'bg-white border-slate-100 text-slate-500 hover:border-[#0B3B24]/30'
-                        }`}
-                      >
-                        <span className={`text-[10px] font-bold ${isSelected ? 'text-emerald-300' : 'text-slate-400'}`}>{d.dayName}</span>
-                        <span className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-[#0B3B24]'}`}>{d.dayNum}</span>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="px-5 pb-5">
-                <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3 flex items-center gap-2">
-                  <Clock size={14}/> 2. Horario {isLoadingTimes && <span className="text-emerald-500 animate-pulse text-[10px]">(Cargando...)</span>}
-                </h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {allTimes.map((time, i) => {
-                    const isSelected = selectedTime === time.value24;
-                    // TODO: Mejorar lógica cuando se pueda cruzar con un horario ya ocupado
-                    const isAvailable = !bookedTimes.includes(time.value24);
-                    
-                    return (
-                      <button
-                        key={i}
-                        disabled={!isAvailable || isLoadingTimes}
-                        onClick={() => setSelectedTime(time.value24)}
-                        className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
-                          !isAvailable 
-                            ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
-                            : isSelected 
-                              ? 'bg-[#eaf4ed] border-emerald-500 text-emerald-800 shadow-sm transform scale-105'
-                              : 'bg-white border-slate-100 text-[#0B3B24] hover:border-[#0B3B24]/30 shadow-sm'
-                        }`}
-                      >
-                        {time.label12}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="px-5 pb-8">
-                <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3">3. Tus Datos</h3>
-                <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3">
-                  <input 
-                    type="text" 
-                    placeholder="Tu Nombre" 
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[#0B3B24] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[#0B3B24] focus:ring-1 focus:ring-[#0B3B24] transition-all"
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Tu Apellido" 
-                    value={customerLastName}
-                    onChange={(e) => setCustomerLastName(e.target.value)}
-                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[#0B3B24] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[#0B3B24] focus:ring-1 focus:ring-[#0B3B24] transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="absolute bottom-0 w-full bg-white/90 backdrop-blur-md border-t border-slate-100 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] shrink-0 z-20">
+            {/* Sticky bottom bar — Mobile only */}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-100 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
               {errorMessage && (
-                <div className="mb-3 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 text-center animate-bounce">
+                <div className="mb-3 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 text-center">
                   {errorMessage}
                 </div>
               )}
@@ -324,9 +374,8 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
               </button>
             </div>
           </div>
-        )}
-
-      </div>
+        </div>
+      )}
       
       <style dangerouslySetInnerHTML={{__html: `
         .hide-scrollbar::-webkit-scrollbar { display: none; }
