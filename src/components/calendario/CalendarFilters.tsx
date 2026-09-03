@@ -10,6 +10,7 @@ import {
   UserCheck,
   Calendar as CalendarIcon,
   Grid,
+  Clock,
 } from 'lucide-react';
 import {
   AppointmentFilterState,
@@ -19,8 +20,8 @@ import {
 } from '@/types/calendario';
 
 export interface CalendarFiltersProps {
-  viewMode: 'month' | 'week';
-  onViewModeChange: (mode: 'month' | 'week') => void;
+  viewMode: 'day' | 'month' | 'week';
+  onViewModeChange: (mode: 'day' | 'month' | 'week') => void;
   currentDate: Date;
   onDateChange: (date: Date) => void;
   filterState: AppointmentFilterState;
@@ -46,8 +47,10 @@ export function CalendarFilters({
     if (viewMode === 'month') {
       nextDate.setDate(1);
       nextDate.setMonth(nextDate.getMonth() - 1);
-    } else {
+    } else if (viewMode === 'week') {
       nextDate.setDate(nextDate.getDate() - 7);
+    } else {
+      nextDate.setDate(nextDate.getDate() - 1);
     }
     onDateChange(nextDate);
   };
@@ -57,8 +60,10 @@ export function CalendarFilters({
     if (viewMode === 'month') {
       nextDate.setDate(1);
       nextDate.setMonth(nextDate.getMonth() + 1);
-    } else {
+    } else if (viewMode === 'week') {
       nextDate.setDate(nextDate.getDate() + 7);
+    } else {
+      nextDate.setDate(nextDate.getDate() + 1);
     }
     onDateChange(nextDate);
   };
@@ -69,6 +74,9 @@ export function CalendarFilters({
 
   // Period Title Formatter
   const getPeriodTitle = () => {
+    if (viewMode === 'day') {
+      return currentDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
     if (viewMode === 'month') {
       return currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
     }
@@ -98,15 +106,15 @@ export function CalendarFilters({
         <div className="flex items-center gap-3">
           <div className="bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl flex items-center gap-1 border border-border">
             <button
-              onClick={() => onViewModeChange('month')}
+              onClick={() => onViewModeChange('day')}
               className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
-                viewMode === 'month'
+                viewMode === 'day'
                   ? 'bg-primary text-primary-foreground shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-foreground'
               }`}
             >
-              <Grid size={14} />
-              Mes
+              <Clock size={14} />
+              Día
             </button>
             <button
               onClick={() => onViewModeChange('week')}
@@ -118,6 +126,17 @@ export function CalendarFilters({
             >
               <CalendarIcon size={14} />
               Semana
+            </button>
+            <button
+              onClick={() => onViewModeChange('month')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                viewMode === 'month'
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-foreground'
+              }`}
+            >
+              <Grid size={14} />
+              Mes
             </button>
           </div>
 

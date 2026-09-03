@@ -47,7 +47,7 @@ export default function CalendarioPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter & Navigation States
-  const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [filterState, setFilterState] = useState<AppointmentFilterState>({
     status: 'all',
@@ -323,11 +323,12 @@ export default function CalendarioPage() {
         }}
       />
 
-      {/* Interactive Monthly / Weekly Event Grid */}
+      {/* Interactive Monthly / Weekly / Daily Event Grid */}
       <CalendarGrid
         viewMode={viewMode}
         currentDate={currentDate}
         appointments={appointments}
+        employees={employees}
         isLoading={isLoading}
         onSelectAppointment={handleSelectAppointment}
         onSelectDateSlot={handleSelectDateSlot}
