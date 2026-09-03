@@ -6,6 +6,7 @@ import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
 import { useERPStore } from '@/store/useERPStore';
+import Link from 'next/link';
 
 export default function AdminTenantsPage() {
   const { session } = useERPStore();
@@ -134,9 +135,9 @@ export default function AdminTenantsPage() {
                     >
                       {tenant.status === 'active' ? 'Suspender Acceso' : 'Reactivar'}
                     </button>
-                    <button className="p-2 text-slate-500 hover:text-white transition-colors">
-                      <MoreVertical size={18} />
-                    </button>
+                    <Link href={`/admin/tenant/${tenant.id}`} className="px-4 py-2 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold transition-colors">
+                      Gestionar
+                    </Link>
                   </div>
                 </td>
               </tr>

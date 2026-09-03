@@ -239,3 +239,46 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     return { success: false, tenant: null, role: null, error: error.message };
   }
 }
+
+export async function getTenantByIdAdmin(tenantId: string, callerEmail: string) {
+  try {
+    if (callerEmail?.toLowerCase() !== 'interpapadavid2811@gmail.com') {
+      return { success: false, tenant: null, error: 'No autorizado' };
+    }
+    const db = supabaseAdmin || supabase;
+    const { data: tenant, error } = await db
+      .from('tenants')
+      .select('*')
+      .eq('id', tenantId)
+      .single();
+
+    if (error) throw error;
+    return { success: true, tenant };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export async function updateTenantAdminAction(tenantId: string, updates: any, callerEmail: string) {
+  try {
+    if (callerEmail?.toLowerCase() !== 'interpapadavid2811@gmail.com') {
+      return { success: false, error: 'No autorizado' };
+    }
+    const db = supabaseAdmin || supabase;
+    const { data: tenant, error } = await db
+      .from('tenants')
+      .update({
+        name: updates.name,
+        active_modules: updates.active_modules,
+        metadata: updates.metadata
+      })
+      .eq('id', tenantId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, tenant };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}

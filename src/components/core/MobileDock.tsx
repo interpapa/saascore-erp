@@ -24,7 +24,7 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const enabledModules = currentTenant?.metadata?.active_modules || [
+  const enabledModules = currentTenant?.active_modules || [
     'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
   ];
 

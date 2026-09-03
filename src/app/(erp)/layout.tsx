@@ -38,7 +38,7 @@ export default function ERPLayout({
   const { currentTenant } = useERPStore();
 
   // Verificar si la ruta actual es un módulo inactivo
-  const enabledModules = currentTenant?.metadata?.active_modules || [
+  const enabledModules = currentTenant?.active_modules || [
     'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
   ];
 

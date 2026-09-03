@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: result.tenant.id,
           name: result.tenant.name,
           blocked: !result.tenant.is_active,
+          active_modules: result.tenant.active_modules || [],
           metadata: result.tenant.metadata
         });
         setSession({

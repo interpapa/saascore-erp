@@ -27,7 +27,7 @@ import { useRouter } from 'next/navigation';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
-  const { currentTenant } = useERPStore();
+  const { currentTenant, session } = useERPStore();
   const router = useRouter();
 
   const apps = [
@@ -139,10 +139,13 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const enabledModules = currentTenant?.metadata?.active_modules || [
+  const enabledModules = currentTenant?.active_modules || [
     'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
   ];
-  const filteredApps = apps.filter((app) => enabledModules.includes(app.id));
+  const filteredApps = apps.filter((app) => {
+    if (app.id === 'admin' && session?.role !== 'superadmin') return false;
+    return enabledModules.includes(app.id);
+  });
 
   // Prefetch all module routes after login
   useEffect(() => {
