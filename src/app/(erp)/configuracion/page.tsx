@@ -19,6 +19,11 @@ const AVAILABLE_MODULES = [
   { id: 'catalogo', name: 'Catálogo' },
   { id: 'contabilidad', name: 'Contabilidad' },
   { id: 'estadisticas', name: 'Estadísticas' },
+  { id: 'franquicias', name: 'Franquicias' },
+  { id: 'integraciones', name: 'Integraciones' },
+  { id: 'apps', name: 'Apps / Extensiones' },
+  { id: 'config', name: 'Ajustes' },
+  { id: 'admin', name: 'Super Admin' },
 ];
 
 export default function ConfiguracionPage() {
@@ -100,7 +105,8 @@ export default function ConfiguracionPage() {
   };
 
   // Filtrar los módulos que el tenant tiene activos realmente
-  const tenantActiveModules = currentTenant?.active_modules || ['caja', 'calendario', 'clientes', 'whatsapp', 'catalogo'];
+  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin', 'apps'];
+  const tenantActiveModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) ? currentTenant.active_modules : fallbackModules;
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">

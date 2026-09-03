@@ -14,7 +14,12 @@ import {
   ShoppingBag,
   Package,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Store,
+  Plug,
+  Blocks,
+  Settings,
+  ShieldAlert
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 
@@ -30,7 +35,7 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'];
+  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin', 'apps'];
   const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : fallbackModules;
@@ -51,6 +56,11 @@ export function MobileDock() {
     { id: 'catalogo', label: 'Catálogo', href: '/catalogo', icon: Package },
     { id: 'contabilidad', label: 'Contabilidad', href: '/contabilidad', icon: FileText },
     { id: 'estadisticas', label: 'Estadísticas', href: '/estadisticas', icon: TrendingUp },
+    { id: 'franquicias', label: 'Franquicias', href: '/franquicias', icon: Store },
+    { id: 'integraciones', label: 'Integraciones', href: '/integraciones', icon: Plug },
+    { id: 'apps', label: 'Apps', href: '/apps', icon: Blocks },
+    { id: 'config', label: 'Ajustes', href: '/configuracion', icon: Settings },
+    { id: 'admin', label: 'Admin', href: '/admin', icon: ShieldAlert },
   ];
 
   // Filtramos la barra del Dock: 
