@@ -24,9 +24,10 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const enabledModules = currentTenant?.active_modules || [
-    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
-  ];
+  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'];
+  const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
+    ? currentTenant.active_modules 
+    : fallbackModules;
 
   // Elementos del Dock de navegación core
   const allItems: DockItem[] = [

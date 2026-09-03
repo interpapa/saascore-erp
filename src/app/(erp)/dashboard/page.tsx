@@ -139,9 +139,10 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const enabledModules = currentTenant?.active_modules || [
-    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
-  ];
+  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'];
+  const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
+    ? currentTenant.active_modules 
+    : fallbackModules;
   const filteredApps = apps.filter((app) => {
     if (app.id === 'admin' && session?.role !== 'superadmin') return false;
     return enabledModules.includes(app.id);
