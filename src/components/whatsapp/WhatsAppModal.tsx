@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Send, User, AlertTriangle, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Entity } from '@/lib/api/entities';
@@ -19,12 +19,12 @@ export function WhatsAppModal({ isOpen, onClose, onSend, clients, initialClientI
   const [selectedClient, setSelectedClient] = useState<Entity | null>(null);
 
   // Initialize selected client
-  React.useEffect(() => {
-    if (initialClientId && clients.length > 0) {
-      const c = clients.find(x => x.id === initialClientId);
-      if (c) setSelectedClient(c);
+  useEffect(() => {
+    if (isOpen && initialClientId) {
+      const client = clients.find(c => c.id === initialClientId);
+      if (client) setSelectedClient(client);
     }
-  }, [initialClientId, clients]);
+  }, [initialClientId, clients, isOpen]);
 
   if (!isOpen) return null;
 
