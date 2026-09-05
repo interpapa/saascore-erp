@@ -1,7 +1,7 @@
-/**
+﻿/**
  * Example Third-Party / Community Plugin: Venezuela Tax & Fiscal Printer Plugin
  * 
- * Demonstrates how external developers can hook into SaaSCore ERP
+ * Demonstrates how external developers can hook into Rendo
  * without modifying a single line of core code.
  * Set enabled to false by default to maintain core tenant tax engine neutrality.
  */
@@ -12,7 +12,7 @@ export const veTaxPlugin: SaaSPlugin = {
   id: 'plugin-ve-tax-fiscal',
   name: 'Venezuela Fiscal & IGTF Extension',
   version: '1.0.0',
-  author: 'Comunidad SaaSCore VE',
+  author: 'Comunidad Rendo VE',
   description: 'Procesa impuestos específicos de Venezuela (IGTF 3%) e integra notificaciones fiscales al completar ventas.',
   enabled: false, // Disabled by default for neutral tenant tax configuration
 

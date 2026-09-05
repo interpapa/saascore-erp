@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Plugin Auto-Initializer
+﻿/**
+ * Rendo Plugin Auto-Initializer
  * Loads default core plugins into the PluginManager on app startup.
  * Single-country plugins (e.g. veTaxPlugin) are opt-in and not auto-registered.
  */

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { User, Clock, FileText, HelpCircle } from 'lucide-react';
@@ -20,7 +20,7 @@ interface AuditTrailSectionProps {
 }
 
 /**
- * AuditTrailSection — SaaSCore Design System
+ * AuditTrailSection — Rendo Design System
  * 
  * Dibuja una línea de tiempo interactiva con los cambios realizados
  * en el módulo, formateando las acciones en lenguaje natural.

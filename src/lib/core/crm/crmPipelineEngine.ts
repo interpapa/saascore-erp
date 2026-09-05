@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Pipeline Kanban & CRM
+﻿/**
+ * Rendo - Motor de Pipeline Kanban & CRM
  * 
  * Gestiona el ciclo de vida de oportunidades de venta, probabilidades de cierre
  * por etapa y cálculo del Embudo de Ventas Ponderado (Weighted Pipeline).

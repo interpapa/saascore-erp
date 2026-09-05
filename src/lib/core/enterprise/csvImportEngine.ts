@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Asistente de Importación & Mapeo CSV/Excel (Import Wizard)
+﻿/**
+ * Rendo - Asistente de Importación & Mapeo CSV/Excel (Import Wizard)
  * 
  * Permite cargar archivos CSV/Excel con mapeo visual dinámico de columnas
  * reconociendo encabezados y transformando datos al esquema ERP.

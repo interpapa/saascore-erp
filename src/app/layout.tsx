@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from '@/components/core/ThemeProvider';
@@ -13,8 +13,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'SaaSCore ERP',
-    template: '%s | SaaSCore ERP'
+    default: 'Rendo',
+    template: '%s | Rendo'
   },
   description: 'Enterprise Resource Planning System',
   robots: {

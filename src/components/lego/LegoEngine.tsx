@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { LegoModuleDNA, LegoPieceDNA } from '@/types/lego';
 import { StatGrid } from './StatGrid';
 import { ListFeed } from './ListFeed';
@@ -49,7 +49,7 @@ const [moduleData] = useState<Record<string, unknown[]>>(() => {
         {/* Cabecera del Módulo */}
         <div className="mb-8">
           <h1 className="text-3xl font-black text-foreground tracking-tight">{dna.name}</h1>
-          <p className="text-slate-600 dark:text-slate-400 font-medium text-sm mt-1">SaaSCore OS Modular Engine</p>
+          <p className="text-slate-600 dark:text-slate-400 font-medium text-sm mt-1">Rendo OS Modular Engine</p>
         </div>
 
         {/* Bento Grid Layout (Lego Canvas) */}

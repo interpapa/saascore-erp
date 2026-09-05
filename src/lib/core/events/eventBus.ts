@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Event Bus
+﻿/**
+ * Rendo Event Bus
  * Decentralized, strongly-typed event listener & emitter system.
  * Allows core modules and third-party plugins to subscribe to domain events.
  */

@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Kernel - Financial Ledger Engine (Partida Doble NIIF / IFRS)
+﻿/**
+ * Rendo Kernel - Financial Ledger Engine (Partida Doble NIIF / IFRS)
  * 
  * Capa inmutable para la generación de asientos contables de partida doble.
  */

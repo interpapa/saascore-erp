@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { LucideIcon } from 'lucide-react';
@@ -22,7 +22,7 @@ interface EmptyStateProps {
 }
 
 /**
- * EmptyState — SaaSCore Design System v2
+ * EmptyState — Rendo Design System v2
  *
  * Estado vacío unificado para todos los módulos.
  * SIEMPRE tiene una acción sugerida — no deja al usuario

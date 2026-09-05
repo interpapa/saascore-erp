@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { writeAuditLog } from '@/lib/core/auditLogger';
@@ -192,7 +192,7 @@ export async function getMessagesAction(
         conversation_id: conversationId,
         tenant_id: log.tenant_id,
         sender_type: log.metadata?.direction === 'inbound' ? 'client' : 'agent',
-        sender_name: log.metadata?.direction === 'inbound' ? 'Cliente' : (log.metadata?.created_by || 'SaaSCore Bot'),
+        sender_name: log.metadata?.direction === 'inbound' ? 'Cliente' : (log.metadata?.created_by || 'Rendo Bot'),
         text: log.notes || '',
         status: log.status === 'invoiced' ? 'delivered' : log.status === 'annulled' ? 'failed' : 'sent',
         timestamp: log.issue_date || log.created_at,

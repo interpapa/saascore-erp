@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface EmptyStateProps {
   /** Lucide React icon component to display (pass as element, e.g. <Users size={48} />) */
@@ -19,7 +19,7 @@ interface EmptyStateProps {
 /**
  * EmptyState
  * A premium empty-state component that acts as an invitation to act.
- * Follows SaaSCore design tokens: glassmorphism surface, primary color for the CTA.
+ * Follows Rendo design tokens: glassmorphism surface, primary color for the CTA.
  */
 export function EmptyState({
   icon,

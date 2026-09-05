@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Órdenes de Producción MO & Asientos de Transformación
+﻿/**
+ * Rendo - Motor de Órdenes de Producción MO & Asientos de Transformación
  * 
  * Controla la ejecución de la fabricación: descuenta insumos de materia prima,
  * incrementa el stock del producto terminado y genera el asiento contable de

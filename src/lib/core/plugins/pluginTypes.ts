@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Plugin System Types
+﻿/**
+ * Rendo Plugin System Types
  * Definitions for third-party modules, hooks, and UI extensions.
  */
 

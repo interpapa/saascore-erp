@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Revaluación por Diferencia en Cambio (NIIF 21 / IAS 21)
+﻿/**
+ * Rendo - Motor de Revaluación por Diferencia en Cambio (NIIF 21 / IAS 21)
  * 
  * Calcula y genera los asientos de ajuste por la variación en la tasa oficial
  * de cambio (BCV / Banco Central) sobre partidas monetarias en moneda extranjera (USD/EUR).

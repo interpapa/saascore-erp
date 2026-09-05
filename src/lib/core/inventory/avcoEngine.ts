@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Valoración de Inventario AVCO (Average Costing)
+﻿/**
+ * Rendo - Motor de Valoración de Inventario AVCO (Average Costing)
  * 
  * Recalcula de forma transparente el Costo Promedio Ponderado de cada ítem
  * en el catálogo al recibir recepciones de compra (Purchase Orders) y calcula

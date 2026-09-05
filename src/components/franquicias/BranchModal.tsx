@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { X, Building2, User, Phone, MapPin, AlertTriangle } from 'lucide-react';
@@ -23,7 +23,7 @@ export function BranchModal({ isOpen, onClose, onSuccess }: BranchModalProps) {
   if (!isOpen) return null;
 
   const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || ('owner' as const),
   };
 

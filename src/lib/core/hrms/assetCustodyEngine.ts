@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Custodia de Activos Corporativos (HRMS)
+﻿/**
+ * Rendo - Custodia de Activos Corporativos (HRMS)
  * 
  * Gestiona el control de asignación de activos de la empresa (laptops, vehículos,
  * herramientas, teléfonos) a empleados con registro de estado y fecha de entrega.

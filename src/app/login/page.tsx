@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -135,7 +135,7 @@ export default function LoginPage() {
             {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">
-            {isLogin ? 'Accede a tu cuenta de SaaSCore' : 'Únete a SaaSCore y gestiona tu negocio'}
+            {isLogin ? 'Accede a tu cuenta de Rendo' : 'Únete a Rendo y gestiona tu negocio'}
           </p>
         </div>
 
@@ -236,7 +236,7 @@ export default function LoginPage() {
 
       {/* Marca de agua / Versión */}
       <div className="fixed bottom-6 text-center w-full pointer-events-none">
-        <p className="text-xs font-medium text-slate-400">SaaSCore ERP · Secure Authentication</p>
+        <p className="text-xs font-medium text-slate-400">Rendo · Secure Authentication</p>
       </div>
 
     </div>

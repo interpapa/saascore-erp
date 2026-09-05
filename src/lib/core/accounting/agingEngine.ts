@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Aging Engine (Cuentas por Cobrar AR & Cuentas por Pagar AP)
+﻿/**
+ * Rendo - Aging Engine (Cuentas por Cobrar AR & Cuentas por Pagar AP)
  * 
  * Calcula la antigüedad de saldos vencidos organizados en rangos temporales:
  * - Al día (0 a 30 días)

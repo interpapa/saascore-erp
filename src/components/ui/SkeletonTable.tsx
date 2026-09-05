@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface SkeletonTableProps {
   /** Número de filas simuladas. Default: 5 */
@@ -12,7 +12,7 @@ interface SkeletonTableProps {
 }
 
 /**
- * SkeletonTable — SaaSCore Design System v2
+ * SkeletonTable — Rendo Design System v2
  *
  * Simula una tabla de datos mientras carga.
  * Usa la clase `.skeleton` con shimmer de globals.css.

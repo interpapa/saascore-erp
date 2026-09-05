@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Compras SRM & 3-Way Matching
+﻿/**
+ * Rendo - Motor de Compras SRM & 3-Way Matching
  * 
  * Implementa la validación 3-Way Matching (Orden de Compra + Recibo de Almacén + Factura del Proveedor)
  * para evitar sobre-facturación y pagos no autorizados a proveedores.

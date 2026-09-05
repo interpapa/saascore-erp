@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { Sparkles, X, Send } from 'lucide-react';
 import { useState } from 'react';
@@ -40,7 +40,7 @@ export const AICopilot = () => {
         <div className="h-16 border-b border-border flex items-center justify-between px-6 bg-gradient-to-r from-indigo-500/10 dark:from-indigo-500/5 to-transparent shrink-0">
           <div className="flex items-center gap-2 font-black text-foreground">
             <Sparkles size={18} className="text-indigo-500" />
-            SaaSCore AI Copilot
+            Rendo AI Copilot
           </div>
           <button
             onClick={() => setIsOpen(false)}

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { X, FileText, Building2, DollarSign, AlertTriangle } from 'lucide-react';
@@ -25,7 +25,7 @@ export function PurchaseOrderModal({ isOpen, onClose, onSuccess, suppliers }: Pu
   if (!isOpen) return null;
 
   const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || ('owner' as const),
   };
 

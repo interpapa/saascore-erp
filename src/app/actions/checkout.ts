@@ -1,4 +1,4 @@
-'use server';
+﻿'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { calculateTaxes, LocalizationCode } from '@/lib/core/taxEngine';
@@ -132,7 +132,7 @@ export async function processSecureCheckout(
             tenant_id: tenantId,
             type: 'customer',
             name: 'Cliente de Mostrador',
-            email: 'mostrador@saascore.com',
+            email: 'mostrador@Rendo.com',
             phone: 'N/A',
             tax_id: 'J-GENERICO',
             address: 'Venta de Mostrador',

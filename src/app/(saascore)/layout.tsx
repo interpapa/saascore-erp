@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { ReactNode, useEffect, useState } from 'react';
 import { Crown, Database, ShieldAlert, Activity } from 'lucide-react';
@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useERPStore } from '@/store/useERPStore';
 import { useRouter } from 'next/navigation';
 
-export default function SaaSCoreLayout({ children }: { children: ReactNode }) {
+export default function RendoLayout({ children }: { children: ReactNode }) {
   const { session } = useERPStore();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
@@ -32,7 +32,7 @@ export default function SaaSCoreLayout({ children }: { children: ReactNode }) {
         <div className="p-6 border-b border-white/10">
           <h1 className="text-xl font-black text-rose-500 tracking-tight flex items-center gap-2">
             <Crown size={24} />
-            SaaSCore Hub
+            Rendo Hub
           </h1>
           <p className="text-xs text-slate-400 font-medium mt-1 uppercase tracking-widest">Master Control Panel</p>
         </div>

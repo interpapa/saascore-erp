@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Strict Multi-Tenant Security Guard
+﻿/**
+ * Rendo Strict Multi-Tenant Security Guard
  * 
  * Verifies on the server that an authenticated actor (email) belongs to the
  * requested tenant_id in PostgreSQL before any database mutation or read.

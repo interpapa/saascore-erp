@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useERPStore } from '@/store/useERPStore';
 import { ActionActor } from '@/app/actions/entities';
@@ -11,7 +11,7 @@ export function useActionActor(): ActionActor {
   const { session } = useERPStore();
 
   return {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || 'owner',
   };
 }

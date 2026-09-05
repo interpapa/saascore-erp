@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Plugin Manager
+﻿/**
+ * Rendo Plugin Manager
  * Central registry that loads, enables, and manages third-party ERP plugins.
  */
 

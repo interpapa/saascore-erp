@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Suscripciones Recurrentes & MRR (SaaS/B2B Engine)
+﻿/**
+ * Rendo - Motor de Suscripciones Recurrentes & MRR (SaaS/B2B Engine)
  * 
  * Gestiona contratos recurrentes, ciclo de renovación automático y métricas de
  * Ingreso Recurrente Mensual (MRR - Monthly Recurring Revenue) y Anual (ARR).

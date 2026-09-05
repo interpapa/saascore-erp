@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Trazabilidad por Lotes y Caducidad (FEFO / FIFO)
+﻿/**
+ * Rendo - Motor de Trazabilidad por Lotes y Caducidad (FEFO / FIFO)
  * 
  * Gestiona el rastreo de número de lote, fecha de vencimiento y número de serie
  * recomendando salidas con la estrategia FEFO (First-Expired, First-Out).

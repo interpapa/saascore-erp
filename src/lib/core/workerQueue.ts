@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Asynchronous Worker Queue
+﻿/**
+ * Rendo - Asynchronous Worker Queue
  * 
  * Encola tareas pesadas o no críticas (notificaciones, auditorías secundarias,
  * reportes, dispatch de webhooks) para ejecutarlas en segundo plano sin

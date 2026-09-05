@@ -1,5 +1,5 @@
-/**
- * Motor de Auditoría — SaaSCore ERP
+﻿/**
+ * Motor de Auditoría — Rendo
  * 
  * Registra todas las operaciones críticas (ventas, nóminas, anulaciones)
  * con trazabilidad completa: quién, qué, cuándo y desde dónde.

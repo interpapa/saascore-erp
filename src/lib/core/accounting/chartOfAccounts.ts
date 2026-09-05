@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Plan Contable Jerárquico (Chart of Accounts - NIIF / IFRS)
+﻿/**
+ * Rendo - Plan Contable Jerárquico (Chart of Accounts - NIIF / IFRS)
  * 
  * Estructura estándar de cuentas contables organizada por niveles jerárquicos:
  * 1. Activo (1.1 Corriente, 1.2 No Corriente)

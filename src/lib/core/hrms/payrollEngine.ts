@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Nómina Localizada & Asientos Contables (HRMS - GDPR)
+﻿/**
+ * Rendo - Motor de Nómina Localizada & Asientos Contables (HRMS - GDPR)
  * 
  * Gestiona el cálculo de nómina (sueldos base, bonos, retenciones legales)
  * y genera automáticamente el asiento contable de gasto salarial NIIF.

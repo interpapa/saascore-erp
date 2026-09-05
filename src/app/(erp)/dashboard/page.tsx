@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect } from 'react';
 import { useAuth } from '@/components/core/AuthProvider';
@@ -131,7 +131,7 @@ export default function LauncherPage() {
     },
     { 
       id: 'admin', 
-      name: 'SaaSCore Hub', 
+      name: 'Rendo Hub', 
       href: '/admin',
       gradient: 'from-rose-400 to-pink-600',
       icon: <ShieldCheck className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
@@ -167,7 +167,7 @@ export default function LauncherPage() {
             <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center border border-primary/20 shadow-xs shrink-0">
               <Sparkles className="w-5 h-5 text-primary" />
             </div>
-            <span className="text-3xl font-black text-foreground">SaaSCore OS</span>
+            <span className="text-3xl font-black text-foreground">Rendo OS</span>
           </h1>
           <p className="text-sm text-slate-500 font-medium mt-1 font-sans">
             {currentTenant?.name || 'Configurando tu empresa...'}
@@ -226,7 +226,7 @@ export default function LauncherPage() {
 
       {/* Footer */}
       <div className="mt-auto pt-16 text-center border-t border-border/40">
-        <p className="text-slate-500 text-xs font-semibold tracking-widest uppercase font-sans">SaaSCore OS v3.0 · Modular Enterprise Engine</p>
+        <p className="text-slate-500 text-xs font-semibold tracking-widest uppercase font-sans">Rendo OS v3.0 · Modular Enterprise Engine</p>
       </div>
 
     </div>

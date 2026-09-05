@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -68,7 +68,7 @@ export default function ContabilidadPage() {
   const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
 
   const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || ('owner' as const),
   };
 

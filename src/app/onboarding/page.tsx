@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -38,7 +38,7 @@ export default function OnboardingPage() {
     const formData = new FormData(e.currentTarget);
     const businessName = formData.get('businessName') as string;
 
-    const result = await createTenant(userId, userEmail || 'admin@saascore.com', businessName);
+    const result = await createTenant(userId, userEmail || 'admin@Rendo.com', businessName);
 
     if (result.success && result.tenant) {
       setCurrentTenant({
@@ -48,7 +48,7 @@ export default function OnboardingPage() {
       });
       
       setSession({
-        userEmail: userEmail || 'user@saascore.com',
+        userEmail: userEmail || 'user@Rendo.com',
         role: 'owner',
         tenantId: result.tenant.id
       });
@@ -70,7 +70,7 @@ export default function OnboardingPage() {
         
         <h1 className="text-2xl font-bold text-center mb-2">Configura tu Empresa</h1>
         <p className="text-slate-500 text-center mb-8">
-          Para empezar a usar SaaSCore, necesitamos el nombre de tu negocio o taller.
+          Para empezar a usar Rendo, necesitamos el nombre de tu negocio o taller.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">

@@ -1,4 +1,4 @@
-import fs from 'fs';
+﻿import fs from 'fs';
 import path from 'path';
 
 // Setup file logger
@@ -57,7 +57,7 @@ try {
 
 const TEST_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 const TEST_ACTOR: ActionActor = {
-  email: 'tester@saascore.local',
+  email: 'tester@Rendo.local',
   role: 'owner',
 };
 

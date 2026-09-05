@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef } from 'react';
 import { X, Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
@@ -27,7 +27,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
   const { session } = useERPStore();
 
   const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || ('owner' as const),
   };
 

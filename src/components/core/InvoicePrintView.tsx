@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useMemo } from 'react';
 import { Printer, ShieldCheck, FileText, X } from 'lucide-react';
@@ -75,7 +75,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
             {/* Header */}
             <div className="flex justify-between items-start border-b border-slate-800/80 pb-6 print:border-black">
               <div>
-                <h1 className="text-2xl font-black text-white print:text-black tracking-tight">SaaSCORE ERP</h1>
+                <h1 className="text-2xl font-black text-white print:text-black tracking-tight">Rendo</h1>
                 <p className="text-xs text-slate-400 print:text-gray-600 mt-1">Comprobante Fiscal Inmutable</p>
                 <p className="text-xs font-mono text-slate-500 print:text-gray-500 mt-0.5">
                   Localización: {metadata.localization || 'VE'}
@@ -178,7 +178,7 @@ export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
         ) : (
           <div id="printable-invoice" className="font-mono text-[10px] text-slate-200 print:text-black space-y-3 p-2 mx-auto">
             <div className="text-center pb-2 border-b border-dashed border-slate-600 print:border-black">
-              <h1 className="text-sm font-black uppercase tracking-wider">SaaSCORE ERP</h1>
+              <h1 className="text-sm font-black uppercase tracking-wider">Rendo</h1>
               <p className="mt-1">Comprobante Fiscal</p>
               <p className="mt-0.5">Factura: {doc.document_number}</p>
               <p>Fecha: {printedDate.toLocaleString()}</p>

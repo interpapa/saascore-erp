@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -24,7 +24,7 @@ const ROUTE_LABELS: Record<string, string> = {
   franquicias:  'Franquicias',
   integraciones:'Conexiones',
   configuracion:'Ajustes',
-  admin:        'SaaSCore Hub',
+  admin:        'Rendo Hub',
   billing:      'Facturación',
   onboarding:   'Onboarding',
   apps:         'Marketplace',

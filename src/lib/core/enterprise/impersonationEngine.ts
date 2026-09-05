@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Herramienta de Impersonación de Usuarios ("Modo Dios" de Soporte)
+﻿/**
+ * Rendo - Herramienta de Impersonación de Usuarios ("Modo Dios" de Soporte)
  * 
  * Permite al equipo de soporte técnico/superadmin iniciar sesión temporal como
  * cualquier usuario específico para visualizar el ERP con sus permisos exactos

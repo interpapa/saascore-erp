@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Portal B2B Token Resolver Engine
+﻿/**
+ * Rendo - Portal B2B Token Resolver Engine
  * 
  * Genera tokens seguros de autoservicio para que los clientes finales puedan
  * consultar sus estados de cuenta y facturas descargables en `/portal/[token]`.

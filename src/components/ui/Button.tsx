@@ -1,4 +1,4 @@
-import React, { ButtonHTMLAttributes, forwardRef } from 'react';
+﻿import React, { ButtonHTMLAttributes, forwardRef } from 'react';
 import { Loader2 } from 'lucide-react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
@@ -16,7 +16,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 /**
- * Button — SaaSCore Design System v2
+ * Button — Rendo Design System v2
  *
  * Jerarquía clara con sombras semánticas (sombra con color del botón).
  * Touch targets: sm=32px, md=44px (iOS HIG), lg=48px.

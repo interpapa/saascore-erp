@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -51,7 +51,7 @@ function CajaPageContent() {
 
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('saascore_pos_cart');
+      const stored = localStorage.getItem('Rendo_pos_cart');
       if (stored) {
         setTicketLines(JSON.parse(stored));
       }
@@ -83,7 +83,7 @@ function CajaPageContent() {
   }, [amountParam, descParam]);
 
   useEffect(() => {
-    localStorage.setItem('saascore_pos_cart', JSON.stringify(ticketLines));
+    localStorage.setItem('Rendo_pos_cart', JSON.stringify(ticketLines));
   }, [ticketLines]);
 
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'mixed'>('cash');
@@ -222,7 +222,7 @@ function CajaPageContent() {
         : selectedCustomer;
 
       const actor = {
-        email: session?.userEmail || 'admin@saascore.com',
+        email: session?.userEmail || 'admin@Rendo.com',
         role: session?.role || ('owner' as const),
       };
 
@@ -311,7 +311,7 @@ function CajaPageContent() {
       } else {
         const cartPayload = ticketLines.map((l) => ({ itemId: l.item.id, quantity: l.quantity }));
         const actor = {
-          email: session?.userEmail || 'admin@saascore.com',
+          email: session?.userEmail || 'admin@Rendo.com',
           role: session?.role || ('owner' as const),
         };
 

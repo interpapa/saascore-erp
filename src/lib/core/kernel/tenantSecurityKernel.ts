@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Kernel - Security & Multi-Tenant Guard
+﻿/**
+ * Rendo Kernel - Security & Multi-Tenant Guard
  * 
  * Capa inmutable del nÃºcleo para validaciÃ³n de acceso multi-tenant y RBAC.
  */

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { Rocket, Upload, CheckCircle2 } from 'lucide-react';
@@ -6,13 +6,13 @@ import { Rocket, Upload, CheckCircle2 } from 'lucide-react';
 export default function OnboardingWizard() {
   const [isVisible, setIsVisible] = useState(() => {
     if (typeof window !== 'undefined') {
-      return !localStorage.getItem('saascore_onboarding_completed');
+      return !localStorage.getItem('Rendo_onboarding_completed');
     }
     return false;
   });
   const [step, setStep] = useState(1);
   const handleComplete = () => {
-    localStorage.setItem('saascore_onboarding_completed', 'true');
+    localStorage.setItem('Rendo_onboarding_completed', 'true');
     setIsVisible(false);
   };
 
@@ -35,7 +35,7 @@ export default function OnboardingWizard() {
           
           {step === 1 && (
             <div className="text-center animate-in fade-in slide-in-from-right-4">
-              <h2 className="text-2xl font-black text-slate-800 mb-2">Bienvenido a SaaSCore</h2>
+              <h2 className="text-2xl font-black text-slate-800 mb-2">Bienvenido a Rendo</h2>
               <p className="text-slate-600 dark:text-slate-400 mb-8">Estás a punto de modernizar tu negocio. Personalicemos tu instancia antes de comenzar.</p>
               
               <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 mb-8 hover:bg-background transition-colors cursor-pointer group">

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { ClientModal } from '@/components/clients/ClientModal';
@@ -36,7 +36,7 @@ export default function ClientesPage() {
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || ('owner' as const),
   };
 

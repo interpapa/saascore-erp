@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Kernel - Dynamic Metadata & UDF Registry
+﻿/**
+ * Rendo Kernel - Dynamic Metadata & UDF Registry
  * 
  * Permite registrar y validar esquemas dinámicos de campos personalizados (UDFs)
  * por tenant en la columna JSONB `metadata` sin alterar la estructura física de PostgreSQL.

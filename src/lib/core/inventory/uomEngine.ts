@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Conversión de Unidades de Medida (UoM Engine - ISO 9001)
+﻿/**
+ * Rendo - Motor de Conversión de Unidades de Medida (UoM Engine - ISO 9001)
  * 
  * Permite comprar en unidades mayores (ej. "Caja x 24", "Pallet x 500")
  * y vender en unidades individuales ("Unidades", "Kilos", "Litros") con conversión

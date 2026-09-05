@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Dual-Currency Engine
+﻿/**
+ * Rendo Dual-Currency Engine
  * 
  * Provides real-time exchange rate management, multi-currency conversions using Decimal.js,
  * and immutable historical rate sealing for transactions.

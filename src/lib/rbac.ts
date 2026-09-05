@@ -1,5 +1,5 @@
-// ═══════════════════════════════════════════════════
-//  SaaSCore React: Control de Acceso Basado en Roles
+﻿// ═══════════════════════════════════════════════════
+//  Rendo React: Control de Acceso Basado en Roles
 // ═══════════════════════════════════════════════════
 
 export type UserRole = 'superadmin' | 'owner' | 'manager' | 'technician' | 'seller';
@@ -11,7 +11,7 @@ export interface RBACPolicy {
 }
 
 export const defaultRoles: Record<UserRole, RBACPolicy> = {
-  'superadmin': { role: 'superadmin', name: 'Arquitecto SaaSCore', permissions: '*' }, // Dios
+  'superadmin': { role: 'superadmin', name: 'Arquitecto Rendo', permissions: '*' }, // Dios
   'owner': { role: 'owner', name: 'Dueño (Full Access)', permissions: '*' }, // Administrador del Negocio
   'manager': { role: 'manager', name: 'Gerente', permissions: ['crm', 'finanzas', 'inventario', 'registros', 'equipo', 'reportes'] },
   'technician': { role: 'technician', name: 'Técnico / Operativo', permissions: ['registros', 'inventario'] },

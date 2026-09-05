@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import { LayoutGrid, List } from 'lucide-react';
@@ -14,7 +14,7 @@ interface ViewToggleProps {
 }
 
 /**
- * ViewToggle — SaaSCore Design System v2
+ * ViewToggle — Rendo Design System v2
  *
  * Toggle reutilizable Grid / Lista.
  * Persiste la preferencia en localStorage por módulo (storageKey).

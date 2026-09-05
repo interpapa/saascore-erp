@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP Kernel - Plugin Execution Sandbox
+﻿/**
+ * Rendo Kernel - Plugin Execution Sandbox
  * 
  * Envoltorio aislado que ejecuta funciones o hooks de plugins con tolerancia a fallos.
  * Si un plugin de terceros lanza un error o timeout, el Kernel captura la excepción

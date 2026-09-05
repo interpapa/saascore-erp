@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { 
@@ -65,7 +65,7 @@ export default function AppsManagerPage() {
     { id: 'franquicias', name: 'Franquicias & Sedes', category: 'administracion', icon: Building2, gradient: 'from-cyan-500 to-blue-600', description: 'Control de múltiples locales, sucursales y consolidación de ingresos.' },
     { id: 'integraciones', name: 'Integraciones & APIs', category: 'administracion', icon: PlugZap, gradient: 'from-fuchsia-500 to-pink-600', description: 'Conexión con Stripe, WhatsApp Meta API y Google Calendar.' },
     { id: 'config', name: 'Ajustes del Sistema', category: 'administracion', icon: Settings, gradient: 'from-slate-500 to-slate-700', description: 'Datos del negocio, logotipo y moneda principal.', isCore: true },
-    { id: 'admin', name: 'SaaSCore Hub', category: 'administracion', icon: Crown, gradient: 'from-pink-500 to-rose-600', description: 'Consola global de administración del software SaaS.', isCore: true },
+    { id: 'admin', name: 'Rendo Hub', category: 'administracion', icon: Crown, gradient: 'from-pink-500 to-rose-600', description: 'Consola global de administración del software SaaS.', isCore: true },
   ];
 
   const handleToggleModule = async (moduleId: string) => {

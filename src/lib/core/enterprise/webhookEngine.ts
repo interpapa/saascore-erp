@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Gestor de Webhooks de Salida & API Keys (Developer Portal)
+﻿/**
+ * Rendo - Gestor de Webhooks de Salida & API Keys (Developer Portal)
  * 
  * Emite notificaciones HTTP POST transaccionales hacia endpoints externos configurados
  * por el cliente (Zapier, Make, n8n, e-commerce) ante eventos del sistema.
@@ -56,8 +56,8 @@ export async function dispatchOutboundWebhook(
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-SaaSCore-Signature': sub.secretKey,
-          'X-SaaSCore-Event': eventName,
+          'X-Rendo-Signature': sub.secretKey,
+          'X-Rendo-Event': eventName,
         },
         body: JSON.stringify({
           event: eventName,

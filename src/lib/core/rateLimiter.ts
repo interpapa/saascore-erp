@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Rate Limiting & Throttling Guard
+﻿/**
+ * Rendo - Rate Limiting & Throttling Guard
  * 
  * Protege los Server Actions contra ataques de fuerza bruta, spam y DDoS.
  * Implementa el algoritmo de Token Bucket / Sliding Window en memoria por actor/IP.

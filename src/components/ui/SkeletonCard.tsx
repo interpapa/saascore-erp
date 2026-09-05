@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 interface SkeletonCardProps {
   /** Número de líneas de texto simuladas. Default: 3 */
@@ -12,7 +12,7 @@ interface SkeletonCardProps {
 }
 
 /**
- * SkeletonCard — SaaSCore Design System v2
+ * SkeletonCard — Rendo Design System v2
  *
  * Reemplaza spinners genéricos con un esqueleto animado
  * que dibuja la forma del contenido que va a aparecer.

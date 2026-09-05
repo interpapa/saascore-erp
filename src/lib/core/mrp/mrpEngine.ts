@@ -1,5 +1,5 @@
-/**
- * SaaSCore ERP - Motor de Manufactura MES & MRP (Bill of Materials - BOM)
+﻿/**
+ * Rendo - Motor de Manufactura MES & MRP (Bill of Materials - BOM)
  * 
  * Gestiona las recetas de fabricación (BOM), la explosión automática de materiales
  * requeridos y la verificación de disponibilidad de insumos en inventario.

@@ -1,9 +1,9 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 
 /**
- * AmbientBackground — SaaSCore Design System
+ * AmbientBackground — Rendo Design System
  * 
  * Restored organic colorful vibe with higher saturation and opacity
  * to prevent the background from looking flat white in light mode.

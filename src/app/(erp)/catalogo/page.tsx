@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
@@ -40,7 +40,7 @@ export default function CatalogoPage() {
   const router = useRouter();
 
   const actor = {
-    email: session?.userEmail || 'admin@saascore.com',
+    email: session?.userEmail || 'admin@Rendo.com',
     role: session?.role || ('owner' as const),
   };
 
