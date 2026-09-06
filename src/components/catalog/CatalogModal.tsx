@@ -38,6 +38,11 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
     const formData = new FormData(e.currentTarget);
     const basePrice = Number(formData.get('base_price') || 0);
 
+    const isGroupSession = formData.get('is_group_session') === 'on';
+    const durationMinutes = Number(formData.get('duration_minutes') || 30);
+    const maxCapacity = Number(formData.get('max_capacity') || 1);
+    const bufferTimeMinutes = Number(formData.get('buffer_time_minutes') || 0);
+
     const itemData: CreateItemInput = {
       type: itemType,
       name: formData.get('name') as string,
@@ -48,7 +53,11 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
       cost: 0,
       stock_quantity: itemType === 'product' ? Number(formData.get('stock_quantity') || 0) : 0,
       metadata: {
-        unit_of_measure: (formData.get('unit_of_measure') as string) || 'unidad'
+        unit_of_measure: (formData.get('unit_of_measure') as string) || 'unidad',
+        duration_minutes: durationMinutes,
+        is_group_session: isGroupSession,
+        max_capacity: maxCapacity,
+        buffer_time_minutes: bufferTimeMinutes
       },
       is_active: true
     };
@@ -182,6 +191,53 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
                   <option value="kilogramo">⚖️ Kilogramo</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          {/* Mostrar campos de servicio si es servicio */}
+          <div className={`transition-all duration-300 overflow-hidden space-y-4 ${itemType === 'service' ? 'opacity-100' : 'max-h-0 opacity-0 pointer-events-none hidden'}`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                name="duration_minutes"
+                label="Duración (minutos) *"
+                type="number"
+                min="5"
+                placeholder="Ej. 30"
+                defaultValue={editItem?.metadata?.duration_minutes ?? '30'}
+              />
+              <Input
+                name="buffer_time_minutes"
+                label="Tiempo de limpieza extra (minutos)"
+                type="number"
+                min="0"
+                placeholder="Ej. 10"
+                defaultValue={editItem?.metadata?.buffer_time_minutes ?? '0'}
+              />
+            </div>
+            
+            <div className="flex items-center gap-3 p-4 border border-border rounded-xl bg-slate-50 dark:bg-slate-800/20">
+               <input 
+                 type="checkbox" 
+                 name="is_group_session" 
+                 id="is_group_session"
+                 className="w-5 h-5 rounded border-slate-300 text-fuchsia-500 focus:ring-fuchsia-500" 
+                 defaultChecked={editItem?.metadata?.is_group_session === true} 
+               />
+               <div className="flex-1">
+                  <label htmlFor="is_group_session" className="text-sm font-bold block cursor-pointer">¿Es una clase o sesión grupal?</label>
+                  <span className="text-xs text-slate-500 block mt-1">Actívalo para permitir que múltiples clientes agenden a la misma hora.</span>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              <Input
+                name="max_capacity"
+                label="Cupo máximo de personas por sesión"
+                type="number"
+                min="1"
+                placeholder="Ej. 15"
+                defaultValue={editItem?.metadata?.max_capacity ?? '1'}
+              />
             </div>
           </div>
 

@@ -6,6 +6,13 @@ export type AppointmentStatus =
   | 'cancelled'
   | 'no_show';
 
+export interface TimeInterval {
+  start: string; // HH:mm
+  end: string;   // HH:mm
+}
+
+export type WorkingHours = Record<string, TimeInterval[]>;
+
 export interface Service {
   id: string;
   tenant_id: string;
@@ -16,6 +23,9 @@ export interface Service {
   category?: string | null;
   color?: string | null;
   is_active: boolean;
+  is_group_session?: boolean;
+  max_capacity?: number;
+  buffer_time_minutes?: number;
   metadata?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;

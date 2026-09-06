@@ -29,6 +29,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     roleTitle: 'Especialista',
     baseSalary: 450,
     bookable: true,
+    avatarUrl: '',
   };
   
   const [form, setForm] = useState(defaultForm);
@@ -47,19 +48,17 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       phone: emp.phone || '',
       roleTitle: (emp.metadata?.role_title as string) || 'Empleado',
       baseSalary: Number(emp.metadata?.base_salary) || 0,
-      bookable: emp.metadata?.bookable !== false, // Defaults to true if undefined
+      bookable: emp.metadata?.bookable !== false,
+      avatarUrl: (emp.metadata?.avatar_url as string) || '',
     });
     setIsModalOpen(true);
   };
 
-  const handleSaveEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSaveEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
-
+    setIsSaving(true);
+    
     try {
-      setIsSaving(true);
-      let res;
-      
       const payload = {
         name: form.name,
         email: form.email || null,
@@ -67,7 +66,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
         metadata: {
           role_title: form.roleTitle,
           base_salary: Number(form.baseSalary),
-          bookable: form.bookable,
+          bookable: form.bookable, avatar_url: form.avatarUrl,
         },
       };
 
@@ -137,11 +136,15 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 onClick={() => openEditModal(emp)}
                 className="bg-card border border-border rounded-2xl p-5 shadow-xs hover:border-indigo-500/50 hover:shadow-md transition-all space-y-4 cursor-pointer group"
               >
-                <div className="flex items-start justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base border border-indigo-500/20 group-hover:scale-105 transition-transform">
-                    {emp.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-base border border-indigo-500/20 group-hover:scale-105 transition-transform overflow-hidden">
+                      {emp.metadata?.avatar_url ? (
+                        <img src={emp.metadata.avatar_url as string} alt={emp.name} className="w-full h-full object-cover" />
+                      ) : (
+                        emp.name.slice(0, 2).toUpperCase()
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
                     <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                       Activo
                     </span>
@@ -242,6 +245,14 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                   placeholder="450"
                 />
               </div>
+
+              <Input
+                label="Foto de Perfil (URL)"
+                type="url"
+                value={form.avatarUrl}
+                onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
+                placeholder="https://ejemplo.com/foto.jpg"
+              />
 
               <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
                 <div className="flex-1">
