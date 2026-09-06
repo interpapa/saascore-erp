@@ -8,6 +8,7 @@ import { useToast } from '@/components/core/ToastProvider';
 import { Users, Plus, Briefcase, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { EmployeeScheduleEditor, defaultWorkingHours, WorkingHours } from './EmployeeScheduleEditor';
 
 interface EmployeeDirectoryTabProps {
   employees: Entity[];
@@ -30,6 +31,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     baseSalary: 450,
     bookable: true,
     avatarUrl: '',
+    workingHours: defaultWorkingHours as WorkingHours,
   };
   
   const [form, setForm] = useState(defaultForm);
@@ -50,6 +52,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       baseSalary: Number(emp.metadata?.base_salary) || 0,
       bookable: emp.metadata?.bookable !== false,
       avatarUrl: (emp.metadata?.avatar_url as string) || '',
+      workingHours: (emp.metadata?.working_hours as WorkingHours) || defaultWorkingHours,
     });
     setIsModalOpen(true);
   };
@@ -66,7 +69,9 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
         metadata: {
           role_title: form.roleTitle,
           base_salary: Number(form.baseSalary),
-          bookable: form.bookable, avatar_url: form.avatarUrl,
+          bookable: form.bookable, 
+          avatar_url: form.avatarUrl,
+          working_hours: form.workingHours,
         },
       };
 
@@ -199,7 +204,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       {/* Modal Nuevo/Editar Empleado */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+          <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold text-foreground mb-4">
               {editingId ? 'Ficha Técnica del Empleado' : 'Registrar Nuevo Empleado'}
             </h3>
@@ -252,6 +257,11 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 value={form.avatarUrl}
                 onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
                 placeholder="https://ejemplo.com/foto.jpg"
+              />
+
+              <EmployeeScheduleEditor 
+                value={form.workingHours} 
+                onChange={(wh) => setForm({ ...form, workingHours: wh })} 
               />
 
               <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
