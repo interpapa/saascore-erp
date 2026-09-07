@@ -45,12 +45,15 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
     .eq('type', 'employee')
     .eq('status', 'active');
 
-  const employees = (employeesData || []).map(e => ({
-    id: e.id,
-    name: e.name,
-    role: e.metadata?.role || 'Profesional',
-    is_active: e.status === 'active'
-  }));
+  const employees = (employeesData || [])
+    .filter(e => e.metadata?.bookable !== false)
+    .map(e => ({
+      id: e.id,
+      name: e.name,
+      role: e.metadata?.role_title || e.metadata?.role || 'Profesional',
+      is_active: e.status === 'active',
+      metadata: e.metadata
+    }));
 
   return <BookingClient tenant={tenant} employees={employees} />;
 }

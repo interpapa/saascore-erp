@@ -5,24 +5,37 @@ import { ArrowLeft, Scissors, Clock, Calendar, User, ChevronRight } from 'lucide
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
 
 type Tenant = { id: string, name: string, metadata?: any };
-type Employee = { id: string, name: string, role: string, is_active: boolean };
+type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
 
-const GENERATE_DATES = (openDays: number[]) => {
+const GENERATE_DATES = (openDays: number[], barber?: Employee | null) => {
   const dates = [];
   const today = new Date();
-  const dayNames = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+  const dayNames = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
+  const mappingDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  
   let attempts = 0;
   
   while (dates.length < 14 && attempts < 60) {
     const d = new Date(today);
     d.setDate(today.getDate() + attempts);
     
-    if (openDays.includes(d.getDay())) {
+    // Check if store is open
+    let isWorkingDay = openDays.includes(d.getDay());
+
+    // If barber is selected, check if they have shifts that day
+    if (barber && barber.metadata?.working_hours) {
+      const dayKey = mappingDays[d.getDay()];
+      const shifts = barber.metadata.working_hours[dayKey] || [];
+      isWorkingDay = shifts.length > 0;
+    }
+    
+    if (isWorkingDay) {
       dates.push({
         dateObj: d,
         dayName: attempts === 0 ? 'HOY' : dayNames[d.getDay()],
         dayNum: d.getDate(),
-        fullDate: d.toISOString().split('T')[0]
+        fullDate: d.toISOString().split('T')[0],
+        dayKey: mappingDays[d.getDay()]
       });
     }
     attempts++;
@@ -49,14 +62,30 @@ const formatTime = (minutes: number) => {
   };
 };
 
-const GENERATE_TIMES = (start: string, end: string, interval: number) => {
+const GENERATE_TIMES = (
+  globalStart: string, 
+  globalEnd: string, 
+  interval: number, 
+  shifts?: {start: string, end: string}[]
+) => {
   const times = [];
-  const startMins = parseTime(start);
-  const endMins = parseTime(end);
   
-  for (let m = startMins; m < endMins; m += interval) {
-    times.push(formatTime(m));
+  if (shifts && shifts.length > 0) {
+    for (const shift of shifts) {
+      const startMins = parseTime(shift.start);
+      const endMins = parseTime(shift.end);
+      for (let m = startMins; m < endMins; m += interval) {
+        times.push(formatTime(m));
+      }
+    }
+  } else {
+    const startMins = parseTime(globalStart);
+    const endMins = parseTime(globalEnd);
+    for (let m = startMins; m < endMins; m += interval) {
+      times.push(formatTime(m));
+    }
   }
+  
   return times;
 };
 
@@ -76,10 +105,28 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
   const [step, setStep] = useState(1);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   
-  const dates = GENERATE_DATES(settings.openDays);
-  const allTimes = GENERATE_TIMES(settings.startHour, settings.endHour, settings.intervalMinutes);
+  const dates = GENERATE_DATES(settings.openDays, selectedBarber);
   
+  // Re-adjust selected date if current selection is invalid for new barber
   const [selectedDate, setSelectedDate] = useState(dates.length > 0 ? dates[0].fullDate : '');
+  
+  useEffect(() => {
+    if (dates.length > 0 && !dates.find(d => d.fullDate === selectedDate)) {
+      setSelectedDate(dates[0].fullDate);
+    }
+  }, [dates, selectedDate]);
+
+  const currentDayObj = dates.find(d => d.fullDate === selectedDate);
+  const currentDayKey = currentDayObj ? currentDayObj.dayKey : 'monday';
+  const shifts = selectedBarber?.metadata?.working_hours?.[currentDayKey];
+
+  const allTimes = GENERATE_TIMES(
+    settings.startHour, 
+    settings.endHour, 
+    settings.intervalMinutes,
+    shifts
+  );
+  
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [isLoadingTimes, setIsLoadingTimes] = useState(false);
@@ -195,10 +242,19 @@ export default function BookingClient({ tenant, employees }: { tenant: Tenant, e
                   <button
                     key={barber.id}
                     onClick={() => handleBarberSelect(barber)}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[#0B3B24]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col"
+                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[#0B3B24]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
                   >
-                    <div className="bg-[#eaf4ed] p-6 relative w-full">
-                      <h2 className="text-xl md:text-2xl font-black text-[#0B3B24]">{barber.name}</h2>
+                    <div className="bg-[#eaf4ed] p-6 relative w-full flex items-center justify-between">
+                      <div>
+                        <h2 className="text-xl md:text-2xl font-black text-[#0B3B24]">{barber.name}</h2>
+                      </div>
+                      {barber.metadata?.avatar_url ? (
+                        <img src={barber.metadata.avatar_url} alt={barber.name} className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-sm" />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-white/50 flex items-center justify-center border-4 border-white shadow-sm">
+                          <span className="text-xl font-black text-[#0B3B24]">{barber.name.slice(0,2).toUpperCase()}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="p-4 flex items-center justify-between w-full bg-white">
                       <div className="flex items-center gap-2 text-slate-500">
