@@ -14,14 +14,18 @@ import {
   XCircle,
   AlertCircle,
   Check,
+  Users
 } from 'lucide-react';
 import { Appointment, AppointmentStatus } from '@/types/calendario';
+import { Entity } from '@/lib/api/entities';
 
 export interface AppointmentDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
   appointment: Appointment | null;
   onUpdateStatus: (id: string, status: AppointmentStatus) => Promise<void>;
+  clients?: Entity[];
+  onUpdateMetadata?: (id: string, metadata: Record<string, any>) => Promise<void>;
 }
 
 const STATUS_CONFIG: Record<
@@ -85,10 +89,49 @@ export function AppointmentDetailsModal({
   onClose,
   appointment,
   onUpdateStatus,
+  clients = [],
+  onUpdateMetadata,
 }: AppointmentDetailsModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [selectedClientToAdd, setSelectedClientToAdd] = useState('');
 
   if (!isOpen || !appointment) return null;
+
+  const isGroupClass = appointment.metadata?.is_group_class === true;
+  const attendees = (appointment.metadata?.attendees as Array<{ id: string; name: string }>) || [];
+  const maxCapacity = (appointment.metadata?.max_capacity as number) || 10;
+
+  const handleAddAttendee = async () => {
+    if (!selectedClientToAdd || !onUpdateMetadata) return;
+    const client = clients.find(c => c.id === selectedClientToAdd);
+    if (!client) return;
+
+    if (attendees.some(a => a.id === client.id)) return;
+
+    const newAttendees = [...attendees, { id: client.id, name: client.name }];
+    try {
+      setIsUpdating(true);
+      await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: newAttendees });
+      setSelectedClientToAdd('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleRemoveAttendee = async (clientId: string) => {
+    if (!onUpdateMetadata) return;
+    const newAttendees = attendees.filter(a => a.id !== clientId);
+    try {
+      setIsUpdating(true);
+      await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: newAttendees });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const cfg = STATUS_CONFIG[appointment.status] || STATUS_CONFIG.scheduled;
 
@@ -147,10 +190,12 @@ export function AppointmentDetailsModal({
                 </div>
               )}
 
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                <User size={14} className="text-slate-400 shrink-0" />
-                <span>Cliente: <strong className="text-foreground">{appointment.client_name || 'General'}</strong></span>
-              </div>
+              {!isGroupClass && (
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <User size={14} className="text-slate-400 shrink-0" />
+                  <span>Cliente: <strong className="text-foreground">{appointment.client_name || 'General'}</strong></span>
+                </div>
+              )}
 
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                 <Briefcase size={14} className="text-slate-400 shrink-0" />
@@ -173,9 +218,73 @@ export function AppointmentDetailsModal({
                 </p>
               </div>
             )}
-          </div>
+            </div>
 
-          {/* Quick Actions (Status Transitions) */}
+            {/* Attendees Section for Group Classes */}
+            {isGroupClass && (
+              <div className="bg-fuchsia-50/50 dark:bg-fuchsia-900/10 border border-fuchsia-100 dark:border-fuchsia-800/30 p-4 rounded-2xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 flex items-center gap-2">
+                    <Users size={16} /> Alumnos Inscritos
+                  </h4>
+                  <span className="text-xs font-semibold px-2 py-1 bg-white dark:bg-slate-900 rounded-md border border-slate-200">
+                    {attendees.length} / {maxCapacity}
+                  </span>
+                </div>
+
+                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                  {attendees.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-4 bg-white/50 rounded-xl border border-dashed border-slate-300">
+                      No hay alumnos inscritos en esta clase.
+                    </p>
+                  ) : (
+                    attendees.map(a => (
+                      <div key={a.id} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 shadow-sm">
+                        <span className="text-sm font-semibold text-foreground">{a.name}</span>
+                        <button
+                          disabled={isUpdating}
+                          onClick={() => handleRemoveAttendee(a.id)}
+                          className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                          title="Remover alumno"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {attendees.length < maxCapacity ? (
+                  <div className="flex items-center gap-2 pt-2 border-t border-fuchsia-200/50">
+                    <select
+                      value={selectedClientToAdd}
+                      onChange={(e) => setSelectedClientToAdd(e.target.value)}
+                      className="flex-1 px-3 py-2 text-xs rounded-xl border border-slate-200 bg-white dark:bg-slate-900 focus:outline-none focus:border-fuchsia-300"
+                    >
+                      <option value="">-- Seleccionar Alumno --</option>
+                      {clients.filter(c => !attendees.some(a => a.id === c.id)).map(c => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      disabled={isUpdating || !selectedClientToAdd}
+                      onClick={handleAddAttendee}
+                      className="px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold transition-colors"
+                    >
+                      Añadir
+                    </button>
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-fuchsia-200/50">
+                    <p className="text-xs text-rose-500 font-bold text-center">
+                      La clase ha alcanzado su capacidad máxima ({maxCapacity}).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quick Actions (Status Transitions) */}
           <div className="space-y-2">
             <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Cambiar Estado</h5>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">

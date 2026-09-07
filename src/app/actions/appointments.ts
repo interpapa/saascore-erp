@@ -302,6 +302,56 @@ export async function createAppointmentAction(
 /**
  * Updates appointment status with fallback to 'documents' table.
  */
+export async function updateAppointmentMetadataAction(
+  id: string,
+  metadata: Record<string, any>,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    const { error } = await supabaseAdmin
+      .from('appointments')
+      .update({ metadata })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      // Fallback
+      if (error.code === '42P01') {
+        const { error: docError } = await supabaseAdmin
+          .from('documents')
+          .update({ metadata })
+          .eq('id', id)
+          .eq('tenant_id', tenantId);
+        if (docError) throw docError;
+      } else {
+        throw error;
+      }
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_id: actor.userId,
+      action: 'UPDATE',
+      table_name: 'appointments',
+      record_id: id,
+      new_values: { metadata },
+    });
+
+    return { success: true };
+  } catch (err: unknown) {
+    console.error('[updateAppointmentMetadataAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 export async function updateAppointmentStatusAction(
   id: string,
   status: AppointmentStatus,

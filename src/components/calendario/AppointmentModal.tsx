@@ -47,6 +47,7 @@ export function AppointmentModal({
   const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [isGroupClass, setIsGroupClass] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -79,6 +80,9 @@ export function AppointmentModal({
       if (!title || title === s.name) setTitle(s.name);
       if (s.duration_minutes) setDurationMinutes(s.duration_minutes);
       if (s.price !== undefined) setPrice(s.price);
+      
+      const isGroup = !!s.metadata?.is_group_session;
+      setIsGroupClass(isGroup);
     }
   };
 
@@ -98,10 +102,20 @@ export function AppointmentModal({
       const startTimeISO = startDateTime.toISOString();
       const endTimeISO = new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString();
 
+      let appointmentMetadata: Record<string, unknown> = {};
+      if (isGroupClass) {
+        const s = services.find((srv) => srv.id === serviceId);
+        appointmentMetadata = {
+          is_group_class: true,
+          max_capacity: s?.metadata?.max_capacity || 10,
+          attendees: []
+        };
+      }
+
       await onSave({
         title: apptTitle,
         service_id: serviceId || null,
-        client_id: clientId || null,
+        client_id: isGroupClass ? null : (clientId || null),
         employee_id: employeeId || null,
         start_time: startTimeISO,
         end_time: endTimeISO,
@@ -109,6 +123,7 @@ export function AppointmentModal({
         status,
         price: Number(price) || 0,
         notes: notes || null,
+        metadata: appointmentMetadata
       });
 
       onClose();
@@ -182,19 +197,39 @@ export function AppointmentModal({
             />
           </div>
 
+          {/* Academy / Group Class Toggle */}
+          <div className="flex items-center gap-3 p-3 bg-fuchsia-50 dark:bg-fuchsia-900/20 rounded-xl border border-fuchsia-100 dark:border-fuchsia-800">
+            <input 
+              type="checkbox" 
+              checked={isGroupClass} 
+              onChange={(e) => setIsGroupClass(e.target.checked)} 
+              id="isGroupClass"
+              className="w-4 h-4 text-fuchsia-600 rounded border-fuchsia-300 focus:ring-fuchsia-500 cursor-pointer"
+            />
+            <div className="flex-1">
+              <label htmlFor="isGroupClass" className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 cursor-pointer">
+                Habilitar Modo Academia (Clase Grupal)
+              </label>
+              <p className="text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
+                Al activar esto, no seleccionarás un cliente ahora. Podrás inscribir a múltiples alumnos desde los detalles de la clase.
+              </p>
+            </div>
+          </div>
+
           {/* Client & Employee Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Client */}
-            <div>
+            {/* Client (Hidden if Group Class) */}
+            <div className={isGroupClass ? 'opacity-50 pointer-events-none' : ''}>
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                 <User size={14} className="text-slate-400" /> Cliente
               </label>
               <select
                 value={clientId}
                 onChange={(e) => setClientId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                disabled={isGroupClass}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-slate-100 disabled:text-slate-400"
               >
-                <option value="">-- Seleccionar Cliente --</option>
+                <option value="">{isGroupClass ? 'Múltiples alumnos (Modo Academia)' : '-- Seleccionar Cliente --'}</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}

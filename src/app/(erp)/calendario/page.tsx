@@ -227,25 +227,17 @@ export default function CalendarioPage() {
 
     try {
       const res = await updateAppointmentStatusAction(id, status, currentTenant.id, actor);
-
-      if (res.success) {
-        toast({
-          variant: 'success',
-          title: 'Estado actualizado',
-          description: `La cita ahora está en estado "${status}".`,
-        });
-      } else {
-        // Revert status
-        setAppointments((prev) =>
-          prev.map((a) => (a.id === id ? { ...a, status: oldStatus } : a))
-        );
-        toast({
-          variant: 'error',
-          title: 'Error al cambiar estado',
-          description: res.error || 'No se pudo actualizar el estado.',
-        });
+      if (!res.success) {
+        throw new Error(res.error || 'Error al actualizar estado');
       }
-    } catch (err: unknown) {
+      toast({
+        variant: 'success',
+        title: 'Estado actualizado',
+        description: `La cita ahora está en estado: ${status}`,
+      });
+    } catch (err) {
+      console.error(err);
+      // Rollback status
       setAppointments((prev) =>
         prev.map((a) => (a.id === id ? { ...a, status: oldStatus } : a))
       );
@@ -267,6 +259,42 @@ export default function CalendarioPage() {
   const handleSelectAppointment = (appt: Appointment) => {
     setSelectedAppointment(appt);
     setIsDetailsModalOpen(true);
+  };
+
+  const handleUpdateMetadata = async (id: string, newMetadata: Record<string, any>) => {
+    if (!currentTenant) return;
+    
+    // Import dynamically to avoid top-level issues if missed
+    const { updateAppointmentMetadataAction } = await import('@/app/actions/appointments');
+    
+    const originalAppt = appointments.find((a) => a.id === id);
+    if (!originalAppt) return;
+    const oldMetadata = originalAppt.metadata || {};
+
+    setAppointments((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, metadata: newMetadata } : a))
+    );
+    setSelectedAppointment((prev) => prev?.id === id ? { ...prev, metadata: newMetadata } : prev);
+
+    try {
+      const res = await updateAppointmentMetadataAction(id, newMetadata, currentTenant.id, actor);
+      if (!res.success) throw new Error(res.error || 'Error al actualizar.');
+      toast({
+        variant: 'success',
+        title: 'Clase actualizada',
+        description: 'La información se ha guardado correctamente.'
+      });
+    } catch (err) {
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, metadata: oldMetadata } : a))
+      );
+      setSelectedAppointment((prev) => prev?.id === id ? { ...prev, metadata: oldMetadata } : prev);
+      toast({
+        variant: 'error',
+        title: 'Error',
+        description: (err as Error).message
+      });
+    }
   };
 
   return (
@@ -365,6 +393,8 @@ export default function CalendarioPage() {
         }}
         appointment={selectedAppointment}
         onUpdateStatus={handleUpdateStatus}
+        clients={clients}
+        onUpdateMetadata={handleUpdateMetadata}
       />
 
       {/* NEW: Booking Settings Modal */}
