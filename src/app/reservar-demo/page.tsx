@@ -108,7 +108,7 @@ export default function ReservarDemo() {
                 <button
                   key={barber.id}
                   onClick={() => handleBarberSelect(barber)}
-                  w-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/30 hover:shadow-md text-left transition-all active:scale-95 flex flex-col
+                  className="w-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/30 hover:shadow-md text-left transition-all active:scale-95 flex flex-col"
                 >
                   <div className="bg-[#eaf4ed] p-5 relative w-full">
                     <div className="absolute top-4 right-4">

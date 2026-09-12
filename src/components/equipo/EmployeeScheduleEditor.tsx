@@ -1,4 +1,4 @@
-'use client';
+ï»¿'use client';
 
 import { useState } from 'react';
 import { Plus, Trash2, Clock } from 'lucide-react';
@@ -9,10 +9,10 @@ export type WorkingHours = Record<string, TimeInterval[]>;
 const DAYS = [
   { id: 'monday', label: 'Lunes' },
   { id: 'tuesday', label: 'Martes' },
-  { id: 'wednesday', label: 'Miércoles' },
+  { id: 'wednesday', label: 'MiÃ©rcoles' },
   { id: 'thursday', label: 'Jueves' },
   { id: 'friday', label: 'Viernes' },
-  { id: 'saturday', label: 'Sábado' },
+  { id: 'saturday', label: 'SÃ¡bado' },
   { id: 'sunday', label: 'Domingo' }
 ];
 
@@ -72,7 +72,7 @@ export function EmployeeScheduleEditor({ value, onChange }: EmployeeScheduleEdit
         Horarios y Turnos de Trabajo
       </h4>
       <p className="text-xs text-slate-500 mb-4">
-        Activa los Días laborables y añade turnos. Puedes configurar horarios intercalados (ej. mañana y tarde).
+        Activa los DÃ­as laborables y aÃ±ade turnos. Puedes configurar horarios intercalados (ej. maÃ±ana y tarde).
       </p>
 
       <div className="space-y-3">
@@ -96,7 +96,7 @@ export function EmployeeScheduleEditor({ value, onChange }: EmployeeScheduleEdit
 
               <div className="flex-1 space-y-2">
                 {!isActive ? (
-                  <span className="text-xs text-slate-400 italic pt-1 inline-block">Día libre</span>
+                  <span className="text-xs text-slate-400 italic pt-1 inline-block">DÃ­a libre</span>
                 ) : (
                   intervals.map((interval, idx) => (
                     <div key={idx} className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function EmployeeScheduleEditor({ value, onChange }: EmployeeScheduleEdit
                     onClick={() => handleAddInterval(d.id)}
                     className="text-xs font-bold text-indigo-500 hover:text-indigo-600 flex items-center gap-1 mt-1"
                   >
-                    <Plus size={12} /> Añadir turno
+                    <Plus size={12} /> AÃ±adir turno
                   </button>
                 )}
               </div>

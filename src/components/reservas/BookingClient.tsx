@@ -90,10 +90,6 @@ const GENERATE_TIMES = (
 };
 
 export default function BookingClient({ tenant, employees, theme }: { tenant: Tenant, employees: Employee[], theme?: { bgColor: string; btnColor: string } }) {
-  const settings = {
-    // existing settings
-  };
-
   // Theme handling
   const defaultTheme = { bgColor: "#ffffff", btnColor: "#0B3B24" };
   const appliedTheme = theme ?? defaultTheme;
@@ -101,6 +97,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     "--theme-bg": appliedTheme.bgColor,
     "--theme-btn": appliedTheme.btnColor,
   } as React.CSSProperties;
+
+  const settings = {
     openDays: tenant.metadata?.booking_settings?.openDays || [1, 2, 3, 4, 5, 6],
     startHour: tenant.metadata?.booking_settings?.startHour || '09:00',
     endHour: tenant.metadata?.booking_settings?.endHour || '18:00',

@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/Button';
 import { updateTenantMetadataAction } from '@/app/actions/tenant';
-import { useToast } from '@/components/ui/use-toast';
-import { X } from 'lucide-react';
+import { X, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface TenantThemeModalProps {
   tenantId: string;
@@ -16,27 +15,24 @@ export function TenantThemeModal({ tenantId, initialTheme, onClose }: TenantThem
   const [bgColor, setBgColor] = useState(initialTheme?.bgColor || '#ffffff');
   const [btnColor, setBtnColor] = useState(initialTheme?.btnColor || '#0B3B24');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
     setIsSubmitting(true);
+    setError(null);
     try {
       const result = await updateTenantMetadataAction(tenantId, {
         public_theme: { bgColor, btnColor }
       }, null);
       if (!result.success) throw new Error(result.error);
 
-      toast({
-        title: 'Tema actualizado',
-        description: 'Los colores de tu página pública se han guardado exitosamente.',
-      });
-      onClose();
+      setSuccess(true);
+      setTimeout(() => {
+        onClose();
+      }, 1500);
     } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Ocurrió un error al guardar el tema.',
-        variant: 'destructive',
-      });
+      setError(error.message || 'Ocurrió un error al guardar el tema.');
     } finally {
       setIsSubmitting(false);
     }
@@ -53,6 +49,19 @@ export function TenantThemeModal({ tenantId, initialTheme, onClose }: TenantThem
         </div>
 
         <div className="p-6 space-y-6">
+          {error && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-xl flex items-center gap-2">
+              <AlertTriangle size={16} />
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-600 text-sm font-medium rounded-xl flex items-center gap-2">
+              <CheckCircle2 size={16} />
+              Tema guardado con éxito.
+            </div>
+          )}
+          
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
