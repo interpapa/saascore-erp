@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { Plus, Trash2, Clock } from 'lucide-react';
@@ -89,7 +89,7 @@ export function EmployeeScheduleEditor({ value, onChange }: EmployeeScheduleEdit
                   onChange={(e) => toggleDay(d.id, e.target.checked)}
                   className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                 />
-                <span className={\	ext-sm font-medium \\}>
+                <span className={`text-sm font-medium ${isActive ? 'text-foreground' : 'text-slate-400'}`}>
                   {d.label}
                 </span>
               </div>
