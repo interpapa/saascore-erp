@@ -55,5 +55,10 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
       metadata: e.metadata
     }));
 
-  return <BookingClient tenant={tenant} employees={employees} />;
+    const publicTheme = tenant.metadata?.public_theme || {};
+  const theme = {
+    bgColor: publicTheme.bgColor ?? "#ffffff",
+    btnColor: publicTheme.btnColor ?? "#0B3B24",
+  };
+  return <BookingClient tenant={tenant} employees={employees} theme={theme} />;
 }

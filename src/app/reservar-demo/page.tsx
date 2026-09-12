@@ -98,7 +98,7 @@ export default function ReservarDemo() {
         {/* PANTALLA 1: SELECCIÓN DE BARBERO */}
         {step === 1 && (
           <div className="flex flex-col h-full">
-            <div className="bg-[#0B3B24] pt-12 pb-8 px-6 shadow-md z-10 md:pt-16">
+            <div className="bg-[color:var(--theme-btn)] pt-12 pb-8 px-6 shadow-md z-10 md:pt-16">
               <h1 className="text-white text-3xl font-black mb-1">Tu Barbería</h1>
               <p className="text-emerald-100/80 text-sm">Selecciona con quién quieres agendar hoy</p>
             </div>
@@ -108,7 +108,7 @@ export default function ReservarDemo() {
                 <button
                   key={barber.id}
                   onClick={() => handleBarberSelect(barber)}
-                  className="w-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[#0B3B24]/30 hover:shadow-md text-left transition-all active:scale-95 flex flex-col"
+                  w-full bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/30 hover:shadow-md text-left transition-all active:scale-95 flex flex-col
                 >
                   <div className="bg-[#eaf4ed] p-5 relative w-full">
                     <div className="absolute top-4 right-4">
@@ -116,7 +116,7 @@ export default function ReservarDemo() {
                         {barber.status}
                       </span>
                     </div>
-                    <h2 className="text-2xl font-black text-[#0B3B24]">{barber.name}</h2>
+                    <h2 className="text-2xl font-black text-[color:var(--theme-btn)]">{barber.name}</h2>
                   </div>
                   <div className="p-4 flex items-center gap-2 text-slate-500 w-full bg-white">
                     <Scissors size={16} />
@@ -132,7 +132,7 @@ export default function ReservarDemo() {
         {step === 2 && (
           <div className="flex flex-col h-full relative">
             {/* Header Sticky */}
-            <div className="bg-[#0B3B24] pt-10 pb-5 px-5 shadow-md shrink-0 md:pt-12">
+            <div className="bg-[color:var(--theme-btn)] pt-10 pb-5 px-5 shadow-md shrink-0 md:pt-12">
               <div className="flex items-center gap-4">
                 <button onClick={() => setStep(1)} className="p-2.5 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
                   <ArrowLeft size={20} />
@@ -157,12 +157,12 @@ export default function ReservarDemo() {
                         onClick={() => { setSelectedDate(d.fullDate); setSelectedTime(null); }}
                         className={`snap-start shrink-0 w-[4.5rem] h-20 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
                           isSelected 
-                            ? 'bg-[#0B3B24] border-[#0B3B24] text-white shadow-md transform scale-105' 
-                            : 'bg-white border-slate-100 text-slate-500 hover:border-[#0B3B24]/30'
+                            ? 'bg-[color:var(--theme-btn)] border-[color:var(--theme-btn)] text-white shadow-md transform scale-105' 
+                            : 'bg-white border-slate-100 text-slate-500 hover:border-[color:var(--theme-btn)]/30'
                         }`}
                       >
                         <span className={`text-[10px] font-bold ${isSelected ? 'text-emerald-300' : 'text-slate-400'}`}>{d.dayName}</span>
-                        <span className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-[#0B3B24]'}`}>{d.dayNum}</span>
+                        <span className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-[color:var(--theme-btn)]'}`}>{d.dayNum}</span>
                       </button>
                     )
                   })}
@@ -187,7 +187,7 @@ export default function ReservarDemo() {
                             ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
                             : isSelected 
                               ? 'bg-[#eaf4ed] border-emerald-500 text-emerald-800 shadow-sm transform scale-105'
-                              : 'bg-white border-slate-100 text-[#0B3B24] hover:border-[#0B3B24]/30 shadow-sm'
+                              : 'bg-white border-slate-100 text-[color:var(--theme-btn)] hover:border-[color:var(--theme-btn)]/30 shadow-sm'
                         }`}
                       >
                         {t.time}
@@ -206,14 +206,14 @@ export default function ReservarDemo() {
                     placeholder="Tu Nombre" 
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[#0B3B24] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[#0B3B24] focus:ring-1 focus:ring-[#0B3B24] transition-all"
+                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
                   />
                   <input 
                     type="text" 
                     placeholder="Tu Apellido" 
                     value={customerLastName}
                     onChange={(e) => setCustomerLastName(e.target.value)}
-                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[#0B3B24] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[#0B3B24] focus:ring-1 focus:ring-[#0B3B24] transition-all"
+                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
                   />
                 </div>
               </div>
@@ -229,7 +229,7 @@ export default function ReservarDemo() {
               <button
                 disabled={!selectedTime || !customerName || !customerLastName || isSubmitting}
                 onClick={handleConfirm}
-                className="w-full bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[#0B3B24] disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
+                className="w-full bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[color:var(--theme-btn)] disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
               >
                 {isSubmitting ? 'Verificando seguridad...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerLastName) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
               </button>

@@ -145,7 +145,7 @@ export function BookingConfigModal({
                 <button
                   key={day.id}
                   onClick={() => toggleDay(day.id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${settings.openDays.includes(day.id) ? 'bg-[#0B3B24] text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${settings.openDays.includes(day.id) ? 'bg-[color:var(--theme-btn)] text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
                 >
                   {day.name}
                 </button>
@@ -161,7 +161,7 @@ export function BookingConfigModal({
                 type="time" 
                 value={settings.startHour}
                 onChange={e => setSettings({...settings, startHour: e.target.value})}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B3B24]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[color:var(--theme-btn)]"
               />
             </div>
             {/* Hora Cierre */}
@@ -171,7 +171,7 @@ export function BookingConfigModal({
                 type="time" 
                 value={settings.endHour}
                 onChange={e => setSettings({...settings, endHour: e.target.value})}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B3B24]"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[color:var(--theme-btn)]"
               />
             </div>
           </div>
@@ -182,7 +182,7 @@ export function BookingConfigModal({
             <select 
               value={settings.intervalMinutes}
               onChange={e => setSettings({...settings, intervalMinutes: Number(e.target.value)})}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0B3B24]"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[color:var(--theme-btn)]"
             >
               <option value={15}>15 minutos</option>
               <option value={30}>30 minutos (Recomendado)</option>
@@ -199,7 +199,7 @@ export function BookingConfigModal({
           <button 
             disabled={isSaving}
             onClick={handleSave} 
-            className="px-6 py-2.5 rounded-xl font-bold text-white bg-[#0B3B24] hover:bg-[#072617] disabled:opacity-70 shadow-md transition-colors"
+            className="px-6 py-2.5 rounded-xl font-bold text-white bg-[color:var(--theme-btn)] hover:bg-[#072617] disabled:opacity-70 shadow-md transition-colors"
           >
             {isSaving ? 'Guardando...' : 'Guardar Configuración'}
           </button>

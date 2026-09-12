@@ -105,6 +105,52 @@ export async function updateTenantSettings(tenantId: string, name: string, metad
   }
 }
 
+/**
+ * Update only the tenant metadata (e.g., theme settings).
+ * Validates that provided colors are hex strings.
+ */
+export async function updateTenantMetadataAction(
+  tenantId: string,
+  metadataUpdates: { public_theme?: { bgColor?: string; btnColor?: string } },
+  actor: any
+) {
+  try {
+    const db = supabaseAdmin || supabase;
+    // Fetch current metadata
+    const { data: tenant, error: fetchError } = await db
+      .from('tenants')
+      .select('metadata')
+      .eq('id', tenantId)
+      .single();
+    if (fetchError) throw new Error('Error fetching tenant: ' + fetchError.message);
+    const currentMeta = (tenant?.metadata as any) || {};
+    const newMeta = { ...currentMeta, ...metadataUpdates };
+    // Validate colors if present
+    if (newMeta.public_theme) {
+      const { bgColor, btnColor } = newMeta.public_theme;
+      const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+      if (bgColor && !hexRegex.test(bgColor)) {
+        throw new Error('bgColor must be a valid hex color');
+      }
+      if (btnColor && !hexRegex.test(btnColor)) {
+        throw new Error('btnColor must be a valid hex color');
+      }
+    }
+    const { data: updated, error: updateError } = await db
+      .from('tenants')
+      .update({ metadata: newMeta })
+      .eq('id', tenantId)
+      .select()
+      .single();
+    if (updateError) throw new Error('Error updating metadata: ' + updateError.message);
+    revalidatePath('/configuracion');
+    revalidatePath('/dashboard');
+    return { success: true, tenant: updated };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 export async function getAllTenants(callerEmail: string) {
   try {
     if (callerEmail?.toLowerCase() !== 'interpapadavid2811@gmail.com') {

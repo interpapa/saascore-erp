@@ -7,6 +7,7 @@ import { ArrowLeft, Save, Building2, Globe, Image as ImageIcon, AlertTriangle, C
 import Link from 'next/link';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { TenantThemeModal } from '@/app/(erp)/tenant/TenantThemeModal';
 
 const AVAILABLE_MODULES = [
   { id: 'caja', name: 'Caja POS' },
@@ -32,6 +33,7 @@ export default function ConfiguracionPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -110,10 +112,27 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-black text-foreground tracking-tight">Ajustes del Sistema</h1>
-        <p className="text-slate-500 font-medium mt-1 mb-8">Personaliza la configuración de tu instancia de negocio</p>
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-foreground tracking-tight">Ajustes del Sistema</h1>
+          <p className="text-slate-500 font-medium mt-1 mb-8">Personaliza la configuración de tu instancia de negocio</p>
+        </div>
+        
+        <Button
+          onClick={() => setShowThemeModal(true)}
+          className="bg-[color:var(--theme-btn)] text-[color:var(--theme-bg)] hover:bg-[color:var(--theme-btn)]/80 md:mt-2 shrink-0"
+        >
+          Personalizar tema público
+        </Button>
       </div>
+
+      {showThemeModal && currentTenant && (
+        <TenantThemeModal
+          tenantId={currentTenant.id}
+          initialTheme={currentTenant.metadata?.public_theme}
+          onClose={() => setShowThemeModal(false)}
+        />
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         {/* Alertas */}
