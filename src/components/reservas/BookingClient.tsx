@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Scissors, Clock, Calendar, User, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Scissors, Clock, Calendar, User, Users, ChevronRight } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
 
-const GENERATE_DATES = (openDays: number[], barber?: Employee | null) => {
+const GENERATE_DATES = (allEmployees: Employee[], barber?: Employee | null) => {
   const dates = [];
   const today = new Date();
   const dayNames = ['DOM', 'LUN', 'MAR', 'MIE', 'JUE', 'VIE', 'SAB'];
@@ -18,15 +18,19 @@ const GENERATE_DATES = (openDays: number[], barber?: Employee | null) => {
   while (dates.length < 14 && attempts < 60) {
     const d = new Date(today);
     d.setDate(today.getDate() + attempts);
+    const dayKey = mappingDays[d.getDay()];
     
-    // Check if store is open
-    let isWorkingDay = openDays.includes(d.getDay());
-
-    // If barber is selected, check if they have shifts that day
-    if (barber && barber.metadata?.working_hours) {
-      const dayKey = mappingDays[d.getDay()];
-      const shifts = barber.metadata.working_hours[dayKey] || [];
+    let isWorkingDay = false;
+    
+    if (barber && barber.id !== 'any') {
+      const shifts = barber.metadata?.working_hours?.[dayKey] || [];
       isWorkingDay = shifts.length > 0;
+    } else {
+      isWorkingDay = allEmployees.some(emp => {
+        if (!emp.is_active) return false;
+        const shifts = emp.metadata?.working_hours?.[dayKey] || [];
+        return shifts.length > 0;
+      });
     }
     
     if (isWorkingDay) {
@@ -113,7 +117,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   const [step, setStep] = useState(1);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   
-  const dates = GENERATE_DATES(settings.openDays, selectedBarber);
+  const dates = GENERATE_DATES(employees, selectedBarber);
   
   // Re-adjust selected date if current selection is invalid for new barber
   const [selectedDate, setSelectedDate] = useState(dates.length > 0 ? dates[0].fullDate : '');
@@ -206,7 +210,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       .replace(/{{profesional}}/g, selectedBarber.name)
       .replace(/{{fecha}}/g, selectedDate)
       .replace(/{{hora}}/g, readableTime || '')
-      .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`.trim());
+      .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`.trim())
+      .replace(/{{recurso}}/g, resourceName);
 
     const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
     const url = cleanPhone 
@@ -241,18 +246,47 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           
           {/* Employee Cards */}
           <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
-            <div className="max-w-5xl mx-auto">
-              {employees.length === 0 && (
-                <p className="text-center text-slate-400 mt-10 text-lg">No hay opciones disponibles en este momento.</p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {employees.map(barber => (
-                  <button
-                    key={barber.id}
-                    onClick={() => handleBarberSelect(barber)}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
-                  >
-                    <div className="bg-[#eaf4ed] p-6 relative w-full flex items-center justify-between">
+              <div className="max-w-5xl mx-auto">
+                {employees.length === 0 && (
+                  <p className="text-center text-slate-400 mt-10 text-lg">No hay opciones disponibles en este momento.</p>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {employees.length > 1 && (
+                    <button
+                      onClick={() => {
+                        // Selección aleatoria (balanceo de carga básico)
+                        const randomIndex = Math.floor(Math.random() * employees.length);
+                        handleBarberSelect(employees[randomIndex]);
+                      }}
+                      className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-700 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                    >
+                      <div className="p-6 relative w-full flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Sin preferencia</p>
+                          <h2 className="text-xl md:text-2xl font-black text-white">Cualquiera disponible</h2>
+                        </div>
+                        <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center border-4 border-slate-800 shadow-sm">
+                           <Users className="text-slate-300 w-8 h-8" />
+                        </div>
+                      </div>
+                      <div className="p-4 flex items-center justify-between w-full bg-slate-800/50">
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Clock size={16} />
+                          <span className="text-sm font-medium">Horarios más flexibles</span>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center group-hover:bg-slate-600 transition-colors">
+                          <ChevronRight size={16} className="text-slate-300" />
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                  {employees.map(barber => (
+                    <button
+                      key={barber.id}
+                      onClick={() => handleBarberSelect(barber)}
+                      className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                    >
+                      <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
                       <div>
                                                 <h2 className="text-xl md:text-2xl font-black text-[color:var(--theme-btn)]">{barber.name}</h2>
                       </div>
@@ -359,10 +393,9 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                           onClick={() => setSelectedTime(time.value24)}
                           className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
                             !isAvailable 
-                              ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
-                              : isSelected 
-                                ? 'bg-[#eaf4ed] border-emerald-500 text-emerald-800 shadow-sm scale-105'
-                                : 'bg-white border-slate-100 text-[color:var(--theme-btn)] hover:border-[color:var(--theme-btn)]/30 shadow-sm'
+                              ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through'                                : isSelected 
+                                  ? 'bg-[color:var(--theme-btn)] text-white shadow-md scale-105 border-[color:var(--theme-btn)]'
+                                  : 'bg-white border-slate-100 text-slate-700 hover:border-[color:var(--theme-btn)]/30 shadow-sm'
                           }`}
                         >
                           {time.label12}

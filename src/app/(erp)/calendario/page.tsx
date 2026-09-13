@@ -359,7 +359,7 @@ export default function CalendarioPage() {
         viewMode={viewMode}
         currentDate={currentDate}
         appointments={appointments}
-        employees={bookableEmployees}
+        employees={filterState.employee_id !== 'all' ? bookableEmployees.filter(e => e.id === filterState.employee_id) : bookableEmployees}
         isLoading={isLoading}
         onSelectAppointment={handleSelectAppointment}
         onSelectDateSlot={handleSelectDateSlot}

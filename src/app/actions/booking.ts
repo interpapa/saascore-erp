@@ -53,7 +53,8 @@ export async function processBookingAction(formData: unknown) {
       .insert({
         tenant_id: cleanData.tenantId,
         employee_id: cleanData.barberId,
-        metadata: { title: `Cita Web - ${fullName}` },
+        title: `Cita Web - ${fullName}`,
+        metadata: { client_name: fullName },
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         status: 'scheduled',
@@ -75,6 +76,7 @@ export async function processBookingAction(formData: unknown) {
           .insert({
             tenant_id: cleanData.tenantId,
             employee_id: cleanData.barberId,
+            title: `Cita Web - ${fullName}`,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
             status: 'scheduled',
@@ -136,33 +138,37 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
     const startDate = new Date(`${date}T00:00:00-04:00`);
     const endDate = new Date(`${date}T23:59:59-04:00`);
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('appointments')
       .select('start_time, end_time')
       .eq('tenant_id', tenantId)
-      .eq('employee_id', employeeId)
       .gte('start_time', startDate.toISOString())
       .lte('start_time', endDate.toISOString())
       .in('status', ['scheduled', 'confirmed']);
+      
+    if (employeeId !== 'any') {
+      query = query.eq('employee_id', employeeId);
+    }
+
+    const { data, error } = await query;
       
     if (error) throw error;
     
     // Extraemos todos los intervalos (cada 15 min) que están ocupados por citas
     const bookedTimesSet = new Set<string>();
+    // Si employeeId === 'any', en un entorno real deberíamos contar si hay citas >= N_EMPLEADOS,
+    // pero para este MVP simple de 'Cualquiera', agrupamos por ahora todas las citas como ocupadas (modo conservador)
+    // O idealmente devolvemos un conteo.
+    // Como solicitó simplicidad, si es 'any', retornamos las citas para que el cliente decida.
     
     data.forEach((r: any) => {
        let current = new Date(r.start_time).getTime();
        const end = new Date(r.end_time || (current + 45 * 60000)).getTime();
        
-       // Marcar cada bloque de 15 minutos dentro de la cita como ocupado
        while (current < end) {
          const d = new Date(current);
-         // Convertimos de vuelta usando -04:00 para mostrar correctamente en la UI local
-         // Una forma simple es ajustar el timestamp localmente para extraer la hora:
-         // Si el servidor (Vercel) está en UTC, getTime() da los milisegundos absolutos.
-         // Para sacar la hora en -04:00, restamos 4 horas (14400000 ms) y usamos getUTCHours()
-         const offsetMs = -4 * 60 * 60 * 1000;
-         const localD = new Date(d.getTime() + offsetMs);
+         // Ajustamos al offset de Venezuela -04:00 para la comparación local
+         const localD = new Date(d.getTime() - 14400000);
          
          const hh = localD.getUTCHours().toString().padStart(2, '0');
          const mm = localD.getUTCMinutes().toString().padStart(2, '0');
@@ -171,7 +177,7 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
        }
     });
 
-    return { success: true, bookedTimes: Array.from(bookedTimesSet) };
+    return { success: true, bookedTimes: Array.from(bookedTimesSet), allAppointments: data };
   } catch (error) {
     console.error('Error fetching booked times:', error);
     return { success: false, bookedTimes: [] };
@@ -190,11 +196,18 @@ export async function updateBookingConfigAction(tenantId: string, settings: any)
       
     if (fetchError) throw fetchError;
     
+    // Extraer publicTheme si viene en el payload
+    const { publicTheme, ...bookingSettings } = settings;
+    
     // 2. Fusionar la metadata actual con la nueva configuración
     const newMetadata = {
       ...(tenant.metadata || {}),
-      booking_settings: settings
+      booking_settings: bookingSettings
     };
+    
+    if (publicTheme) {
+      newMetadata.public_theme = publicTheme;
+    }
     
     // 3. Guardar en la base de datos
     const { error: updateError } = await supabaseAdmin

@@ -9,6 +9,7 @@ import { Users, Plus, Briefcase, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { EmployeeScheduleEditor, defaultWorkingHours, WorkingHours } from './EmployeeScheduleEditor';
+import { ImageUpload } from '@/components/core/ImageUpload';
 
 interface EmployeeDirectoryTabProps {
   employees: Entity[];
@@ -31,6 +32,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     baseSalary: 450,
     bookable: true,
     avatarUrl: '',
+    color: '#3b82f6',
     workingHours: defaultWorkingHours as WorkingHours,
   };
   
@@ -52,6 +54,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       baseSalary: Number(emp.metadata?.base_salary) || 0,
       bookable: emp.metadata?.bookable !== false,
       avatarUrl: (emp.metadata?.avatar_url as string) || '',
+      color: (emp.metadata?.color as string) || '#3b82f6',
       workingHours: (emp.metadata?.working_hours as WorkingHours) || defaultWorkingHours,
     });
     setIsModalOpen(true);
@@ -71,10 +74,12 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
           base_salary: Number(form.baseSalary),
           bookable: form.bookable, 
           avatar_url: form.avatarUrl,
+          color: form.color,
           working_hours: form.workingHours,
         },
       };
 
+      let res: any;
       if (editingId) {
         // dynamic import of updateEntityAction because it wasn't originally imported here
         const { updateEntityAction } = await import('@/app/actions/entities');
@@ -87,12 +92,12 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
         );
       }
 
-      if (res.success) {
+      if (res && res.success) {
         toast({ variant: 'success', title: 'Éxito', description: `Empleado guardado correctamente.` });
         setIsModalOpen(false);
         onRefresh();
       } else {
-        toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo guardar.' });
+        toast({ variant: 'error', title: 'Error', description: res?.error || 'No se pudo guardar.' });
       }
     } catch (err: unknown) {
       toast({ variant: 'error', title: 'Error de servidor', description: (err as Error).message });
@@ -251,13 +256,35 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 />
               </div>
 
-              <Input
-                label="Foto de Perfil (URL)"
-                type="url"
-                value={form.avatarUrl}
-                onChange={(e) => setForm({ ...form, avatarUrl: e.target.value })}
-                placeholder="https://ejemplo.com/foto.jpg"
-              />
+              <div className="grid grid-cols-2 gap-4 mb-4 items-start">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Foto de Perfil
+                  </label>
+                  <ImageUpload 
+                    value={form.avatarUrl}
+                    onChange={(url) => setForm({ ...form, avatarUrl: url })}
+                    bucket="avatars"
+                    folder={tenantId}
+                    className="items-start"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                    Color de Agenda
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="color" 
+                      value={form.color}
+                      onChange={(e) => setForm({ ...form, color: e.target.value })}
+                      className="w-10 h-10 rounded-lg cursor-pointer border-0 p-0"
+                    />
+                    <span className="text-sm font-medium text-slate-600">{form.color.toUpperCase()}</span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-2">Diferencia las citas de este empleado visualmente en el calendario.</p>
+                </div>
+              </div>
 
               <EmployeeScheduleEditor 
                 value={form.workingHours} 
