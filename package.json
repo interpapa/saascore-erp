@@ -9,6 +9,9 @@
     "lint": "eslint . --fix",
     "deploy": "npx vercel --prod --yes"
   },
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
     "date-fns": "^4.4.0",
