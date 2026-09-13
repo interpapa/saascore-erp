@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Entity } from '@/lib/api/entities';
 import { createDocumentAction } from '@/app/actions/documents';
 import { useActionActor } from '@/hooks/useActionActor';

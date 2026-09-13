@@ -1,4 +1,6 @@
-﻿import { create } from 'zustand';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/set-state-in-effect */
+import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserRole } from '@/lib/rbac';
 
