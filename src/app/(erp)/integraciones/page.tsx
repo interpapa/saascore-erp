@@ -5,6 +5,7 @@ import { ArrowLeft, CreditCard, MessageCircle, CalendarDays, Power, AlertTriangl
 import Link from 'next/link';
 import { useERPStore } from '@/store/useERPStore';
 import { updateTenantSettings } from '@/app/actions/tenant';
+import { useActionActor } from '@/hooks/useActionActor';
 
 const AVAILABLE_INTEGRATIONS = [
   {
@@ -32,13 +33,14 @@ const AVAILABLE_INTEGRATIONS = [
 
 export default function IntegracionesPage() {
   const { currentTenant, setCurrentTenant } = useERPStore();
+  const actor = useActionActor();
   const [integrationsState, setIntegrationsState] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentTenant?.metadata?.integrations) {
-      setIntegrationsState(currentTenant.metadata.integrations);
+      setIntegrationsState((currentTenant.metadata as any).integrations);
     } else {
       // Default: all off
       setIntegrationsState({
@@ -64,7 +66,10 @@ export default function IntegracionesPage() {
     };
 
     try {
-      const res = await updateTenantSettings(currentTenant.id, currentTenant.name, newMetadata);
+      if (!actor) {
+        throw new Error('No se detectó una sesión activa con token de seguridad.');
+      }
+      const res = await updateTenantSettings(currentTenant.id, currentTenant.name, newMetadata, undefined, actor);
       if (res.success && res.tenant) {
         setCurrentTenant(res.tenant); // Actualizamos la store local
         setIntegrationsState(newMetadata.integrations);

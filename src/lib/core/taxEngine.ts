@@ -121,17 +121,17 @@ export function calculateTaxes(
     }
   }
 
-  const totalSurcharges = surchargesList.reduce(
-    (sum, s) => sum.plus(s.amount),
-    new Decimal(0)
-  );
+  // Redondear los componentes ANTES de sumarlos para garantizar cuadre contable exacto
+  const finalSubtotal = subtotal.toDecimalPlaces(2);
+  const finalTax = taxAmount.toDecimalPlaces(2);
+  const finalSurcharges = surchargesList.reduce((sum, s) => sum.plus(new Decimal(s.amount)), new Decimal(0)).toDecimalPlaces(2);
 
-  const total = subtotal.plus(taxAmount).plus(totalSurcharges);
+  const total = finalSubtotal.plus(finalTax).plus(finalSurcharges);
 
   return {
-    subtotal: subtotal.toDecimalPlaces(2).toNumber(),
-    taxAmount: taxAmount.toDecimalPlaces(2).toNumber(),
-    total: total.toDecimalPlaces(2).toNumber(),
+    subtotal: finalSubtotal.toNumber(),
+    taxAmount: finalTax.toNumber(),
+    total: total.toNumber(),
     details: {
       taxRate: taxRate.toNumber(),
       taxName,

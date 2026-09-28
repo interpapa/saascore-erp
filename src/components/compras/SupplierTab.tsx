@@ -29,7 +29,7 @@ export function SupplierTab({ suppliers, tenantId, onRefresh }: SupplierTabProps
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!form.name.trim() || !actor) return;
 
     try {
       setIsSubmitting(true);

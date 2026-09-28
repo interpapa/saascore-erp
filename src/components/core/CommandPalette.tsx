@@ -15,7 +15,7 @@ interface CommandItem {
 const COMMAND_ITEMS: CommandItem[] = [
   { id: '1',  title: 'Caja — POS Bimoneda',           category: 'módulo', href: '/caja',          icon: ShoppingCart },
   { id: '2',  title: 'Clientes — CRM Directorio',     category: 'módulo', href: '/clientes',     icon: Users },
-  { id: '3',  title: 'Catálogo — Productos y Servicios', category: 'módulo', href: '/catalogo',    icon: Box },
+  { id: '3',  title: 'Inventario — Control de Stock y Existencias', category: 'módulo', href: '/inventario',  icon: Box },
   { id: '4',  title: 'Estadísticas — Panel Ejecutivo',  category: 'módulo', href: '/estadisticas', icon: BarChart3 },
   { id: '5',  title: 'Compras — Proveedores y POs',   category: 'módulo', href: '/compras',      icon: ShoppingCart },
   { id: '6',  title: 'Contabilidad — Libro Mayor',    category: 'módulo', href: '/contabilidad', icon: Scale },
@@ -89,8 +89,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
             </div>
           ) : (
             filtered.map((item) => {
-              const Icon = (r.icon as any); // eslint-disable-line
-item.icon;
+              const Icon = item.icon as any;
               return (
                 <div
                   key={item.id}

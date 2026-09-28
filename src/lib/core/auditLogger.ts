@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Motor de Auditoría — Rendo
  * 
  * Registra todas las operaciones críticas (ventas, nóminas, anulaciones)
@@ -21,7 +21,8 @@ export type AuditAction =
   | 'login.failed'
   | 'permission.denied'
   | 'cash_session.opened'
-  | 'cash_session.closed';
+  | 'cash_session.closed'
+  | (string & {});
 
 export interface AuditEntry {
   tenant_id: string;
@@ -39,7 +40,17 @@ const CRITICAL_AUDIT_ACTIONS = [
   'payment.recorded',
   'payroll.processed',
   'permission.denied',
-  'login.failed'
+  'login.failed',
+  'entity.updated',
+  'entity.created',
+  'entity.deleted',
+  'entity_record.created',
+  'entity_record.deleted',
+  'item.created',
+  'item.updated',
+  'item.deleted',
+  'cash_session.opened',
+  'cash_session.closed',
 ];
 
 export async function writeAuditLog(entry: AuditEntry): Promise<void> {
@@ -63,9 +74,36 @@ export async function writeAuditLog(entry: AuditEntry): Promise<void> {
       }]);
 
     if (error) {
-      // El audit log NUNCA debe romper el flujo principal de negocio.
-      // Solo registramos la falla internamente.
-      console.error('⚠️  AUDIT LOG WRITE FAILED (non-critical):', error.message);
+      console.warn('⚠️  AUDIT LOG TABLE MISSING (using tenant metadata fallback):', error.message);
+      try {
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('metadata')
+          .eq('id', entry.tenant_id)
+          .maybeSingle();
+
+        if (tenant) {
+          const currentLogs = Array.isArray(tenant.metadata?.audit_logs) ? tenant.metadata.audit_logs : [];
+          const newEntry = {
+            id: `audit-${Date.now()}-${Math.random().toString(36).slice(-4)}`,
+            ...entry,
+            created_at: new Date().toISOString(),
+            ip_address: 'server-action',
+          };
+          const updatedLogs = [newEntry, ...currentLogs].slice(0, 100);
+          await supabaseAdmin
+            .from('tenants')
+            .update({
+              metadata: {
+                ...tenant.metadata,
+                audit_logs: updatedLogs,
+              },
+            })
+            .eq('id', entry.tenant_id);
+        }
+      } catch (fallbackErr) {
+        // Silencioso para no quebrar el hilo principal
+      }
     }
   } catch (err) {
     console.error('⚠️  AUDIT LOG EXCEPTION (non-critical):', err);

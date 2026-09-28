@@ -3,8 +3,33 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
-import { getTenantByIdAdmin, updateTenantAdminAction, deleteTenantAdminAction } from '@/app/actions/tenant';
-import { ArrowLeft, Save, ShieldCheck, ToggleLeft, ToggleRight, LayoutTemplate, Briefcase, ChevronDown, ChevronRight, Settings2, Trash2 } from 'lucide-react';
+import { useActionActor } from '@/hooks/useActionActor';
+import { 
+  getTenantByIdAdmin, 
+  updateTenantAdminAction, 
+  deleteTenantAdminAction,
+  getTenantUsersAdminAction,
+  resetTenantUserPasswordAdminAction,
+  createTenantUserAction
+} from '@/app/actions/tenant';
+import { 
+  ArrowLeft, 
+  Save, 
+  ShieldCheck, 
+  ToggleLeft, 
+  ToggleRight, 
+  LayoutTemplate, 
+  Briefcase, 
+  ChevronDown, 
+  ChevronRight, 
+  Settings2, 
+  Trash2,
+  Users,
+  KeyRound,
+  LogIn,
+  UserPlus,
+  X
+} from 'lucide-react';
 import { useToast } from '@/components/core/ToastProvider';
 import Link from 'next/link';
 
@@ -19,8 +44,8 @@ const ALL_MODULES = [
   },
   { id: 'clientes', name: 'Clientes (CRM)', features: [] },
   { 
-    id: 'catalogo', 
-    name: 'Catálogo e Inventario',
+    id: 'inventario', 
+    name: 'Inventario de Mercancía',
     features: [
       { key: 'use_inventory_recipes', label: 'Usar Recetas e Insumos (BOM)' },
       { key: 'use_multiple_warehouses', label: 'Habilitar Múltiples Almacenes' }
@@ -45,10 +70,13 @@ const ALL_MODULES = [
   { id: 'config', name: 'Ajustes del Sistema', features: [] }
 ];
 
+import { UserRole } from '@/lib/rbac';
+
 export default function TenantAdminPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { session } = useERPStore();
+  const { session, impersonateTenant } = useERPStore();
+  const actor = useActionActor();
   const { toast } = useToast();
   const [tenant, setTenant] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,21 +88,34 @@ export default function TenantAdminPage() {
   const [activeModules, setActiveModules] = useState<string[]>([]);
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
 
+  // Gestión de Usuarios del Tenant
+  const [users, setUsers] = useState<any[]>([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('seller');
+  const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+
   useEffect(() => {
     if (session?.userEmail && id) {
       fetchTenant();
+      fetchUsers();
     }
   }, [session, id]);
 
   const fetchTenant = async () => {
     setIsLoading(true);
-    const result = await getTenantByIdAdmin(id as string, session!.userEmail!);
+    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const result = await getTenantByIdAdmin(id as string, activeActor);
     if (result.success && result.tenant) {
       setTenant(result.tenant);
       setName(result.tenant.name || '');
       // Si está vacío en BD asume que todos estaban activos por retrocompatibilidad
-      const savedModules = result.tenant.active_modules || ALL_MODULES.map(m => m.id);
-      setActiveModules(savedModules);
+      const rawModules: string[] = result.tenant.active_modules || ALL_MODULES.map(m => m.id);
+      // Migración defensiva: convertir cualquier 'catalogo' legado en 'inventario'
+      const normalizedModules = Array.from(new Set(rawModules.map(m => m === 'catalogo' ? 'inventario' : m)));
+      setActiveModules(normalizedModules);
       
       setFeatureFlags(result.tenant.metadata?.features || {
         use_inventory_recipes: true,
@@ -84,6 +125,71 @@ export default function TenantAdminPage() {
       });
     }
     setIsLoading(false);
+  };
+
+  const fetchUsers = async () => {
+    if (!id) return;
+    setIsLoadingUsers(true);
+    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const res = await getTenantUsersAdminAction(id as string, activeActor);
+    if (res.success && res.users) {
+      setUsers(res.users);
+    }
+    setIsLoadingUsers(false);
+  };
+
+  const handleImpersonate = () => {
+    if (!tenant) return;
+    impersonateTenant({
+      id: tenant.id,
+      name: tenant.name,
+      blocked: tenant.status === 'suspended',
+      active_modules: tenant.active_modules,
+      metadata: tenant.metadata,
+    });
+    toast({
+      variant: 'success',
+      title: 'Modo Soporte Activado',
+      description: `Has ingresado al ERP como "${tenant.name}".`,
+    });
+    router.push('/dashboard');
+  };
+
+  const handleResetPassword = async (email: string) => {
+    const newPass = window.prompt(`Ingrese la nueva contraseña para ${email} (mínimo 6 caracteres):`);
+    if (!newPass) return;
+    if (newPass.length < 6) {
+      toast({ variant: 'error', title: 'Error', description: 'La contraseña debe tener al menos 6 caracteres.' });
+      return;
+    }
+    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const res = await resetTenantUserPasswordAdminAction(email, newPass, activeActor);
+    if (res.success) {
+      toast({ variant: 'success', title: 'Contraseña Actualizada', description: `La clave de ${email} ha sido cambiada con éxito.` });
+    } else {
+      toast({ variant: 'error', title: 'Error', description: res.error });
+    }
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserEmail.trim() || !newUserPassword.trim()) {
+      toast({ variant: 'error', title: 'Error', description: 'Correo y contraseña requeridos.' });
+      return;
+    }
+    setIsSubmittingUser(true);
+    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const res = await createTenantUserAction(id as string, newUserEmail.trim(), newUserPassword.trim(), newUserRole, activeActor);
+    if (res.success) {
+      toast({ variant: 'success', title: 'Usuario Creado', description: `Cuenta creada para ${newUserEmail}.` });
+      setIsUserModalOpen(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
+      fetchUsers();
+    } else {
+      toast({ variant: 'error', title: 'Error', description: res.error });
+    }
+    setIsSubmittingUser(false);
   };
 
   const toggleModule = (modId: string, e: React.MouseEvent) => {
@@ -104,6 +210,7 @@ export default function TenantAdminPage() {
   const handleSave = async () => {
     if (!session?.userEmail) return;
     setIsSaving(true);
+    const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
     
     const newMetadata = {
       ...(tenant.metadata || {}),
@@ -116,7 +223,7 @@ export default function TenantAdminPage() {
       metadata: newMetadata
     };
 
-    const result = await updateTenantAdminAction(tenant.id, updates, session.userEmail);
+    const result = await updateTenantAdminAction(tenant.id, updates, activeActor);
     if (result.success) {
       toast({ variant: 'success', title: 'Guardado', description: 'Configuración actualizada exitosamente.' });
     } else {
@@ -135,7 +242,8 @@ export default function TenantAdminPage() {
     if (!confirm2) return;
 
     setIsSaving(true);
-    const result = await deleteTenantAdminAction(tenant.id, session.userEmail);
+    const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
+    const result = await deleteTenantAdminAction(tenant.id, activeActor);
     if (result.success) {
       toast({ variant: 'success', title: 'Eliminado', description: 'La empresa fue borrada de la base de datos.' });
       router.replace('/admin');
@@ -174,10 +282,17 @@ export default function TenantAdminPage() {
           </div>
         </div>
         <div className="flex w-full sm:w-auto gap-2">
+          <button
+            onClick={handleImpersonate}
+            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm shrink-0"
+            title="Ingresar a la sesión de este negocio en modo soporte (Modo Dios)"
+          >
+            <LogIn size={16} /> Entrar al ERP
+          </button>
           <button 
             onClick={handleDelete}
             disabled={isSaving}
-            className="w-12 sm:w-auto flex justify-center items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all shrink-0"
+            className="w-10 sm:w-auto flex justify-center items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all shrink-0"
             title="Eliminar Empresa"
           >
             <Trash2 size={18} />
@@ -225,6 +340,75 @@ export default function TenantAdminPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Usuarios y Accesos del Tenant */}
+      <div className="bg-slate-900 border border-white/10 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-4">
+          <div>
+            <h3 className="font-bold text-white flex items-center gap-2 text-lg">
+              <Users size={20} className="text-indigo-400" /> Miembros & Accesos del Tenant
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Cuentas de usuario registradas para este negocio. Puedes resetear contraseñas o crear nuevos colaboradores.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsUserModalOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+          >
+            <UserPlus size={15} /> Crear Usuario
+          </button>
+        </div>
+
+        {isLoadingUsers ? (
+          <div className="text-center py-6 text-xs text-slate-400">Cargando colaboradores...</div>
+        ) : users.length === 0 ? (
+          <div className="text-center py-6 text-xs text-slate-500">
+            No hay miembros explícitos en user_tenants para esta empresa.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="text-[10px] text-slate-400 uppercase tracking-wider font-bold border-b border-white/5">
+                <tr>
+                  <th className="pb-2">Usuario (Email / ID)</th>
+                  <th className="pb-2">Rol Asignado</th>
+                  <th className="pb-2">Fecha Vinculación</th>
+                  <th className="pb-2 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {users.map(u => (
+                  <tr key={u.id || u.user_email} className="hover:bg-white/[0.01]">
+                    <td className="py-2.5 font-medium text-white">
+                      {u.user_email || u.user_id}
+                    </td>
+                    <td className="py-2.5">
+                      <span className="bg-white/10 text-indigo-300 px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold">
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-slate-400">
+                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}
+                    </td>
+                    <td className="py-2.5 text-right">
+                      {u.user_email && (
+                        <button
+                          onClick={() => handleResetPassword(u.user_email)}
+                          className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all inline-flex items-center gap-1"
+                          title="Resetear Contraseña"
+                        >
+                          <KeyRound size={12} /> Reset Clave
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Arquitectura Modular */}
@@ -317,6 +501,92 @@ export default function TenantAdminPage() {
           })}
         </div>
       </div>
+
+      {/* Modal Crear Usuario */}
+      {isUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+            <button
+              onClick={() => setIsUserModalOpen(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <UserPlus size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-white">Nuevo Miembro / Acceso</h3>
+                <p className="text-xs text-slate-400">Crear cuenta con acceso inmediato a este negocio</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                  Correo Electrónico *
+                </label>
+                <input
+                  type="email"
+                  required
+                  placeholder="empleado@empresa.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                  Contraseña Temporal * (mínimo 6 caracteres)
+                </label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                  Rol en el Sistema
+                </label>
+                <select
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                >
+                  <option value="seller">Ventas / Cajero</option>
+                  <option value="technician">Técnico / Operativo</option>
+                  <option value="manager">Gerente (Inventario, Ventas, Reportes)</option>
+                  <option value="owner">Dueño / Administrador</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-white/10 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsUserModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingUser}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                >
+                  {isSubmittingUser ? 'Creando...' : 'Crear Acceso'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { UserRole } from '@/lib/rbac';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import {
   TenantBranch,
   TenantBranchesResult,
@@ -36,7 +37,7 @@ export async function processCSVImportAction(
 
     const result = processCSVMapping(csvRawContent, mappings);
     return { success: true, result };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
@@ -55,7 +56,7 @@ export async function registerWebhookAction(
 
     const sub = registerWebhook(tenantId, targetUrl, events);
     return { success: true, subscription: sub };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
@@ -72,7 +73,7 @@ export async function startImpersonationAction(
     }
 
     return await startImpersonationSession(actor.email, targetUserEmail, targetUserRole, tenantId);
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
@@ -94,6 +95,11 @@ export async function getTenantBranchesAction(
 
     if (!tenantId) return { success: true, data: [] };
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'franquicias');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de franquicias está desactivado.', data: [] };
+    }
+
     const { data: rawBranches, error } = await supabaseAdmin
       .from('entities')
       .select('*')
@@ -104,7 +110,7 @@ export async function getTenantBranchesAction(
 
     if (error) throw new Error(error.message);
 
-    const formattedBranches: TenantBranch[] = (rawBranches || []).map((b: unknown) => ({
+    const formattedBranches: TenantBranch[] = (rawBranches || []).map((b: any) => ({
       id: b.id,
       tenant_id: b.tenant_id || tenantId,
       name: b.name,
@@ -121,7 +127,7 @@ export async function getTenantBranchesAction(
     }));
 
     return { success: true, data: formattedBranches };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getTenantBranchesAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, data: [] };
   }
@@ -142,6 +148,11 @@ export async function getBranchPerformanceAction(
       }
     }
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'franquicias');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de franquicias está desactivado.', data: [], globalMetrics: { totalRevenue: 0, activeBranches: 0, topBranchName: '' } };
+    }
+
     const branchesRes = await getTenantBranchesAction(tenantId, actor);
     const branches = branchesRes.data || [];
 
@@ -156,23 +167,23 @@ export async function getBranchPerformanceAction(
 
     const performances: BranchPerformance[] = branches.map((branch, idx) => {
       const branchDocs = salesDocs.filter(
-        (d: unknown) => d.entity_id === branch.id || d.metadata?.branch_id === branch.id
+        (d: any) => d.entity_id === branch.id || d.metadata?.branch_id === branch.id
       );
 
       // If no document specifies branch_id explicitly, distribute mock proportion or assign to HQ (first branch)
       const effectiveDocs = branchDocs.length > 0 ? branchDocs : (idx === 0 ? salesDocs : []);
 
       const totalRevenue = effectiveDocs.reduce(
-        (sum: number, d: unknown) => sum + Number(d.total_amount || 0),
+        (sum: number, d: any) => sum + Number(d.total_amount || 0),
         0
       );
       const totalInvoices = effectiveDocs.length;
       const averageTicket = totalInvoices > 0 ? Math.round((totalRevenue / totalInvoices) * 100) / 100 : 0;
       const pendingReceivables = effectiveDocs
-        .filter((d: unknown) => d.status === 'draft' || d.status === 'in_progress')
-        .reduce((sum: number, d: unknown) => sum + Number(d.total_amount || 0), 0);
+        .filter((d: any) => d.status === 'draft' || d.status === 'in_progress')
+        .reduce((sum: number, d: any) => sum + Number(d.total_amount || 0), 0);
 
-      const uniqueCustomers = new Set(effectiveDocs.map((d: unknown) => d.entity_id).filter(Boolean)).size;
+      const uniqueCustomers = new Set(effectiveDocs.map((d: any) => d.entity_id).filter(Boolean)).size;
 
       const metrics: BranchSalesMetrics = {
         branch_id: branch.id,
@@ -211,7 +222,7 @@ export async function getBranchPerformanceAction(
         topBranchName,
       },
     };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getBranchPerformanceAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }

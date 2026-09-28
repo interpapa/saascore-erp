@@ -4,8 +4,6 @@ import { useToast } from '@/components/core/ToastProvider';
 import { getAvailableSlots, createReservation } from '@/lib/reservations';
 import { format } from 'date-fns';
 
-export const dynamic = 'force-dynamic';
-
 export default function ReservasPage() {
   const { toast } = useToast();
   const [date, setDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));

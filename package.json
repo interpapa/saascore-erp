@@ -7,12 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --fix",
+    "test:qa": "npx --yes tsx --env-file=.env.local src/__tests__/business_flow_qa.ts",
     "deploy": "npx vercel --prod --yes"
   },
   "engines": {
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.107.0",
     "date-fns": "^4.4.0",
     "decimal.js": "^10.6.0",

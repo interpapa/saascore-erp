@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo - Aging Engine (Cuentas por Cobrar AR & Cuentas por Pagar AP)
  * 
  * Calcula la antigüedad de saldos vencidos organizados en rangos temporales:
@@ -28,12 +28,14 @@ export async function calculateAgingReport(
   try {
     const docType = type === 'customer' ? 'invoice' : 'purchase_order';
 
-    // Obtener documentos pendientes de cobro/pago
+    // Obtener documentos pendientes de cobro/pago (excluyendo saldados y anulados)
     const { data: docs, error } = await supabaseAdmin
       .from('documents')
       .select('id, entity_id, total_amount, created_at, status, entities(name)')
       .eq('tenant_id', tenantId)
       .eq('type', docType)
+      .neq('status', 'paid')
+      .neq('status', 'annulled')
       .is('deleted_at', null);
 
     if (error) throw error;

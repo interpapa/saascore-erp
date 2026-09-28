@@ -18,7 +18,7 @@ export async function getAvailableSlots(date: string): Promise<string[]> {
  * Placeholder: create a reservation.
  * Returns a success object; in production would insert into Supabase.
  */
-export async function createReservation(): Promise<{ success: boolean; error?: string }> {
+export async function createReservation(data: any): Promise<{ success: boolean; error?: string }> {
   // Simulate a successful insertion.
   return { success: true };
 }

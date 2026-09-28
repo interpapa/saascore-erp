@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
@@ -14,19 +14,33 @@ export interface EntityLogInput {
   metadata?: unknown;
 }
 
-function isMissingTableError(error: unknown): boolean {
+function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = error.code || '';
-  const msg = error.message || '';
-  return code === 'PGRST204' || code === '42P01' || msg.includes('does not exist');
+  const msg = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache')
+  );
 }
 
 /**
  * Trae la bitácora de anotaciones/inspecciones para un cliente o activo específico.
  */
-export async function getEntityLogsAction(entityId: string, tenantId: string) {
+export async function getEntityLogsAction(entityId: string, tenantId: string, actor?: ActionActor) {
   try {
-    const db = supabaseAdmin || supabase;
+    if (actor) {
+      const securityCheck = await validateUserTenantAccess(actor, tenantId);
+      if (!securityCheck.authorized) {
+        return { success: false, error: securityCheck.error || 'Acceso denegado.', logs: [] };
+      }
+    }
+
+    const db = supabaseAdmin;
 
     // 1. Intentar leer de la tabla física 'entity_logs'
     const { data, error } = await db
@@ -53,7 +67,7 @@ export async function getEntityLogsAction(entityId: string, tenantId: string) {
     }
 
     throw new Error(error?.message || 'Error al consultar bitácora.');
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('[getEntityLogsAction Error]:', error.message);
     return { success: false, error: error.message, logs: [] };
   }
@@ -68,14 +82,14 @@ export async function createEntityLogAction(
   actor: ActionActor
 ) {
   try {
-    const db = supabaseAdmin || supabase;
+    const db = supabaseAdmin;
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
     const newLog = {
-      id: `elog-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(-4)}`,
+      id: `elog-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       tenant_id: tenantId,
       entity_id: payload.entity_id,
       log_type: payload.log_type,
@@ -130,7 +144,7 @@ export async function createEntityLogAction(
     }
 
     throw new Error(error?.message || 'Error al guardar bitácora.');
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('[createEntityLogAction Error]:', error.message);
     return { success: false, error: error.message };
   }

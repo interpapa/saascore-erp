@@ -17,14 +17,14 @@ export async function getCRMPipelineSummaryAction(
       return { success: false, error: 'Demasiadas peticiones al CRM.' };
     }
 
-    const security = await validateKernelAccess(actor, tenantId);
+    const security = await validateKernelAccess(actor, tenantId, 'clientes');
     if (!security.authorized) {
-      return { success: false, error: security.error || 'Acceso denegado.' };
+      return { success: false, error: security.error || 'Acceso denegado al CRM.' };
     }
 
     const summary = summarizePipeline(opportunities);
     return { success: true, summary };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
@@ -35,14 +35,14 @@ export async function getMRRMetricsAction(
   actor: KernelActor
 ) {
   try {
-    const security = await validateKernelAccess(actor, tenantId);
+    const security = await validateKernelAccess(actor, tenantId, 'clientes');
     if (!security.authorized) {
-      return { success: false, error: security.error || 'Acceso denegado.' };
+      return { success: false, error: security.error || 'Acceso denegado a métricas de clientes.' };
     }
 
     const metrics = summarizeSubscriptions(subscriptions);
     return { success: true, metrics };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
@@ -53,16 +53,16 @@ export async function generateB2BPortalLinkAction(
   actor: KernelActor
 ) {
   try {
-    const security = await validateKernelAccess(actor, tenantId);
+    const security = await validateKernelAccess(actor, tenantId, 'clientes');
     if (!security.authorized) {
-      return { success: false, error: security.error || 'Acceso denegado.' };
+      return { success: false, error: security.error || 'Acceso denegado al portal B2B.' };
     }
 
     const token = createB2BPortalToken(customerId, tenantId);
     const link = `/portal/${token}`;
 
     return { success: true, token, link };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }

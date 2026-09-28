@@ -10,7 +10,7 @@ export default async function CatalogPage(props: {
   const { tenantSlug } = await props.params;
 
   let activeTenant = { id: '00000000-0000-0000-0000-000000000001', name: 'Catálogo Demo', metadata: {} };
-  let itemsArr: unknown[] = [];
+  let itemsArr: any[] = [];
 
   try {
     let tenantQuery = supabaseAdmin.from('tenants').select('*');

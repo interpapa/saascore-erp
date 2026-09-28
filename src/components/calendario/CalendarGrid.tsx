@@ -13,7 +13,7 @@ export interface CalendarGridProps {
   isLoading: boolean;
   onSelectAppointment: (appt: Appointment) => void;
   onSelectDateSlot: (date: Date, timeStr?: string) => void;
-  onOpenCreateModal: () => void;
+  onOpenCreateModal: (type?: 'appointment' | 'block') => void;
 }
 
 const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -106,7 +106,7 @@ export function CalendarGrid({
   // -------------------------
   const renderDayView = () => {
     // Generar horas desde 08:00 hasta 20:30 (intervalos de 30 min)
-    const hours = [];
+    const hours: string[] = [];
     for (let h = 8; h <= 20; h++) {
       hours.push(`${h.toString().padStart(2, '0')}:00`);
       if (h < 20) hours.push(`${h.toString().padStart(2, '0')}:30`);

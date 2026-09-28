@@ -1,13 +1,15 @@
-﻿// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
 //  Rendo React: Control de Acceso Basado en Roles
 // ═══════════════════════════════════════════════════
 
 export type UserRole = 'superadmin' | 'owner' | 'manager' | 'technician' | 'seller';
 
+export type Permission = 'crm' | 'finanzas' | 'inventario' | 'registros' | 'equipo' | 'reportes' | 'contabilidad' | 'calendario' | 'whatsapp' | 'kanban' | 'franquicias' | 'integraciones' | 'apps' | 'config' | 'admin';
+
 export interface RBACPolicy {
   role: UserRole;
   name: string;
-  permissions: string[] | '*';
+  permissions: Permission[] | '*';
 }
 
 export const defaultRoles: Record<UserRole, RBACPolicy> = {
@@ -22,5 +24,5 @@ export const checkPermission = (userRole: UserRole, requiredPermission: string):
   const policy = defaultRoles[userRole];
   if (!policy) return false;
   if (policy.permissions === '*') return true;
-  return policy.permissions.includes(requiredPermission);
+  return policy.permissions.includes(requiredPermission as any);
 };

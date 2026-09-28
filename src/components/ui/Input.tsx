@@ -30,8 +30,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               ${className}
             `}
             onFocus={(e) => {
-              if (props.type === 'number' || props.inputMode === 'numeric') {
-                e.target.select();
+              try {
+                if (props.type === 'number' || props.inputMode === 'numeric') {
+                  e.target.select?.();
+                }
+              } catch {
+                // Ignore DOMException on inputs that don't allow text selection
               }
               if (props.onFocus) props.onFocus(e);
             }}

@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { AmbientBackground } from '@/components/core/AmbientBackground';
 
 /**
@@ -34,12 +35,12 @@ export default function NotFound() {
 
         {/* Botón de Retorno al Launcher */}
         <div className="pt-2">
-          <a 
+          <Link 
             href="/dashboard"
             className="btn-base btn-primary w-full shadow-lg shadow-primary/25 btn-haptic flex items-center justify-center gap-2"
           >
             Regresar al Launcher
-          </a>
+          </Link>
         </div>
         
       </div>

@@ -3,8 +3,21 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
+import { eventBus } from '@/lib/core/events/eventBus';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
+
+function safeRevalidate(path: string, tenantId?: string) {
+  try {
+    revalidatePath(path);
+    if (tenantId) {
+      revalidatePath(`/reservas/${tenantId}`);
+    }
+  } catch {
+    // Graceful degradation when outside Next.js request context
+  }
+}
 import {
   Appointment,
   AppointmentFilterState,
@@ -14,11 +27,25 @@ import {
   Service
 } from '@/types/calendario';
 
-function isMissingTableError(error: unknown): boolean {
+function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = error.code || '';
-  const msg = error.message || '';
-  return code === 'PGRST204' || code === '42P01' || msg.includes('does not exist');
+  const msg = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache')
+  );
+}
+
+function isMissingColumnError(error: any): boolean {
+  if (!error) return false;
+  const code = (error as any).code || '';
+  const msg = (error as any).message || '';
+  return code === '42703' || (msg.includes('column') && msg.includes('does not exist'));
 }
 
 /**
@@ -26,9 +53,20 @@ function isMissingTableError(error: unknown): boolean {
  */
 export async function getAppointmentsAction(
   tenantId: string,
-  filter?: AppointmentFilterState
+  filter: AppointmentFilterState | undefined,
+  actor: ActionActor
 ): Promise<{ success: boolean; appointments: Appointment[]; error?: string }> {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', appointments: [] };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.', appointments: [] };
+    }
+
     if (!tenantId) return { success: true, appointments: [] };
 
     // 1. Primary Attempt: Query custom 'appointments' table
@@ -40,12 +78,12 @@ export async function getAppointmentsAction(
 
     if (!error && appts) {
       // Gather unique IDs to fetch related records in batch, bypassing PostgreSQL schema foreign key relationship checks
-      const clientIds = Array.from(new Set(appts.map((a: unknown) => a.client_id).filter(Boolean)));
-      const employeeIds = Array.from(new Set(appts.map((a: unknown) => a.employee_id).filter(Boolean)));
-      const serviceIds = Array.from(new Set(appts.map((a: unknown) => a.service_id).filter(Boolean)));
+      const clientIds = Array.from(new Set(appts.map((a: any) => a.client_id).filter(Boolean)));
+      const employeeIds = Array.from(new Set(appts.map((a: any) => a.employee_id).filter(Boolean)));
+      const serviceIds = Array.from(new Set(appts.map((a: any) => a.service_id).filter(Boolean)));
 
       const allEntityIds = [...clientIds, ...employeeIds];
-      const entitiesMap: Record<string, unknown> = {};
+      const entitiesMap: Record<string, any> = {};
       if (allEntityIds.length > 0) {
         const { data: entities } = await supabaseAdmin
           .from('entities')
@@ -58,7 +96,7 @@ export async function getAppointmentsAction(
         }
       }
 
-      const itemsMap: Record<string, unknown> = {};
+      const itemsMap: Record<string, any> = {};
       if (serviceIds.length > 0) {
         const { data: items } = await supabaseAdmin
           .from('items')
@@ -71,7 +109,7 @@ export async function getAppointmentsAction(
         }
       }
 
-      const formatted: Appointment[] = appts.map((a: unknown) => {
+      const formatted: Appointment[] = appts.map((a: any) => {
         const client = a.client_id ? entitiesMap[a.client_id] : null;
         const employee = a.employee_id ? entitiesMap[a.employee_id] : null;
         const service = a.service_id ? itemsMap[a.service_id] : null;
@@ -102,18 +140,7 @@ export async function getAppointmentsAction(
       return { success: true, appointments: filterAppointments(formatted, filter) };
     }
 
-function isMissingColumnError(error: unknown): boolean {
-  if (!error) return false;
-  const code = (error as any).code || '';
-  const msg = (error as any).message || '';
-  return code === '42703' || msg.includes('column') && msg.includes('does not exist');
-}
-
-// Existing fallback condition updated
-// Replace line 106-108 condition
-// Original: if (error && isMissingTableError(error)) {
-// New:
-if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
+    if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
       const { data: docs, error: docErr } = await supabaseAdmin
         .from('documents')
         .select(`
@@ -126,7 +153,7 @@ if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
 
       if (docErr) throw new Error(docErr.message);
 
-      const fallbackAppts: Appointment[] = (docs || []).map((doc: unknown) => {
+      const fallbackAppts: Appointment[] = (docs || []).map((doc: any) => {
         const issueDate = doc.issue_date || doc.metadata?.issue_date || doc.created_at;
         const dueDate = doc.due_date || doc.metadata?.due_date || new Date(new Date(issueDate).getTime() + 3600000).toISOString();
 
@@ -159,7 +186,7 @@ if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
     }
 
     throw new Error(error?.message || 'Error al obtener citas.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getAppointmentsAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, appointments: [] };
   }
@@ -179,6 +206,11 @@ export async function createAppointmentAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
+    }
+
     if (!tenantId || !payload.title || !payload.start_time) {
       throw new Error('Empresa, título y hora de inicio son requeridos.');
     }
@@ -186,12 +218,38 @@ export async function createAppointmentAction(
     const calculatedEndTime = payload.end_time || 
       new Date(new Date(payload.start_time).getTime() + (payload.duration_minutes || 60) * 60000).toISOString();
 
+    // Prevención de colisión defensiva: verificar que el especialista no tenga otra cita activa en ese rango horario
+    if (payload.employee_id && payload.status !== 'cancelled') {
+      try {
+        const { data: overlapping } = await supabaseAdmin
+          .from('appointments')
+          .select('id, title, start_time, end_time')
+          .eq('tenant_id', tenantId)
+          .eq('employee_id', payload.employee_id)
+          .neq('status', 'cancelled')
+          .neq('status', 'no_show')
+          .neq('status', 'completed')
+          .lt('start_time', calculatedEndTime)
+          .gt('end_time', payload.start_time)
+          .limit(1);
+
+        if (overlapping && overlapping.length > 0) {
+          return {
+            success: false,
+            error: `El colaborador ya tiene una cita agendada en ese horario ("${overlapping[0].title || 'Cita'}"). Por favor selecciona otro turno o especialista.`
+          };
+        }
+      } catch {
+        // En caso de tabla appointments no disponible, el fallback se encargará
+      }
+    }
+
     // 1. Primary Attempt: Insert into 'appointments' table
     const { data: newAppt, error } = await supabaseAdmin
       .from('appointments')
       .insert([{
         tenant_id: tenantId,
-        // Guardamos el título dentro de metadata, ya que la tabla no tiene columna 'title'
+        title: payload.title,
         metadata: { ...(payload.metadata || {}), title: payload.title },
         description: payload.description || null,
         client_id: payload.client_id || null,
@@ -218,7 +276,25 @@ export async function createAppointmentAction(
         metadata: { action: 'appointment_created', title: payload.title, start_time: payload.start_time },
       });
 
-      revalidatePath('/calendario');
+      // Emisión de evento desacoplado (Estilo Odoo 17)
+      const clientName = typeof payload.metadata?.client_name === 'string' ? payload.metadata.client_name : payload.title;
+      const clientPhone = typeof payload.metadata?.client_phone === 'string' ? payload.metadata.client_phone : undefined;
+      const serviceName = typeof payload.metadata?.service_name === 'string' ? payload.metadata.service_name : undefined;
+
+      await eventBus.emit('appointment.booked', {
+        appointmentId: newAppt.id,
+        tenantId,
+        customerName: clientName,
+        customerPhone: clientPhone,
+        barberId: payload.employee_id || '',
+        date: payload.start_time.split('T')[0],
+        time: payload.start_time.split('T')[1]?.slice(0, 5) || '00:00',
+        durationMinutes: payload.duration_minutes || 60,
+        serviceName: serviceName,
+        timestamp: new Date().toISOString(),
+      });
+
+      safeRevalidate('/calendario', tenantId);
       return { success: true, appointment: newAppt };
     }
 
@@ -265,7 +341,7 @@ export async function createAppointmentAction(
         metadata: { action: 'appointment_created', title: payload.title, start_time: payload.start_time },
       });
 
-      revalidatePath('/calendario');
+      safeRevalidate('/calendario', tenantId);
       return {
         success: true,
         appointment: {
@@ -293,7 +369,7 @@ export async function createAppointmentAction(
     }
 
     throw new Error(error?.message || 'Error al crear la cita.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[createAppointmentAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -314,11 +390,29 @@ export async function updateAppointmentMetadataAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
+    }
+
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    // 1. Obtener metadata actual para fusionar de forma segura sin sobreescribir otros campos
+    const { data: currentAppt } = await supabaseAdmin
+      .from('appointments')
+      .select('metadata')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const mergedMetadata = {
+      ...(typeof currentAppt?.metadata === 'object' && currentAppt?.metadata !== null ? currentAppt.metadata : {}),
+      ...metadata,
+    };
 
     const { error } = await supabaseAdmin
       .from('appointments')
-      .update({ metadata })
+      .update({ metadata: mergedMetadata })
       .eq('id', id)
       .eq('tenant_id', tenantId);
 
@@ -327,7 +421,7 @@ export async function updateAppointmentMetadataAction(
       if (error.code === '42P01') {
         const { error: docError } = await supabaseAdmin
           .from('documents')
-          .update({ metadata })
+          .update({ metadata: mergedMetadata })
           .eq('id', id)
           .eq('tenant_id', tenantId);
         if (docError) throw docError;
@@ -338,16 +432,100 @@ export async function updateAppointmentMetadataAction(
 
     await writeAuditLog({
       tenant_id: tenantId,
-      actor_id: actor.userId,
-      action: 'UPDATE',
-      table_name: 'appointments',
-      record_id: id,
-      new_values: { metadata },
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.updated',
+      target_type: 'appointment',
+      target_id: id,
+      metadata: { action: 'appointment_metadata_updated', metadata: mergedMetadata },
     });
 
     return { success: true };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[updateAppointmentMetadataAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Actualiza de forma segura el estado de cobro de una cita (paid | pending | unrecorded).
+ */
+export async function updateAppointmentPaymentStatusAction(
+  id: string,
+  paymentStatus: 'paid' | 'pending' | 'unrecorded',
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  return updateAppointmentMetadataAction(
+    id,
+    {
+      payment_status: paymentStatus,
+      paid_at: paymentStatus === 'paid' ? new Date().toISOString() : null,
+      payment_updated_by: actor.email,
+    },
+    tenantId,
+    actor
+  );
+}
+
+/**
+ * Actualiza el precio acordado o monto de un tratamiento para una cita.
+ * Permite ajustar precios libres, tratamientos personalizados o cargos adicionales.
+ */
+export async function updateAppointmentPriceAction(
+  id: string,
+  price: number,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; price?: number; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
+    }
+
+    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    const cleanPrice = Math.max(0, Number(price) || 0);
+
+    const { error } = await supabaseAdmin
+      .from('appointments')
+      .update({ price: cleanPrice })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      if (error.code === '42P01') {
+        const { error: docError } = await supabaseAdmin
+          .from('documents')
+          .update({ total_amount: cleanPrice })
+          .eq('id', id)
+          .eq('tenant_id', tenantId);
+        if (docError) throw docError;
+      } else {
+        throw error;
+      }
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.updated',
+      target_type: 'appointment',
+      target_id: id,
+      metadata: { action: 'appointment_price_updated', new_price: cleanPrice },
+    });
+
+    safeRevalidate('/calendario', tenantId);
+    return { success: true, price: cleanPrice };
+  } catch (err: any) {
+    console.error('[updateAppointmentPriceAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
 }
@@ -362,6 +540,11 @@ export async function updateAppointmentStatusAction(
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
     }
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
@@ -386,12 +569,42 @@ export async function updateAppointmentStatusAction(
         metadata: { action: 'appointment_status_updated', new_status: status },
       });
 
-      revalidatePath('/calendario');
+      // Emisión de eventos de dominio desacoplados (Estilo Odoo 17)
+      const parseMetadata = (raw: unknown): Record<string, any> => {
+        if (!raw) return {};
+        if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, any>;
+        if (typeof raw === 'string') {
+          try { return JSON.parse(raw); } catch { return {}; }
+        }
+        return {};
+      };
+      const meta = parseMetadata(updatedAppt.metadata);
+
+      if (status === 'completed') {
+        await eventBus.emit('appointment.completed', {
+          appointmentId: id,
+          tenantId,
+          customerName: meta.client_name || updatedAppt.title || 'Cliente',
+          barberId: updatedAppt.employee_id || '',
+          total: updatedAppt.price || 0,
+          paymentStatus: meta.payment_status === 'paid' ? 'paid' : (meta.payment_status === 'pending' ? 'pending' : 'unrecorded'),
+          timestamp: new Date().toISOString(),
+        });
+      } else if (status === 'cancelled') {
+        await eventBus.emit('appointment.cancelled', {
+          appointmentId: id,
+          tenantId,
+          reason: meta.cancel_reason,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      safeRevalidate('/calendario', tenantId);
       return { success: true, appointment: updatedAppt };
     }
 
     // 2. Fallback: Update 'documents' table
-    if (error && (isMissingTableError(error) || isMissingColumnError(error))) {
+    if (error && (isMissingTableError(error) || error.message?.includes('column'))) {
       const docStatus = mapApptStatusToDocStatus(status);
       const { data: updatedDoc, error: docErr } = await supabaseAdmin
         .from('documents')
@@ -413,7 +626,7 @@ export async function updateAppointmentStatusAction(
         metadata: { action: 'appointment_status_updated', new_status: status },
       });
 
-      revalidatePath('/calendario');
+      safeRevalidate('/calendario', tenantId);
       return {
         success: true,
         appointment: {
@@ -431,7 +644,7 @@ export async function updateAppointmentStatusAction(
     }
 
     throw new Error(error?.message || 'Error al actualizar el estado de la cita.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[updateAppointmentStatusAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -473,3 +686,169 @@ function filterAppointments(list: Appointment[], filter?: AppointmentFilterState
     return true;
   });
 }
+
+/**
+ * Añade atómicamente un participante a una clase o turno grupal,
+ * verificando el aforo máximo en backend para evitar sobrecupos por carreras.
+ */
+export async function addAttendeeToAppointmentAction(
+  appointmentId: string,
+  client: { id: string; name: string },
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; attendees?: Array<{ id: string; name: string }>; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!appointmentId || !client?.id) {
+      return { success: false, error: 'ID de cita y cliente son requeridos.' };
+    }
+
+    // 1. Intentar en tabla appointments
+    const { data: appt, error } = await supabaseAdmin
+      .from('appointments')
+      .select('id, metadata')
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!error && appt) {
+      const metadata = appt.metadata || {};
+      const currentAttendees: Array<{ id: string; name: string }> = Array.isArray(metadata.attendees) ? metadata.attendees : [];
+      const maxCapacity = Number(metadata.max_capacity) || 20;
+
+      if (currentAttendees.some(a => a.id === client.id)) {
+        return { success: true, attendees: currentAttendees };
+      }
+
+      if (currentAttendees.length >= maxCapacity) {
+        return { success: false, error: `El aforo para esta sesión grupal (${maxCapacity} personas) ya está completo.` };
+      }
+
+      const updatedAttendees = [...currentAttendees, { id: client.id, name: client.name }];
+      const updatedMetadata = { ...metadata, attendees: updatedAttendees };
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('appointments')
+        .update({ metadata: updatedMetadata, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId)
+        .eq('tenant_id', tenantId);
+
+      if (updateErr) throw updateErr;
+
+      safeRevalidate('/calendario');
+      return { success: true, attendees: updatedAttendees };
+    }
+
+    // 2. Fallback en documents
+    const { data: doc, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .select('id, metadata')
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (docErr || !doc) {
+      return { success: false, error: 'Cita no encontrada.' };
+    }
+
+    const metadata = doc.metadata || {};
+    const currentAttendees: Array<{ id: string; name: string }> = Array.isArray(metadata.attendees) ? metadata.attendees : [];
+    const maxCapacity = Number(metadata.max_capacity) || 20;
+
+    if (currentAttendees.some(a => a.id === client.id)) {
+      return { success: true, attendees: currentAttendees };
+    }
+
+    if (currentAttendees.length >= maxCapacity) {
+      return { success: false, error: `El aforo para esta sesión grupal (${maxCapacity} personas) ya está completo.` };
+    }
+
+    const updatedAttendees = [...currentAttendees, { id: client.id, name: client.name }];
+    const updatedMetadata = { ...metadata, attendees: updatedAttendees };
+
+    await supabaseAdmin
+      .from('documents')
+      .update({ metadata: updatedMetadata, updated_at: new Date().toISOString() })
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId);
+
+    safeRevalidate('/calendario');
+    return { success: true, attendees: updatedAttendees };
+  } catch (err: any) {
+    console.error('[addAttendeeToAppointmentAction Error]:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Remueve de forma segura un participante de una clase grupal.
+ */
+export async function removeAttendeeFromAppointmentAction(
+  appointmentId: string,
+  clientId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; attendees?: Array<{ id: string; name: string }>; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    // 1. Intentar en tabla appointments
+    const { data: appt, error } = await supabaseAdmin
+      .from('appointments')
+      .select('id, metadata')
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!error && appt) {
+      const metadata = appt.metadata || {};
+      const currentAttendees: Array<{ id: string; name: string }> = Array.isArray(metadata.attendees) ? metadata.attendees : [];
+      const updatedAttendees = currentAttendees.filter(a => a.id !== clientId);
+
+      await supabaseAdmin
+        .from('appointments')
+        .update({ metadata: { ...metadata, attendees: updatedAttendees }, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId)
+        .eq('tenant_id', tenantId);
+
+      safeRevalidate('/calendario');
+      return { success: true, attendees: updatedAttendees };
+    }
+
+    // 2. Fallback en documents
+    const { data: doc } = await supabaseAdmin
+      .from('documents')
+      .select('id, metadata')
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (doc) {
+      const metadata = doc.metadata || {};
+      const currentAttendees: Array<{ id: string; name: string }> = Array.isArray(metadata.attendees) ? metadata.attendees : [];
+      const updatedAttendees = currentAttendees.filter(a => a.id !== clientId);
+
+      await supabaseAdmin
+        .from('documents')
+        .update({ metadata: { ...metadata, attendees: updatedAttendees }, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId)
+        .eq('tenant_id', tenantId);
+
+      safeRevalidate('/calendario');
+      return { success: true, attendees: updatedAttendees };
+    }
+
+    return { success: false, error: 'Cita no encontrada.' };
+  } catch (err: any) {
+    console.error('[removeAttendeeFromAppointmentAction Error]:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+

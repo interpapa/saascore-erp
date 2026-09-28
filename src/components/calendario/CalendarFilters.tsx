@@ -28,7 +28,7 @@ export interface CalendarFiltersProps {
   onFilterChange: (filters: AppointmentFilterState) => void;
   employees: Employee[];
   services: Service[];
-  onOpenCreateModal: () => void;
+  onOpenCreateModal: (type?: 'appointment' | 'block') => void;
 }
 
 export function CalendarFilters({
@@ -171,13 +171,22 @@ export function CalendarFilters({
             </button>
           </div>
 
-          <button
-            onClick={onOpenCreateModal}
-            className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic shrink-0"
-          >
-            <Plus size={16} />
-            Agendar
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onOpenCreateModal('block')}
+              className="flex-1 sm:flex-none justify-center bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 px-3 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 shadow-sm btn-haptic shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Bloquear
+            </button>
+            <button
+              onClick={() => onOpenCreateModal('appointment')}
+              className="flex-1 sm:flex-none justify-center bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic shrink-0"
+            >
+              <Plus size={16} />
+              Agendar
+            </button>
+          </div>
         </div>
       </div>
 

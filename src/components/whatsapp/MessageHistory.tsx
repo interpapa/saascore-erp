@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { Check, CheckCheck, Clock, AlertTriangle, MessageCircle } from 'lucide-react';
+import { Check, CheckCheck, Clock, AlertTriangle, MessageCircle, Lock } from 'lucide-react';
 import { Message } from '@/types/whatsapp';
 import { EmptyState } from '@/components/core/EmptyState';
 
@@ -32,7 +32,7 @@ export function MessageHistory({ messages, isLoading, activeClientName }: Messag
         <EmptyState
           icon={<MessageCircle size={36} />}
           title="Sin mensajes en este chat"
-          description={`Envía el primer mensaje a ${activeClientName || 'este cliente'} para iniciar la conversación.`}
+          description={`Envía el primer mensaje a ${activeClientName || 'este contacto'} para iniciar la conversación.`}
           className="py-6"
         />
       </div>
@@ -42,10 +42,36 @@ export function MessageHistory({ messages, isLoading, activeClientName }: Messag
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
       {messages.map((msg) => {
-        const isAgent = msg.sender_type === 'agent';
+        const isInternalNote = Boolean(msg.metadata?.is_internal_note);
+        const isAgent = msg.sender_type === 'agent' || isInternalNote;
         const formattedTime = msg.timestamp
           ? new Date(msg.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
           : '';
+
+        // Render Internal Note Card (Private Team Sticky)
+        if (isInternalNote) {
+          return (
+            <div key={msg.id} className="flex justify-center my-3">
+              <div className="w-full max-w-md rounded-2xl p-3.5 bg-amber-500/10 border border-amber-500/30 text-amber-950 dark:text-amber-200 shadow-xs space-y-1.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                  <span className="flex items-center gap-1.5">
+                    <Lock size={13} />
+                    <span>Nota Interna (Solo visible para el equipo)</span>
+                  </span>
+                  {formattedTime && <span className="text-[10px] text-slate-400 font-mono">{formattedTime}</span>}
+                </div>
+                <p className="text-xs sm:text-sm whitespace-pre-wrap break-words font-medium">
+                  {msg.text}
+                </p>
+                {msg.sender_name && (
+                  <span className="block text-[10px] text-slate-400 text-right">
+                    Registrado por: {msg.sender_name}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        }
 
         return (
           <div

@@ -2,14 +2,30 @@
 
 import { useERPStore, Tenant } from '@/store/useERPStore';
 
-const DEFAULT_DEMO_TENANT: Tenant = {
-  id: '00000000-0000-0000-0000-000000000001',
-  name: 'Empresa Principal (Demo)',
-  blocked: false,
-  metadata: {},
-};
+/**
+ * Hook to resolve the active tenant cleanly and safely.
+ * Returns the currentTenant if hydrated, or a fallback reconstructed from session.tenantId.
+ * Returns null if no valid tenant ID is known yet, preventing accidental queries
+ * to invalid or fake demo UUIDs that cause false empty states.
+ */
+export function useTenantResolver(): Tenant | null {
+  const currentTenant = useERPStore(s => s.currentTenant);
+  const session = useERPStore(s => s.session);
 
-export function useTenantResolver() {
-  const { currentTenant } = useERPStore();
-  return currentTenant || DEFAULT_DEMO_TENANT;
+  if (currentTenant?.id) {
+    return currentTenant;
+  }
+
+  // Fallback seguro: si currentTenant aún se está hidratando pero session.tenantId ya está disponible
+  if (session?.tenantId) {
+    return {
+      id: session.tenantId,
+      name: currentTenant?.name || 'Mi Empresa',
+      blocked: false,
+      active_modules: currentTenant?.active_modules || [],
+      metadata: currentTenant?.metadata || {},
+    };
+  }
+
+  return null;
 }

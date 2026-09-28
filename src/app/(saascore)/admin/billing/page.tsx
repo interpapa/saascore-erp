@@ -2,23 +2,25 @@
 
 import { useState, useEffect } from 'react';
 import { useERPStore } from '@/store/useERPStore';
+import { useActionActor } from '@/hooks/useActionActor';
 import { ArrowLeft, Users, DollarSign, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
 import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
-export const dynamic = 'force-dynamic';
 
 export default function BillingAdminPage() {
   const { toast } = useToast();
   const { session } = useERPStore();
-  const [tenants, setTenants] = useState<unknown[]>([]);
+  const actor = useActionActor();
+  const [tenants, setTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTenants = async () => {
-    if (!session?.userEmail) return;
+    if (!actor && !session?.userEmail) return;
     setIsLoading(true);
-    const result = await getAllTenants(session.userEmail);
+    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const result = await getAllTenants(activeActor);
     if (result.success && result.tenants) {
       setTenants(result.tenants);
     }
@@ -34,9 +36,10 @@ export default function BillingAdminPage() {
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (!session?.userEmail) return;
     const newStatus = currentStatus === 'active' ? 'suspended' : 'active';
+    const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
     setTenants(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
     
-    const result = await toggleTenantStatus(id, newStatus, session.userEmail);
+    const result = await toggleTenantStatus(id, newStatus, activeActor);
     if (!result.success) {
       toast({ variant: 'error', title: 'Error', description: result.error });
       fetchTenants();

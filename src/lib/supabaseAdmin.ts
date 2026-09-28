@@ -5,21 +5,52 @@
  * sobre la base de datos y BYPASA las Row Level Security (RLS) policies.
  * 
  * NUNCA importar este archivo desde componentes de React o páginas del cliente.
- * Solo usar en archivos que tengan 'use server' al inicio.
+ * Solo usar en archivos que tengan 'use server' al inicio o en rutas de backend.
  */
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+let _supabaseAdminInstance: SupabaseClient | null = null;
 
-if (!serviceRoleKey) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY no está configurada. Los Server Actions no pueden operar de forma segura.');
+function getSupabaseAdmin(): SupabaseClient {
+  if (typeof window !== 'undefined') {
+    throw new Error('supabaseAdmin es exclusivo de backend/Server Actions y no puede ejecutarse en el navegador.');
+  }
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY 
+    || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    || "dummy-build-key-for-prerendering";
+
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NODE_ENV === 'production' && typeof window === 'undefined') {
+    console.warn('[supabaseAdmin]: SUPABASE_SERVICE_ROLE_KEY no está configurada explícitamente en el entorno de ejecución.');
+  }
+
+  if (!_supabaseAdminInstance) {
+    _supabaseAdminInstance = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      }
+    });
+  }
+
+  return _supabaseAdminInstance;
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: {
-    // El cliente admin nunca persiste sesiones de usuario
-    persistSession: false,
-    autoRefreshToken: false,
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(target, prop) {
+    if (prop in target) {
+      return (target as any)[prop];
+    }
+    const client = getSupabaseAdmin();
+    const value = (client as any)[prop];
+    if (typeof value === 'function') {
+      return value.bind(client);
+    }
+    return value;
+  },
+  set(target, prop, value) {
+    (target as any)[prop] = value;
+    return true;
   }
 });

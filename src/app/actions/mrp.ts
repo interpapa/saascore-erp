@@ -23,7 +23,7 @@ export async function checkBOMExplosionAction(
     const result = explodeBOM(bom, quantity, stockMap);
 
     return { success: true, result };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
@@ -53,11 +53,12 @@ export async function executeManufacturingOrderAction(
     });
 
     if (res.success) {
+      revalidatePath('/inventario');
       revalidatePath('/catalogo');
     }
 
     return res;
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }

@@ -1,9 +1,8 @@
-﻿'use client';
+'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useAuth } from '@/components/core/AuthProvider';
 import { useERPStore } from '@/store/useERPStore';
-import { LetterCascade } from '@/components/ui/LetterCascade';
 import { 
   Coins, 
   Users, 
@@ -47,8 +46,8 @@ export default function LauncherPage() {
     },
     { 
       id: 'catalogo', 
-      name: 'Catálogo', 
-      href: '/catalogo',
+      name: 'Inventario', 
+      href: '/inventario',
       gradient: 'from-violet-500 to-purple-600',
       icon: <Package className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
@@ -109,13 +108,6 @@ export default function LauncherPage() {
       icon: <Store className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
-      id: 'integraciones', 
-      name: 'Conexiones API', 
-      href: '/integraciones',
-      gradient: 'from-fuchsia-400 to-pink-600',
-      icon: <Webhook className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
-    },
-    { 
       id: 'apps', 
       name: 'Marketplace', 
       href: '/apps',
@@ -139,24 +131,18 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'];
+  const fallbackModules = ['caja', 'clientes', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin'];
   const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : fallbackModules;
   const filteredApps = apps.filter((app) => {
-    if (app.id === 'admin' && session?.role !== 'superadmin') return false;
-    return enabledModules.includes(app.id);
+    if (app.id === 'admin') return session?.role === 'superadmin';
+    return enabledModules.includes(app.id) || (app.id === 'inventario' && enabledModules.includes('catalogo'));
   });
 
-  // Prefetch all module routes after login
-  useEffect(() => {
-    if (!currentTenant) return;
-    // Prefetch each enabled module to avoid stale chunk errors
-    filteredApps.forEach((app) => {
-      router.prefetch(app.href);
-    });
-  }, [currentTenant, filteredApps]);
-
+  // La precarga manual (prefetch) fue eliminada porque saturaba el CPU en modo desarrollo
+  // al intentar compilar las 15 rutas simultáneamente. Next.js <Link> ya hace prefetch automático
+  // al entrar en el viewport de forma mucho más optimizada.
     return (
         <div className="min-h-[calc(100vh-5rem)] flex flex-col pt-8 pb-20 px-4 sm:px-6 max-w-6xl mx-auto w-full space-y-12 animate-in fade-in duration-300 relative z-10">
       

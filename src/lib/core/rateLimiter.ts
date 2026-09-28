@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo - Rate Limiting & Throttling Guard
  * 
  * Protege los Server Actions contra ataques de fuerza bruta, spam y DDoS.
@@ -17,6 +17,19 @@ const LIMITS: Record<string, { maxTokens: number; refillRatePerSec: number }> = 
 };
 
 const storage = new Map<string, RateLimitRecord>();
+
+// Garbage Collector: Limpiar IPs antiguas cada 5 minutos para evitar Memory Leaks (Out of Memory)
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now();
+    for (const [key, record] of storage.entries()) {
+      // Si el registro no se ha actualizado en 10 minutos (600000 ms), eliminarlo
+      if (now - record.lastRefill > 600000) {
+        storage.delete(key);
+      }
+    }
+  }, 300000).unref(); // .unref() evita que el setInterval impida que Node se cierre
+}
 
 /**
  * Revisa si un actor o IP ha excedido la tasa de peticiones permitidas.

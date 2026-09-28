@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { updateTenantMetadataAction } from '@/app/actions/tenant';
+import { useActionActor } from '@/hooks/useActionActor';
 import { X, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface TenantThemeModalProps {
@@ -12,6 +13,7 @@ interface TenantThemeModalProps {
 }
 
 export function TenantThemeModal({ tenantId, initialTheme, onClose }: TenantThemeModalProps) {
+  const actor = useActionActor();
   const [bgColor, setBgColor] = useState(initialTheme?.bgColor || '#ffffff');
   const [btnColor, setBtnColor] = useState(initialTheme?.btnColor || '#0B3B24');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -19,12 +21,16 @@ export function TenantThemeModal({ tenantId, initialTheme, onClose }: TenantThem
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
+    if (!actor) {
+      setError('Sesión no disponible.');
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
       const result = await updateTenantMetadataAction(tenantId, {
         public_theme: { bgColor, btnColor }
-      }, null);
+      }, actor);
       if (!result.success) throw new Error(result.error);
 
       setSuccess(true);

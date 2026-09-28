@@ -29,11 +29,12 @@ import {
 } from '@/types/calendario';
 
 import { BookingConfigModal } from '@/components/calendario/BookingConfigModal';
+import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 
 export default function CalendarioPage() {
   const currentTenant = useTenantResolver();
   const searchParams = useSearchParams();
-  const { session } = useERPStore();
+  const session = useERPStore(s => s.session);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -58,6 +59,7 @@ export default function CalendarioPage() {
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [createModalType, setCreateModalType] = useState<'appointment' | 'block'>('appointment');
   const [selectedDateForCreate, setSelectedDateForCreate] = useState<Date | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -75,16 +77,27 @@ export default function CalendarioPage() {
 
   const bookableEmployees = employees.filter(e => e.bookable);
 
-  // Fetch Data Function
+  const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0)
+    ? currentTenant.active_modules
+    : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
+      ? (currentTenant?.metadata as any).active_modules
+      : null;
+
+  const isInventoryEnabled = isModuleActive(tenantModules, 'inventario');
+  const isCRMEnabled = isModuleActive(tenantModules, 'clientes');
+  const isTeamEnabled = isModuleActive(tenantModules, 'equipo');
+
+  // Fetch Data Function (Adaptativo a Módulos Habilitados)
   const fetchData = useCallback(async () => {
     if (!currentTenant) return;
     try {
+      if (!actor) return;
       setIsLoading(true);
       const [apptsRes, empRes, custRes, srvRes] = await Promise.all([
-        getAppointmentsAction(currentTenant.id, filterState),
-        getEntitiesAction(currentTenant.id, 'employee'),
-        getEntitiesAction(currentTenant.id, 'customer'),
-        getItemsAction(currentTenant.id, 'service'),
+        getAppointmentsAction(currentTenant.id, filterState, actor),
+        isTeamEnabled ? getEntitiesAction(currentTenant.id, 'employee', 50, actor) : Promise.resolve({ success: true, entities: [] }),
+        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 50, actor) : Promise.resolve({ success: true, entities: [] }),
+        isInventoryEnabled ? getItemsAction(currentTenant.id, 'service', 50, actor) : Promise.resolve({ success: true, items: [] }),
       ]);
 
       if (apptsRes.success) {
@@ -137,7 +150,7 @@ export default function CalendarioPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant, filterState, toast]);
+  }, [currentTenant?.id, actor, filterState, toast, isTeamEnabled, isCRMEnabled, isInventoryEnabled]);
 
   useEffect(() => {
     fetchData();
@@ -180,6 +193,11 @@ export default function CalendarioPage() {
     setAppointments((prev) => [optimisticAppt, ...prev]);
 
     try {
+      if (!actor) {
+        setAppointments((prev) => prev.filter((a) => a.id !== optimisticId));
+        toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
+        return;
+      }
       const res = await createAppointmentAction(input, currentTenant.id, actor);
 
       if (res.success && res.appointment) {
@@ -226,6 +244,11 @@ export default function CalendarioPage() {
     );
 
     try {
+      if (!actor) {
+        setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: oldStatus } : a)));
+        toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
+        return;
+      }
       const res = await updateAppointmentStatusAction(id, status, currentTenant.id, actor);
       if (!res.success) {
         throw new Error(res.error || 'Error al actualizar estado');
@@ -277,6 +300,12 @@ export default function CalendarioPage() {
     setSelectedAppointment((prev) => prev?.id === id ? { ...prev, metadata: newMetadata } : prev);
 
     try {
+      if (!actor) {
+        setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, metadata: oldMetadata } : a)));
+        setSelectedAppointment((prev) => prev?.id === id ? { ...prev, metadata: oldMetadata } : prev);
+        toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
+        return;
+      }
       const res = await updateAppointmentMetadataAction(id, newMetadata, currentTenant.id, actor);
       if (!res.success) throw new Error(res.error || 'Error al actualizar.');
       toast({
@@ -348,8 +377,9 @@ export default function CalendarioPage() {
         onFilterChange={setFilterState}
         employees={bookableEmployees}
         services={services}
-        onOpenCreateModal={() => {
+        onOpenCreateModal={(type = 'appointment') => {
           setSelectedDateForCreate(null);
+          setCreateModalType(type);
           setIsCreateModalOpen(true);
         }}
       />
@@ -363,8 +393,9 @@ export default function CalendarioPage() {
         isLoading={isLoading}
         onSelectAppointment={handleSelectAppointment}
         onSelectDateSlot={handleSelectDateSlot}
-        onOpenCreateModal={() => {
+        onOpenCreateModal={(type = 'appointment') => {
           setSelectedDateForCreate(null);
+          setCreateModalType(type);
           setIsCreateModalOpen(true);
         }}
       />
@@ -372,6 +403,7 @@ export default function CalendarioPage() {
       {/* Create Appointment Modal */}
       <AppointmentModal
         isOpen={isCreateModalOpen}
+        type={createModalType}
         onClose={() => {
           setIsCreateModalOpen(false);
           setSelectedDateForCreate(null);

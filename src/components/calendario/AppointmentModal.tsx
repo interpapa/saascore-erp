@@ -7,6 +7,7 @@ import { Entity } from '@/lib/api/entities';
 
 export interface AppointmentModalProps {
   isOpen: boolean;
+  type?: 'appointment' | 'block';
   onClose: () => void;
   onSave: (input: CreateAppointmentInput) => Promise<void>;
   employees: Employee[];
@@ -26,6 +27,7 @@ function toYYYYMMDD(d: Date): string {
 
 export function AppointmentModal({
   isOpen,
+  type = 'appointment',
   onClose,
   onSave,
   employees,
@@ -48,6 +50,7 @@ export function AppointmentModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [isGroupClass, setIsGroupClass] = useState(false);
+  const [customClientName, setCustomClientName] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -61,6 +64,7 @@ export function AppointmentModal({
        
       setServiceId('');
       setClientId(initialClientId || '');
+      setCustomClientName('');
       setEmployeeId('');
       setDurationMinutes(60);
       setStatus('scheduled');
@@ -78,11 +82,44 @@ export function AppointmentModal({
     const s = services.find((srv) => srv.id === id);
     if (s) {
       if (!title || title === s.name) setTitle(s.name);
-      if (s.duration_minutes) setDurationMinutes(s.duration_minutes);
-      if (s.price !== undefined) setPrice(s.price);
+      let dur = s.duration_minutes || 60;
+      let prc = s.price !== undefined ? s.price : 0;
+      
+      // Si ya hay un empleado seleccionado, ver si tiene tarifa personalizada
+      if (employeeId) {
+        const emp = employees.find(e => e.id === employeeId);
+        const empSvcs = (emp?.metadata as any)?.services as Array<{ name: string; durationMinutes?: number; price?: number }> | undefined;
+        if (empSvcs) {
+          const match = empSvcs.find(es => es.name?.trim().toLowerCase() === s.name.trim().toLowerCase());
+          if (match) {
+            if (match.durationMinutes) dur = match.durationMinutes;
+            if (match.price !== undefined && match.price > 0) prc = match.price;
+          }
+        }
+      }
+      
+      setDurationMinutes(dur);
+      setPrice(prc);
       
       const isGroup = !!s.metadata?.is_group_session;
       setIsGroupClass(isGroup);
+    }
+  };
+
+  const handleEmployeeChange = (empId: string) => {
+    setEmployeeId(empId);
+    if (!empId) return;
+    const emp = employees.find(e => e.id === empId);
+    const srv = services.find(s => s.id === serviceId);
+    if (emp && srv) {
+      const empSvcs = (emp?.metadata as any)?.services as Array<{ name: string; durationMinutes?: number; price?: number }> | undefined;
+      if (empSvcs) {
+        const match = empSvcs.find(es => es.name?.trim().toLowerCase() === srv.name.trim().toLowerCase());
+        if (match) {
+          if (match.durationMinutes) setDurationMinutes(match.durationMinutes);
+          if (match.price !== undefined && match.price > 0) setPrice(match.price);
+        }
+      }
     }
   };
 
@@ -103,19 +140,25 @@ export function AppointmentModal({
       const endTimeISO = new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString();
 
       let appointmentMetadata: Record<string, unknown> = {};
-      if (isGroupClass) {
+      if (type === 'block') {
+        appointmentMetadata = { is_block: true };
+      } else if (isGroupClass) {
         const s = services.find((srv) => srv.id === serviceId);
         appointmentMetadata = {
           is_group_class: true,
           max_capacity: s?.metadata?.max_capacity || 10,
           attendees: []
         };
+      } else if (customClientName.trim()) {
+        appointmentMetadata = {
+          client_name: customClientName.trim()
+        };
       }
 
       await onSave({
         title: apptTitle,
         service_id: serviceId || null,
-        client_id: isGroupClass ? null : (clientId || null),
+        client_id: (isGroupClass || clientId === 'manual') ? null : (clientId || null),
         employee_id: employeeId || null,
         start_time: startTimeISO,
         end_time: endTimeISO,
@@ -142,10 +185,14 @@ export function AppointmentModal({
         aria-modal="true"
       >
         {/* Header */}
-        <div className="border-b border-border p-5 sm:p-6 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+        <div className={`border-b border-border p-5 sm:p-6 flex items-center justify-between ${type === 'block' ? 'bg-red-50/50 dark:bg-red-900/20' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
           <div>
-            <h3 className="text-xl font-black text-foreground tracking-tight">Agendar Cita / Turno</h3>
-            <p className="text-xs text-slate-500 font-medium">Asigne servicio, profesional y horario</p>
+            <h3 className={`text-xl font-black tracking-tight ${type === 'block' ? 'text-red-700 dark:text-red-400' : 'text-foreground'}`}>
+              {type === 'block' ? 'Bloquear Horario' : 'Agendar Cita / Turno'}
+            </h3>
+            <p className="text-xs text-slate-500 font-medium">
+              {type === 'block' ? 'Reserva tiempo de inactividad, almuerzo o pausas' : 'Asigne servicio, profesional y horario'}
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -163,80 +210,116 @@ export function AppointmentModal({
             </div>
           )}
 
-          {/* Service Selector */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-              <Briefcase size={14} className="text-slate-400" /> Servicio
-            </label>
-            <select
-              value={serviceId}
-              onChange={(e) => handleServiceChange(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-            >
-              <option value="">-- Seleccionar Servicio (Opcional) --</option>
-              {services.map((srv) => (
-                <option key={srv.id} value={srv.id}>
-                  {srv.name} (${srv.price} • {srv.duration_minutes || 60} min)
+          {/* Service Selector (Hidden for Block) */}
+          {type !== 'block' && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                <Briefcase size={14} className="text-slate-400" /> Servicio
+              </label>
+              <select
+                value={serviceId}
+                onChange={(e) => handleServiceChange(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+              >
+                <option value="">
+                  {services.length > 0 ? '-- Seleccionar Servicio del Catálogo (Opcional) --' : '-- Sin Catálogo (Define título y precio abajo) --'}
                 </option>
-              ))}
-            </select>
-          </div>
+                {services.map((srv) => (
+                  <option key={srv.id} value={srv.id}>
+                    {srv.name} (${srv.price} • {srv.duration_minutes || 60} min)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Title Input */}
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              Título de la Cita *
+              {type === 'block' ? 'Motivo del Bloqueo *' : 'Título de la Cita *'}
             </label>
             <input
               type="text"
               required
-              placeholder="Ej: Corte de Cabello + Barba"
+              placeholder={type === 'block' ? 'Ej: Mantenimiento, Almuerzo, Vacaciones' : 'Ej: Corte de Cabello + Barba'}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
             />
           </div>
 
-          {/* Academy / Group Class Toggle */}
-          <div className="flex items-center gap-3 p-3 bg-fuchsia-50 dark:bg-fuchsia-900/20 rounded-xl border border-fuchsia-100 dark:border-fuchsia-800">
-            <input 
-              type="checkbox" 
-              checked={isGroupClass} 
-              onChange={(e) => setIsGroupClass(e.target.checked)} 
-              id="isGroupClass"
-              className="w-4 h-4 text-fuchsia-600 rounded border-fuchsia-300 focus:ring-fuchsia-500 cursor-pointer"
-            />
-            <div className="flex-1">
-              <label htmlFor="isGroupClass" className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 cursor-pointer">
-                Habilitar Modo Academia (Clase Grupal)
-              </label>
-              <p className="text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
-                Al activar esto, no seleccionarás un cliente ahora. Podrás inscribir a múltiples alumnos desde los detalles de la clase.
-              </p>
+          {/* Academy / Group Class Toggle (Hidden for Block) */}
+          {type !== 'block' && (
+            <div className="flex items-center gap-3 p-3 bg-fuchsia-50 dark:bg-fuchsia-900/20 rounded-xl border border-fuchsia-100 dark:border-fuchsia-800">
+              <input 
+                type="checkbox" 
+                checked={isGroupClass} 
+                onChange={(e) => setIsGroupClass(e.target.checked)} 
+                id="isGroupClass"
+                className="w-4 h-4 text-fuchsia-600 rounded border-fuchsia-300 focus:ring-fuchsia-500 cursor-pointer"
+              />
+              <div className="flex-1">
+                <label htmlFor="isGroupClass" className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 cursor-pointer">
+                  Habilitar Modo Academia (Clase Grupal)
+                </label>
+                <p className="text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
+                  Al activar esto, no seleccionarás un cliente ahora. Podrás inscribir a múltiples alumnos desde los detalles de la clase.
+                </p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Client & Employee Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Client (Hidden if Group Class) */}
-            <div className={isGroupClass ? 'opacity-50 pointer-events-none' : ''}>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <User size={14} className="text-slate-400" /> Cliente
-              </label>
-              <select
-                value={clientId}
-                onChange={(e) => setClientId(e.target.value)}
-                disabled={isGroupClass}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                <option value="">{isGroupClass ? 'Múltiples alumnos (Modo Academia)' : '-- Seleccionar Cliente --'}</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className={`grid grid-cols-1 gap-4 ${type === 'block' ? '' : 'sm:grid-cols-2'}`}>
+            {/* Client (Hidden if Group Class or Block) */}
+            {type !== 'block' && (
+              <div className={isGroupClass ? 'opacity-50 pointer-events-none' : ''}>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <User size={14} className="text-slate-400" /> Cliente
+                  </span>
+                  {clients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (clientId === 'manual') {
+                          setClientId('');
+                          setCustomClientName('');
+                        } else {
+                          setClientId('manual');
+                        }
+                      }}
+                      className="text-[11px] text-primary hover:underline font-bold"
+                    >
+                      {clientId === 'manual' ? 'Elegir del directorio' : 'Escribir manual'}
+                    </button>
+                  )}
+                </label>
+                {clients.length > 0 && clientId !== 'manual' ? (
+                  <select
+                    value={clientId}
+                    onChange={(e) => setClientId(e.target.value)}
+                    disabled={isGroupClass}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    <option value="">{isGroupClass ? 'Múltiples alumnos (Modo Academia)' : '-- Seleccionar Cliente del Directorio --'}</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Escribe el nombre del cliente o teléfono..."
+                    value={customClientName}
+                    onChange={(e) => setCustomClientName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  />
+                )}
+              </div>
+            )}
 
             {/* Employee */}
             <div>
@@ -245,7 +328,7 @@ export function AppointmentModal({
               </label>
               <select
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
+                onChange={(e) => handleEmployeeChange(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
               >
                 <option value="">-- Sin Asignar --</option>
@@ -308,40 +391,45 @@ export function AppointmentModal({
             </div>
           </div>
 
-          {/* Status & Price Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Status */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Estado Inicial
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as AppointmentStatus)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value="scheduled">Programada</option>
-                <option value="confirmed">Confirmada</option>
-                <option value="in_progress">En Curso</option>
-                <option value="completed">Completada</option>
-              </select>
-            </div>
+          {/* Status & Price Row (Hidden for Block) */}
+          {type !== 'block' && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Status */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Estado Inicial
+                </label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value as AppointmentStatus)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                >
+                  <option value="scheduled">Programada</option>
+                  <option value="confirmed">Confirmada</option>
+                  <option value="in_progress">En Curso</option>
+                  <option value="completed">Completada</option>
+                </select>
+              </div>
 
-            {/* Price */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <DollarSign size={14} className="text-slate-400" /> Precio / Valor ($)
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={price}
-                onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
+              {/* Price */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-slate-400" /> Precio / Monto ($)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">Editable / Libre</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={price === 0 ? '' : price}
+                  onChange={(e) => setPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                  placeholder="0.00 (Precio libre)"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Puedes ajustarlo para tratamientos específicos o dejarlo en $0 para valorarlo en caja.</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           <div>
@@ -376,7 +464,7 @@ export function AppointmentModal({
               ) : (
                 <Check size={16} />
               )}
-              Guardar Cita
+              {type === 'block' ? 'Confirmar Bloqueo' : 'Guardar Cita'}
             </button>
           </div>
         </form>

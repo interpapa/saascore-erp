@@ -2,16 +2,18 @@
 
 import { useState } from 'react';
 import { verify3WayMatchAction } from '@/app/actions/procurement';
+import { updatePurchaseOrderMatchAction } from '@/app/actions/documents';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
 import { ShieldCheck, CheckCircle2, AlertTriangle, FileCheck, ArrowRight } from 'lucide-react';
 
 interface MatchValidationTabProps {
-  purchaseOrders: unknown[];
+  purchaseOrders: any[];
   tenantId: string;
+  onRefresh?: () => void;
 }
 
-export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidationTabProps) {
+export function MatchValidationTab({ purchaseOrders, tenantId, onRefresh }: MatchValidationTabProps) {
   const actor = useActionActor();
   const { toast } = useToast();
 
@@ -19,7 +21,7 @@ export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidation
   const [goodsReceiptAmt, setGoodsReceiptAmt] = useState<number>(0);
   const [billNumber, setBillNumber] = useState('');
   const [billAmt, setBillAmt] = useState<number>(0);
-  const [matchResult, setMatchResult] = useState<unknown>(null);
+  const [matchResult, setMatchResult] = useState<any>(null);
   const [isValidating, setIsValidating] = useState(false);
 
   const handleSelectPo = (poId: string) => {
@@ -29,13 +31,13 @@ export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidation
       const amt = Number(po.total_amount || 0);
       setGoodsReceiptAmt(amt);
       setBillAmt(amt);
-      setBillNumber(`FACT-${po.document_number?.slice(-6) || '001'}`);
+      setBillNumber(po.metadata?.three_way_match?.supplier_bill_number || `FACT-${po.document_number?.slice(-6) || '001'}`);
     }
   };
 
   const handleValidateMatch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPoId) return;
+    if (!selectedPoId || !actor) return;
 
     const poObj = purchaseOrders.find(p => p.id === selectedPoId);
     if (!poObj) return;
@@ -64,17 +66,34 @@ export function MatchValidationTab({ purchaseOrders, tenantId }: MatchValidation
           billedAmount: Number(billAmt),
         },
         tenantId,
-        actor
+        actor as any
       );
 
       if (res.success && res.matchResult) {
         setMatchResult(res.matchResult);
+
+        if (res.matchResult.matched) {
+          // Persistir estado de conciliación en el documento
+          await updatePurchaseOrderMatchAction(
+            poObj.id,
+            {
+              billNumber: billNumber || 'FACT-DEFAULT',
+              goodsReceiptAmt: Number(goodsReceiptAmt),
+              billAmt: Number(billAmt),
+              statusMessage: res.matchResult.statusMessage,
+            },
+            tenantId,
+            actor
+          );
+          if (onRefresh) onRefresh();
+        }
+
         toast({
           variant: res.matchResult.matched ? 'success' : 'error',
-          title: res.matchResult.matched ? 'Conciliación Exitosa' : 'Discrepancia Detectada',
+          title: res.matchResult.matched ? 'Conciliación Guardada' : 'Discrepancia Detectada',
           description: res.matchResult.statusMessage || (
             res.matchResult.matched
-              ? 'Los montos de la Orden, Entrada e Inspección coinciden al 100%.'
+              ? 'Los montos coinciden y la conciliación fue guardada en el expediente de la orden.'
               : 'Se detectó una discrepancia entre la Orden y la Factura del Proveedor.'
           ),
         });

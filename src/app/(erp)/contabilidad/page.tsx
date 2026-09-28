@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -11,6 +11,7 @@ import { CreateJournalEntryModal } from '@/components/contabilidad/CreateJournal
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
 import { getAuditLogsAction } from '@/app/actions/audit';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import {
@@ -30,7 +31,7 @@ import { RefreshCw } from 'lucide-react';
 
 export default function ContabilidadPage() {
   const currentTenant = useTenantResolver();
-  const { session } = useERPStore();
+  const session = useERPStore(s => s.session);
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -67,10 +68,7 @@ export default function ContabilidadPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSubmittingEntry, setIsSubmittingEntry] = useState(false);
 
-  const actor = {
-    email: session?.userEmail || 'admin@Rendo.com',
-    role: session?.role || ('owner' as const),
-  };
+  const actor = useActionActor();
 
   // Sync period filter to URL
   useEffect(() => {
@@ -96,11 +94,11 @@ export default function ContabilidadPage() {
   const fetchAccountingData = useCallback(async () => {
     try {
       setIsLoading(true);
-      if (!currentTenant?.id) return;
+      if (!currentTenant?.id || !actor) return;
       const [journalRes, trialRes, incomeRes] = await Promise.all([
-        getJournalEntriesAction(currentTenant.id, period),
-        getTrialBalanceAction(currentTenant.id, period),
-        getIncomeStatementAction(currentTenant.id, period),
+        getJournalEntriesAction(currentTenant.id, period, actor),
+        getTrialBalanceAction(currentTenant.id, period, actor),
+        getIncomeStatementAction(currentTenant.id, period, actor),
       ]);
 
       if (journalRes.success) setJournalEntries(journalRes.data || []);
@@ -114,17 +112,17 @@ export default function ContabilidadPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id, period]);
+  }, [currentTenant?.id, period, actor]);
 
   const loadAuditLogs = useCallback(async () => {
-    if (!currentTenant?.id) return;
+    if (!currentTenant?.id || !actor) return;
     try {
       setIsLoadingAudit(true);
       // Obtener logs de auditoría contable
-      const res = await getAuditLogsAction(currentTenant.id, 'document', 40);
+      const res = await getAuditLogsAction(currentTenant.id, 'document', 40, actor);
       if (res.success) {
         const accountingLogs = res.logs.filter(
-          (l: unknown) => l.action.includes('journal_entry') || l.action.includes('invoice')
+          (l: any) => l.action.includes('journal_entry') || l.action.includes('invoice')
         );
         setAuditLogs(accountingLogs.length > 0 ? accountingLogs : res.logs);
       }
@@ -133,7 +131,7 @@ export default function ContabilidadPage() {
     } finally {
       setIsLoadingAudit(false);
     }
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, actor]);
 
   useEffect(() => {
     fetchAccountingData();
@@ -145,8 +143,8 @@ export default function ContabilidadPage() {
     }
   }, [activeTab, loadAuditLogs]);
 
-  const handleCreateJournalEntry = async (payload: unknown) => {
-    if (!currentTenant?.id) return;
+  const handleCreateJournalEntry = async (payload: any) => {
+    if (!currentTenant?.id || !actor) return;
     try {
       setIsSubmittingEntry(true);
       const res = await createJournalEntryAction(payload, currentTenant.id, actor);
@@ -158,7 +156,7 @@ export default function ContabilidadPage() {
         toast({ variant: 'error', title: 'Error al registrar asiento', description: res.error });
       }
     } catch (error: unknown) {
-      toast({ variant: 'error', title: 'Error de servidor', description: error.message });
+      toast({ variant: 'error', title: 'Error de servidor', description: (error as Error).message });
     } finally {
       setIsSubmittingEntry(false);
     }
@@ -170,11 +168,11 @@ export default function ContabilidadPage() {
         exportToCSV(
           `libro_diario_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'ID Asiento', accessor: (r: unknown) => r.id },
-            { header: 'Fecha', accessor: (r: unknown) => new Date(r.date).toLocaleDateString() },
-            { header: 'Número Doc', accessor: (r: unknown) => r.document_number || '' },
-            { header: 'Referencia', accessor: (r: unknown) => r.reference || '' },
-            { header: 'Concepto / Glosa', accessor: (r: unknown) => r.concept },
+            { header: 'ID Asiento', accessor: (r: any) => r.id },
+            { header: 'Fecha', accessor: (r: any) => new Date(r.date).toLocaleDateString() },
+            { header: 'Número Doc', accessor: (r: any) => r.document_number || '' },
+            { header: 'Referencia', accessor: (r: any) => r.reference || '' },
+            { header: 'Concepto / Glosa', accessor: (r: any) => r.concept },
           ],
           journalEntries
         );
@@ -182,13 +180,13 @@ export default function ContabilidadPage() {
         exportToCSV(
           `balance_comprobacion_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'Código Cuenta', accessor: (r: unknown) => r.account_code },
-            { header: 'Nombre Cuenta', accessor: (r: unknown) => r.account_name },
-            { header: 'Tipo', accessor: (r: unknown) => r.account_type },
-            { header: 'Mov. Débito ($)', accessor: (r: unknown) => r.period_debit },
-            { header: 'Mov. Crédito ($)', accessor: (r: unknown) => r.period_credit },
-            { header: 'Saldo Débito ($)', accessor: (r: unknown) => r.final_debit },
-            { header: 'Saldo Crédito ($)', accessor: (r: unknown) => r.final_credit },
+            { header: 'Código Cuenta', accessor: (r: any) => r.account_code },
+            { header: 'Nombre Cuenta', accessor: (r: any) => r.account_name },
+            { header: 'Tipo', accessor: (r: any) => r.account_type },
+            { header: 'Mov. Débito ($)', accessor: (r: any) => r.period_debit },
+            { header: 'Mov. Crédito ($)', accessor: (r: any) => r.period_credit },
+            { header: 'Saldo Débito ($)', accessor: (r: any) => r.final_debit },
+            { header: 'Saldo Crédito ($)', accessor: (r: any) => r.final_credit },
           ],
           trialBalance
         );
@@ -205,8 +203,8 @@ export default function ContabilidadPage() {
         exportToCSV(
           `estado_resultados_${new Date().toISOString().slice(0, 10)}`,
           [
-            { header: 'Concepto', accessor: (r: unknown) => r.concepto },
-            { header: 'Monto ($)', accessor: (r: unknown) => r.monto },
+            { header: 'Concepto', accessor: (r: any) => r.concepto },
+            { header: 'Monto ($)', accessor: (r: any) => r.monto },
           ],
           rows
         );
@@ -317,7 +315,7 @@ export default function ContabilidadPage() {
             <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora Contable NIIF</h3>
             <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de asientos diarios creados, facturación y operaciones de mayor.</p>
           </div>
-          <AuditTrailSection logs={auditLogs} isLoading={isLoadingAudit} />
+          <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
         </div>
       )}
 

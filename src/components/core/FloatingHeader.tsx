@@ -19,7 +19,7 @@ export function FloatingHeader() {
   const [scrolled, setScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-
+  const [isAnyModalOpen, setIsAnyModalOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   useEffect(() => {
@@ -34,6 +34,31 @@ export function FloatingHeader() {
     return () => window.removeEventListener('global:open_command_palette', handleOpenCommandPalette);
   }, []);
 
+  // Detectar automáticamente si hay un modal, ficha técnica o diálogo abierto para ocultar la barra flotante
+  useEffect(() => {
+    const checkModals = () => {
+      const hasModal = !!document.querySelector(
+        '[role="dialog"], [aria-modal="true"], [class*="bg-black/"][class*="fixed"], [class*="fixed"][class*="inset-0"]:not([class*="z-0"]):not([class*="pointer-events-none"])'
+      );
+      setIsAnyModalOpen(hasModal);
+    };
+
+    checkModals();
+
+    const observer = new MutationObserver(() => {
+      checkModals();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const markAllAsRead = () => {
@@ -42,7 +67,13 @@ export function FloatingHeader() {
 
   return (
     <>
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-fit px-4 pointer-events-none">
+      <div 
+        className={`fixed top-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-fit px-4 pointer-events-none transition-all duration-300 ease-out ${
+          isAnyModalOpen 
+            ? 'opacity-0 -translate-y-12 scale-90 pointer-events-none' 
+            : 'opacity-100 translate-y-0 scale-100'
+        }`}
+      >
         <div
           className={`pointer-events-auto flex items-center gap-2 p-2 rounded-full transition-all duration-500 ease-out border ${
             scrolled
@@ -148,7 +179,6 @@ export function FloatingHeader() {
           <div className="w-10 h-10 flex items-center justify-center">
             <ThemeToggle />
           </div>
-
         </div>
       </div>
 

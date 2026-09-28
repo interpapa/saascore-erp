@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, MessageCircle, Plus } from 'lucide-react';
+import { Search, MessageCircle, Plus, Archive, Inbox, DollarSign, Gift } from 'lucide-react';
 import { Conversation, WhatsAppFilterState } from '@/types/whatsapp';
 import { CustomerTagBadge } from './CustomerTagBadge';
 import { EmptyState } from '@/components/core/EmptyState';
@@ -15,7 +15,7 @@ interface ConversationListProps {
   onNewChatClick: () => void;
 }
 
-const FILTER_TAGS = ['all', 'VIP', 'Lead', 'Soporte', 'Cliente'];
+const FILTER_TAGS = ['all', 'VIP', 'Lead', 'Soporte', 'Cliente', 'Deudor', 'Proveedor'];
 
 export function ConversationList({
   conversations,
@@ -26,6 +26,8 @@ export function ConversationList({
   isLoading,
   onNewChatClick,
 }: ConversationListProps) {
+  const currentStatus = filter.status || 'active';
+
   return (
     <div className="w-full md:w-1/3 border-r border-border bg-slate-50/50 dark:bg-slate-900/50 flex flex-col h-full shrink-0">
       {/* Header & Search */}
@@ -37,39 +39,91 @@ export function ConversationList({
           </h2>
           <button
             onClick={onNewChatClick}
-            className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors btn-haptic flex items-center gap-1 text-xs font-bold"
+            className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 transition-colors btn-haptic flex items-center gap-1 text-xs font-bold cursor-pointer"
             title="Nueva Conversación"
           >
-            <Plus size={16} />
-            <span className="hidden sm:inline">Nuevo</span>
+            <Plus size={15} />
+            <span>Nuevo</span>
+          </button>
+        </div>
+
+        {/* Status Tabs: Activas vs Archivadas */}
+        <div className="grid grid-cols-2 gap-1 bg-slate-200/60 dark:bg-slate-800/60 p-1 rounded-xl text-xs font-bold">
+          <button
+            onClick={() => onFilterChange({ ...filter, status: 'active' })}
+            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              currentStatus === 'active'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-slate-500 hover:text-foreground'
+            }`}
+          >
+            <Inbox size={13} />
+            <span>Activas</span>
+          </button>
+          <button
+            onClick={() => onFilterChange({ ...filter, status: 'archived' })}
+            className={`py-1.5 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+              currentStatus === 'archived'
+                ? 'bg-card text-foreground shadow-xs'
+                : 'text-slate-500 hover:text-foreground'
+            }`}
+          >
+            <Archive size={13} />
+            <span>Archivadas</span>
           </button>
         </div>
 
         {/* Search Input */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
           <input
             type="text"
-            placeholder="Buscar por cliente o teléfono..."
+            placeholder="Buscar por nombre, teléfono o mensaje..."
             value={filter.search || ''}
             onChange={(e) => onFilterChange({ ...filter, search: e.target.value })}
-            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-medium text-foreground"
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-slate-950 border border-border rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 font-medium text-foreground"
           />
         </div>
 
-        {/* Tag Filter Pills */}
+        {/* Smart Filters: Con Deuda, Cumpleaños, Tags */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          {/* Quick Toggle: Con Deuda */}
+          <button
+            onClick={() => onFilterChange({ ...filter, debt_only: !filter.debt_only })}
+            className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+              filter.debt_only
+                ? 'bg-red-600 text-white shadow-xs'
+                : 'bg-card text-slate-600 dark:text-slate-400 border border-border hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <DollarSign size={11} />
+            <span>Con Deuda</span>
+          </button>
+
+          {/* Quick Toggle: Cumpleaños */}
+          <button
+            onClick={() => onFilterChange({ ...filter, birthday_only: !filter.birthday_only })}
+            className={`px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1 cursor-pointer ${
+              filter.birthday_only
+                ? 'bg-pink-600 text-white shadow-xs'
+                : 'bg-card text-slate-600 dark:text-slate-400 border border-border hover:bg-slate-100 dark:hover:bg-slate-800'
+            }`}
+          >
+            <Gift size={11} />
+            <span>Cumpleaños</span>
+          </button>
+
           {FILTER_TAGS.map((tagKey) => {
-            const isActive = (filter.tag_id || 'all') === tagKey;
+            const isActive = !filter.debt_only && !filter.birthday_only && (filter.tag_id || 'all') === tagKey;
             const label = tagKey === 'all' ? 'Todos' : tagKey;
             return (
               <button
                 key={tagKey}
-                onClick={() => onFilterChange({ ...filter, tag_id: tagKey })}
-                className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                onClick={() => onFilterChange({ ...filter, tag_id: tagKey, debt_only: false, birthday_only: false })}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                   isActive
                     ? 'bg-emerald-600 text-white shadow-xs'
-                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-border hover:bg-slate-100 dark:hover:bg-slate-700'
+                    : 'bg-card text-slate-600 dark:text-slate-400 border border-border hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
                 {label}
@@ -100,12 +154,13 @@ export function ConversationList({
               const lastTime = conv.last_activity
                 ? new Date(conv.last_activity).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
                 : '';
+              const debt = Number((conv.metadata?.client_metadata as { total_debt?: number })?.total_debt || 0);
 
               return (
                 <button
                   key={conv.id}
                   onClick={() => onSelectConversation(conv.id)}
-                  className={`p-3.5 text-left border-b border-border transition-colors flex items-start gap-3 relative ${
+                  className={`p-3.5 text-left border-b border-border transition-colors flex items-start gap-3 relative cursor-pointer ${
                     isSelected
                       ? 'bg-emerald-50/80 dark:bg-emerald-950/30 border-l-4 border-l-emerald-500'
                       : 'hover:bg-slate-100/70 dark:hover:bg-slate-800/50 border-l-4 border-l-transparent'
@@ -119,6 +174,19 @@ export function ConversationList({
                     <div className="flex justify-between items-baseline mb-0.5">
                       <h4 className="font-bold text-sm text-foreground truncate pr-2">{conv.client_name}</h4>
                       {lastTime && <span className="text-[10px] text-slate-400 shrink-0">{lastTime}</span>}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] mb-1">
+                      {conv.client_phone && (
+                        <span className="font-mono text-slate-400 truncate">
+                          +{conv.client_phone.replace(/[^0-9]/g, '')}
+                        </span>
+                      )}
+                      {debt > 0 && (
+                        <span className="font-bold text-red-500 bg-red-500/10 px-1.5 py-0.2 rounded-md text-[10px]">
+                          ${debt.toFixed(0)}
+                        </span>
+                      )}
                     </div>
 
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate mb-1.5">{lastText}</p>

@@ -14,10 +14,21 @@ import {
   XCircle,
   AlertCircle,
   Check,
-  Users
+  Users,
+  MessageCircle,
+  Edit2
 } from 'lucide-react';
 import { Appointment, AppointmentStatus } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
+import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
+import { logExternalWhatsAppMessageAction } from '@/app/actions/whatsapp';
+import { 
+  addAttendeeToAppointmentAction, 
+  removeAttendeeFromAppointmentAction,
+  updateAppointmentPriceAction 
+} from '@/app/actions/appointments';
+import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 
 export interface AppointmentDetailsModalProps {
   isOpen: boolean;
@@ -94,6 +105,40 @@ export function AppointmentDetailsModal({
 }: AppointmentDetailsModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [selectedClientToAdd, setSelectedClientToAdd] = useState('');
+  const [isEditingPrice, setIsEditingPrice] = useState(false);
+  const [editedPrice, setEditedPrice] = useState<number>(appointment?.price || 0);
+  const [currentPrice, setCurrentPrice] = useState<number>(appointment?.price || 0);
+
+  const currentTenant = useTenantResolver();
+  const actor = useActionActor();
+  const activeModules = currentTenant?.active_modules || (currentTenant?.metadata as any)?.active_modules;
+  const isCajaEnabled = isModuleActive(activeModules, 'caja');
+
+  React.useEffect(() => {
+    if (appointment) {
+      setCurrentPrice(appointment.price || 0);
+      setEditedPrice(appointment.price || 0);
+      setIsEditingPrice(false);
+    }
+  }, [appointment]);
+
+  const handleSavePrice = async () => {
+    if (!appointment || !currentTenant?.id || !actor) return;
+    setIsUpdating(true);
+    try {
+      const res = await updateAppointmentPriceAction(appointment.id, editedPrice, currentTenant.id, actor);
+      if (res.success) {
+        const newP = res.price ?? editedPrice;
+        setCurrentPrice(newP);
+        appointment.price = newP;
+        setIsEditingPrice(false);
+      }
+    } catch (err) {
+      console.error('Error al actualizar precio:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   if (!isOpen || !appointment) return null;
 
@@ -101,32 +146,81 @@ export function AppointmentDetailsModal({
   const attendees = (appointment.metadata?.attendees as Array<{ id: string; name: string }>) || [];
   const maxCapacity = (appointment.metadata?.max_capacity as number) || 10;
 
+  const handleSendAppointmentWhatsApp = () => {
+    if (!appointment) return;
+    const clientPhone = appointment.client_phone || (appointment.metadata as any)?.client_phone || '';
+    const cleanPhone = clientPhone.replace(/[^0-9]/g, '');
+    const clientName = appointment.client_name || (appointment.metadata as any)?.client_name || 'Cliente';
+    const dateFormatted = formatDateTime(appointment.start_time);
+    const serviceName = appointment.service_name || (appointment.metadata as any)?.service_name || 'Servicio';
+
+    const message = `*RECORDATORIO DE CITA*\n` +
+      `Hola ${clientName}, te saludamos de ${currentTenant?.name || 'nuestro centro'}.\n` +
+      `Te recordamos tu cita agendada:\n\n` +
+      `📌 *Servicio:* ${serviceName}\n` +
+      `📅 *Fecha y Hora:* ${dateFormatted}\n` +
+      (appointment.employee_name ? `👤 *Especialista:* ${appointment.employee_name}\n` : '') +
+      `\nPor favor responde a este mensaje para *confirmar* tu asistencia o reprogramar si lo necesitas. ¡Te esperamos!`;
+
+    if (cleanPhone) {
+      window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+    } else {
+      window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+    }
+
+    if (actor && currentTenant?.id) {
+      logExternalWhatsAppMessageAction(
+        {
+          phone: cleanPhone || '580000000000',
+          client_name: clientName,
+          client_id: appointment.client_id || undefined,
+          text: message,
+          module_source: 'calendario',
+          metadata: {
+            appointment_id: appointment.id,
+            start_time: appointment.start_time,
+          },
+        },
+        currentTenant.id,
+        actor
+      ).catch((err) => console.warn('[WhatsApp Calendario Log Warning]:', err));
+    }
+  };
+
   const handleAddAttendee = async () => {
-    if (!selectedClientToAdd || !onUpdateMetadata) return;
+    if (!selectedClientToAdd || !currentTenant || !actor) return;
     const client = clients.find(c => c.id === selectedClientToAdd);
     if (!client) return;
 
-    if (attendees.some(a => a.id === client.id)) return;
-
-    const newAttendees = [...attendees, { id: client.id, name: client.name }];
     try {
       setIsUpdating(true);
-      await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: newAttendees });
-      setSelectedClientToAdd('');
-    } catch (err) {
-      console.error(err);
+      const res = await addAttendeeToAppointmentAction(appointment.id, { id: client.id, name: client.name }, currentTenant.id, actor);
+      if (res.success && res.attendees) {
+        if (onUpdateMetadata) {
+          await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: res.attendees });
+        }
+        setSelectedClientToAdd('');
+      } else {
+        alert(res.error || 'No se pudo agregar participante.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al agregar participante');
     } finally {
       setIsUpdating(false);
     }
   };
 
   const handleRemoveAttendee = async (clientId: string) => {
-    if (!onUpdateMetadata) return;
-    const newAttendees = attendees.filter(a => a.id !== clientId);
+    if (!currentTenant || !actor) return;
     try {
       setIsUpdating(true);
-      await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: newAttendees });
-    } catch (err) {
+      const res = await removeAttendeeFromAppointmentAction(appointment.id, clientId, currentTenant.id, actor);
+      if (res.success && res.attendees) {
+        if (onUpdateMetadata) {
+          await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: res.attendees });
+        }
+      }
+    } catch (err: any) {
       console.error(err);
     } finally {
       setIsUpdating(false);
@@ -193,7 +287,7 @@ export function AppointmentDetailsModal({
               {!isGroupClass && (
                 <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
                   <User size={14} className="text-slate-400 shrink-0" />
-                  <span>Cliente: <strong className="text-foreground">{appointment.client_name || 'General'}</strong></span>
+                  <span>Cliente: <strong className="text-foreground">{appointment.client_name || (appointment.metadata as any)?.client_name || 'General'}</strong></span>
                 </div>
               )}
 
@@ -202,9 +296,69 @@ export function AppointmentDetailsModal({
                 <span>Profesional: <strong className="text-foreground">{appointment.employee_name || 'Sin Asignar'}</strong></span>
               </div>
 
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                <DollarSign size={14} className="text-slate-400 shrink-0" />
-                <span>Precio: <strong className="text-foreground">${(appointment.price || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</strong></span>
+              <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">
+                {isEditingPrice ? (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-bold text-slate-500">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={editedPrice === 0 ? '' : editedPrice}
+                      placeholder="0.00"
+                      onChange={(e) => setEditedPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                      className="w-20 px-2 py-1 text-xs font-bold rounded-lg border border-indigo-400 bg-background text-foreground focus:outline-none"
+                      autoFocus
+                    />
+                    <button
+                      disabled={isUpdating}
+                      onClick={handleSavePrice}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditedPrice(currentPrice);
+                        setIsEditingPrice(false);
+                      }}
+                      className="px-2 py-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs hover:bg-slate-300 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={14} className="text-slate-400 shrink-0" />
+                    <span>Precio: <strong className="text-foreground">${currentPrice.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</strong></span>
+                    {appointment.metadata?.payment_status !== 'paid' && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingPrice(true)}
+                        className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-semibold ml-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
+                        title="Ajustar precio para este tratamiento o trabajo específico"
+                      >
+                        <Edit2 size={11} /> Ajustar
+                      </button>
+                    )}
+                  </div>
+                )}
+                <div>
+                  {appointment.metadata?.payment_status === 'paid' ? (
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      ✅ Pagado
+                    </span>
+                  ) : appointment.metadata?.payment_status === 'pending' ? (
+                    <span className="text-[10px] font-extrabold uppercase px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      ⏳ Pago Pendiente
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                      Sin Cobrar
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -308,7 +462,7 @@ export function AppointmentDetailsModal({
                 </button>
               )}
 
-              {appointment.status !== 'completed' ? (
+              {appointment.status !== 'completed' && (
                 <button
                   disabled={isUpdating}
                   onClick={() => handleStatusChange('completed')}
@@ -316,18 +470,25 @@ export function AppointmentDetailsModal({
                 >
                   <CheckCircle2 size={14} /> Completar
                 </button>
-              ) : (
+              )}
+
+              {/* Botón de Pase a Caja POS (Solo visible si el módulo de Caja está habilitado) */}
+              {isCajaEnabled && (
                 <button
-                  onClick={() => {
-                    if (appointment.client_id) {
-                      window.location.href = `/caja?client=${appointment.client_id}&amount=${appointment.price || 0}&desc=Cobro Cita: ${appointment.title}`;
-                    } else {
-                      window.location.href = `/caja?amount=${appointment.price || 0}&desc=Cobro Cita: ${appointment.title}`;
+                  disabled={isUpdating}
+                  onClick={async () => {
+                    if (appointment.status !== 'completed') {
+                      await handleStatusChange('completed');
                     }
+                    const srvId = appointment.service_id || '';
+                    const srvTitle = encodeURIComponent(appointment.title || appointment.service_name || 'Servicio de Cita');
+                    const clientQuery = appointment.client_id ? `&client_id=${appointment.client_id}` : '';
+                    window.location.href = `/caja?appointment_id=${appointment.id}${clientQuery}&service_id=${srvId}&price=${currentPrice}&title=${srvTitle}`;
                   }}
                   className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white shadow-md hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
+                  title="Facturar en Punto de Venta POS y agregar extras"
                 >
-                  <DollarSign size={14} /> Cobrar en Caja
+                  <DollarSign size={14} /> {appointment.status === 'completed' ? 'Cobrar en Caja' : 'Completar y Cobrar'}
                 </button>
               )}
 
@@ -353,8 +514,70 @@ export function AppointmentDetailsModal({
             </div>
           </div>
 
+          {/* Quick Payment Management (Sin necesidad de módulo de Caja) */}
+          <div className="space-y-2 pt-3 border-t border-border/80">
+            <div className="flex items-center justify-between">
+              <h5 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Gestión de Cobro Directo</h5>
+              <span className="text-[11px] text-slate-400">Sin depender de Caja</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                disabled={isUpdating || appointment.metadata?.payment_status === 'paid'}
+                onClick={async () => {
+                  if (!onUpdateMetadata) return;
+                  setIsUpdating(true);
+                  await onUpdateMetadata(appointment.id, {
+                    ...appointment.metadata,
+                    payment_status: 'paid',
+                    paid_at: new Date().toISOString()
+                  });
+                  setIsUpdating(false);
+                }}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  appointment.metadata?.payment_status === 'paid'
+                    ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40 cursor-default'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                }`}
+              >
+                <CheckCircle2 size={14} />
+                {appointment.metadata?.payment_status === 'paid' ? '¡Cobro Registrado!' : 'Marcar como Pagado'}
+              </button>
+
+              <button
+                disabled={isUpdating || appointment.metadata?.payment_status === 'pending'}
+                onClick={async () => {
+                  if (!onUpdateMetadata) return;
+                  setIsUpdating(true);
+                  await onUpdateMetadata(appointment.id, {
+                    ...appointment.metadata,
+                    payment_status: 'pending'
+                  });
+                  setIsUpdating(false);
+                }}
+                className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  appointment.metadata?.payment_status === 'pending'
+                    ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/40 cursor-default'
+                    : 'border border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/10'
+                }`}
+              >
+                <AlertCircle size={14} />
+                {appointment.metadata?.payment_status === 'pending' ? 'Pendiente Anotado' : 'Dejar Pago Pendiente'}
+              </button>
+            </div>
+          </div>
+
           {/* Footer */}
-          <div className="flex justify-end pt-3 border-t border-border">
+          <div className="flex items-center justify-between pt-3 border-t border-border">
+            <button
+              type="button"
+              onClick={handleSendAppointmentWhatsApp}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Enviar recordatorio de cita vía WhatsApp"
+            >
+              <MessageCircle size={15} />
+              <span>Recordatorio WhatsApp</span>
+            </button>
+
             <button
               onClick={onClose}
               className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"

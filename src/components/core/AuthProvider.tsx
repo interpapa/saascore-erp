@@ -14,12 +14,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Rutas que NO requieren autenticación
-const PUBLIC_ROUTES = ['/login', '/reservar-demo'];
+const PUBLIC_ROUTES = ['/login', '/reservar-demo', '/reservas', '/c'];
 
 // Comprueba si la ruta es pública o es una de las rutas base permitidas sin sesión
 const isPublicRoute = (path: string) => {
   if (PUBLIC_ROUTES.includes(path)) return true;
-  // Permitir todas las rutas dinámicas bajo /reservas/
+  // Permitir todas las rutas dinámicas bajo /reservas/ y /c/
   if (path.startsWith('/reservas/')) return true;
   if (path.startsWith('/c/')) return true;
   return false;
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const handleSessionSync = useCallback(async (user: { email?: string; id?: string } | null | undefined) => {
+  const handleSessionSync = useCallback(async (user: { email?: string; id?: string } | null | undefined, accessToken?: string) => {
     if (!user || !user.email) return;
 
     try {
@@ -44,22 +44,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: result.tenant.id,
           name: result.tenant.name,
           blocked: !result.tenant.is_active,
-          active_modules: result.tenant.active_modules || [],
+          active_modules: result.tenant.active_modules || (result.tenant.metadata as any)?.active_modules || [],
           metadata: result.tenant.metadata
         });
         setSession({
           userEmail: user.email,
-          role: (result.role as 'owner' | 'admin' | 'user') || 'owner',
-          tenantId: result.tenant.id
+          role: (result.role as any) || 'owner',
+          tenantId: result.tenant.id,
+          token: accessToken
         });
         return;
       }
 
-      // Usuario sin empresa, va al onboarding
+      // Si getUserTenant no devolvió tenant, verificar si el store ya tiene un tenant y sesión activos
+      const existingSession = useERPStore.getState().session;
+      const existingTenant = useERPStore.getState().currentTenant;
+
+      if (existingSession?.tenantId && existingTenant?.id) {
+        // Preservar el tenant existente y solo actualizar el token
+        console.warn('[AuthProvider] Preservando tenant activo existente frente a desincronización de getUserTenant');
+        setSession({
+          ...existingSession,
+          userEmail: user.email,
+          token: accessToken || existingSession.token
+        });
+        return;
+      }
+
+      // Usuario sin empresa previa, va al onboarding
       setSession({
         userEmail: user.email,
-        role: 'owner',
-        tenantId: ''
+        role: 'owner' as any,
+        tenantId: '',
+        token: accessToken
       });
       setCurrentTenant(null);
     } catch (err) {
@@ -75,10 +92,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data: { session: supabaseSession } } = await supabase.auth.getSession();
         
         if (supabaseSession) {
-          await handleSessionSync(supabaseSession.user);
+          await handleSessionSync(supabaseSession.user, supabaseSession.access_token);
         } else {
-          setSession(null);
-          setCurrentTenant(null);
+          // Si supabase.auth.getSession() no retornó sesión, verificar si hay sesión activa persistida
+          const existingSession = useERPStore.getState().session;
+          if (!existingSession) {
+            setSession(null);
+            setCurrentTenant(null);
+          }
         }
       } catch (err) {
         console.error("Error getting session:", err);
@@ -95,8 +116,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setCurrentTenant(null);
           router.push('/login');
+        } else if (event === 'TOKEN_REFRESHED' && supabaseSession) {
+          // Token renovado: actualizar token en el store en tiempo real sin destruir la empresa
+          const currentSession = useERPStore.getState().session;
+          if (currentSession) {
+            setSession({
+              ...currentSession,
+              token: supabaseSession.access_token,
+            });
+          }
         } else if (supabaseSession) {
-          await handleSessionSync(supabaseSession.user);
+          await handleSessionSync(supabaseSession.user, supabaseSession.access_token);
         }
       }
     );

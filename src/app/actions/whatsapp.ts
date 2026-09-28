@@ -1,8 +1,9 @@
-﻿'use server';
+'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
 import {
@@ -13,11 +14,32 @@ import {
   WhatsAppFilterState
 } from '@/types/whatsapp';
 
-function isMissingTableError(error: unknown): boolean {
+function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = error.code || '';
-  const msg = error.message || '';
-  return code === 'PGRST204' || code === '42P01' || msg.includes('does not exist');
+  const msg = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache')
+  );
+}
+
+/**
+ * Sanitizes phone numbers to standard WhatsApp format (international, digits only).
+ */
+export async function sanitizeWhatsAppPhone(phone: string, defaultCountry = '58'): Promise<string> {
+  let clean = phone.replace(/[^0-9]/g, '');
+  if (!clean) return '';
+  if (clean.startsWith('0')) {
+    clean = defaultCountry + clean.slice(1);
+  } else if (clean.length === 10 && (clean.startsWith('412') || clean.startsWith('414') || clean.startsWith('424') || clean.startsWith('416') || clean.startsWith('426'))) {
+    clean = defaultCountry + clean;
+  }
+  return clean;
 }
 
 /**
@@ -25,9 +47,20 @@ function isMissingTableError(error: unknown): boolean {
  */
 export async function getConversationsAction(
   tenantId: string,
-  filter?: WhatsAppFilterState
+  filter: WhatsAppFilterState | undefined,
+  actor: ActionActor
 ): Promise<{ success: boolean; conversations: Conversation[]; error?: string }> {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', conversations: [] };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'whatsapp');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de WhatsApp está desactivado.', conversations: [] };
+    }
+
     if (!tenantId) return { success: true, conversations: [] };
 
     // 1. Primary Attempt: Query 'whatsapp_conversations' table
@@ -41,17 +74,17 @@ export async function getConversationsAction(
       .order('last_activity', { ascending: false });
 
     if (!error && convs) {
-      const formatted: Conversation[] = convs.map((c: unknown) => ({
+      const formatted: Conversation[] = convs.map((c: any) => ({
         id: c.id,
         tenant_id: c.tenant_id,
-        client_id: c.client_id,
-        client_name: c.client?.name || c.client_name || 'Cliente',
+        client_id: c.client_id || null,
+        client_name: c.client?.name || c.client_name || 'Contacto WhatsApp',
         client_phone: c.client?.phone || c.client_phone || '',
-        client_email: c.client?.email || null,
+        client_email: c.client?.email || c.client_email || null,
         unread_count: c.unread_count || 0,
         last_message: c.last_message || null,
         last_activity: c.last_activity,
-        tags: c.metadata?.tags || [],
+        tags: c.tags || c.metadata?.tags || [],
         status: c.status || 'active',
         metadata: {
           ...c.metadata,
@@ -77,12 +110,12 @@ export async function getConversationsAction(
 
       const conversationMap = new Map<string, Conversation>();
 
-      (logs || []).forEach((log: unknown) => {
+      (logs || []).forEach((log: any) => {
         const entityId = log.entity_id || log.document_number || 'unknown';
-        const client = (customers || []).find((c: unknown) => c.id === log.entity_id);
+        const client = (customers || []).find((c: any) => c.id === log.entity_id);
 
         if (!conversationMap.has(entityId)) {
-          const rawTags: string[] = client?.metadata?.tags || [];
+          const rawTags: string[] = client?.metadata?.tags || log.metadata?.tags || [];
           const tags: CustomerTag[] = rawTags.map((t) => ({
             id: t,
             name: t,
@@ -94,6 +127,7 @@ export async function getConversationsAction(
             conversation_id: entityId,
             tenant_id: log.tenant_id,
             sender_type: log.metadata?.direction === 'inbound' ? 'client' : 'agent',
+            sender_name: log.metadata?.direction === 'inbound' ? (client?.name || log.metadata?.client_name || 'Cliente') : (log.metadata?.created_by || 'Rendo Bot'),
             text: log.notes || 'Mensaje de WhatsApp',
             status: log.status === 'invoiced' ? 'delivered' : log.status === 'annulled' ? 'failed' : 'sent',
             timestamp: log.issue_date || log.created_at,
@@ -103,8 +137,8 @@ export async function getConversationsAction(
           conversationMap.set(entityId, {
             id: entityId,
             tenant_id: tenantId,
-            client_id: log.entity_id || '',
-            client_name: client?.name || log.metadata?.client_name || log.document_number || 'Cliente CRM',
+            client_id: client ? client.id : null,
+            client_name: client?.name || log.metadata?.client_name || log.document_number || 'Contacto WhatsApp',
             client_phone: client?.phone || log.document_number || '',
             client_email: client?.email || null,
             unread_count: 0,
@@ -112,12 +146,17 @@ export async function getConversationsAction(
             last_activity: log.issue_date || log.created_at,
             tags,
             status: 'active',
+            metadata: {
+              ...log.metadata,
+              client_metadata: client?.metadata || null,
+              client_address: client?.address || null,
+            }
           });
         }
       });
 
       // Include registered customers who don't have messages yet
-      (customers || []).forEach((cust: unknown) => {
+      (customers || []).forEach((cust: any) => {
         if (!conversationMap.has(cust.id)) {
           const rawTags: string[] = cust.metadata?.tags || [];
           const tags: CustomerTag[] = rawTags.map((t) => ({
@@ -138,6 +177,10 @@ export async function getConversationsAction(
             last_activity: cust.created_at,
             tags,
             status: 'active',
+            metadata: {
+              client_metadata: cust.metadata || null,
+              client_address: cust.address || null,
+            }
           });
         }
       });
@@ -147,7 +190,7 @@ export async function getConversationsAction(
     }
 
     throw new Error(error?.message || 'Error al obtener conversaciones.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getConversationsAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, conversations: [] };
   }
@@ -158,9 +201,20 @@ export async function getConversationsAction(
  */
 export async function getMessagesAction(
   conversationId: string,
-  tenantId: string
+  tenantId: string,
+  actor: ActionActor
 ): Promise<{ success: boolean; messages: Message[]; error?: string }> {
   try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', messages: [] };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'whatsapp');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de WhatsApp está desactivado.', messages: [] };
+    }
+
     if (!conversationId || !tenantId) return { success: true, messages: [] };
 
     // 1. Primary Attempt: Query 'whatsapp_messages' table
@@ -187,12 +241,12 @@ export async function getMessagesAction(
 
       if (docErr) throw new Error(docErr.message);
 
-      const messages: Message[] = (logs || []).map((log: unknown) => ({
+      const messages: Message[] = (logs || []).map((log: any) => ({
         id: log.id,
         conversation_id: conversationId,
         tenant_id: log.tenant_id,
         sender_type: log.metadata?.direction === 'inbound' ? 'client' : 'agent',
-        sender_name: log.metadata?.direction === 'inbound' ? 'Cliente' : (log.metadata?.created_by || 'Rendo Bot'),
+        sender_name: log.metadata?.direction === 'inbound' ? (log.metadata?.client_name || 'Cliente') : (log.metadata?.created_by || 'Rendo Bot'),
         text: log.notes || '',
         status: log.status === 'invoiced' ? 'delivered' : log.status === 'annulled' ? 'failed' : 'sent',
         timestamp: log.issue_date || log.created_at,
@@ -204,14 +258,15 @@ export async function getMessagesAction(
     }
 
     throw new Error(error?.message || 'Error al obtener mensajes.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getMessagesAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, messages: [] };
   }
 }
 
 /**
- * Sends a WhatsApp message with fallback to 'documents' (whatsapp_log).
+ * Sends a WhatsApp message with fallback to 'documents' (whatsapp_log)
+ * and optional webhook dispatch.
  */
 export async function sendMessageAction(
   input: SendMessageInput,
@@ -224,11 +279,18 @@ export async function sendMessageAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'whatsapp');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de WhatsApp está desactivado.' };
+    }
+
     if (!tenantId || !input.conversation_id || !input.text) {
       throw new Error('Empresa, ID de conversación y texto del mensaje son requeridos.');
     }
 
     const timestamp = new Date().toISOString();
+    const isInternalNote = Boolean(input.is_internal_note || input.metadata?.is_internal_note);
+    const senderType = isInternalNote ? 'system' : 'agent';
 
     // 1. Primary Attempt: Insert into 'whatsapp_messages' table
     const { data: newMsg, error } = await supabaseAdmin
@@ -236,17 +298,36 @@ export async function sendMessageAction(
       .insert([{
         conversation_id: input.conversation_id,
         tenant_id: tenantId,
-        sender_type: 'agent',
-        sender_name: actor.email,
+        sender_type: senderType,
+        sender_name: isInternalNote ? `Nota Interna (${actor.email})` : actor.email,
         text: input.text,
-        status: 'delivered',
+        status: isInternalNote ? 'delivered' : 'delivered',
         timestamp,
-        metadata: { created_by: actor.email, ...input.metadata },
+        metadata: {
+          created_by: actor.email,
+          is_internal_note: isInternalNote,
+          ...input.metadata,
+        },
       }])
       .select()
       .single();
 
     if (!error && newMsg) {
+      // Update parent conversation's last_activity and last_message
+      try {
+        await supabaseAdmin
+          .from('whatsapp_conversations')
+          .update({
+            last_message: newMsg,
+            last_activity: timestamp,
+            updated_at: timestamp,
+          })
+          .eq('id', input.conversation_id)
+          .eq('tenant_id', tenantId);
+      } catch {
+        // Ignored if update fails
+      }
+
       await writeAuditLog({
         tenant_id: tenantId,
         actor_email: actor.email,
@@ -256,6 +337,11 @@ export async function sendMessageAction(
         target_id: newMsg.id,
         metadata: { action: 'whatsapp_message_sent', phone: input.client_phone, length: input.text.length },
       });
+
+      // Dispatch to optional external webhook if configured (only if not an internal note)
+      if (!isInternalNote) {
+        await dispatchOptionalWebhook(tenantId, input);
+      }
 
       revalidatePath('/whatsapp');
       return { success: true, message: newMsg };
@@ -279,9 +365,11 @@ export async function sendMessageAction(
           notes: input.text,
           metadata: {
             platform: 'whatsapp',
-            direction: 'outbound',
+            direction: isInternalNote ? 'internal' : 'outbound',
             created_by: actor.email,
+            is_internal_note: isInternalNote,
             conversation_id: input.conversation_id,
+            client_name: input.client_name,
             ...input.metadata,
           },
         }])
@@ -297,8 +385,17 @@ export async function sendMessageAction(
         action: 'entity.updated',
         target_type: 'document',
         target_id: newDoc.id,
-        metadata: { action: 'whatsapp_message_sent', phone: input.client_phone, length: input.text.length },
+        metadata: {
+          action: isInternalNote ? 'whatsapp_internal_note_added' : 'whatsapp_message_sent',
+          phone: input.client_phone,
+          length: input.text.length,
+        },
       });
+
+      // Dispatch to optional external webhook if configured (only if not an internal note)
+      if (!isInternalNote) {
+        await dispatchOptionalWebhook(tenantId, input);
+      }
 
       revalidatePath('/whatsapp');
 
@@ -320,8 +417,155 @@ export async function sendMessageAction(
     }
 
     throw new Error(error?.message || 'Error al enviar el mensaje de WhatsApp.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[sendMessageAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Converts a WhatsApp conversation/phone number into a registered customer entity in CRM.
+ */
+export async function createClientFromConversationAction(
+  conversationId: string,
+  clientData: {
+    name: string;
+    phone: string;
+    email?: string;
+    address?: string;
+    notes?: string;
+  },
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; entity?: any; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!tenantId || !clientData.name || !clientData.phone) {
+      throw new Error('Nombre y teléfono son obligatorios para crear el cliente.');
+    }
+
+    // 1. Insert new customer entity
+    const { data: entity, error: entityErr } = await supabaseAdmin
+      .from('entities')
+      .insert([{
+        tenant_id: tenantId,
+        type: 'customer',
+        name: clientData.name.trim(),
+        phone: clientData.phone.trim(),
+        email: clientData.email?.trim() || null,
+        address: clientData.address?.trim() || null,
+        metadata: {
+          notes: clientData.notes?.trim() || 'Creado desde WhatsApp CRM',
+          source: 'whatsapp_crm',
+          created_by: actor.email,
+        }
+      }])
+      .select()
+      .single();
+
+    if (entityErr || !entity) {
+      throw new Error(entityErr?.message || 'Error al crear entidad de cliente.');
+    }
+
+    // 2. Link conversation to new entity in native table
+    try {
+      await supabaseAdmin
+        .from('whatsapp_conversations')
+        .update({
+          client_id: entity.id,
+          client_name: entity.name,
+          client_phone: entity.phone,
+          client_email: entity.email,
+        })
+        .eq('id', conversationId)
+        .eq('tenant_id', tenantId);
+    } catch {
+      // Ignored if table does not exist
+    }
+
+    // 3. Link documents fallback logs to new entity
+    try {
+      await supabaseAdmin
+        .from('documents')
+        .update({ entity_id: entity.id })
+        .eq('tenant_id', tenantId)
+        .eq('type', 'whatsapp_log')
+        .or(`entity_id.eq.${conversationId},document_number.eq.${clientData.phone.trim()}`);
+    } catch {
+      // Ignored
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.created',
+      target_type: 'entity',
+      target_id: entity.id,
+      metadata: { action: 'customer_created_from_whatsapp', conversation_id: conversationId },
+    });
+
+    revalidatePath('/whatsapp');
+    revalidatePath('/clientes');
+
+    return { success: true, entity };
+  } catch (err: any) {
+    console.error('[createClientFromConversationAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Logs an external WhatsApp message dispatch from other modules (e.g. Caja POS, Calendario, Compras).
+ */
+export async function logExternalWhatsAppMessageAction(
+  input: {
+    phone: string;
+    client_name?: string;
+    client_id?: string;
+    text: string;
+    module_source: 'caja' | 'calendario' | 'compras' | 'crm';
+    metadata?: Record<string, unknown>;
+  },
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!tenantId || !input.phone || !input.text) {
+      return { success: false, error: 'Teléfono y texto son requeridos.' };
+    }
+
+    const cleanPhone = await sanitizeWhatsAppPhone(input.phone);
+    const timestamp = new Date().toISOString();
+    const convId = input.client_id || `conv-${cleanPhone}`;
+
+    // Try primary table or fallback
+    return await sendMessageAction(
+      {
+        conversation_id: convId,
+        client_id: input.client_id,
+        client_name: input.client_name,
+        client_phone: cleanPhone,
+        text: input.text,
+        metadata: {
+          source_module: input.module_source,
+          ...input.metadata,
+        }
+      },
+      tenantId,
+      actor
+    );
+  } catch (err: any) {
+    console.error('[logExternalWhatsAppMessageAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
 }
@@ -350,25 +594,34 @@ export async function updateCustomerTagAction(
       .eq('tenant_id', tenantId)
       .single();
 
-    if (fetchErr) throw new Error('Cliente no encontrado: ' + fetchErr.message);
+    if (!fetchErr && entity) {
+      const updatedMetadata = {
+        ...(entity?.metadata || {}),
+        tags,
+      };
 
-    const updatedMetadata = {
-      ...(entity?.metadata || {}),
-      tags,
-    };
-
-    const { error: updateErr } = await supabaseAdmin
-      .from('entities')
-      .update({ metadata: updatedMetadata })
-      .eq('id', entityId)
-      .eq('tenant_id', tenantId);
-
-    if (updateErr) throw new Error('Error al actualizar etiquetas: ' + updateErr.message);
+      await supabaseAdmin
+        .from('entities')
+        .update({ metadata: updatedMetadata })
+        .eq('id', entityId)
+        .eq('tenant_id', tenantId);
+    }
 
     try {
+      const { data: conv } = await supabaseAdmin
+        .from('whatsapp_conversations')
+        .select('metadata')
+        .eq('client_id', entityId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+
+      const convMeta = (typeof conv?.metadata === 'object' && conv?.metadata !== null)
+        ? conv.metadata
+        : {};
+
       await supabaseAdmin
         .from('whatsapp_conversations')
-        .update({ metadata: { tags } })
+        .update({ metadata: { ...convMeta, tags }, tags })
         .eq('client_id', entityId)
         .eq('tenant_id', tenantId);
     } catch {
@@ -387,7 +640,7 @@ export async function updateCustomerTagAction(
 
     revalidatePath('/whatsapp');
     return { success: true, tags };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[updateCustomerTagAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -432,9 +685,38 @@ export async function updateConversationStatusAction(
 
     revalidatePath('/whatsapp');
     return { success: true };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[updateConversationStatusAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
+  }
+}
+
+// Internal Dispatcher for External Webhooks
+async function dispatchOptionalWebhook(tenantId: string, input: SendMessageInput): Promise<void> {
+  try {
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants')
+      .select('metadata')
+      .eq('id', tenantId)
+      .single();
+
+    const webhookUrl = tenant?.metadata?.whatsapp_settings?.webhook_url;
+    if (webhookUrl && typeof webhookUrl === 'string' && webhookUrl.startsWith('http')) {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: input.client_phone,
+          text: input.text,
+          conversation_id: input.conversation_id,
+          timestamp: new Date().toISOString(),
+        }),
+      }).catch((fetchErr) => {
+        console.warn('[WhatsApp Webhook Dispatch Warning]:', fetchErr.message);
+      });
+    }
+  } catch (e) {
+    // Non-blocking dispatch
   }
 }
 
@@ -455,13 +737,35 @@ function filterConversations(list: Conversation[], filter?: WhatsAppFilterState)
       const q = filter.search.toLowerCase();
       const nameMatch = c.client_name.toLowerCase().includes(q);
       const phoneMatch = c.client_phone.includes(q);
-      if (!nameMatch && !phoneMatch) return false;
+      const lastMsgMatch = c.last_message?.text.toLowerCase().includes(q);
+      if (!nameMatch && !phoneMatch && !lastMsgMatch) return false;
     }
     if (filter.tag_id && filter.tag_id !== 'all') {
-      const hasTag = c.tags.some((t: unknown) => typeof t === 'string' ? t === filter.tag_id : (t?.id === filter.tag_id || t?.name === filter.tag_id));
+      const hasTag = c.tags.some((t: any) => typeof t === 'string' ? t === filter.tag_id : (t?.id === filter.tag_id || t?.name === filter.tag_id));
       if (!hasTag) return false;
     }
+    if (filter.status && filter.status !== 'all') {
+      if (c.status !== filter.status) return false;
+    }
     if (filter.unread_only && c.unread_count === 0) return false;
+    if (filter.debt_only) {
+      const debt = Number((c.metadata?.client_metadata as any)?.total_debt || 0);
+      const isDeudorTag = c.tags.some((t: any) =>
+        typeof t === 'string' ? t.toLowerCase().includes('deud') : t?.name?.toLowerCase().includes('deud')
+      );
+      if (debt <= 0 && !isDeudorTag) return false;
+    }
+    if (filter.birthday_only) {
+      const birthDate = (c.metadata?.client_metadata as any)?.birth_date;
+      if (!birthDate) return false;
+      try {
+        const b = new Date(birthDate);
+        const now = new Date();
+        if (b.getUTCMonth() !== now.getUTCMonth()) return false;
+      } catch {
+        return false;
+      }
+    }
     return true;
   });
 }

@@ -86,10 +86,13 @@ export default function CatalogClient({ tenant, items }: { tenant: Tenant, items
     message += `\n*Subtotal:* ${formatCurrency(subtotal)}\n`;
     message += `*Total:* ${formatCurrency(total)}\n`;
     
-    const phone = tenant.phone || tenant.metadata?.phone || '';
+    const rawPhone = tenant.phone || (tenant.metadata?.phone as string) || '';
+    let cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.startsWith('0')) cleanPhone = '58' + cleanPhone.slice(1);
+    else if (cleanPhone.length === 10 && (cleanPhone.startsWith('412') || cleanPhone.startsWith('414') || cleanPhone.startsWith('424') || cleanPhone.startsWith('416') || cleanPhone.startsWith('426'))) cleanPhone = '58' + cleanPhone;
     
     const encoded = encodeURIComponent(message);
-    const waUrl = `https://wa.me/${phone}?text=${encoded}`;
+    const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
     window.open(waUrl, '_blank');
   };
 
@@ -101,7 +104,7 @@ export default function CatalogClient({ tenant, items }: { tenant: Tenant, items
             <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center">
               {tenant.metadata?.logo_url ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-<img src={tenant.metadata.logo_url} alt="Logo" className="w-10 h-10 rounded-full object-cover" />
+<img src={(tenant.metadata as any).logo_url} alt="Logo" className="w-10 h-10 rounded-full object-cover" />
               ) : (
                 <Store size={20} />
               )}
@@ -112,7 +115,13 @@ export default function CatalogClient({ tenant, items }: { tenant: Tenant, items
             </div>
           </div>
           <button 
-            onClick={() => window.open(`https://wa.me/${tenant.phone || tenant.metadata?.phone || ''}`, '_blank')}
+            onClick={() => {
+              const raw = tenant.phone || (tenant.metadata?.phone as string) || '';
+              let clean = raw.replace(/[^0-9]/g, '');
+              if (clean.startsWith('0')) clean = '58' + clean.slice(1);
+              else if (clean.length === 10 && (clean.startsWith('412') || clean.startsWith('414') || clean.startsWith('424') || clean.startsWith('416') || clean.startsWith('426'))) clean = '58' + clean;
+              window.open(clean ? `https://wa.me/${clean}` : 'https://wa.me/', '_blank');
+            }}
             className="p-2 text-green-600 bg-green-50 rounded-full hover:bg-green-100 transition-colors"
           >
             <MessageCircle size={20} />
@@ -176,7 +185,7 @@ export default function CatalogClient({ tenant, items }: { tenant: Tenant, items
                     <div className="w-20 h-20 bg-gray-100 rounded-xl flex-shrink-0 flex items-center justify-center">
                       {item.metadata?.image_url ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
-<img src={item.metadata.image_url} alt={item.name} className="w-full h-full object-cover rounded-xl" />
+<img src={(item.metadata as any).image_url} alt={item.name} className="w-full h-full object-cover rounded-xl" />
                       ) : (
                         <Store className="text-gray-400" size={24} />
                       )}

@@ -6,23 +6,19 @@ import { writeAuditLog } from '@/lib/core/auditLogger';
 import { eventBus } from '@/lib/core/events/eventBus';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { createKernelJournalEntry } from '@/lib/core/kernel/ledgerKernel';
 import Decimal from 'decimal.js';
-
-interface PaymentActor {
-  email: string;
-  role: UserRole;
-}
 
 export async function recordDocumentPayment(
   documentId: string,
   paymentAmount: number,
   paymentMethod: string,
   tenantId: string,
-  actor: PaymentActor,
+  actor: ActionActor,
   referenceNumber?: string
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor as unknown as ActionActor, tenantId);
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
@@ -98,20 +94,20 @@ export async function recordDocumentPayment(
 
     if (updateError) throw updateError;
 
-    // 4. Accounting Journal Entry for Payment (Partida Doble)
+    // 4. Accounting Journal Entry for Payment (Partida Doble NIIF)
     try {
-      await supabaseAdmin.from('accounting_entries').insert([{
+      await createKernelJournalEntry({
         tenant_id: tenantId,
         document_id: documentId,
-        date: new Date().toISOString(),
+        entry_date: new Date().toISOString(),
         description: `Abono/Pago recibido a Factura ${document.document_number} [Ref: ${referenceNumber || 'N/A'}]`,
         lines: [
-          { account_code: '1001', account_name: 'Caja/Bancos', debit: paymentAmountDecimal.toNumber(), credit: 0 },
-          { account_code: '1005', account_name: 'Cuentas por Cobrar', debit: 0, credit: paymentAmountDecimal.toNumber() }
+          { account_code: '1.1.01.01', account_name: 'Caja Principal (Efectivo)', debit: paymentAmountDecimal.toNumber(), credit: 0 },
+          { account_code: '1.1.02.01', account_name: 'Clientes Nacionales (AR)', debit: 0, credit: paymentAmountDecimal.toNumber() }
         ]
-      }]);
+      });
     } catch (journalErr) {
-      console.warn('Abono guardado pero falló el asiento contable:', journalErr);
+      console.warn('Abono guardado pero falló el asiento contable en ledgerKernel:', journalErr);
     }
 
     // 5. Audit Logging
@@ -137,7 +133,7 @@ export async function recordDocumentPayment(
       isFullyPaid 
     };
 
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('SERVER ACTION ERROR (recordDocumentPayment):', error.message);
     return { success: false, error: error.message };
   }

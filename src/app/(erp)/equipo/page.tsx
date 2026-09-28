@@ -6,6 +6,8 @@ import { getAuditLogsAction } from '@/app/actions/audit';
 import { Entity } from '@/lib/api/entities';
 import { Users, Clock, CreditCard, RefreshCw, Activity } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
+import { useToast } from '@/components/core/ToastProvider';
 import { EmployeeDirectoryTab } from '@/components/equipo/EmployeeDirectoryTab';
 import { AttendanceTab } from '@/components/equipo/AttendanceTab';
 import { PayrollTab } from '@/components/equipo/PayrollTab';
@@ -18,6 +20,8 @@ type TabType = 'directorio' | 'asistencia' | 'nomina' | 'audit';
 
 export default function EquipoPage() {
   const currentTenant = useTenantResolver();
+  const actor = useActionActor();
+  const { toast } = useToast();
   const [employees, setEmployees] = useState<Entity[]>([]);
   const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,28 +31,42 @@ export default function EquipoPage() {
   const fetchEmployees = useCallback(async () => {
     try {
       setIsLoading(true);
-      if (!currentTenant?.id) return;
-      const res = await getEntitiesAction(currentTenant.id, 'employee', 50);
+      if (!currentTenant?.id || !actor) return;
+      const res = await getEntitiesAction(currentTenant.id, 'employee', 50, actor);
       if (res?.success) {
-        setEmployees((res.entities as any) || []);
+        const mapped = ((res.entities as any[]) || []).map(e => ({
+          ...e,
+          is_resource: Boolean(e.is_resource || e.metadata?.is_resource),
+          metadata: {
+            ...e.metadata,
+            is_resource: Boolean(e.is_resource || e.metadata?.is_resource),
+            resource_type: e.metadata?.resource_type || (Boolean(e.is_resource || e.metadata?.is_resource) ? 'space' : 'human')
+          }
+        }));
+        setEmployees(mapped);
       }
     } catch (err) {
       console.error('Error cargando empleados:', err);
+      toast({
+        variant: 'error',
+        title: 'Error al cargar equipo',
+        description: 'No se pudieron cargar los colaboradores.',
+      });
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, actor, toast]);
 
   const loadAuditLogs = useCallback(async () => {
-    if (!currentTenant?.id) return;
+    if (!currentTenant?.id || !actor) return;
     try {
       setIsLoadingAudit(true);
       // Consultar logs de auditoría generales
-      const res = await getAuditLogsAction(currentTenant.id, 'entity', 40);
+      const res = await getAuditLogsAction(currentTenant.id, 'entity', 40, actor);
       if (res.success) {
         // Filtrar del lado del cliente por acciones de equipo (employee, payroll)
         const teamLogs = res.logs.filter(
-          (l: unknown) => l.action.includes('payroll') || l.action.includes('entity') || l.action.includes('employee')
+          (l: any) => l.action.includes('payroll') || l.action.includes('entity') || l.action.includes('employee')
         );
         setAuditLogs(teamLogs.length > 0 ? teamLogs : res.logs);
       }
@@ -57,7 +75,7 @@ export default function EquipoPage() {
     } finally {
       setIsLoadingAudit(false);
     }
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, actor]);
 
   useEffect(() => {
     fetchEmployees();
@@ -147,7 +165,7 @@ export default function EquipoPage() {
                 <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora de Recursos Humanos</h3>
                 <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de registros de empleados, asistencia y procesamiento de nóminas.</p>
               </div>
-              <AuditTrailSection logs={auditLogs} isLoading={isLoadingAudit} />
+              <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
             </div>
           )}
         </>
@@ -156,3 +174,4 @@ export default function EquipoPage() {
     </div>
   );
 }
+

@@ -14,7 +14,9 @@ import { PurchaseOrderTab } from '@/components/compras/PurchaseOrderTab';
 import { MatchValidationTab } from '@/components/compras/MatchValidationTab';
 import { SkeletonTable } from '@/components/ui/SkeletonTable';
 import { UnderlineTabs } from '@/components/ui/Tabs';
+import { useActionActor } from '@/hooks/useActionActor';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
+import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -27,22 +29,31 @@ function ComprasPageContent() {
   const [activeTab, setActiveTab] = useState<TabType>('pos');
   const initialItemParam = searchParams.get('item');
 
+  const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0)
+    ? currentTenant.active_modules
+    : (currentTenant?.metadata as any)?.active_modules;
+
+  const isInventoryEnabled = isModuleActive(tenantModules, 'inventario');
+  const isCRMEnabled = isModuleActive(tenantModules, 'clientes');
+
   // Data State
   const [suppliers, setSuppliers] = useState<Entity[]>([]);
-  const [purchaseOrders, setPurchaseOrders] = useState<unknown[]>([]);
-  const [catalogItems, setCatalogItems] = useState<unknown[]>([]);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [catalogItems, setCatalogItems] = useState<any[]>([]);
   const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
+  const actor = useActionActor();
+
   const loadData = useCallback(async () => {
     try {
       setIsLoading(true);
-      if (!currentTenant?.id) return;
+      if (!currentTenant?.id || !actor) return;
       const [suppliersRes, posRes, itemsRes] = await Promise.all([
-        getEntitiesAction(currentTenant.id, 'supplier', 50),
-        getDocumentsAction(currentTenant.id, 'purchase_order', 50),
-        getItemsAction(currentTenant.id, undefined, 50),
+        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'supplier', 50, actor) : Promise.resolve({ success: true, entities: [] }),
+        getDocumentsAction(currentTenant.id, 'purchase_order', 50, actor),
+        isInventoryEnabled ? getItemsAction(currentTenant.id, undefined, 50, actor) : Promise.resolve({ success: true, items: [] }),
       ]);
 
       if (suppliersRes?.success) setSuppliers(suppliersRes.entities || []);
@@ -53,19 +64,19 @@ function ComprasPageContent() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, actor, isCRMEnabled, isInventoryEnabled]);
 
   const loadAuditLogs = useCallback(async () => {
-    if (!currentTenant?.id) return;
+    if (!currentTenant?.id || !actor) return;
     try {
       setIsLoadingAudit(true);
       // Filtrar logs de compras (creación de POs, proveedores, etc)
-      const res = await getAuditLogsAction(currentTenant.id, 'document', 40);
+      const res = await getAuditLogsAction(currentTenant.id, 'document', 40, actor);
       if (res.success) {
         // Filtrar del lado del cliente por si hay otras entidades,
         // o mostrar todo el flujo de documentos de compras
         const purchaseLogs = res.logs.filter(
-          (l: unknown) => l.action.includes('invoice') || l.action.includes('payment') || l.action.includes('entity')
+          (l: any) => l.action.includes('invoice') || l.action.includes('payment') || l.action.includes('entity')
         );
         setAuditLogs(purchaseLogs.length > 0 ? purchaseLogs : res.logs);
       }
@@ -74,7 +85,7 @@ function ComprasPageContent() {
     } finally {
       setIsLoadingAudit(false);
     }
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, actor]);
 
   useEffect(() => {
     let isSubscribed = true;
@@ -161,6 +172,8 @@ function ComprasPageContent() {
               tenantId={currentTenant?.id || ''}
               onRefresh={loadData}
               initialItem={initialItemParam}
+              isInventoryEnabled={isInventoryEnabled}
+              isCRMEnabled={isCRMEnabled}
             />
           )}
 
@@ -168,6 +181,7 @@ function ComprasPageContent() {
             <MatchValidationTab
               purchaseOrders={purchaseOrders}
               tenantId={currentTenant?.id || ''}
+              onRefresh={loadData}
             />
           )}
 
@@ -177,7 +191,7 @@ function ComprasPageContent() {
                 <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora de Eventos de Compras</h3>
                 <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de facturas, pagos y órdenes del Tenant.</p>
               </div>
-              <AuditTrailSection logs={auditLogs} isLoading={isLoadingAudit} />
+              <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
             </div>
           )}
         </>

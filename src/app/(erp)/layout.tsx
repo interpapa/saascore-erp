@@ -1,21 +1,21 @@
 'use client';
 
 import React, { Suspense } from 'react';
-import { usePathname } from 'next/navigation';
-import { AICopilot } from '@/components/core/AICopilot';
+import { usePathname, useRouter } from 'next/navigation';
 import { FloatingHeader } from '@/components/core/FloatingHeader';
 import { AmbientBackground } from '@/components/core/AmbientBackground';
 import { ErrorBoundary } from '@/components/core/ErrorBoundary';
 import { useKeybindings } from '@/hooks/useKeybindings';
 import { useERPStore } from '@/store/useERPStore';
-import { Lock, LayoutGrid } from 'lucide-react';
+import { Lock, LayoutGrid, Eye, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { MobileDock } from '@/components/core/MobileDock';
 
 const routeToModuleId: Record<string, string> = {
   '/caja': 'caja',
   '/clientes': 'clientes',
-  '/catalogo': 'catalogo',
+  '/inventario': 'inventario',
+  '/catalogo': 'inventario',
   '/estadisticas': 'estadisticas',
   '/compras': 'compras',
   '/contabilidad': 'contabilidad',
@@ -35,23 +35,53 @@ export default function ERPLayout({
 }) {
   useKeybindings();
   const pathname = usePathname();
-  const { currentTenant } = useERPStore();
+  const router = useRouter();
+  const currentTenant = useERPStore(s => s.currentTenant);
+  const impersonatedTenant = useERPStore(s => s.impersonatedTenant);
+  const stopImpersonation = useERPStore(s => s.stopImpersonation);
 
   // Verificar si la ruta actual es un módulo inactivo
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'];
-  const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin'];
+  const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
-    : fallbackModules;
+    : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
+      ? (currentTenant?.metadata as any).active_modules
+      : null;
+  const enabledModules = tenantModules || fallbackModules;
 
   // Buscamos si la ruta actual (o su prefijo) corresponde a un módulo del ERP
   const matchedRoute = Object.keys(routeToModuleId).find(route => pathname.startsWith(route));
-  const isModuleDisabled = matchedRoute ? !enabledModules.includes(routeToModuleId[matchedRoute]) : false;
+  const targetModule = matchedRoute ? routeToModuleId[matchedRoute] : null;
+  const isModuleDisabled = targetModule
+    ? (!enabledModules.includes(targetModule) && !(targetModule === 'inventario' && enabledModules.includes('catalogo')))
+    : false;
 
   return (
     <div className="min-h-screen text-foreground overflow-x-hidden selection:bg-primary/30 relative">
       <AmbientBackground />
 
       <div className="relative z-10 flex flex-col min-h-screen">
+        {impersonatedTenant && (
+          <div className="bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 text-white text-xs py-2 px-4 sticky top-0 z-50 flex items-center justify-between shadow-lg">
+            <div className="flex items-center gap-2 font-bold truncate">
+              <Eye size={15} className="animate-pulse shrink-0" />
+              <span>MODO SOPORTE ACTIVO (Modo Dios):</span>
+              <span className="bg-white/20 px-2 py-0.5 rounded font-mono truncate">
+                {impersonatedTenant.name}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                stopImpersonation();
+                router.push('/admin');
+              }}
+              className="bg-white text-slate-900 hover:bg-slate-100 px-3 py-1 rounded-lg font-black text-[11px] transition-all shrink-0 shadow-sm ml-4 flex items-center gap-1.5"
+            >
+              <LogOut size={13} />
+              Salir y Volver a Rendo Hub
+            </button>
+          </div>
+        )}
         <FloatingHeader />
         <main className="flex-1 w-full pt-20 pb-24 md:pb-6">
           {isModuleDisabled ? (
@@ -102,8 +132,6 @@ export default function ERPLayout({
         {/* Dock de navegación inferior móvil */}
         <MobileDock />
       </div>
-
-      <AICopilot />
     </div>
   );
 }

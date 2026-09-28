@@ -28,9 +28,9 @@ export async function processInventoryReceiptAction(
       return { success: false, error: 'Demasiadas operaciones de inventario.' };
     }
 
-    const security = await validateKernelAccess(actor, tenantId);
+    const security = await validateKernelAccess(actor, tenantId, 'catalogo');
     if (!security.authorized) {
-      return { success: false, error: security.error || 'Acceso denegado.' };
+      return { success: false, error: security.error || 'Acceso denegado a inventario.' };
     }
 
     // Obtener ítem actual
@@ -66,7 +66,7 @@ export async function processInventoryReceiptAction(
     if (updateErr) throw updateErr;
 
     return { success: true, item: updatedItem, avco };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[processInventoryReceiptAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }

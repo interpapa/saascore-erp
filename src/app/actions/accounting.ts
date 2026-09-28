@@ -37,7 +37,7 @@ export async function getAgingReportAction(
     }
 
     return await calculateAgingReport(tenantId, type);
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getAgingReportAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, data: [], summary: { total: 0, overdue: 0 } };
   }
@@ -51,7 +51,7 @@ export async function getChartOfAccountsAction(tenantId: string, actor: KernelAc
     }
 
     return { success: true, accounts: DEFAULT_CHART_OF_ACCOUNTS };
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message, accounts: [] };
   }
 }
@@ -69,16 +69,23 @@ export async function runFXRevaluationAction(
     }
 
     return await processFXRevaluation(tenantId, totalUSDReceivables, historicalRate);
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }
 
-function isMissingTableError(error: unknown): boolean {
+function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = error.code || '';
-  const msg = error.message || '';
-  return code === 'PGRST204' || code === '42P01' || msg.includes('does not exist');
+  const msg = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache')
+  );
 }
 
 /**
@@ -87,15 +94,13 @@ function isMissingTableError(error: unknown): boolean {
  */
 export async function getJournalEntriesAction(
   tenantId: string,
-  filter?: FiscalPeriodFilter,
-  actor?: ActionActor
+  filter: FiscalPeriodFilter | undefined | null,
+  actor: ActionActor
 ): Promise<JournalEntriesResult> {
   try {
-    if (actor) {
-      const securityCheck = await validateUserTenantAccess(actor, tenantId);
-      if (!securityCheck.authorized) {
-        throw new Error(securityCheck.error || 'Acceso denegado.');
-      }
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      throw new Error(securityCheck.error || 'Acceso denegado.');
     }
     if (!tenantId) return { success: true, data: [] };
 
@@ -117,7 +122,7 @@ export async function getJournalEntriesAction(
     const entriesList = dbEntries as unknown[] | null;
 
     if (!error && entriesList && entriesList.length > 0) {
-      const formatted: JournalEntry[] = entriesList.map((e: unknown) => ({
+      const formatted: JournalEntry[] = entriesList.map((e: any) => ({
         id: e.id,
         tenant_id: e.tenant_id,
         document_id: e.document_id,
@@ -127,7 +132,7 @@ export async function getJournalEntriesAction(
         total_debit: Number(e.total_debit || 0),
         total_credit: Number(e.total_credit || 0),
         status: e.status || 'posted',
-        lines: (e.lines || []).map((l: unknown) => ({
+        lines: (e.lines || []).map((l: any) => ({
           id: l.id,
           journal_entry_id: l.journal_entry_id,
           account_code: l.account_code,
@@ -139,7 +144,7 @@ export async function getJournalEntriesAction(
         created_at: e.created_at,
       }));
 
-      return { success: true, data: filterEntries(formatted, filter), totalCount: formatted.length };
+      return { success: true, data: filterEntries(formatted, filter as any), totalCount: formatted.length };
     }
 
     // 2. Fallback: Synthesize NIIF Journal Entries from 'documents' table
@@ -158,26 +163,79 @@ export async function getJournalEntriesAction(
       const synthesized: JournalEntry[] = [];
       let entryIdx = 1;
 
-      (docs || []).forEach((doc: unknown) => {
+      (docs || []).forEach((doc: any) => {
         // Ignorar cotizaciones y citas que no representan movimientos financieros reales
         if (doc.type === 'quote' || doc.type === 'appointment' || doc.type === 'work_order') return;
 
-        const subtotal = Number(doc.subtotal_amount || doc.total_amount || 0);
-        const tax = Number(doc.tax_amount || 0);
-        const total = Number(doc.total_amount || subtotal + tax);
-        if (total === 0) return;
+        // Normalización Multimoneda a Moneda Base Funcional NIIF (USD):
+        // Si el documento se originó expresado en Bs (VES), se convierte a USD dividiendo entre su tasa oficial registrada.
+        const docRate = Number(doc.metadata?.exchange_rate || 0);
+        const isDocInVES = doc.metadata?.currency === 'VES' || doc.currency === 'VES' || (doc.metadata?.is_in_ves === true);
+
+        let rawSubtotal = Number(doc.subtotal_amount || doc.total_amount || 0);
+        let rawTax = Number(doc.tax_amount || 0);
+        let rawTotal = Number(doc.total_amount || rawSubtotal + rawTax);
+
+        if (rawTotal === 0 && (!doc.metadata?.journal_lines || doc.metadata.journal_lines.length === 0)) return;
+
+        const subtotal = (isDocInVES && docRate > 0) ? rawSubtotal / docRate : rawSubtotal;
+        const tax = (isDocInVES && docRate > 0) ? rawTax / docRate : rawTax;
+        const total = (isDocInVES && docRate > 0) ? rawTotal / docRate : rawTotal;
 
         const dateStr = doc.issue_date || doc.created_at || new Date().toISOString();
         const lines: JournalLine[] = [];
 
-        if (doc.type === 'invoice' || doc.type === 'sale') {
-          lines.push({
-            account_code: '1.1.02.01',
-            account_name: 'Clientes Nacionales (AR)',
-            debit: total,
-            credit: 0,
-            description: `Cobro Cuentas por Cobrar ${doc.document_number}`,
+        if (doc.type === 'journal_entry' && Array.isArray(doc.metadata?.journal_lines) && doc.metadata.journal_lines.length > 0) {
+          // Asiento explícito registrado (Extorno, Arqueo, etc.)
+          doc.metadata.journal_lines.forEach((jl: any) => {
+            lines.push({
+              account_code: jl.account_code,
+              account_name: jl.account_name,
+              debit: Number(jl.debit || 0),
+              credit: Number(jl.credit || 0),
+              description: jl.description || doc.notes || `Asiento ${doc.document_number}`,
+            });
           });
+        } else if (doc.type === 'invoice' || doc.type === 'sale') {
+          // Discriminar Venta a Crédito (AR) vs Venta Cobrada al Contado (Caja o Banco) o Pago Mixto
+          const rawMethod = String(doc.metadata?.payment_method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
+          const isCredit = rawMethod === 'credit' || rawMethod === 'credito';
+          const isBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'pos', 'bank', 'punto'].includes(rawMethod);
+          const payments = Array.isArray(doc.metadata?.payments) ? doc.metadata.payments : null;
+
+          if (rawMethod === 'mixed' && payments && payments.length > 0) {
+            for (const p of payments) {
+              const pAmount = Number(p.amount || 0);
+              if (pAmount <= 0) continue;
+              const pMethod = String(p.method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
+              const pIsCredit = pMethod === 'credit' || pMethod === 'credito';
+              const pIsBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'pos', 'bank', 'punto'].includes(pMethod);
+              lines.push({
+                account_code: pIsCredit ? '1.1.02.01' : (pIsBank ? '1.1.01.02' : '1.1.01.01'),
+                account_name: pIsCredit ? 'Clientes Nacionales (AR)' : (pIsBank ? 'Banco y Cuentas Operativas' : 'Caja Principal (Efectivo)'),
+                debit: pAmount,
+                credit: 0,
+                description: `Cobro parcial en ${p.method || 'Caja'} ${doc.document_number}`,
+              });
+            }
+          } else if (isCredit) {
+            lines.push({
+              account_code: '1.1.02.01',
+              account_name: 'Clientes Nacionales (AR)',
+              debit: total,
+              credit: 0,
+              description: `Venta a Crédito ${doc.document_number}`,
+            });
+          } else {
+            lines.push({
+              account_code: isBank ? '1.1.01.02' : '1.1.01.01',
+              account_name: isBank ? 'Banco y Cuentas Operativas' : 'Caja Principal (Efectivo)',
+              debit: total,
+              credit: 0,
+              description: `Cobro en ${doc.metadata?.payment_method || 'Caja'} ${doc.document_number}`,
+            });
+          }
+
           lines.push({
             account_code: '4.1.01',
             account_name: 'Ventas de Productos',
@@ -185,6 +243,7 @@ export async function getJournalEntriesAction(
             credit: subtotal,
             description: `Ingresos por Venta ${doc.document_number}`,
           });
+
           if (tax > 0) {
             lines.push({
               account_code: '2.1.02.01',
@@ -256,13 +315,13 @@ export async function getJournalEntriesAction(
 
       return {
         success: true,
-        data: filterEntries(synthesized, filter),
+        data: filterEntries(synthesized, filter as any),
         totalCount: synthesized.length,
       };
     }
 
     throw new Error(error?.message || 'Error al consultar el Libro Mayor.');
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getJournalEntriesAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, data: [] };
   }
@@ -273,15 +332,13 @@ export async function getJournalEntriesAction(
  */
 export async function getTrialBalanceAction(
   tenantId: string,
-  filter?: FiscalPeriodFilter,
-  actor?: ActionActor
+  filter: FiscalPeriodFilter | undefined | null,
+  actor: ActionActor
 ): Promise<TrialBalanceResult> {
   try {
-    if (actor) {
-      const securityCheck = await validateUserTenantAccess(actor, tenantId);
-      if (!securityCheck.authorized) {
-        return { success: false, error: securityCheck.error || 'Acceso denegado.', data: [], totals: { debit: 0, credit: 0 } };
-      }
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', data: [], totals: { debit: 0, credit: 0 } };
     }
     
     const journalRes = await getJournalEntriesAction(tenantId, filter, actor);
@@ -345,7 +402,7 @@ export async function getTrialBalanceAction(
         credit: Math.round(totalCredit * 100) / 100,
       },
     };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getTrialBalanceAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -356,24 +413,22 @@ export async function getTrialBalanceAction(
  */
 export async function getIncomeStatementAction(
   tenantId: string,
-  filter?: FiscalPeriodFilter,
-  actor?: ActionActor
+  filter: FiscalPeriodFilter | undefined | null,
+  actor: ActionActor
 ): Promise<IncomeStatementResult> {
   try {
-    if (actor) {
-      const securityCheck = await validateUserTenantAccess(actor, tenantId);
-      if (!securityCheck.authorized) {
-        return { success: false, error: securityCheck.error || 'Acceso denegado.', data: {
-          period: filter || { preset: 'all' },
-          revenue: { rows: [], total: 0 },
-          costOfSales: { rows: [], total: 0 },
-          grossProfit: 0,
-          operatingExpenses: { rows: [], total: 0 },
-          operatingProfit: 0,
-          otherIncomeExpenses: { rows: [], total: 0 },
-          netProfit: 0
-        } };
-      }
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', data: {
+        period: filter || { preset: 'all' },
+        revenue: { rows: [], total: 0 },
+        costOfSales: { rows: [], total: 0 },
+        grossProfit: 0,
+        operatingExpenses: { rows: [], total: 0 },
+        operatingProfit: 0,
+        otherIncomeExpenses: { rows: [], total: 0 },
+        netProfit: 0
+      } };
     }
 
     const trialRes = await getTrialBalanceAction(tenantId, filter, actor);
@@ -437,7 +492,7 @@ export async function getIncomeStatementAction(
     };
 
     return { success: true, data: report };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getIncomeStatementAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -494,7 +549,7 @@ export async function createJournalEntryAction(
       description: payload.description,
       lines: formattedLines,
     });
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[createJournalEntryAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }

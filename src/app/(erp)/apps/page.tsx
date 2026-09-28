@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { 
@@ -17,12 +17,14 @@ import {
   CheckCircle2,
   XCircle,
   LayoutGrid,
-  ShieldCheck
+  ShieldCheck,
+  Stethoscope
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { updateTenantSettings } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
+import { useActionActor } from '@/hooks/useActionActor';
 
 interface AppModule {
   id: string;
@@ -35,35 +37,37 @@ interface AppModule {
 }
 
 export default function AppsManagerPage() {
-  const { currentTenant, setCurrentTenant } = useERPStore();
+  const { currentTenant, setCurrentTenant, session } = useERPStore();
   const tenant = useTenantResolver();
+  const actor = useActionActor();
   const { toast } = useToast();
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeModules, setActiveModules] = useState<string[]>([
-    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin'
+    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'estadisticas', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin'
   ]);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const activeModules = (currentTenant?.metadata as { active_modules?: string[] })?.active_modules;
-    if (activeModules) {
-      setActiveModules(activeModules);
+    const modules = currentTenant?.active_modules || (currentTenant?.metadata as { active_modules?: string[] })?.active_modules;
+    if (modules && Array.isArray(modules) && modules.length > 0) {
+      setActiveModules(modules);
     }
   }, [currentTenant]);
 
   const modulesList: AppModule[] = [
     { id: 'caja', name: 'Caja POS', category: 'comercial', icon: Wrench, gradient: 'from-emerald-500 to-teal-600', description: 'Registro de ventas en mostrador, emisión de tickets y cobros rápidos.' },
     { id: 'clientes', name: 'Directorio CRM', category: 'comercial', icon: Users, gradient: 'from-blue-500 to-indigo-600', description: 'Fichas de clientes, historial de compras y saldos por cobrar.' },
-    { id: 'catalogo', name: 'Catálogo & Inventario', category: 'operaciones', icon: Box, gradient: 'from-violet-500 to-purple-600', description: 'Gestión de productos, productos terminados, servicios y stock.' },
+    { id: 'inventario', name: 'Inventario de Mercancías', category: 'operaciones', icon: Box, gradient: 'from-violet-500 to-purple-600', description: 'Control de existencias, costos de adquisición, valuación de activos, stock mínimo y reposición.' },
     { id: 'compras', name: 'Compras y Proveedores', category: 'operaciones', icon: ShoppingCart, gradient: 'from-orange-500 to-amber-600', description: 'Órdenes de compra, recepción de mercadería y validación 3-Way Match.' },
     { id: 'contabilidad', name: 'Contabilidad NIIF', category: 'finanzas', icon: Scale, gradient: 'from-slate-800 to-slate-900', description: 'Libro mayor de partida doble, balance de comprobación y diario general.' },
+    { id: 'estadisticas', name: 'Reportes & Estadísticas', category: 'finanzas', icon: ShieldCheck, gradient: 'from-sky-400 to-blue-500', description: 'Métricas gerenciales, análisis de rendimiento y reportes ejecutivos.' }, // FIX A1
     { id: 'calendario', name: 'Citas y Turnos', category: 'operaciones', icon: CalendarDays, gradient: 'from-blue-400 to-blue-600', description: 'Agenda de atención a clientes, asignación de técnicos y programación de servicios.' },
     { id: 'whatsapp', name: 'WhatsApp CRM', category: 'comercial', icon: MessageCircle, gradient: 'from-green-400 to-emerald-600', description: 'Bandeja omnicanal de soporte con chat en tiempo real y vinculación a clientes.' },
     { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones', icon: KanbanSquare, gradient: 'from-yellow-400 to-orange-500', description: 'Tablero visual de seguimiento de servicios, diagnósticos y reparaciones.' },
+    { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'operaciones', icon: Stethoscope, gradient: 'from-teal-400 to-cyan-600', description: 'Odontograma digital FDI interactivo, historial clínico por diente, piezas supernumerarias y planes de tratamiento Kanban.' },
     { id: 'equipo', name: 'Personal & Nómina', category: 'administracion', icon: Users, gradient: 'from-indigo-400 to-indigo-600', description: 'Registro de empleados, marcaje de asistencia y liquidación de sueldos.' },
     { id: 'franquicias', name: 'Franquicias & Sedes', category: 'administracion', icon: Building2, gradient: 'from-cyan-500 to-blue-600', description: 'Control de múltiples locales, sucursales y consolidación de ingresos.' },
-    { id: 'integraciones', name: 'Integraciones & APIs', category: 'administracion', icon: PlugZap, gradient: 'from-fuchsia-500 to-pink-600', description: 'Conexión con Stripe, WhatsApp Meta API y Google Calendar.' },
     { id: 'config', name: 'Ajustes del Sistema', category: 'administracion', icon: Settings, gradient: 'from-slate-500 to-slate-700', description: 'Datos del negocio, logotipo y moneda principal.', isCore: true },
     { id: 'admin', name: 'Rendo Hub', category: 'administracion', icon: Crown, gradient: 'from-pink-500 to-rose-600', description: 'Consola global de administración del software SaaS.', isCore: true },
   ];
@@ -71,10 +75,30 @@ export default function AppsManagerPage() {
   const handleToggleModule = async (moduleId: string) => {
     if (!currentTenant) return;
 
-    const isInstalled = activeModules.includes(moduleId);
-    const updatedModules = isInstalled
-      ? activeModules.filter(m => m !== moduleId)
-      : [...activeModules, moduleId];
+    if (session?.role !== 'owner' && session?.role !== 'manager' && session?.role !== 'superadmin') {
+      toast({
+        variant: 'error',
+        title: 'Sin permisos',
+        description: 'Solo el propietario o administrador puede activar o desactivar módulos.',
+      });
+      return;
+    }
+
+    const isTargetInventory = moduleId === 'inventario' || moduleId === 'catalogo';
+    const isInstalled = isTargetInventory
+      ? (activeModules.includes('inventario') || activeModules.includes('catalogo'))
+      : activeModules.includes(moduleId);
+
+    let updatedModules: string[];
+    if (isTargetInventory) {
+      updatedModules = isInstalled
+        ? activeModules.filter(m => m !== 'inventario' && m !== 'catalogo')
+        : [...activeModules.filter(m => m !== 'catalogo' && m !== 'inventario'), 'inventario', 'catalogo'];
+    } else {
+      updatedModules = isInstalled
+        ? activeModules.filter(m => m !== moduleId)
+        : [...activeModules, moduleId];
+    }
 
     setActiveModules(updatedModules);
 
@@ -85,11 +109,22 @@ export default function AppsManagerPage() {
         active_modules: updatedModules,
       };
 
-      const result = await updateTenantSettings(currentTenant.id, currentTenant.name, newMetadata);
+      if (!actor) {
+        toast({
+          variant: 'error',
+          title: 'Error de autenticación',
+          description: 'No se detectó una sesión activa con token de seguridad.',
+        });
+        return;
+      }
+
+      // FIX C5: pasar updatedModules como 4to arg para escribir en columna directa active_modules
+      const result = await updateTenantSettings(currentTenant.id, currentTenant.name, newMetadata, updatedModules, actor);
       if (result.success) {
         setCurrentTenant({
           ...currentTenant,
           metadata: newMetadata,
+          active_modules: updatedModules,   // FIX C5: sincronizar store a nivel raíz
         });
         toast({
           variant: 'success',
@@ -162,7 +197,6 @@ export default function AppsManagerPage() {
         {filteredModules.map(mod => {
           const isActive = activeModules.includes(mod.id);
           const IconComp = (mod.icon as any); /* eslint-disable-line */
-mod.icon;
 
           return (
             <div 

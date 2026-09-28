@@ -1,4 +1,4 @@
-﻿'use server';
+'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { calculateTaxes, LocalizationCode } from '@/lib/core/taxEngine';
@@ -8,30 +8,34 @@ import { checkPermission, UserRole } from '@/lib/rbac';
 import { eventBus } from '@/lib/core/events/eventBus';
 import { pluginManager } from '@/lib/core/plugins/pluginManager';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { checkRateLimit } from '@/lib/core/rateLimiter';
 import { getExchangeRate, convertUSDToLocal } from '@/lib/core/currencyEngine';
+import { ActionActor } from './entities';
 import Decimal from 'decimal.js';
 
-interface CartItem {
+export interface CartItem {
   itemId: string;
   quantity: number;
+  name?: string;
+  price?: number;
+  type?: 'product' | 'service';
+  appointmentId?: string;
 }
 
-interface CheckoutActor {
-  email: string;
-  role: UserRole;
-}
+export type CheckoutActor = ActionActor;
 
 export async function processSecureCheckout(
   cart: CartItem[], 
   entityId: string, 
   paymentMethod: string,
   tenantId: string,
-  actor: CheckoutActor,
+  actor: ActionActor,
   localizationCode: LocalizationCode = 'VE',
   idempotencyKey?: string,
-  chargeTaxes: boolean = true,
-  paymentBreakdown?: Array<{ method: 'cash' | 'card' | 'transfer'; amount: number }>
+  chargeTaxes: boolean = false,
+  paymentBreakdown?: Array<{ method: 'cash' | 'card' | 'transfer' | 'credit'; amount: number }>,
+  appointmentId?: string
 ) {
   try {
     // Rate Limiting Guard
@@ -49,6 +53,12 @@ export async function processSecureCheckout(
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso multi-tenant denegado.' };
+    }
+
+    // Validación Backend de Módulo Activo (Estilo Odoo 17)
+    const moduleCheck = await assertModuleEnabled(tenantId, 'caja');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de Caja POS está desactivado para esta empresa.' };
     }
 
 
@@ -84,16 +94,18 @@ export async function processSecureCheckout(
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 2: Control Transaccional (Idempotencia)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    if (idempotencyKey) {
+    const cleanIdempotencyKey = typeof idempotencyKey === 'string' ? idempotencyKey.trim() : null;
+    if (cleanIdempotencyKey) {
       const { data: existingDoc } = await supabaseAdmin
         .from('documents')
         .select('*')
+        .eq('tenant_id', tenantId)
         .eq('type', 'invoice')
-        .eq('metadata->>idempotency_key', idempotencyKey)
-        .single();
+        .eq('metadata->>idempotency_key', cleanIdempotencyKey)
+        .maybeSingle();
       
       if (existingDoc) {
-        console.warn(`Idempotency hit: cobro duplicado interceptado. Key: ${idempotencyKey}`);
+        console.warn(`Idempotency hit: cobro duplicado interceptado. Key: ${cleanIdempotencyKey}`);
         return { success: true, document: existingDoc, isDuplicate: true };
       }
     }
@@ -101,13 +113,14 @@ export async function processSecureCheckout(
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 3: Inmutabilidad Fiscal (Snapshotting)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    let entityData: unknown = null;
+    let entityData: any = null;
     
-    // Intentar buscar cliente real
+    // Intentar buscar cliente real perteneciente a este tenant (Anti-IDOR)
     const { data: realEntity } = await supabaseAdmin
       .from('entities')
       .select('*')
       .eq('id', entityId)
+      .eq('tenant_id', tenantId)
       .maybeSingle();
 
     if (realEntity) {
@@ -155,47 +168,68 @@ export async function processSecureCheckout(
     };
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 4: Validación de Ítems (Solo precios del servidor)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    const itemIds = cart.map(c => c.itemId);
-    const { data: dbItems, error: itemsError } = await supabaseAdmin
-      .from('items')
-      .select('*')
-      .in('id', itemIds);
+    const aggregatedDemand = new Map<string, number>();
+    for (const c of cart) {
+      aggregatedDemand.set(c.itemId, (aggregatedDemand.get(c.itemId) || 0) + c.quantity);
+    }
 
-    if (itemsError || !dbItems) throw new Error('Error validando ítems en la base de datos');
+    const itemIds = Array.from(aggregatedDemand.keys());
+    const realItemIds = itemIds.filter(id => !id.startsWith('custom-') && !id.startsWith('appt-'));
+    
+    let dbItems: any[] = [];
+    if (realItemIds.length > 0) {
+      const { data, error: itemsError } = await supabaseAdmin
+        .from('items')
+        .select('*')
+        .eq('tenant_id', tenantId)
+        .in('id', realItemIds);
+
+      if (itemsError) throw new Error('Error validando ítems en la base de datos: ' + itemsError.message);
+      dbItems = data || [];
+    }
+
+    // Validación de stock sobre demanda consolidada (solo para productos físicos de inventario)
+    for (const [itemId, totalDemand] of Array.from(aggregatedDemand.entries())) {
+      const realItem = dbItems.find(i => i.id === itemId);
+      if (realItem) {
+        if (realItem.type === 'product') {
+          const itemStock = realItem.stock !== undefined ? realItem.stock : realItem.stock_quantity;
+          if (itemStock !== null && itemStock !== undefined && itemStock < totalDemand) {
+            throw new Error(`Stock insuficiente para: ${realItem.name} (disponible: ${itemStock}, solicitado: ${totalDemand})`);
+          }
+        }
+      } else {
+        const cartItem = cart.find(c => c.itemId === itemId);
+        if (!cartItem?.name && !itemId.startsWith('appt-') && !itemId.startsWith('custom-')) {
+          throw new Error(`Ítem no existe: ${itemId}`);
+        }
+      }
+    }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     // CAPA 5: Matemáticas Seguras (Decimal.js)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     let subtotalDecimal = new Decimal(0);
     const documentLines = [];
-    const stockUpdates = [];
 
     for (const cartItem of cart) {
       const realItem = dbItems.find(i => i.id === cartItem.itemId);
-      if (!realItem) throw new Error(`Ítem no existe: ${cartItem.itemId}`);
+      const unitPrice = realItem ? Number(realItem.base_price) : (Number(cartItem.price) || 0);
+      const itemName = realItem ? realItem.name : (cartItem.name || 'Servicio de Cita');
 
-      const itemStock = realItem.stock !== undefined ? realItem.stock : realItem.stock_quantity;
-
-      if (itemStock !== null && itemStock !== undefined && itemStock < cartItem.quantity) {
-        throw new Error(`Stock insuficiente para: ${realItem.name}`);
-      }
-
-      const lineSubtotal = new Decimal(realItem.base_price).times(cartItem.quantity);
+      const lineSubtotal = new Decimal(unitPrice).times(cartItem.quantity);
       subtotalDecimal = subtotalDecimal.plus(lineSubtotal);
 
       documentLines.push({
-        item_id: realItem.id,
-        description: realItem.name,
+        item_id: realItem ? realItem.id : null,
+        description: itemName,
         quantity: cartItem.quantity,
-        unit_price: realItem.base_price,
+        unit_price: unitPrice,
         tax_amount: 0
       });
-
-      if (itemStock !== null && itemStock !== undefined) {
-        stockUpdates.push({ id: realItem.id, new_stock: itemStock - cartItem.quantity });
-      }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -229,9 +263,47 @@ export async function processSecureCheckout(
         .toNumber();
     });
 
+    // Validación Matemática de Desglose de Pagos Combinados (Anti-Fraude)
+    if (paymentBreakdown && paymentBreakdown.length > 0) {
+      let breakdownSum = new Decimal(0);
+      for (const p of paymentBreakdown) {
+        if (p.amount < 0) {
+          return { success: false, error: 'Los importes en el desglose de pago no pueden ser negativos.' };
+        }
+        breakdownSum = breakdownSum.plus(new Decimal(p.amount));
+      }
+      if (breakdownSum.minus(taxResult.total).abs().greaterThan(0.02)) {
+        return { 
+          success: false, 
+          error: `El desglose de pagos ($${breakdownSum.toFixed(2)}) no coincide con el total de la orden ($${taxResult.total.toFixed(2)}).` 
+        };
+      }
+    }
+
+    // Validación de Venta a Crédito: Requiere cliente real en CRM
+    const isCreditPayment = paymentMethod === 'credit';
+    const creditInBreakdown = paymentBreakdown?.filter(p => p.method === ('credit' as any)) || [];
+    const totalCreditAmount = isCreditPayment 
+      ? taxResult.total 
+      : creditInBreakdown.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    if (totalCreditAmount > 0) {
+      const isGenericCounter = !entityData || entityData.name === 'Cliente de Mostrador' || entityData.tax_id === 'J-GENERICO' || entityId === tenantId;
+      if (isGenericCounter) {
+        return { 
+          success: false, 
+          error: 'La venta a crédito requiere seleccionar un cliente registrado en el CRM para asociar la cuenta por cobrar.' 
+        };
+      }
+    }
+
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // CAPA 7: Inserción Inmutable de la Factura Bimoneda
+    // CAPA 7: Inserción Inmutable de la Factura / Orden de Entrega Bimoneda
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const docSubtype = chargeTaxes ? 'fiscal_invoice' : 'delivery_order';
+    const docPrefix = chargeTaxes ? 'FAC' : 'ORD';
+    const docLabel = chargeTaxes ? 'Factura Fiscal' : 'Orden de Entrega';
+
     const { data: newDoc, error: docError } = await supabaseAdmin
       .from('documents')
       .insert([{
@@ -239,11 +311,14 @@ export async function processSecureCheckout(
         entity_id: entityId,
         type: 'invoice',
         status: 'invoiced',
-        document_number: `INV-${Date.now().toString().slice(-6)}`,
+        document_number: `${docPrefix}-${Date.now().toString().slice(-6)}`,
         subtotal_amount: taxResult.subtotal,
         tax_amount: taxResult.taxAmount,
         total_amount: taxResult.total,
         metadata: {
+          doc_subtype: docSubtype,
+          doc_label: docLabel,
+          charge_taxes: chargeTaxes,
           localization: localizationCode,
           tax_details: taxResult.details,
           payment_method: paymentBreakdown ? 'mixed' : paymentMethod,
@@ -256,7 +331,7 @@ export async function processSecureCheckout(
           currency_local: exchangeData.currency,
           currency_symbol: exchangeData.symbol,
           total_local: totalLocal,
-          cart_lines: documentLines.map((line: unknown) => ({
+          cart_lines: documentLines.map((line: any) => ({
             description: line.description,
             quantity: line.quantity,
             unit_price: line.unit_price,
@@ -270,53 +345,156 @@ export async function processSecureCheckout(
 
     if (docError) throw docError;
 
+    // Si la venta tiene monto a crédito, actualizar automáticamente la deuda del cliente en el CRM
+    if (totalCreditAmount > 0 && entityData?.id) {
+      try {
+        const currentDebt = Number(entityData.metadata?.total_debt || 0);
+        const updatedDebt = currentDebt + totalCreditAmount;
+        await supabaseAdmin
+          .from('entities')
+          .update({
+            metadata: {
+              ...(entityData.metadata || {}),
+              total_debt: updatedDebt
+            },
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', entityData.id)
+          .eq('tenant_id', tenantId);
+
+        entityData.metadata = { ...(entityData.metadata || {}), total_debt: updatedDebt };
+      } catch (debtErr) {
+        console.warn('[checkout.ts] Advertencia al actualizar deuda de cliente:', debtErr);
+      }
+    }
+
+    // Si la venta está vinculada a una cita de la agenda, marcarla automáticamente como pagada
+    if (appointmentId) {
+      try {
+        const { data: currentAppt } = await supabaseAdmin
+          .from('appointments')
+          .select('metadata')
+          .eq('id', appointmentId)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+
+        const mergedApptMeta = {
+          ...(typeof currentAppt?.metadata === 'object' && currentAppt?.metadata !== null ? currentAppt.metadata : {}),
+          payment_status: 'paid',
+          paid_at: new Date().toISOString(),
+          invoice_id: newDoc.id,
+          invoice_number: newDoc.document_number,
+          paid_via_pos: true,
+        };
+
+        await supabaseAdmin
+          .from('appointments')
+          .update({
+            status: 'completed',
+            metadata: mergedApptMeta,
+          })
+          .eq('id', appointmentId)
+          .eq('tenant_id', tenantId);
+      } catch (apptErr) {
+        console.warn('[checkout.ts] Aviso: No se pudo actualizar metadata de cita:', apptErr);
+      }
+    }
+
     // Líneas de la factura
     const linesToInsert = documentLines.map(line => ({ ...line, document_id: newDoc.id }));
     const { error: linesError } = await supabaseAdmin.from('document_lines').insert(linesToInsert);
 
     if (linesError) {
-      await supabaseAdmin.from('documents').delete().eq('id', newDoc.id);
-      throw new Error('Fallo al guardar líneas, factura anulada por seguridad');
+      const isMissingTable = 
+        linesError.code === 'PGRST205' || 
+        linesError.message?.includes('could not find the table') || 
+        linesError.message?.includes('schema cache');
+
+      if (!isMissingTable) {
+        await supabaseAdmin.from('documents').delete().eq('id', newDoc.id);
+        throw new Error('Fallo al guardar líneas, factura anulada por seguridad: ' + linesError.message);
+      } else {
+        console.warn('Nota: Tabla document_lines no disponible; líneas guardadas en documents.metadata.cart_lines');
+      }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // CAPA 8: Descuento Atómico de Inventario (RPC PostgreSQL)
+    // CAPA 8: Descuento Atómico de Inventario (Saga Pattern / Rollback Seguro)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    for (const cartItem of cart) {
+    const successfulDecrements: Array<{ itemId: string; quantity: number }> = [];
+    
+    for (const [itemId, quantity] of Array.from(aggregatedDemand.entries())) {
+      const realItem = dbItems.find(i => i.id === itemId);
+      // Los servicios y los ítems de citas NO descuentan inventario físico
+      if (!realItem || realItem.type === 'service') {
+        continue;
+      }
+
       const { data: rpcRes, error: rpcErr } = await supabaseAdmin.rpc('decrement_item_stock', {
-        p_item_id: cartItem.itemId,
-        p_quantity: cartItem.quantity,
+        p_item_id: itemId,
+        p_quantity: quantity,
         p_tenant_id: tenantId
       });
 
+      let itemFailed = false;
+      let failReason = '';
+
       if (rpcErr) {
-        // En caso de que la función RPC aún no se haya desplegado, usar decremento atómico directo en SQL
-        console.warn('RPC decrement_item_stock no disponible, usando fallback seguro:', rpcErr.message);
-        const realItem = dbItems.find(i => i.id === cartItem.itemId);
+        console.warn('RPC decrement_item_stock no disponible, usando fallback:', rpcErr.message);
+        const realItem = dbItems.find(i => i.id === itemId);
         const itemStock = realItem ? (realItem.stock !== undefined ? realItem.stock : realItem.stock_quantity) : null;
         if (realItem && itemStock !== null && itemStock !== undefined) {
-          const newStock = Math.max(0, itemStock - cartItem.quantity);
-          const { error: updateErr } = await supabaseAdmin.from('items').update({ stock: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
-          if (updateErr && (updateErr.message.includes('stock') || updateErr.message.includes('column'))) {
-            // Fallback: If DB schema uses stock_quantity instead of stock
-            await supabaseAdmin.from('items').update({ stock_quantity: newStock }).eq('id', cartItem.itemId).eq('tenant_id', tenantId);
+          if (itemStock < quantity) {
+             itemFailed = true;
+             failReason = `Stock insuficiente para: ${realItem.name}`;
+          } else {
+             const newStock = Math.max(0, itemStock - quantity);
+             const { error: updateErr } = await supabaseAdmin.from('items').update({ stock: newStock }).eq('id', itemId).eq('tenant_id', tenantId);
+             if (updateErr && (updateErr.message.includes('stock') || updateErr.message.includes('column'))) {
+               await supabaseAdmin.from('items').update({ stock_quantity: newStock }).eq('id', itemId).eq('tenant_id', tenantId);
+             }
           }
         }
       } else if (rpcRes && rpcRes.length > 0 && !rpcRes[0].success) {
-        // Si el procedimiento almacenado detectó stock insuficiente en el momento exacto
+        itemFailed = true;
+        failReason = rpcRes[0].error_message || 'Stock insuficiente';
+      }
+
+      if (itemFailed) {
+        // [ROLLBACK INVENTARIO]: Revertir todos los descuentos anteriores exitosos
+        for (const success of successfulDecrements) {
+          const oldItem = dbItems.find(i => i.id === success.itemId);
+          if (oldItem) {
+            const field = oldItem.stock !== undefined ? 'stock' : 'stock_quantity';
+            const { data: currentData } = await supabaseAdmin.from('items').select(field).eq('id', success.itemId).single();
+            if (currentData) {
+               const rawData = currentData as Record<string, any>;
+               const val = rawData.stock !== undefined ? rawData.stock : rawData.stock_quantity;
+               const revertPayload = oldItem.stock !== undefined ? { stock: val + success.quantity } : { stock_quantity: val + success.quantity };
+               await supabaseAdmin.from('items').update(revertPayload).eq('id', success.itemId).eq('tenant_id', tenantId);
+            }
+          }
+        }
+        // Destruir la factura huérfana
         await supabaseAdmin.from('documents').delete().eq('id', newDoc.id);
-        throw new Error(rpcRes[0].error_message || 'Stock insuficiente para completar la venta');
+        throw new Error(`Venta cancelada (Inventario Revertido): ${failReason}`);
+      } else {
+        // Anotar éxito para posible rollback futuro
+        successfulDecrements.push({ itemId, quantity });
       }
     }
 
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // CAPA 9: Asientos Contables (Partida Doble)
+    // CAPA 9: Asientos Contables (Partida Doble - Solo si Contabilidad está activa)
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    try {
-      await generateJournalEntryForInvoice(newDoc as unknown, tenantId);
-    } catch (journalError) {
-      console.warn('Factura guardada pero falló asiento contable:', journalError);
+    const contabilidadCheck = await assertModuleEnabled(tenantId, 'contabilidad');
+    if (contabilidadCheck.authorized) {
+      try {
+        await generateJournalEntryForInvoice(newDoc as any, tenantId);
+      } catch (journalError) {
+        console.warn('Factura guardada pero falló asiento contable:', journalError);
+      }
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -354,7 +532,7 @@ export async function processSecureCheckout(
 
     return { success: true, document: newDoc };
 
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('SERVER ACTION ERROR (checkout):', error.message);
     return { success: false, error: error.message };
   }

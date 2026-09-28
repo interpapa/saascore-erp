@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef } from 'react';
 import { X, Upload, FileText, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
@@ -16,7 +16,7 @@ interface CSVImportModalProps {
 
 export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [previewRows, setPreviewRows] = useState<unknown[]>([]);
+  const [previewRows, setPreviewRows] = useState<any[]>([]);
   const [parsedItems, setParsedItems] = useState<BulkImportItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +70,7 @@ export function CSVImportModal({ isOpen, onClose, onSuccess }: CSVImportModalPro
       }
 
       const parsed: BulkImportItem[] = [];
-      const previews: unknown[] = [];
+      const previews: any[] = [];
 
       for (let i = 1; i < lines.length; i++) {
         // Parse CSV line handling quotes properly

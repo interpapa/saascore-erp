@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // TODO: 606 errores TS pre-existentes (399 son TS18046 'unknown' en respuestas de Supabase).
+  // Requiere un refactor dedicado para tipar todas las respuestas de DB.
+  // Los fixes de seguridad (tenantSecurity, actor obligatorio) ya están aplicados.
   typescript: {
     ignoreBuildErrors: true,
   },

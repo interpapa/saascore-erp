@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo Event Bus
  * Decentralized, strongly-typed event listener & emitter system.
  * Allows core modules and third-party plugins to subscribe to domain events.
@@ -48,12 +48,60 @@ export interface AuditLoggedPayload {
   timestamp: string;
 }
 
+export interface AppointmentBookedPayload {
+  appointmentId: string;
+  tenantId: string;
+  customerName: string;
+  customerPhone?: string;
+  barberId: string;
+  date: string;
+  time: string;
+  durationMinutes: number;
+  serviceName?: string;
+  timestamp: string;
+}
+
+export interface AppointmentCompletedPayload {
+  appointmentId: string;
+  tenantId: string;
+  customerName: string;
+  barberId: string;
+  total?: number;
+  paymentStatus: 'paid' | 'pending' | 'unrecorded';
+  timestamp: string;
+}
+
+export interface AppointmentCancelledPayload {
+  appointmentId: string;
+  tenantId: string;
+  reason?: string;
+  timestamp: string;
+}
+
+export interface PurchaseCompletedPayload {
+  purchaseId: string;
+  tenantId: string;
+  supplierId: string;
+  total: number;
+  currency: string;
+  items: Array<{
+    itemId: string;
+    quantity: number;
+    unitCost: number;
+  }>;
+  timestamp: string;
+}
+
 export type DomainEvents = {
   'sale.completed': SaleCompletedPayload;
   'sale.failed': { tenantId: string; reason: string; actorId?: string };
   'payroll.processed': PayrollProcessedPayload;
   'inventory.stock_changed': InventoryStockChangedPayload;
   'audit.logged': AuditLoggedPayload;
+  'appointment.booked': AppointmentBookedPayload;
+  'appointment.completed': AppointmentCompletedPayload;
+  'appointment.cancelled': AppointmentCancelledPayload;
+  'purchase.completed': PurchaseCompletedPayload;
 };
 
 export type EventName = keyof DomainEvents;

@@ -35,7 +35,7 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'integraciones', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
   const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : fallbackModules;
@@ -53,11 +53,10 @@ export function MobileDock() {
     { id: 'kanban', label: 'Kanban', href: '/kanban', icon: LayoutGrid },
     { id: 'equipo', label: 'Personal', href: '/equipo', icon: Briefcase },
     { id: 'compras', label: 'Compras', href: '/compras', icon: ShoppingBag },
-    { id: 'catalogo', label: 'Catálogo', href: '/catalogo', icon: Package },
+    { id: 'inventario', label: 'Inventario', href: '/inventario', icon: Package },
     { id: 'contabilidad', label: 'Contabilidad', href: '/contabilidad', icon: FileText },
     { id: 'estadisticas', label: 'Estadísticas', href: '/estadisticas', icon: TrendingUp },
     { id: 'franquicias', label: 'Franquicias', href: '/franquicias', icon: Store },
-    { id: 'integraciones', label: 'Integraciones', href: '/integraciones', icon: Plug },
     { id: 'apps', label: 'Apps', href: '/apps', icon: Blocks },
     { id: 'config', label: 'Ajustes', href: '/configuracion', icon: Settings },
     { id: 'admin', label: 'Admin', href: '/admin', icon: ShieldAlert },
@@ -68,7 +67,13 @@ export function MobileDock() {
   // 2. Incluir los IDs que estén en dockPreferences y también en enabledModules
   const activeItems = allItems.filter(item => {
     if (item.id === 'dashboard') return true;
-    return dockPreferences.includes(item.id) && enabledModules.includes(item.id);
+    const isModuleActiveInDock = item.id === 'inventario'
+      ? (enabledModules.includes('inventario') || enabledModules.includes('catalogo'))
+      : enabledModules.includes(item.id);
+    const isItemInPreferences = item.id === 'inventario'
+      ? (dockPreferences.includes('inventario') || dockPreferences.includes('catalogo'))
+      : dockPreferences.includes(item.id);
+    return isItemInPreferences && isModuleActiveInDock;
   });
 
   return (

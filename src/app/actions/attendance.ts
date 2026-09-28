@@ -1,9 +1,18 @@
 'use server';
 
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { revalidatePath } from 'next/cache';
+
+function safeRevalidate(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Graceful degradation when outside Next.js request context
+  }
+}
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { getMembershipsAction } from './memberships';
 
 export interface AttendanceInput {
@@ -15,11 +24,18 @@ export interface AttendanceInput {
   metadata?: unknown;
 }
 
-function isMissingTableError(error: unknown): boolean {
+function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = error.code || '';
-  const msg = error.message || '';
-  return code === 'PGRST204' || code === '42P01' || msg.includes('does not exist');
+  const msg = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache')
+  );
 }
 
 /**
@@ -34,7 +50,12 @@ export async function getAttendanceLogsAction(tenantId: string, actor?: ActionAc
       }
     }
 
-    const db = supabaseAdmin || supabase;
+    const moduleCheck = await assertModuleEnabled(tenantId, 'equipo');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de Personal está desactivado.', logs: [] };
+    }
+
+    const db = supabaseAdmin;
 
     // 1. Intentar leer de la tabla física 'attendance_logs'
     const { data, error } = await db
@@ -60,7 +81,7 @@ export async function getAttendanceLogsAction(tenantId: string, actor?: ActionAc
     }
 
     throw new Error(error?.message || 'Error al consultar asistencia.');
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('[getAttendanceLogsAction Error]:', error.message);
     return { success: false, error: error.message, logs: [] };
   }
@@ -75,17 +96,76 @@ export async function registerAttendanceAction(
   actor: ActionActor
 ) {
   try {
-    const db = supabaseAdmin || supabase;
+    const db = supabaseAdmin;
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'equipo');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de Personal está desactivado.' };
+    }
+
+    // Validación de estado previo para evitar doble check-in continuo sin salida (Soporte Dual: Tabla + Fallback JSONB)
+    if (payload.log_type === 'check_in' || payload.log_type === 'check_out') {
+      let lastLogType: string | null = null;
+      try {
+        const { data: lastLog, error } = await db
+          .from('attendance_logs')
+          .select('log_type')
+          .eq('tenant_id', tenantId)
+          .eq('entity_id', payload.entity_id)
+          .order('timestamp', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && lastLog) {
+          lastLogType = lastLog.log_type;
+        } else if (error && isMissingTableError(error)) {
+          const { data: tenant } = await db
+            .from('tenants')
+            .select('metadata')
+            .eq('id', tenantId)
+            .single();
+          const list = (tenant?.metadata?.attendance_logs || []) as any[];
+          const entityLogs = list.filter((l: any) => l.entity_id === payload.entity_id);
+          if (entityLogs.length > 0) {
+            lastLogType = entityLogs[0].log_type;
+          }
+        }
+      } catch {
+        try {
+          const { data: tenant } = await db
+            .from('tenants')
+            .select('metadata')
+            .eq('id', tenantId)
+            .single();
+          const list = (tenant?.metadata?.attendance_logs || []) as any[];
+          const entityLogs = list.filter((l: any) => l.entity_id === payload.entity_id);
+          if (entityLogs.length > 0) {
+            lastLogType = entityLogs[0].log_type;
+          }
+        } catch {
+          // Si falla lectura, permitir continuar
+        }
+      }
+
+      if (lastLogType && lastLogType === payload.log_type) {
+        return { 
+          success: false, 
+          error: payload.log_type === 'check_in' 
+            ? 'El colaborador ya tiene un ingreso (check-in) activo registrado.' 
+            : 'El colaborador ya registró su salida previamente.' 
+        };
+      }
     }
 
     // Validación de límites si es check-in de clase de un alumno
     if (payload.entity_type === 'customer' && payload.log_type === 'class_attendance') {
       const { memberships } = await getMembershipsAction(tenantId);
       const activeMship = (memberships || []).find(
-        (m: unknown) => m.client_id === payload.entity_id && m.status === 'active'
+        (m: any) => m.client_id === payload.entity_id && m.status === 'active'
       );
 
       if (activeMship) {
@@ -129,8 +209,8 @@ export async function registerAttendanceAction(
       .single();
 
     if (!error && data) {
-      revalidatePath('/equipo');
-      revalidatePath('/calendario');
+      safeRevalidate('/equipo');
+      safeRevalidate('/calendario');
       return { success: true, log: data };
     }
 
@@ -144,7 +224,7 @@ export async function registerAttendanceAction(
 
       const currentMetadata = tenant?.metadata || {};
       const currentList = currentMetadata.attendance_logs || [];
-      const updatedList = [newLog, ...currentList];
+      const updatedList = [newLog, ...currentList].slice(0, 500);
 
       const { error: updateError } = await db
         .from('tenants')
@@ -158,13 +238,13 @@ export async function registerAttendanceAction(
 
       if (updateError) throw new Error(updateError.message);
 
-      revalidatePath('/equipo');
-      revalidatePath('/calendario');
+      safeRevalidate('/equipo');
+      safeRevalidate('/calendario');
       return { success: true, log: newLog };
     }
 
     throw new Error(error?.message || 'Error al guardar registro de asistencia.');
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('[registerAttendanceAction Error]:', error.message);
     return { success: false, error: error.message };
   }
@@ -173,9 +253,9 @@ export async function registerAttendanceAction(
 /**
  * Helper interno para guardar el incremento del uso de la membresía.
  */
-async function updateMembershipCount(mship: unknown, tenantId: string) {
+async function updateMembershipCount(mship: any, tenantId: string) {
   try {
-    const db = supabaseAdmin || supabase;
+    const db = supabaseAdmin;
     const { error } = await db
       .from('memberships')
       .update({ sessions_used_current_cycle: mship.sessions_used_current_cycle })
@@ -192,7 +272,7 @@ async function updateMembershipCount(mship: unknown, tenantId: string) {
 
       const currentMetadata = tenant?.metadata || {};
       const list = currentMetadata.memberships || [];
-      const updated = list.map((m: unknown) => (m.id === mship.id ? mship : m));
+      const updated = list.map((m: any) => (m.id === mship.id ? mship : m));
 
       const { error: updateError } = await db
         .from('tenants')
@@ -209,7 +289,7 @@ async function updateMembershipCount(mship: unknown, tenantId: string) {
     }
 
     throw new Error(error.message);
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }

@@ -34,8 +34,8 @@ export default function TicketsPage() {
   const fetchTickets = async () => {
     try {
       setIsLoading(true);
-      if (!currentTenant?.id) return;
-      const res = await getDocumentsAction(currentTenant.id, 'work_order');
+      if (!currentTenant?.id || !actor) return;
+      const res = await getDocumentsAction(currentTenant.id, 'work_order', 100, actor);
       if (res.success) {
         setTickets(res.documents as Document[]);
       } else {
@@ -51,10 +51,10 @@ export default function TicketsPage() {
 
   useEffect(() => {
     fetchTickets();
-  }, [currentTenant?.id]);
+  }, [currentTenant?.id, actor]);
 
-  const handleCreateTicket = async (formData: unknown) => {
-    if (!currentTenant?.id) throw new Error('No hay empresa activa');
+  const handleCreateTicket = async (formData: any) => {
+    if (!currentTenant?.id || !actor) throw new Error('No hay empresa activa');
     const res = await createDocumentAction({
       entity_id: formData.entity_id,
       type: 'work_order',
@@ -81,7 +81,7 @@ export default function TicketsPage() {
   };
 
   const handleStatusChange = async (ticketId: string, newStatus: string) => {
-    if (!currentTenant?.id) return;
+    if (!currentTenant?.id || !actor) return;
     try {
       const res = await updateDocumentStatusAction(ticketId, newStatus as any, currentTenant.id, actor);
       if (res.success) {
@@ -154,7 +154,7 @@ export default function TicketsPage() {
             const meta = ticket.metadata || {};
             const pill = STATUS_PILLS[ticket.status] || STATUS_PILLS['draft'];
             const PillIcon = pill.icon;
-            const priorityDot = PRIORITY_DOTS[meta.priority] || PRIORITY_DOTS['medium'];
+            const priorityDot = PRIORITY_DOTS[(meta as any).priority] || PRIORITY_DOTS['medium'];
             return (
               <div
                 key={ticket.id}
@@ -167,7 +167,7 @@ export default function TicketsPage() {
                 {/* Main info */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                    {meta.title || 'Orden sin título'}
+                    {(meta as any).title || 'Orden sin título'}
                   </h3>
                   <p className="text-sm text-slate-500 mt-0.5 truncate">
                     {(ticket.entity as any)?.name || 'Sin cliente'} · #{ticket.document_number}
@@ -206,3 +206,4 @@ export default function TicketsPage() {
     </div>
   );
 }
+

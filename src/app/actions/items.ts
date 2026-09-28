@@ -4,8 +4,19 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { checkPermission, UserRole } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
+import { createModuleAction } from '@/lib/core/kernel/actionKernel';
+import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
+
+function safeRevalidate(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Graceful no-op when called outside Next.js request lifecycle (e.g. testing / cron)
+  }
+}
 
 export type ItemType = 'product' | 'service' | 'subscription';
 
@@ -33,11 +44,21 @@ export async function createItemAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'catalogo');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
+    }
+
     if (!tenantId || !input.name) {
       throw new Error('Empresa y Nombre de ítem son requeridos.');
     }
 
-    const insertData: unknown = {
+    // Validación financiera: precios y costos no pueden ser negativos
+    if (input.base_price < 0 || input.cost < 0) {
+      return { success: false, error: 'El precio base y el costo no pueden ser importes negativos.' };
+    }
+
+    const insertData: any = {
       tenant_id: tenantId,
       type: input.type,
       sku: input.sku || null,
@@ -82,11 +103,12 @@ export async function createItemAction(
       metadata: { action: 'created', name: input.name, price: input.base_price },
     });
 
-    revalidatePath('/catalogo');
-    revalidatePath('/caja');
+    safeRevalidate('/inventario');
+    safeRevalidate('/catalogo');
+    safeRevalidate('/caja');
 
     return { success: true, item: newItem };
-  } catch (err: unknown) {
+  } catch (err: any) {
     const errorMsg = err?.message || 'Error de red al conectar con el servidor (Failed to fetch).';
     console.error('[createItemAction Error]:', errorMsg);
     return { success: false, error: errorMsg };
@@ -106,7 +128,19 @@ export async function updateItemAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    const moduleCheck = await assertModuleEnabled(tenantId, 'catalogo');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
+    }
+
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    if (
+      (updates.base_price !== undefined && updates.base_price < 0) ||
+      (updates.cost !== undefined && updates.cost < 0)
+    ) {
+      return { success: false, error: 'El precio base y el costo no pueden ser importes negativos.' };
+    }
 
     const { data: updatedItem, error } = await supabaseAdmin
       .from('items')
@@ -128,11 +162,12 @@ export async function updateItemAction(
       metadata: { action: 'updated', updates },
     });
 
-    revalidatePath('/catalogo');
-    revalidatePath('/caja');
+    safeRevalidate('/inventario');
+    safeRevalidate('/catalogo');
+    safeRevalidate('/caja');
 
     return { success: true, item: updatedItem };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[updateItemAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -147,6 +182,11 @@ export async function deleteItemAction(
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'catalogo');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
     }
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
@@ -181,26 +221,25 @@ export async function deleteItemAction(
       metadata: { action: 'soft_deleted' },
     });
 
-    revalidatePath('/catalogo');
-    revalidatePath('/caja');
+    safeRevalidate('/inventario');
+    safeRevalidate('/catalogo');
+    safeRevalidate('/caja');
 
     return { success: true };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[deleteItemAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
 }
 
-export async function getItemsAction(tenantId: string, type?: ItemType, limit: number = 50, actor?: ActionActor) {
+export async function getItemsAction(tenantId: string, type: ItemType | undefined, limit: number = 50, actor: ActionActor) {
   try {
-    if (!tenantId) return { success: true, items: [] };
-
-    if (actor) {
-      const securityCheck = await validateUserTenantAccess(actor, tenantId);
-      if (!securityCheck.authorized) {
-        return { success: false, error: securityCheck.error || 'Acceso denegado.', items: [] };
-      }
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', items: [] };
     }
+
+    if (!tenantId) return { success: true, items: [] };
 
     let selectFields = 'id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at';
     let baseQuery = supabaseAdmin
@@ -239,14 +278,14 @@ export async function getItemsAction(tenantId: string, type?: ItemType, limit: n
     if (error) throw new Error(error.message);
 
     // Map `stock` or `stock_quantity` safely to `stock_quantity` for interface compatibility
-    const mappedItems = (items || []).map((item: unknown) => ({
+    const mappedItems = (items || []).map((item: any) => ({
       ...item,
       stock: item.stock !== undefined ? item.stock : item.stock_quantity,
       stock_quantity: item.stock_quantity !== undefined ? item.stock_quantity : (item.stock ?? 0),
     }));
 
     return { success: true, items: mappedItems };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[getItemsAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message, items: [] };
   }
@@ -260,7 +299,8 @@ export async function adjustItemStockAction(
   id: string,
   quantityDelta: number,
   tenantId: string,
-  actor: ActionActor
+  actor: ActionActor,
+  reason?: string
 ) {
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
@@ -281,10 +321,9 @@ export async function adjustItemStockAction(
     const currentStock = item.stock !== undefined ? (item.stock || 0) : (item.stock_quantity || 0);
     const newStock = Math.max(0, currentStock + quantityDelta);
 
-    // 2. Actualizar stock
     // 2. Actualizar stock con fallback y registrar cuál columna se usó
-    const _stockFieldUsed = 'stock';
-    let error: unknown = null;
+    let _stockFieldUsed = 'stock';
+    let error: any = null;
     const result = await supabaseAdmin
       .from('items')
       .update({ stock: newStock })
@@ -300,7 +339,7 @@ export async function adjustItemStockAction(
         .eq('id', id)
         .eq('tenant_id', tenantId);
       error = retryQty.error;
-      if (!error) stockFieldUsed = 'stock_quantity';
+      if (!error) _stockFieldUsed = 'stock_quantity';
     }
 
     if (error && (error.message.includes('quantity') || error.message.includes('column'))) {
@@ -311,15 +350,10 @@ export async function adjustItemStockAction(
         .eq('id', id)
         .eq('tenant_id', tenantId);
       error = retryQuantity.error;
-      if (!error) stockFieldUsed = 'quantity';
+      if (!error) _stockFieldUsed = 'quantity';
     }
 
     if (error) throw new Error('Error al actualizar inventario: ' + error.message);
-
-
-
-
-
 
     await writeAuditLog({
       tenant_id: tenantId,
@@ -328,16 +362,55 @@ export async function adjustItemStockAction(
       action: 'item.updated',
       target_type: 'item',
       target_id: id,
-      metadata: { action: 'stock_adjustment', delta: quantityDelta, newStock },
+      metadata: { 
+        action: 'stock_adjustment', 
+        delta: quantityDelta, 
+        newStock, 
+        previousStock: currentStock,
+        reason: reason || 'Ajuste manual de inventario' 
+      },
     });
 
-    revalidatePath('/catalogo');
-    revalidatePath('/caja');
+    safeRevalidate('/inventario');
+    safeRevalidate('/catalogo');
+    safeRevalidate('/caja');
 
     return { success: true, newStock };
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[adjustItemStockAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
 }
+
+/**
+ * Función construida con el Action Kernel:
+ * Archiva o reactiva un producto/servicio con validación Zod, guardia de módulo 'catalogo',
+ * Zero-Trust y auditoría automática sin escribir plomería manual.
+ */
+export const archiveItemAction = createModuleAction({
+  module: 'catalogo',
+  permission: 'inventario',
+  schema: z.object({
+    itemId: z.string(),
+    archive: z.boolean().default(true),
+  }),
+  audit: {
+    action: 'item.updated',
+    targetType: 'item',
+    getTargetId: (_res, input) => input.itemId,
+  },
+  revalidatePaths: ['/inventario', '/catalogo', '/caja'],
+  handler: async ({ input, ctx }) => {
+    const { data, error } = await ctx.supabase
+      .from('items')
+      .update({ is_active: !input.archive })
+      .eq('id', input.itemId)
+      .eq('tenant_id', ctx.tenantId)
+      .select()
+      .single();
+
+    if (error) throw new Error('Error al modificar estado de archivo del producto: ' + error.message);
+    return data;
+  },
+});
 

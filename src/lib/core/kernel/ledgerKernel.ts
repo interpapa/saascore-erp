@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo Kernel - Financial Ledger Engine (Partida Doble NIIF / IFRS)
  * 
  * Capa inmutable para la generación de asientos contables de partida doble.
@@ -32,6 +32,23 @@ export async function createKernelJournalEntry(payload: JournalEntryPayload): Pr
       throw new Error(`Asiento contable desbalanceado: Débitos ($${totalDebit.toFixed(2)}) !== Créditos ($${totalCredit.toFixed(2)}).`);
     }
 
+    // Intento 1: Transacción Atómica ACID vía RPC en PostgreSQL (Evita asientos huérfanos)
+    try {
+      const { data: rpcData, error: rpcErr } = await supabaseAdmin.rpc('insert_journal_transaction', {
+        p_tenant_id: payload.tenant_id,
+        p_document_id: payload.document_id || null,
+        p_description: payload.description,
+        p_lines: payload.lines
+      });
+
+      if (!rpcErr && rpcData && (rpcData as any).success) {
+        return { success: true, entryId: (rpcData as any).entry_id };
+      }
+    } catch {
+      // Si la función RPC no existe en la base de datos, continuar con fallback
+    }
+
+    // Intento 2 (Fallback): Inserción en 2 pasos
     const { data: header, error: headerErr } = await supabaseAdmin
       .from('journal_entries')
       .insert([{

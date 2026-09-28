@@ -18,12 +18,24 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
     );
   }
 
-  // 1. Fetch Tenant Name and Metadata
-  const { data: tenant, error: tenantError } = await supabaseAdmin
-    .from('tenants')
-    .select('id, name, metadata')
-    .eq('id', tenantId)
-    .single();
+  // 1. Fetch Tenant and Employees in parallel for maximum speed
+  const [tenantRes, employeesRes] = await Promise.all([
+    supabaseAdmin
+      .from('tenants')
+      .select('id, name, metadata')
+      .eq('id', tenantId)
+      .single(),
+    supabaseAdmin
+      .from('entities')
+      .select('id, name, metadata, status')
+      .eq('tenant_id', tenantId)
+      .eq('type', 'employee')
+      .eq('status', 'active'),
+  ]);
+
+  const tenant = tenantRes.data;
+  const tenantError = tenantRes.error;
+  const employeesData = employeesRes.data;
 
   if (tenantError || !tenant) {
     return (
@@ -36,14 +48,6 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
       </div>
     );
   }
-
-  // 2. Fetch Barbers (Employees) for this tenant
-  const { data: employeesData } = await supabaseAdmin
-    .from('entities')
-    .select('id, name, metadata, status')
-    .eq('tenant_id', tenantId)
-    .eq('type', 'employee')
-    .eq('status', 'active');
 
   const employees = (employeesData || [])
     .filter(e => e.metadata?.bookable !== false)

@@ -1,8 +1,8 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { ChevronRight, MoreHorizontal } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, LayoutGrid } from 'lucide-react';
 import { useState } from 'react';
 
 // ─── Route label map ──────────────────────────────────────────────────────────
@@ -12,7 +12,8 @@ const ROUTE_LABELS: Record<string, string> = {
   dashboard:    'Launcher',
   caja:         'Caja',
   clientes:     'Clientes',
-  catalogo:     'Catálogo',
+  inventario:   'Inventario',
+  catalogo:     'Inventario',
   estadisticas: 'Estadísticas',
   compras:      'Compras AP',
   contabilidad: 'Contabilidad',
@@ -124,11 +125,12 @@ export function Breadcrumbs() {
       className="flex items-center gap-1 min-w-0"
     >
       {/* ── Desktop: render all crumbs ───────────────────────────────────── */}
-      <div className="hidden sm:flex items-center gap-1 min-w-0">
+      <div className="hidden sm:flex items-center gap-1.5 min-w-0">
         {crumbs.map((crumb, idx) => {
           const isLast = idx === crumbs.length - 1;
+          const isRoot = idx === 0;
           return (
-            <span key={crumb.href} className="flex items-center gap-1 min-w-0">
+            <span key={crumb.href} className="flex items-center gap-1.5 min-w-0">
               {idx > 0 && (
                 <ChevronRight
                   size={12}
@@ -137,15 +139,16 @@ export function Breadcrumbs() {
                 />
               )}
               {isLast ? (
-                <span className="text-sm font-bold text-foreground truncate max-w-[140px]">
+                <span className="text-xs font-bold text-foreground truncate max-w-[160px]">
                   {crumb.label}
                 </span>
               ) : (
                 <Link
                   href={crumb.href}
-                  className="text-sm font-medium text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors truncate max-w-[100px]"
+                  className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-foreground transition-colors flex items-center gap-1 truncate max-w-[120px] px-1.5 py-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
-                  {crumb.label}
+                  {isRoot && <LayoutGrid size={13} className="text-indigo-500 shrink-0" />}
+                  <span>{crumb.label}</span>
                 </Link>
               )}
             </span>
@@ -158,9 +161,10 @@ export function Breadcrumbs() {
         {/* First crumb (Launcher) */}
         <Link
           href={crumbs[0].href}
-          className="text-sm font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors shrink-0"
+          className="text-xs font-bold text-slate-500 hover:text-foreground transition-colors flex items-center gap-1 shrink-0"
         >
-          {crumbs[0].label}
+          <LayoutGrid size={13} className="text-indigo-500 shrink-0" />
+          <span>{crumbs[0].label}</span>
         </Link>
 
         {isMobileCollapsed && (

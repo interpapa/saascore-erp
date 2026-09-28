@@ -1,36 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Building2, Plus, MapPin, DollarSign, Crown, Phone, Users, Activity, BarChart3, Search } from 'lucide-react';
 import { getEntitiesAction } from '@/app/actions/entities';
 import { getDocumentsAction } from '@/app/actions/documents';
 import { Entity } from '@/lib/api/entities';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
+import { useActionActor } from '@/hooks/useActionActor';
 import { BranchModal } from '@/components/franquicias/BranchModal';
 
 export default function FranquiciasPage() {
   const currentTenant = useTenantResolver();
+  const actor = useActionActor();
   const [branches, setBranches] = useState<Entity[]>([]);
   const [globalRevenue, setGlobalRevenue] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchData = async () => {
-    if (!currentTenant) return;
+  const fetchData = useCallback(async () => {
+    if (!currentTenant?.id || !actor) return;
     try {
       setIsLoading(true);
       const [branchesRes, invoicesRes] = await Promise.all([
-        getEntitiesAction(currentTenant.id, 'branch'),
-        getDocumentsAction(currentTenant.id, 'invoice')
+        getEntitiesAction(currentTenant.id, 'branch', 50, actor),
+        getDocumentsAction(currentTenant.id, 'invoice', 50, actor)
       ]);
 
       if (branchesRes.success) setBranches(branchesRes.entities as any);
 
       if (invoicesRes.success) {
         const totalRev = invoicesRes.documents
-          .filter((doc: unknown) => doc.status === 'invoiced' || doc.status === 'paid')
-          .reduce((sum: number, doc: unknown) => sum + (doc.total_amount || 0), 0);
+          .filter((doc: any) => doc.status === 'invoiced' || doc.status === 'paid')
+          .reduce((sum: number, doc: any) => sum + (doc.total_amount || 0), 0);
         setGlobalRevenue(totalRev);
       }
 
@@ -39,11 +41,11 @@ export default function FranquiciasPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentTenant?.id, actor]);
 
   useEffect(() => {
     fetchData();
-  }, [currentTenant]);
+  }, [fetchData]);
 
   // KPIs
   const activeBranches = branches.length;
@@ -52,7 +54,7 @@ export default function FranquiciasPage() {
 
   const filteredBranches = branches.filter(b => 
     b.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (b.metadata?.manager || '').toLowerCase().includes(searchTerm.toLowerCase())
+    ((b.metadata as any)?.manager || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -178,7 +180,7 @@ export default function FranquiciasPage() {
                           </div>
                           <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase">Gerente</p>
-                            <p className="text-sm font-semibold text-foreground">{branch.metadata?.manager || 'No asignado'}</p>
+                            <p className="text-sm font-semibold text-foreground">{(branch.metadata as any)?.manager || 'No asignado'}</p>
                           </div>
                         </div>
                       </div>

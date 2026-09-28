@@ -17,9 +17,9 @@ export async function processPayrollDisbursementAction(
       return { success: false, error: 'Demasiadas solicitudes de nómina.' };
     }
 
-    const security = await validateKernelAccess(actor, tenantId, 'nomina');
+    const security = await validateKernelAccess(actor, tenantId, 'equipo');
     if (!security.authorized) {
-      return { success: false, error: security.error || 'Acceso denegado a nómina.' };
+      return { success: false, error: security.error || 'Acceso denegado al módulo de Personal y Nómina.' };
     }
 
     return await processPayroll({
@@ -27,7 +27,7 @@ export async function processPayrollDisbursementAction(
       periodName,
       employees,
     });
-  } catch (err: unknown) {
+  } catch (err: any) {
     console.error('[processPayrollDisbursementAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
@@ -41,13 +41,13 @@ export async function assignAssetAction(
   actor: KernelActor
 ) {
   try {
-    const security = await validateKernelAccess(actor, tenantId);
+    const security = await validateKernelAccess(actor, tenantId, 'equipo');
     if (!security.authorized) {
       return { success: false, error: security.error || 'Acceso denegado.' };
     }
 
     return assignAssetToEmployee(asset, employeeId, employeeName);
-  } catch (err: unknown) {
+  } catch (err: any) {
     return { success: false, error: (err as Error).message };
   }
 }

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useMemo } from 'react';
 import { Printer, ShieldCheck, FileText, X } from 'lucide-react';
@@ -12,14 +12,14 @@ interface InvoicePrintViewProps {
 
 export function InvoicePrintView({ document, onClose }: InvoicePrintViewProps) {
   const [printFormat, setPrintFormat] = useState<'letter' | 'thermal'>('letter');
-  const doc = document as { created_at?: string; metadata?: Record<string, unknown>; document_number?: string; subtotal_amount?: number; tax_amount?: number; total_amount?: number; id?: string };
+  const doc = document as { created_at?: string; metadata?: Record<string, any>; document_number?: string; subtotal_amount?: number; tax_amount?: number; total_amount?: number; id?: string };
   const printedDate = useMemo(() => new Date(doc?.created_at || now), [doc?.created_at]);
   
   if (!doc) return null;
 
-  const metadata = (doc.metadata as Record<string, unknown>) || {};
-  const customer = (metadata.customer_snapshot as Record<string, unknown>) || {};
-  const taxDetails = (metadata.tax_details as Record<string, unknown>) || {};
+  const metadata = (doc.metadata as Record<string, any>) || {};
+  const customer = (metadata.customer_snapshot as Record<string, any>) || {};
+  const taxDetails = (metadata.tax_details as Record<string, any>) || {};
 
   const handlePrint = () => {
     window.print();

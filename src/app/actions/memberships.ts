@@ -1,6 +1,6 @@
 'use server';
 
-import { supabase, supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
@@ -16,11 +16,18 @@ export interface MembershipInput {
   status?: 'active' | 'paused' | 'expired';
 }
 
-function isMissingTableError(error: unknown): boolean {
+function isMissingTableError(error: any): boolean {
   if (!error) return false;
   const code = error.code || '';
-  const msg = error.message || '';
-  return code === 'PGRST204' || code === '42P01' || msg.includes('does not exist');
+  const msg = (error.message || '').toLowerCase();
+  return (
+    code === 'PGRST204' ||
+    code === 'PGRST205' ||
+    code === '42P01' ||
+    msg.includes('does not exist') ||
+    msg.includes('could not find the table') ||
+    msg.includes('schema cache')
+  );
 }
 
 /**
@@ -35,7 +42,7 @@ export async function getMembershipsAction(tenantId: string, actor?: ActionActor
       }
     }
     
-    const db = supabaseAdmin || supabase;
+    const db = supabaseAdmin;
 
     // 1. Intentar leer de la tabla física 'memberships'
     const { data, error } = await db
@@ -61,7 +68,7 @@ export async function getMembershipsAction(tenantId: string, actor?: ActionActor
     }
 
     throw new Error(error?.message || 'Error al consultar mensualidades.');
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('[getMembershipsAction Error]:', error.message);
     return { success: false, error: error.message, memberships: [] };
   }
@@ -76,14 +83,14 @@ export async function createMembershipAction(
   actor: ActionActor
 ) {
   try {
-    const db = supabaseAdmin || supabase;
+    const db = supabaseAdmin;
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
     const newMembership = {
-      id: `mship-${Date.now().toString().slice(-6)}-${Math.random().toString(36).slice(-4)}`,
+      id: `mship-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
       tenant_id: tenantId,
       client_id: payload.client_id,
       item_id: payload.item_id,
@@ -138,7 +145,7 @@ export async function createMembershipAction(
     }
 
     throw new Error(error?.message || 'Error al guardar membresía.');
-  } catch (error: unknown) {
+  } catch (error: any) {
     console.error('[createMembershipAction Error]:', error.message);
     return { success: false, error: error.message };
   }

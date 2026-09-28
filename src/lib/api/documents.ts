@@ -78,7 +78,7 @@ export async function createDocumentWithLines(data: CreateDocumentInput) {
     delete cleanInsert.notes;
     
     cleanInsert.metadata = {
-      ...cleanInsert.metadata,
+      ...(cleanInsert.metadata as Record<string, unknown> || {}),
       issue_date: docData.issue_date,
       due_date: docData.due_date,
       notes: docData.notes,

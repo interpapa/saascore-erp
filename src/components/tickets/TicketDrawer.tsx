@@ -36,7 +36,7 @@ export function TicketDrawer({ ticket, isOpen, onClose, onStatusChange }: Ticket
   const status = STATUS_CONFIG[ticket.status] || STATUS_CONFIG['draft'];
   const StatusIcon = status.icon;
   const nextStep = NEXT_STATUS[ticket.status];
-  const meta = ticket.metadata || {};
+  const meta = (ticket.metadata as any) || {};
 
   return (
     <>
@@ -69,18 +69,18 @@ export function TicketDrawer({ ticket, isOpen, onClose, onStatusChange }: Ticket
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Cliente</p>
-              <p className="text-sm font-bold text-foreground">{(ticket.entity as TicketEntity)?.name || 'Sin cliente'}</p>
-              {(ticket.entity as TicketEntity)?.phone && (
-                <p className="text-xs text-slate-500">{(ticket.entity as TicketEntity).phone}</p>
+              <p className="text-sm font-bold text-foreground">{((ticket as any).entity as TicketEntity)?.name || 'Sin cliente'}</p>
+              {((ticket as any).entity as TicketEntity)?.phone && (
+                <p className="text-xs text-slate-500">{((ticket as any).entity as TicketEntity).phone}</p>
               )}
             </div>
           </div>
 
           {/* Descripción */}
-          {meta.description && (
+          {!!(meta as any).description && (
             <div>
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Problema Reportado</h3>
-              <p className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl leading-relaxed">{(meta.description as string)}</p>
+              <p className="text-sm text-foreground bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl leading-relaxed">{((meta as any).description as string)}</p>
             </div>
           )}
 

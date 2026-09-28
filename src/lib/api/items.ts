@@ -1,7 +1,18 @@
 import { supabase } from '@/lib/supabase';
 
-interface ItemMetadata {
-  // Future explicit fields
+export interface ItemMetadata {
+  unit_of_measure?: string;
+  min_stock?: number;
+  max_stock?: number;
+  location?: string;
+  barcode?: string;
+  preferred_supplier_name?: string;
+  brand?: string;
+  notes?: string;
+  duration_minutes?: number;
+  buffer_time_minutes?: number;
+  is_group_session?: boolean;
+  max_capacity?: number;
   [key: string]: unknown;
 }
 

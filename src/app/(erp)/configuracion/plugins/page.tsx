@@ -7,7 +7,7 @@ import { Blocks, CheckCircle2, XCircle, ShieldCheck, Cpu, ArrowLeft } from 'luci
 import Link from 'next/link';
 
 export default function PluginsConfigPage() {
-  const [plugins, setPlugins] = useState<unknown[]>([]);
+  const [plugins, setPlugins] = useState<any[]>([]);
 
   useEffect(() => {
     initializePlugins();

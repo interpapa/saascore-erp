@@ -85,9 +85,8 @@ export default function ReservarDemo() {
     }
 
     // 2. Si es exitoso (pasó el Rate Limit y Zod), redirigimos a WhatsApp
-    const phone = "5804245642100"; // Número real de la barbería
     const text = `¡Hola! Quiero confirmar mi reserva con ${selectedBarber.name} para el día ${selectedDate} a las ${selectedTime}. Mi nombre es ${customerName} ${customerLastName}.`;
-    const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
