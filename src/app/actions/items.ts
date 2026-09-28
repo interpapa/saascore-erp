@@ -49,8 +49,11 @@ export async function createItemAction(
       return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
     }
 
-    if (!tenantId || !input.name) {
-      throw new Error('Empresa y Nombre de ítem son requeridos.');
+    if (!tenantId) {
+      return { success: false, error: 'La empresa activa es requerida para registrar el ítem.' };
+    }
+    if (!input.name || !input.name.trim()) {
+      return { success: false, error: 'El nombre del artículo o servicio es requerido.' };
     }
 
     // Validación financiera: precios y costos no pueden ser negativos

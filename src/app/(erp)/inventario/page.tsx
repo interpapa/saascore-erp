@@ -108,7 +108,24 @@ export default function InventarioPage() {
   }, [activeTab, loadAuditLogs]);
 
   const handleSaveItem = async (data: any) => {
-    if (!activeTenant || !actor) return;
+    const targetTenantId = activeTenant?.id || session?.tenantId;
+    if (!targetTenantId) {
+      toast({
+        variant: 'warning',
+        title: 'Empresa no identificada',
+        description: 'No se detectó la empresa activa. Por favor selecciona tu empresa en la cabecera.',
+      });
+      return;
+    }
+
+    if (!actor) {
+      toast({
+        variant: 'warning',
+        title: 'Sesión requerida',
+        description: 'Por favor inicia sesión nuevamente para guardar cambios.',
+      });
+      return;
+    }
 
     if (editingItem) {
       try {
@@ -125,7 +142,7 @@ export default function InventarioPage() {
             stock_quantity: Number(data.stock_quantity || 0),
             metadata: data.metadata,
           },
-          activeTenant.id,
+          targetTenantId,
           actor
         );
 
@@ -169,14 +186,14 @@ export default function InventarioPage() {
             stock_quantity: Number(data.stock_quantity || 0),
             metadata: data.metadata,
           },
-          activeTenant.id,
+          targetTenantId,
           actor
         );
 
         if (!res.success) {
           toast({ variant: 'warning', title: 'Aviso', description: res.error || 'No se pudo sincronizar con la nube.' });
         } else {
-          toast({ variant: 'success', title: 'Artículo Creado', description: `"${data.name}" se guardó en el inventario.` });
+          toast({ variant: 'success', title: data.type === 'service' ? 'Servicio Registrado' : 'Artículo Creado', description: `"${data.name}" se guardó en el catálogo.` });
           fetchItems();
         }
       } catch (err: unknown) {

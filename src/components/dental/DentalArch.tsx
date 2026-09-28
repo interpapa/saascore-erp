@@ -20,89 +20,112 @@ export const CHILD_TO_ADULT_MAP: Record<string, string> = {
   '71': '31', '72': '32', '73': '33', '74': '34', '75': '35',
 };
 
-// Coordenadas calculadas en arco anatómico (parábola en herradura)
-// Ancho de lienzo: 640px, Alto: 380px por arcada
+// Nombres anatómicos en español para tooltips clínicos
+export const TOOTH_NAMES: Record<string, string> = {
+  // Cuadrante 1 - Adulto Superior Derecho
+  '18': 'Tercer Molar (Cordal)', '17': 'Segundo Molar', '16': 'Primer Molar',
+  '15': 'Segundo Premolar', '14': 'Primer Premolar', '13': 'Canino',
+  '12': 'Incisivo Lateral', '11': 'Incisivo Central',
+  // Cuadrante 2 - Adulto Superior Izquierdo
+  '21': 'Incisivo Central', '22': 'Incisivo Lateral', '23': 'Canino',
+  '24': 'Primer Premolar', '25': 'Segundo Premolar', '26': 'Primer Molar',
+  '27': 'Segundo Molar', '28': 'Tercer Molar (Cordal)',
+  // Cuadrante 3 - Adulto Inferior Izquierdo
+  '31': 'Incisivo Central', '32': 'Incisivo Lateral', '33': 'Canino',
+  '34': 'Primer Premolar', '35': 'Segundo Premolar', '36': 'Primer Molar',
+  '37': 'Segundo Molar', '38': 'Tercer Molar (Cordal)',
+  // Cuadrante 4 - Adulto Inferior Derecho
+  '41': 'Incisivo Central', '42': 'Incisivo Lateral', '43': 'Canino',
+  '44': 'Primer Premolar', '45': 'Segundo Premolar', '46': 'Primer Molar',
+  '47': 'Segundo Molar', '48': 'Tercer Molar (Cordal)',
+  // Dientes Temporales (Niño)
+  '51': 'Incisivo Central Sup. Der. (Temporal)', '52': 'Incisivo Lat. Sup. Der. (Temporal)', '53': 'Canino Sup. Der. (Temporal)', '54': 'Primer Molar Sup. Der. (Temporal)', '55': 'Segundo Molar Sup. Der. (Temporal)',
+  '61': 'Incisivo Central Sup. Izq. (Temporal)', '62': 'Incisivo Lat. Sup. Izq. (Temporal)', '63': 'Canino Sup. Izq. (Temporal)', '64': 'Primer Molar Sup. Izq. (Temporal)', '65': 'Segundo Molar Sup. Izq. (Temporal)',
+  '71': 'Incisivo Central Inf. Izq. (Temporal)', '72': 'Incisivo Lat. Inf. Izq. (Temporal)', '73': 'Canino Inf. Izq. (Temporal)', '74': 'Primer Molar Inf. Izq. (Temporal)', '75': 'Segundo Molar Inf. Izq. (Temporal)',
+  '81': 'Incisivo Central Inf. Der. (Temporal)', '82': 'Incisivo Lat. Inf. Der. (Temporal)', '83': 'Canino Inf. Der. (Temporal)', '84': 'Primer Molar Inf. Der. (Temporal)', '85': 'Segundo Molar Inf. Der. (Temporal)',
+};
+
 interface ToothPosition {
   number: string;
   x: number;
   y: number;
-  angle: number; // Grados de rotación siguiendo el arco mandibular
+  angle: number;
   type: 'molar' | 'premolar' | 'canine' | 'incisor';
   isChild?: boolean;
 }
 
-// Generador de posiciones en forma de herradura anatómica
+// Posiciones de los dientes en arco anatómico (Herradura clínica)
 const UPPER_ADULT_POSITIONS: ToothPosition[] = [
   // Cuadrante 1 (Superior Derecho del paciente - izquierda visual)
-  { number: '18', x: 65,  y: 280, angle: -18, type: 'molar' },
-  { number: '17', x: 95,  y: 225, angle: -24, type: 'molar' },
-  { number: '16', x: 130, y: 175, angle: -30, type: 'molar' },
-  { number: '15', x: 170, y: 130, angle: -38, type: 'premolar' },
-  { number: '14', x: 215, y: 95,  angle: -46, type: 'premolar' },
-  { number: '13', x: 265, y: 70,  angle: -58, type: 'canine' },
-  { number: '12', x: 315, y: 55,  angle: -72, type: 'incisor' },
-  { number: '11', x: 365, y: 50,  angle: -85, type: 'incisor' },
+  { number: '18', x: 80,  y: 270, angle: -16, type: 'molar' },
+  { number: '17', x: 108, y: 220, angle: -22, type: 'molar' },
+  { number: '16', x: 142, y: 172, angle: -28, type: 'molar' },
+  { number: '15', x: 182, y: 130, angle: -36, type: 'premolar' },
+  { number: '14', x: 228, y: 96,  angle: -45, type: 'premolar' },
+  { number: '13', x: 278, y: 72,  angle: -58, type: 'canine' },
+  { number: '12', x: 326, y: 58,  angle: -72, type: 'incisor' },
+  { number: '11', x: 370, y: 52,  angle: -85, type: 'incisor' },
 
   // Cuadrante 2 (Superior Izquierdo del paciente - derecha visual)
-  { number: '21', x: 415, y: 50,  angle: 85,  type: 'incisor' },
-  { number: '22', x: 465, y: 55,  angle: 72,  type: 'incisor' },
-  { number: '23', x: 515, y: 70,  angle: 58,  type: 'canine' },
-  { number: '24', x: 565, y: 95,  angle: 46,  type: 'premolar' },
-  { number: '25', x: 610, y: 130, angle: 38,  type: 'premolar' },
-  { number: '26', x: 650, y: 175, angle: 30,  type: 'molar' },
-  { number: '27', x: 685, y: 225, angle: 24,  type: 'molar' },
-  { number: '28', x: 715, y: 280, angle: 18,  type: 'molar' },
+  { number: '21', x: 410, y: 52,  angle: 85,  type: 'incisor' },
+  { number: '22', x: 454, y: 58,  angle: 72,  type: 'incisor' },
+  { number: '23', x: 502, y: 72,  angle: 58,  type: 'canine' },
+  { number: '24', x: 552, y: 96,  angle: 45,  type: 'premolar' },
+  { number: '25', x: 598, y: 130, angle: 36,  type: 'premolar' },
+  { number: '26', x: 638, y: 172, angle: 28,  type: 'molar' },
+  { number: '27', x: 672, y: 220, angle: 22,  type: 'molar' },
+  { number: '28', x: 700, y: 270, angle: 16,  type: 'molar' },
 ];
 
 const LOWER_ADULT_POSITIONS: ToothPosition[] = [
   // Cuadrante 4 (Inferior Derecho del paciente - izquierda visual)
-  { number: '48', x: 75,  y: 60,  angle: 18,  type: 'molar' },
-  { number: '47', x: 105, y: 115, angle: 24,  type: 'molar' },
-  { number: '46', x: 140, y: 165, angle: 30,  type: 'molar' },
-  { number: '45', x: 180, y: 210, angle: 38,  type: 'premolar' },
-  { number: '44', x: 225, y: 245, angle: 46,  type: 'premolar' },
-  { number: '43', x: 275, y: 270, angle: 58,  type: 'canine' },
-  { number: '42', x: 325, y: 285, angle: 72,  type: 'incisor' },
-  { number: '41', x: 375, y: 290, angle: 85,  type: 'incisor' },
+  { number: '48', x: 90,  y: 400, angle: 16,  type: 'molar' },
+  { number: '47', x: 118, y: 450, angle: 22,  type: 'molar' },
+  { number: '46', x: 152, y: 498, angle: 28,  type: 'molar' },
+  { number: '45', x: 192, y: 540, angle: 36,  type: 'premolar' },
+  { number: '44', x: 238, y: 574, angle: 45,  type: 'premolar' },
+  { number: '43', x: 288, y: 598, angle: 58,  type: 'canine' },
+  { number: '42', x: 334, y: 612, angle: 72,  type: 'incisor' },
+  { number: '41', x: 372, y: 618, angle: 85,  type: 'incisor' },
 
   // Cuadrante 3 (Inferior Izquierdo del paciente - derecha visual)
-  { number: '31', x: 425, y: 290, angle: -85, type: 'incisor' },
-  { number: '32', x: 475, y: 285, angle: -72, type: 'incisor' },
-  { number: '33', x: 525, y: 270, angle: -58, type: 'canine' },
-  { number: '34', x: 575, y: 245, angle: -46, type: 'premolar' },
-  { number: '35', x: 620, y: 210, angle: -38, type: 'premolar' },
-  { number: '36', x: 660, y: 165, angle: -30, type: 'molar' },
-  { number: '37', x: 695, y: 115, angle: -24, type: 'molar' },
-  { number: '38', x: 725, y: 60,  angle: -18, type: 'molar' },
+  { number: '31', x: 408, y: 618, angle: -85, type: 'incisor' },
+  { number: '32', x: 446, y: 612, angle: -72, type: 'incisor' },
+  { number: '33', x: 492, y: 598, angle: -58, type: 'canine' },
+  { number: '34', x: 542, y: 574, angle: -45, type: 'premolar' },
+  { number: '35', x: 588, y: 540, angle: -36, type: 'premolar' },
+  { number: '36', x: 628, y: 498, angle: -28, type: 'molar' },
+  { number: '37', x: 662, y: 450, angle: -22, type: 'molar' },
+  { number: '38', x: 690, y: 400, angle: -16, type: 'molar' },
 ];
 
-// Posiciones para dientes de leche (arco más cerrado)
+// Posiciones para dentición infantil / temporal (arco más cerrado)
 const UPPER_CHILD_POSITIONS: ToothPosition[] = [
-  { number: '55', x: 190, y: 190, angle: -32, type: 'molar', isChild: true },
-  { number: '54', x: 235, y: 145, angle: -42, type: 'molar', isChild: true },
-  { number: '53', x: 285, y: 115, angle: -56, type: 'canine', isChild: true },
-  { number: '52', x: 335, y: 95,  angle: -72, type: 'incisor', isChild: true },
-  { number: '51', x: 375, y: 90,  angle: -85, type: 'incisor', isChild: true },
+  { number: '55', x: 200, y: 195, angle: -30, type: 'molar', isChild: true },
+  { number: '54', x: 242, y: 154, angle: -40, type: 'molar', isChild: true },
+  { number: '53', x: 290, y: 126, angle: -54, type: 'canine', isChild: true },
+  { number: '52', x: 336, y: 108, angle: -70, type: 'incisor', isChild: true },
+  { number: '51', x: 374, y: 104, angle: -85, type: 'incisor', isChild: true },
 
-  { number: '61', x: 425, y: 90,  angle: 85,  type: 'incisor', isChild: true },
-  { number: '62', x: 465, y: 95,  angle: 72,  type: 'incisor', isChild: true },
-  { number: '63', x: 515, y: 115, angle: 56,  type: 'canine', isChild: true },
-  { number: '64', x: 565, y: 145, angle: 42,  type: 'molar', isChild: true },
-  { number: '65', x: 610, y: 190, angle: 32,  type: 'molar', isChild: true },
+  { number: '61', x: 406, y: 104, angle: 85,  type: 'incisor', isChild: true },
+  { number: '62', x: 444, y: 108, angle: 70,  type: 'incisor', isChild: true },
+  { number: '63', x: 490, y: 126, angle: 54,  type: 'canine', isChild: true },
+  { number: '64', x: 538, y: 154, angle: 40,  type: 'molar', isChild: true },
+  { number: '65', x: 580, y: 195, angle: 30,  type: 'molar', isChild: true },
 ];
 
 const LOWER_CHILD_POSITIONS: ToothPosition[] = [
-  { number: '85', x: 195, y: 150, angle: 32,  type: 'molar', isChild: true },
-  { number: '84', x: 240, y: 195, angle: 42,  type: 'molar', isChild: true },
-  { number: '83', x: 290, y: 225, angle: 56,  type: 'canine', isChild: true },
-  { number: '82', x: 340, y: 245, angle: 72,  type: 'incisor', isChild: true },
-  { number: '81', x: 380, y: 250, angle: 85,  type: 'incisor', isChild: true },
+  { number: '85', x: 204, y: 475, angle: 30,  type: 'molar', isChild: true },
+  { number: '84', x: 246, y: 516, angle: 40,  type: 'molar', isChild: true },
+  { number: '83', x: 294, y: 544, angle: 54,  type: 'canine', isChild: true },
+  { number: '82', x: 340, y: 562, angle: 70,  type: 'incisor', isChild: true },
+  { number: '81', x: 376, y: 566, angle: 85,  type: 'incisor', isChild: true },
 
-  { number: '71', x: 430, y: 250, angle: -85, type: 'incisor', isChild: true },
-  { number: '72', x: 470, y: 245, angle: -72, type: 'incisor', isChild: true },
-  { number: '73', x: 520, y: 225, angle: -56, type: 'canine', isChild: true },
-  { number: '74', x: 570, y: 195, angle: -42, type: 'molar', isChild: true },
-  { number: '75', x: 615, y: 150, angle: -32, type: 'molar', isChild: true },
+  { number: '71', x: 404, y: 566, angle: -85, type: 'incisor', isChild: true },
+  { number: '72', x: 440, y: 562, angle: -70, type: 'incisor', isChild: true },
+  { number: '73', x: 486, y: 544, angle: -54, type: 'canine', isChild: true },
+  { number: '74', x: 534, y: 516, angle: -40, type: 'molar', isChild: true },
+  { number: '75', x: 576, y: 475, angle: -30, type: 'molar', isChild: true },
 ];
 
 export function DentalArch({
@@ -112,253 +135,245 @@ export function DentalArch({
   mode,
   onExfoliateAndErupt,
 }: DentalArchProps) {
-  // Render de un diente anatómico con forma y multi-condición
+  // Render anatómico de cada diente con silueta real y detalles oclusales
   const renderTooth = (pos: ToothPosition) => {
     const data = teeth[pos.number];
     const isSelected = selectedTooth === pos.number;
     const conditions = data?.conditions || [];
     const isAbsent = conditions.some((c) => c.code === 'ausente');
 
-    // Múltiples condiciones: si hay 2 o más
     const cond1 = conditions[0] ? CONDITIONS[conditions[0].code] : null;
     const cond2 = conditions[1] ? CONDITIONS[conditions[1].code] : null;
     const hasMultiple = conditions.length > 1;
 
-    // Dimensiones según tipo anatómico
-    const size = pos.isChild
-      ? { width: 32, height: 34, r: 8 }
-      : pos.type === 'molar'
-      ? { width: 44, height: 46, r: 12 }
-      : pos.type === 'premolar'
-      ? { width: 38, height: 40, r: 10 }
-      : pos.type === 'canine'
-      ? { width: 34, height: 38, r: 9 }
-      : { width: 32, height: 38, r: 7 };
+    // Dimensiones proporcionales y escala
+    const scale = pos.isChild ? 0.78 : 1;
+    const toothName = TOOTH_NAMES[pos.number] || `Pieza ${pos.number}`;
 
-    // Estilos de fondo / borde multi-tratamiento
-    let fillStyle = 'fill-white dark:fill-slate-800';
-    let strokeStyle = 'stroke-slate-300 dark:stroke-slate-600';
-    let strokeWidth = isSelected ? '3' : '1.5';
+    // Estilos de color para la superficie dental
+    let toothFill = 'url(#enamel-gradient)';
+    let toothStroke = '#cbd5e1';
+    let strokeWidth = isSelected ? 2.5 : 1.2;
 
-    if (isSelected) {
-      strokeStyle = 'stroke-primary';
-    } else if (isAbsent) {
-      fillStyle = 'fill-slate-200 dark:fill-slate-800/80';
-      strokeStyle = 'stroke-slate-400 dark:stroke-slate-500';
+    if (isAbsent) {
+      toothFill = 'url(#absent-pattern)';
+      toothStroke = '#94a3b8';
     } else if (hasMultiple && cond1 && cond2) {
-      strokeStyle = cond1.color;
+      toothStroke = cond1.color;
     } else if (cond1) {
-      strokeStyle = cond1.color;
-      fillStyle = '';
+      toothStroke = cond1.color;
+      toothFill = cond1.color + '26'; // 15% opacity tint
     }
 
     return (
       <g
         key={pos.number}
-        transform={`translate(${pos.x - size.width / 2}, ${pos.y - size.height / 2})`}
+        transform={`translate(${pos.x}, ${pos.y}) rotate(${pos.angle}) scale(${scale})`}
         className="cursor-pointer group transition-all"
         onClick={() => onSelectTooth(pos.number)}
       >
-        {/* Sombra de selección */}
+        <title>{`Pieza ${pos.number} — ${toothName}${conditions.length > 0 ? ` (${conditions.map(c => CONDITIONS[c.code]?.label || c.code).join(', ')})` : ''}`}</title>
+
+        {/* Halo de selección clínica / Focus Glow */}
         {isSelected && (
-          <rect
-            x={-4}
-            y={-4}
-            width={size.width + 8}
-            height={size.height + 8}
-            rx={size.r + 4}
-            className="fill-primary/20 animate-pulse"
+          <ellipse
+            cx={0}
+            cy={0}
+            rx={pos.type === 'molar' ? 24 : pos.type === 'premolar' ? 20 : 18}
+            ry={pos.type === 'molar' ? 22 : pos.type === 'premolar' ? 18 : 16}
+            className="fill-teal-400/20 stroke-teal-500 animate-pulse"
+            strokeWidth={3}
+            filter="drop-shadow(0 0 6px rgba(20, 184, 166, 0.6))"
           />
         )}
 
-        {/* Silueta Anatómica del Diente (Corona) */}
-        {hasMultiple && cond1 && cond2 ? (
-          // Split visual bicolor para múltiples tratamientos
-          <g>
-            <clipPath id={`clip-left-${pos.number}`}>
-              <rect x={0} y={0} width={size.width / 2} height={size.height} />
-            </clipPath>
-            <clipPath id={`clip-right-${pos.number}`}>
-              <rect x={size.width / 2} y={0} width={size.width / 2} height={size.height} />
-            </clipPath>
+        {/* SILUETA ANATÓMICA SEGÚN TIPO DE DIENTE */}
 
-            {/* Mitad Izquierda */}
-            <rect
-              x={0}
-              y={0}
-              width={size.width}
-              height={size.height}
-              rx={size.r}
-              fill={cond1.color}
-              fillOpacity={0.25}
-              stroke={cond1.color}
+        {/* 1. MOLAR: Corona con 4 cúspides redondeadas y surcos en cruz */}
+        {pos.type === 'molar' && (
+          <g className="transition-transform group-hover:scale-105 duration-150">
+            {/* Contorno corona molar */}
+            <path
+              d="M -18 -14 C -12 -17, 12 -17, 18 -14 C 21 -10, 21 10, 18 14 C 12 17, -12 17, -18 14 C -21 10, -21 -10, -18 -14 Z"
+              fill={toothFill}
+              stroke={isSelected ? '#0ea5e9' : toothStroke}
               strokeWidth={strokeWidth}
-              clipPath={`url(#clip-left-${pos.number})`}
+              strokeLinejoin="round"
+              className={isAbsent ? 'stroke-dashed' : ''}
+              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
             />
-
-            {/* Mitad Derecha */}
-            <rect
-              x={0}
-              y={0}
-              width={size.width}
-              height={size.height}
-              rx={size.r}
-              fill={cond2.color}
-              fillOpacity={0.25}
-              stroke={cond2.color}
-              strokeWidth={strokeWidth}
-              clipPath={`url(#clip-right-${pos.number})`}
-            />
-
-            {/* Borde Exterior General */}
-            <rect
-              x={0}
-              y={0}
-              width={size.width}
-              height={size.height}
-              rx={size.r}
-              fill="none"
-              stroke={isSelected ? '#0ea5e9' : cond1.color}
-              strokeWidth={strokeWidth}
-            />
+            {/* Surcos y fosas oclusales de desarrollo (anatomía del molar) */}
+            {!isAbsent && (
+              <>
+                {/* Surco central mesiodistal */}
+                <path
+                  d="M -13 0 Q 0 -1 13 0"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                  opacity="0.85"
+                />
+                {/* Surco vestibulolingual con fosa central */}
+                <path
+                  d="M 0 -11 Q -1 0 0 11"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                  opacity="0.85"
+                />
+                {/* Fosa central / fovea */}
+                <circle cx={0} cy={0} r={2} fill="#64748b" opacity="0.6" />
+                {/* Micro fisuras triangulares marginales */}
+                <path d="M -10 -4 L -13 0 L -10 4" fill="none" stroke="#cbd5e1" strokeWidth="0.8" />
+                <path d="M 10 -4 L 13 0 L 10 4" fill="none" stroke="#cbd5e1" strokeWidth="0.8" />
+              </>
+            )}
           </g>
-        ) : (
-          <rect
-            x={0}
-            y={0}
-            width={size.width}
-            height={size.height}
-            rx={size.r}
-            className={`${fillStyle} transition-colors group-hover:filter group-hover:brightness-95`}
-            style={{
-              fill: cond1 && !isAbsent ? cond1.color + '26' : undefined,
-              stroke: isSelected ? '#0ea5e9' : cond1 ? cond1.color : undefined,
-              strokeWidth: strokeWidth,
-              strokeDasharray: isAbsent ? '3 3' : undefined,
-            }}
-          />
         )}
 
-        {/* Centro / Oclusal cruz anatómica sutil para molares y premolares */}
-        {(pos.type === 'molar' || pos.type === 'premolar') && !isAbsent && (
-          <circle
-            cx={size.width / 2}
-            cy={size.height / 2}
-            r={pos.type === 'molar' ? 6 : 4}
-            className="fill-slate-100 dark:fill-slate-700/60 stroke-slate-300 dark:stroke-slate-600/40"
-            strokeWidth="0.8"
-          />
+        {/* 2. PREMOLAR: Corona ovoide con 2 cúspides y surco transversal */}
+        {pos.type === 'premolar' && (
+          <g className="transition-transform group-hover:scale-105 duration-150">
+            <path
+              d="M -14 -12 C -8 -15, 8 -15, 14 -12 C 17 -8, 17 8, 14 12 C 8 15, -8 15, -14 12 C -17 8, -17 -8, -14 -12 Z"
+              fill={toothFill}
+              stroke={isSelected ? '#0ea5e9' : toothStroke}
+              strokeWidth={strokeWidth}
+              strokeLinejoin="round"
+              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
+            />
+            {!isAbsent && (
+              <>
+                <path
+                  d="M -10 0 Q 0 -0.5 10 0"
+                  fill="none"
+                  stroke="#94a3b8"
+                  strokeWidth="1"
+                  strokeLinecap="round"
+                  opacity="0.85"
+                />
+                <circle cx={-5} cy={0} r={1.2} fill="#64748b" opacity="0.7" />
+                <circle cx={5} cy={0} r={1.2} fill="#64748b" opacity="0.7" />
+              </>
+            )}
+          </g>
         )}
 
-        {/* Borde Incisal para Incisivos y Caninos */}
-        {(pos.type === 'incisor' || pos.type === 'canine') && !isAbsent && (
-          <line
-            x1={size.width * 0.25}
-            y1={size.height * 0.5}
-            x2={size.width * 0.75}
-            y2={size.height * 0.5}
-            className="stroke-slate-300 dark:stroke-slate-600/40"
-            strokeWidth="1"
-          />
+        {/* 3. CANINO: Silueta en punta de diamante redondeada (cúspide y vertientes) */}
+        {pos.type === 'canine' && (
+          <g className="transition-transform group-hover:scale-105 duration-150">
+            <path
+              d="M 0 -15 C 8 -11, 14 -4, 13 6 C 11 12, -11 12, -13 6 C -14 -4, -8 -11, 0 -15 Z"
+              fill={toothFill}
+              stroke={isSelected ? '#0ea5e9' : toothStroke}
+              strokeWidth={strokeWidth}
+              strokeLinejoin="round"
+              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
+            />
+            {!isAbsent && (
+              <path
+                d="M 0 -12 L 0 5"
+                fill="none"
+                stroke="#cbd5e1"
+                strokeWidth="1"
+                strokeLinecap="round"
+                opacity="0.8"
+              />
+            )}
+          </g>
         )}
 
-        {/* Simbología en el Diente */}
+        {/* 4. INCISIVO: Corona alargada en arco con borde incisal liso */}
+        {pos.type === 'incisor' && (
+          <g className="transition-transform group-hover:scale-105 duration-150">
+            <path
+              d="M -13 -10 C -8 -13, 8 -13, 13 -10 C 15 -4, 14 6, 12 11 C 6 13, -6 13, -12 11 C -14 6, -15 -4, -13 -10 Z"
+              fill={toothFill}
+              stroke={isSelected ? '#0ea5e9' : toothStroke}
+              strokeWidth={strokeWidth}
+              strokeLinejoin="round"
+              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
+            />
+            {!isAbsent && (
+              <path
+                d="M -9 8 Q 0 9 9 8"
+                fill="none"
+                stroke="#cbd5e1"
+                strokeWidth="1"
+                strokeLinecap="round"
+                opacity="0.8"
+              />
+            )}
+          </g>
+        )}
+
+        {/* RENDERIZADO VISUAL DE TRATAMIENTO(S) */}
         {isAbsent ? (
-          // Ausente: Gran ✕ Visible en Gris Claro Contrastante
+          // Símbolo de pieza ausente
           <g>
-            <line
-              x1={6}
-              y1={6}
-              x2={size.width - 6}
-              y2={size.height - 6}
-              className="stroke-slate-400 dark:stroke-slate-300"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
-            <line
-              x1={size.width - 6}
-              y1={6}
-              x2={6}
-              y2={size.height - 6}
-              className="stroke-slate-400 dark:stroke-slate-300"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-            />
+            <line x1={-9} y1={-9} x2={9} y2={9} stroke="#64748b" strokeWidth={2.5} strokeLinecap="round" />
+            <line x1={9} y1={-9} x2={-9} y2={9} stroke="#64748b" strokeWidth={2.5} strokeLinecap="round" />
           </g>
-        ) : hasMultiple ? (
-          // Multi-tratamiento: mostrar micro-badges con símbolos
+        ) : hasMultiple && cond1 && cond2 ? (
+          // Múltiples condiciones: indicador visual dual
           <g>
+            {/* Círculo central con badge numérico de tratamientos */}
+            <circle cx={0} cy={0} r={6.5} fill="#0f172a" stroke="#ffffff" strokeWidth={1} />
             <text
-              x={size.width / 2}
-              y={size.height / 2 + 3}
+              x={0}
+              y={2.5}
               textAnchor="middle"
-              className="font-black text-[9px] fill-foreground select-none"
-            >
-              {cond1?.symbol}·{cond2?.symbol}
-            </text>
-            <circle
-              cx={size.width - 2}
-              cy={2}
-              r={5}
-              className="fill-primary text-white"
-            />
-            <text
-              x={size.width - 2}
-              y={4.5}
-              textAnchor="middle"
-              className="fill-white font-black text-[7px]"
+              className="fill-white font-black text-[8px] select-none pointer-events-none"
             >
               {conditions.length}
             </text>
           </g>
         ) : cond1 ? (
-          // 1 Tratamiento
-          <text
-            x={size.width / 2}
-            y={size.height / 2 + 4}
-            textAnchor="middle"
-            style={{ fill: cond1.color }}
-            className="font-black text-[12px] select-none"
-          >
-            {cond1.symbol}
-          </text>
+          // Tratamiento único con su color y símbolo clínico
+          <g>
+            <circle cx={0} cy={0} r={6} fill={cond1.color} opacity={0.9} />
+            <text
+              x={0}
+              y={2.5}
+              textAnchor="middle"
+              className="fill-white font-black text-[7.5px] select-none pointer-events-none"
+            >
+              {cond1.symbol}
+            </text>
+          </g>
         ) : null}
 
-        {/* Número FDI del Diente */}
-        <text
-          x={size.width / 2}
-          y={pos.y > 170 ? size.height + 12 : -5}
-          textAnchor="middle"
-          className={`font-mono font-bold select-none ${
-            pos.isChild ? 'text-[8.5px] fill-amber-500' : 'text-[9.5px] fill-slate-400 dark:fill-slate-500'
-          } ${isSelected ? 'fill-primary font-black' : ''}`}
-        >
-          {pos.number}
-        </text>
+        {/* ETIQUETA NUMÉRICA FDI */}
+        {/* Desrotar el texto para que el número siempre esté perfectamente horizontal */}
+        <g transform={`rotate(${-pos.angle})`}>
+          <text
+            x={0}
+            y={pos.y > 340 ? 25 : -20}
+            textAnchor="middle"
+            className={`font-mono font-bold select-none text-[10px] ${
+              pos.isChild ? 'fill-amber-500 font-black' : isSelected ? 'fill-primary font-black' : 'fill-slate-600 dark:fill-slate-300'
+            }`}
+          >
+            {pos.number}
+          </text>
+        </g>
 
-        {/* Botón rápido de erupción / muda si es diente de leche en modo mixto */}
+        {/* BOTÓN RÁPIDO DE ERUPCIÓN INFANTIL (SI ES DIENTE DE LECHE EN MODO MIXTO) */}
         {mode === 'mixed' && pos.isChild && onExfoliateAndErupt && (
           <g
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
+            className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            transform={`rotate(${-pos.angle}) translate(0, -28)`}
             onClick={(e) => {
               e.stopPropagation();
               const adultNum = CHILD_TO_ADULT_MAP[pos.number];
               if (adultNum) onExfoliateAndErupt(pos.number, adultNum);
             }}
           >
-            <title>{`Erupcionar a pieza definitiva (${CHILD_TO_ADULT_MAP[pos.number]})`}</title>
-            <circle
-              cx={size.width / 2}
-              cy={-14}
-              r={7}
-              className="fill-amber-500 hover:fill-amber-600"
-            />
-            <text
-              x={size.width / 2}
-              y={-11}
-              textAnchor="middle"
-              className="fill-white font-black text-[8px]"
-            >
+            <title>{`Mudar y Erupcionar a pieza permanente (${CHILD_TO_ADULT_MAP[pos.number]})`}</title>
+            <circle cx={0} cy={0} r={8} className="fill-amber-500 hover:fill-amber-600 shadow-md" />
+            <text x={0} y={3} textAnchor="middle" className="fill-white font-black text-[9px] pointer-events-none">
               ⬆
             </text>
           </g>
@@ -371,77 +386,155 @@ export function DentalArch({
   const showChild = mode === 'child' || mode === 'mixed';
 
   return (
-    <div className="w-full bg-slate-50/60 dark:bg-slate-900/40 border border-border rounded-3xl p-6 relative overflow-x-auto">
-      {/* Indicadores Clínicos del Arco */}
-      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-8 mb-2">
+    <div className="w-full bg-linear-to-b from-slate-50 to-slate-100 dark:from-slate-900/60 dark:to-slate-950/80 border border-border rounded-3xl p-6 relative overflow-x-auto shadow-inner">
+      {/* Guías clínicas de orientación anatómica */}
+      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest px-8 mb-2">
         <span>◀ Cuadrante Derecho (1 & 4)</span>
-        <span className="text-primary font-black">Arcada Superior (Maxilar)</span>
+        <span className="text-teal-600 dark:text-teal-400 font-black flex items-center gap-1.5 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
+          🦷 Arcada Superior (Maxilar)
+        </span>
         <span>Cuadrante Izquierdo (2 & 3) ▶</span>
       </div>
 
-      {/* Lienzo SVG Anatómico */}
-      <div className="min-w-[780px] flex justify-center">
+      {/* Lienzo SVG Anatómico Ultra Realista */}
+      <div className="min-w-[780px] flex justify-center py-2">
         <svg
-          viewBox="0 0 780 660"
-          className="w-full max-w-3xl h-auto select-none drop-shadow-xs"
+          viewBox="0 0 780 670"
+          className="w-full max-w-3xl h-auto select-none drop-shadow-md"
         >
-          {/* Líneas guía anatómicas del arco dental */}
-          {/* Parábola Maxilar Superior */}
+          <defs>
+            {/* Gradiente de Esmalte Dental Perlado con Iluminación Superior */}
+            <radialGradient id="enamel-gradient" cx="40%" cy="35%" r="65%">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="65%" stopColor="#fdfdfc" />
+              <stop offset="100%" stopColor="#f1f5f9" />
+            </radialGradient>
+
+            {/* Gradiente Realista de Encía Superior (Rosa / Salmón gingival) */}
+            <linearGradient id="upper-gum-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.45" />
+              <stop offset="50%" stopColor="#f43f5e" stopOpacity="0.65" />
+              <stop offset="100%" stopColor="#fda4af" stopOpacity="0.35" />
+            </linearGradient>
+
+            {/* Gradiente Realista de Encía Inferior */}
+            <linearGradient id="lower-gum-grad" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.45" />
+              <stop offset="50%" stopColor="#f43f5e" stopOpacity="0.65" />
+              <stop offset="100%" stopColor="#fda4af" stopOpacity="0.35" />
+            </linearGradient>
+
+            {/* Sombra suave y anatomía del Paladar */}
+            <radialGradient id="palate-gradient" cx="50%" cy="30%" r="50%">
+              <stop offset="0%" stopColor="#fda4af" stopOpacity="0.3" />
+              <stop offset="80%" stopColor="#f43f5e" stopOpacity="0.15" />
+              <stop offset="100%" stopColor="#e11d48" stopOpacity="0" />
+            </radialGradient>
+
+            {/* Anatomía de la Lengua en Arcada Inferior */}
+            <radialGradient id="tongue-gradient" cx="50%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.55" />
+              <stop offset="70%" stopColor="#e11d48" stopOpacity="0.75" />
+              <stop offset="100%" stopColor="#be123c" stopOpacity="0.9" />
+            </radialGradient>
+
+            {/* Patrón rayado para Dientes Ausentes */}
+            <pattern id="absent-pattern" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#cbd5e1" strokeWidth="2" />
+            </pattern>
+          </defs>
+
+          {/* FONDO ANATÓMICO: PALADAR SUPERIOR */}
           <path
-            d="M 65 280 C 130 50, 650 50, 715 280"
+            d="M 170 170 C 230 40, 550 40, 610 170 C 530 250, 250 250, 170 170 Z"
+            fill="url(#palate-gradient)"
+          />
+          {/* Rugosidades palatinas sutiles */}
+          <path d="M 330 90 Q 390 100 450 90" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.3" />
+          <path d="M 340 120 Q 390 132 440 120" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.25" />
+          <path d="M 350 150 Q 390 160 430 150" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.2" />
+
+          {/* ARCO DE ENCÍA SUPERIOR (Herradura Gingival Maxilar) */}
+          <path
+            d="M 60 285 C 80 40, 700 40, 720 285"
             fill="none"
-            className="stroke-slate-200 dark:stroke-slate-800"
-            strokeWidth="30"
+            stroke="url(#upper-gum-grad)"
+            strokeWidth="48"
             strokeLinecap="round"
-            opacity="0.4"
+            filter="drop-shadow(0 2px 4px rgba(244,63,94,0.15))"
           />
 
-          {/* Parábola Mandibular Inferior */}
+          {/* FONDO ANATÓMICO: LENGUA EN LA ARCADA INFERIOR */}
+          <g>
+            {/* Silueta de la Lengua */}
+            <path
+              d="M 230 500 C 240 400, 540 400, 550 500 C 530 570, 250 570, 230 500 Z"
+              fill="url(#tongue-gradient)"
+              filter="drop-shadow(0 4px 6px rgba(0,0,0,0.2))"
+            />
+            {/* Surco medio lingual */}
+            <line
+              x1="390"
+              y1="435"
+              x2="390"
+              y2="525"
+              stroke="#9f1239"
+              strokeWidth="2"
+              strokeLinecap="round"
+              opacity="0.4"
+            />
+          </g>
+
+          {/* ARCO DE ENCÍA INFERIOR (Herradura Gingival Mandibular) */}
           <path
-            d="M 75 380 C 140 610, 660 610, 725 380"
+            d="M 70 385 C 90 635, 690 635, 710 385"
             fill="none"
-            className="stroke-slate-200 dark:stroke-slate-800"
-            strokeWidth="30"
+            stroke="url(#lower-gum-grad)"
+            strokeWidth="48"
             strokeLinecap="round"
-            opacity="0.4"
+            filter="drop-shadow(0 2px 4px rgba(244,63,94,0.15))"
           />
 
-          {/* Línea Media Facial / Interincisiva */}
+          {/* LÍNEA MEDIA FACIAL / INTERINCISIVA */}
           <line
             x1="390"
-            y1="20"
+            y1="25"
             x2="390"
-            y2="640"
-            className="stroke-primary/30"
+            y2="645"
+            stroke="#14b8a6"
             strokeWidth="1.5"
             strokeDasharray="4 4"
+            opacity="0.5"
           />
           <text
             x="390"
-            y="335"
+            y="340"
             textAnchor="middle"
-            className="fill-slate-400 dark:fill-slate-600 text-[10px] font-black tracking-widest uppercase"
+            className="fill-slate-400 dark:fill-slate-500 text-[10px] font-black tracking-widest uppercase select-none"
           >
-            Línea Media
+            Línea Media Facial
           </text>
 
-          {/* Arco Superior Adulto */}
+          {/* PIEZAS DENTALES SUPERIORES (ADULTAS) */}
           {showAdult && UPPER_ADULT_POSITIONS.map(renderTooth)}
 
-          {/* Arco Superior Infantil (en modo child o mixto) */}
+          {/* PIEZAS DENTALES SUPERIORES (INFANTILES / TEMPORALES) */}
           {showChild && UPPER_CHILD_POSITIONS.map(renderTooth)}
 
-          {/* Arco Inferior Infantil (en modo child o mixto) */}
-          {showChild && LOWER_CHILD_POSITIONS.map((p) => renderTooth({ ...p, y: p.y + 260 }))}
+          {/* PIEZAS DENTALES INFERIORES (INFANTILES / TEMPORALES) */}
+          {showChild && LOWER_CHILD_POSITIONS.map(renderTooth)}
 
-          {/* Arco Inferior Adulto */}
-          {showAdult && LOWER_ADULT_POSITIONS.map((p) => renderTooth({ ...p, y: p.y + 280 }))}
+          {/* PIEZAS DENTALES INFERIORES (ADULTAS) */}
+          {showAdult && LOWER_ADULT_POSITIONS.map(renderTooth)}
         </svg>
       </div>
 
-      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-8 mt-2">
+      {/* Guías clínicas de orientación mandibular */}
+      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest px-8 mt-2">
         <span>◀ Cuadrante Derecho</span>
-        <span className="text-primary font-black">Arcada Inferior (Mandíbula)</span>
+        <span className="text-teal-600 dark:text-teal-400 font-black flex items-center gap-1.5 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
+          🦷 Arcada Inferior (Mandíbula)
+        </span>
         <span>Cuadrante Izquierdo ▶</span>
       </div>
     </div>
