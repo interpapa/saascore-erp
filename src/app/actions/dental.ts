@@ -22,28 +22,35 @@ export interface ToothData {
   notes?: string;
 }
 
-export interface DentalChart {
-  mode: 'adult' | 'child' | 'mixed';
-  teeth: Record<string, ToothData>;  // key = FDI number
-  supernumeraryTeeth: ToothData[];   // piezas extra
-  generalNotes?: string;
-  lastUpdated: string;
+export interface DentalTreatmentProcedure {
+  id?: string;
+  toothNumber: string;
+  conditionCode: string;
+  procedure: string;
+  category?: string;
+  estimatedCost: number;
+  completed: boolean;
+  stages?: Array<{ id: string; title: string; order: number; completed?: boolean }>;
+  notes?: string;
 }
 
 export interface DentalTreatmentPlan {
   id: string;
   title: string;
   teeth: string[];       // FDI numbers involucrados
-  procedures: Array<{
-    toothNumber: string;
-    conditionCode: string;
-    procedure: string;   // Descripción libre del procedimiento
-    estimatedCost: number;
-    completed: boolean;
-  }>;
+  procedures: DentalTreatmentProcedure[];
   totalCost: number;
   notes?: string;
   createdAt: string;
+}
+
+export interface DentalChart {
+  mode: 'adult' | 'child' | 'mixed';
+  teeth: Record<string, ToothData>;  // key = FDI number
+  supernumeraryTeeth: ToothData[];   // piezas extra
+  treatmentPlan?: DentalTreatmentPlan; // Plan de tratamiento y presupuesto persistido
+  generalNotes?: string;
+  lastUpdated: string;
 }
 
 /**

@@ -33,6 +33,9 @@ import { useRouter } from 'next/navigation';
 import { Odontogram } from '@/components/dental/Odontogram';
 import { ClientRecordsTab } from '@/components/clients/ClientRecordsTab';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
+import { DentalCheckoutModal } from '@/components/dental/DentalCheckoutModal';
+import { DentalScheduleModal } from '@/components/dental/DentalScheduleModal';
+import { mergeTenantDentalServices, DentalProcedureDefinition } from '@/lib/dental/proceduresCatalog';
 import { 
   DentalChart, 
   DentalTreatmentPlan, 
@@ -101,6 +104,11 @@ export default function OdontologiaPage() {
   // Modal para registrar nuevo paciente directamente
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
   const [isSubmittingPatient, setIsSubmittingPatient] = useState(false);
+
+  // Modales de Cobro y Agendamiento en Consulta
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleHint, setScheduleHint] = useState<string>('Control y Tratamiento Odontológico');
 
   // Cargar overview general
   const loadOverview = useCallback(async () => {
@@ -380,25 +388,88 @@ export default function OdontologiaPage() {
     : null;
   const patientDebt = Number(patientMeta.total_debt || 0);
 
-  // Desglose de tratamientos presupuestados del odontograma actual
+  // Parámetros de la empresa (Tasa de cambio)
+  const tenantMeta = (currentTenant?.metadata as Record<string, any>) || {};
+  const currentExchangeRate = Number(tenantMeta.exchange_rate?.rate || tenantMeta.exchange_rate || 850);
+
+  // Catálogo unificado de procedimientos dentales (maestro + servicios de la empresa)
+  const unifiedDentalCatalog = useMemo(() => {
+    return mergeTenantDentalServices(dentalServices);
+  }, [dentalServices]);
+
+  // Desglose de tratamientos presupuestados del odontograma actual con precios reales
   const plannedTreatments = useMemo(() => {
-    if (!currentChart?.teeth) return [];
-    const list: Array<{ toothNum: string; condition: string; code: string; color: string; notes?: string }> = [];
+    if (!currentChart) return [];
+
+    // 1. Si el odontograma ya tiene un plan de tratamiento explícito con procedimientos y costos
+    if (currentChart.treatmentPlan?.procedures && currentChart.treatmentPlan.procedures.length > 0) {
+      return currentChart.treatmentPlan.procedures.map((p, idx) => {
+        const match = unifiedDentalCatalog.find(
+          c => c.name.toLowerCase() === p.procedure.toLowerCase() || (p.conditionCode && c.conditionCode === p.conditionCode)
+        );
+        return {
+          id: p.id || `proc-${idx}`,
+          toothNum: p.toothNumber || 'General',
+          condition: p.conditionCode || 'Tratamiento',
+          code: p.conditionCode || 'general',
+          procedureName: p.procedure,
+          category: p.category || match?.categoryLabel || 'General',
+          cost: typeof p.estimatedCost === 'number' ? p.estimatedCost : (match?.defaultPriceUSD || 40),
+          color: match?.color || '#0ea5e9',
+          stages: p.stages || match?.stages || [],
+          notes: p.notes,
+          completed: p.completed || false,
+        };
+      });
+    }
+
+    // 2. Si no hay plan guardado aún, deducir tratamientos automáticamente a partir de las condiciones en los dientes
+    if (!currentChart.teeth) return [];
+    const list: Array<{
+      id: string;
+      toothNum: string;
+      condition: string;
+      code: string;
+      procedureName: string;
+      category: string;
+      cost: number;
+      color: string;
+      stages: Array<{ id: string; title: string; order: number; sessionNumber?: number }>;
+      notes?: string;
+      completed: boolean;
+    }> = [];
+
     Object.entries(currentChart.teeth).forEach(([num, data]) => {
-      data.conditions?.forEach((c) => {
+      data.conditions?.forEach((c, cIdx) => {
         if (c.code !== 'ausente') {
+          const match = unifiedDentalCatalog.find(p => p.conditionCode === c.code);
+          const procName = match ? match.name : (c.label || `Tratamiento ${c.code.toUpperCase()}`);
+          const cost = match ? match.defaultPriceUSD : 40.0;
+          const category = match ? match.categoryLabel : 'Restauradora';
+          const stages = match?.stages || [];
+
           list.push({
+            id: `auto-${num}-${c.code}-${cIdx}`,
             toothNum: num,
             condition: c.label || c.code.toUpperCase(),
             code: c.code,
-            color: c.color || '#0ea5e9',
+            procedureName: procName,
+            category,
+            cost,
+            color: c.color || match?.color || '#0ea5e9',
+            stages,
             notes: c.notes || data.notes,
+            completed: false,
           });
         }
       });
     });
     return list;
-  }, [currentChart]);
+  }, [currentChart, unifiedDentalCatalog]);
+
+  const totalBudgetUSD = useMemo(() => {
+    return plannedTreatments.reduce((sum, item) => sum + (item.cost || 0), 0);
+  }, [plannedTreatments]);
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in duration-300">
@@ -705,6 +776,12 @@ export default function OdontologiaPage() {
                   onCreateKanban={handleCreateKanban}
                   isSaving={isSavingChart}
                   isCreatingKanban={isCreatingKanban}
+                  dentalCatalog={unifiedDentalCatalog}
+                  onOpenCheckout={() => setIsCheckoutModalOpen(true)}
+                  onOpenSchedule={(hint) => {
+                    setScheduleHint(hint || 'Control y Tratamiento Odontológico');
+                    setIsScheduleModalOpen(true);
+                  }}
                 />
               </div>
             )
@@ -773,17 +850,66 @@ export default function OdontologiaPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    setScheduleHint('Seguimiento de Plan de Tratamiento');
+                    setIsScheduleModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic"
+                >
+                  <CalendarDays size={14} />
+                  <span>Agendar Cita</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
                     if (plannedTreatments.length === 0) {
-                      toast({ variant: 'warning', title: 'Sin tratamientos', description: 'No hay procedimientos presupuestados para cobrar en caja.' });
+                      toast({ variant: 'warning', title: 'Sin tratamientos', description: 'No hay procedimientos para enviar al flujo de trabajo.' });
                       return;
                     }
-                    const totalEst = plannedTreatments.length * 40; // Base referencial
-                    router.push(`/caja?client=${selectedPatient.id}&amount=${totalEst}&desc=${encodeURIComponent('Tratamiento Odontológico - ' + selectedPatient.name)}`);
+                    if (currentChart?.treatmentPlan) {
+                      handleCreateKanban(currentChart.treatmentPlan);
+                    } else {
+                      const tempPlan: DentalTreatmentPlan = {
+                        id: `plan-${Date.now()}`,
+                        title: `Plan Clínico — ${selectedPatient.name}`,
+                        teeth: Array.from(new Set(plannedTreatments.map(t => t.toothNum).filter(n => n !== 'General' && n !== 'Boca Completa'))),
+                        procedures: plannedTreatments.map((p, idx) => ({
+                          id: p.id || `proc-${idx}`,
+                          toothNumber: p.toothNum,
+                          conditionCode: p.code,
+                          procedure: p.procedureName,
+                          category: p.category,
+                          estimatedCost: p.cost,
+                          completed: p.completed || false,
+                          stages: p.stages,
+                          notes: p.notes,
+                        })),
+                        totalCost: totalBudgetUSD,
+                        createdAt: new Date().toISOString(),
+                      };
+                      handleCreateKanban(tempPlan);
+                    }
                   }}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all flex items-center gap-1.5 btn-haptic shadow-xs"
+                  disabled={isCreatingKanban}
+                  className="px-3 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic disabled:opacity-50"
+                >
+                  <KanbanSquare size={14} />
+                  <span>{isCreatingKanban ? 'Enviando...' : 'Enviar a Kanban'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (plannedTreatments.length === 0) {
+                      toast({ variant: 'warning', title: 'Sin tratamientos', description: 'No hay procedimientos presupuestados para cobrar.' });
+                      return;
+                    }
+                    setIsCheckoutModalOpen(true);
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all flex items-center gap-1.5 btn-haptic shadow-md"
                 >
                   <DollarSign size={14} />
-                  <span>Cobrar en Caja POS</span>
+                  <span>Cobrar en Consulta</span>
                 </button>
               </div>
             )}
@@ -794,7 +920,7 @@ export default function OdontologiaPage() {
               <Sparkles size={32} className="mx-auto opacity-30 text-teal-500" />
               <p className="text-sm font-bold text-foreground">Sin tratamientos pendientes en el odontograma</p>
               <p className="text-xs max-w-sm mx-auto">
-                Selecciona dientes en la pestaña de <strong>Odontograma</strong> y aplícales caries, resinas o coronas para ver el presupuesto automático aquí.
+                Selecciona dientes en la pestaña de <strong>Odontograma</strong> o agrega procedimientos generales para presupuestar y cobrar aquí.
               </p>
             </div>
           ) : (
@@ -804,31 +930,81 @@ export default function OdontologiaPage() {
                   <thead className="bg-slate-50 dark:bg-slate-900/50 border-b border-border text-slate-400 font-bold uppercase text-[10px]">
                     <tr>
                       <th className="p-3 pl-4">Pieza Dental</th>
-                      <th className="p-3">Diagnóstico / Procedimiento Requerido</th>
-                      <th className="p-3">Notas Clínicas</th>
-                      <th className="p-3 text-right pr-4">Costo Estimado</th>
+                      <th className="p-3">Procedimiento & Categoría</th>
+                      <th className="p-3">Etapas / Capas Clínicas</th>
+                      <th className="p-3">Notas</th>
+                      <th className="p-3 text-center">Estado</th>
+                      <th className="p-3 text-right pr-4">Arancel / Precio</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {plannedTreatments.map((pt, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
-                        <td className="p-3 pl-4 font-mono font-bold text-teal-600 dark:text-teal-400">
-                          🦷 Pieza #{pt.toothNum}
+                        <td className="p-3 pl-4 font-mono font-bold text-teal-600 dark:text-teal-400 whitespace-nowrap">
+                          {pt.toothNum.toLowerCase().includes('boca') || pt.toothNum.toLowerCase().includes('general') ? (
+                            <span>🌐 {pt.toothNum}</span>
+                          ) : (
+                            <span>🦷 Pieza #{pt.toothNum}</span>
+                          )}
                         </td>
-                        <td className="p-3 font-semibold text-foreground flex items-center gap-2">
-                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: pt.color }} />
-                          <span>{pt.condition}</span>
+                        <td className="p-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: pt.color }} />
+                            <div>
+                              <p className="font-bold text-foreground">{pt.procedureName}</p>
+                              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{pt.category}</span>
+                            </div>
+                          </div>
                         </td>
-                        <td className="p-3 text-slate-500">{pt.notes || '—'}</td>
-                        <td className="p-3 text-right pr-4 font-mono font-bold text-foreground">$40.00</td>
+                        <td className="p-3 max-w-xs">
+                          {pt.stages && pt.stages.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {pt.stages.map((stg, sIdx) => (
+                                <span
+                                  key={sIdx}
+                                  className="text-[9px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-md border border-border/50"
+                                >
+                                  {stg.order ? `${stg.order}. ` : ''}{stg.title}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">Cita única directa</span>
+                          )}
+                        </td>
+                        <td className="p-3 text-slate-500 text-[11px] max-w-xs">{pt.notes || '—'}</td>
+                        <td className="p-3 text-center">
+                          {pt.completed ? (
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                              Realizado
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                              Planificado
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3 text-right pr-4 font-mono font-black text-foreground whitespace-nowrap">
+                          ${pt.cost.toFixed(2)} USD
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot className="bg-slate-50 dark:bg-slate-900/70 border-t border-border font-black text-xs">
                     <tr>
-                      <td colSpan={3} className="p-3 pl-4 text-right">TOTAL PRESUPUESTADO ESTIMADO:</td>
-                      <td className="p-3 pr-4 text-right font-mono text-base text-primary">
-                        ${(plannedTreatments.length * 40).toFixed(2)}
+                      <td colSpan={5} className="p-3.5 pl-4 text-right">
+                        TOTAL PRESUPUESTADO ESTIMADO:
+                      </td>
+                      <td className="p-3.5 pr-4 text-right font-mono text-base text-primary">
+                        ${totalBudgetUSD.toFixed(2)} USD
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5} className="p-2 pl-4 text-right text-[11px] text-slate-400 font-medium">
+                        Equivalente aproximado en moneda nacional (Tasa BCV {currentExchangeRate.toFixed(2)} Bs./USD):
+                      </td>
+                      <td className="p-2 pr-4 text-right font-mono text-xs text-slate-500 dark:text-slate-400 font-bold">
+                        {(totalBudgetUSD * currentExchangeRate).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Bs.
                       </td>
                     </tr>
                   </tfoot>
@@ -1249,6 +1425,60 @@ export default function OdontologiaPage() {
         onClose={() => setIsCatalogModalOpen(false)}
         onSave={handleSaveCatalogService}
       />
+
+      {/* MODAL DE COBRO INMEDIATO EN CONSULTA */}
+      {selectedPatient && actor && (
+        <DentalCheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={() => setIsCheckoutModalOpen(false)}
+          patient={{
+            id: selectedPatient.id,
+            name: selectedPatient.name,
+            phone: selectedPatient.phone,
+            email: selectedPatient.email,
+            tax_id: selectedPatient.tax_id,
+          }}
+          plannedTreatments={plannedTreatments.map(t => ({
+            id: t.id,
+            toothNum: t.toothNum,
+            procedureName: t.procedureName,
+            cost: t.cost,
+            category: t.category,
+            notes: t.notes,
+          }))}
+          tenantId={tenantId}
+          actor={actor}
+          exchangeRate={currentExchangeRate}
+          onSuccess={() => {
+            loadOverview();
+            if (selectedPatient) {
+              loadPatientChart(selectedPatient.id);
+            }
+          }}
+        />
+      )}
+
+      {/* MODAL DE AGENDAMIENTO DIRECTO DE PRÓXIMA CITA */}
+      {selectedPatient && actor && (
+        <DentalScheduleModal
+          isOpen={isScheduleModalOpen}
+          onClose={() => setIsScheduleModalOpen(false)}
+          patient={{
+            id: selectedPatient.id,
+            name: selectedPatient.name,
+            phone: selectedPatient.phone,
+          }}
+          tenantId={tenantId}
+          actor={actor}
+          procedureHint={scheduleHint}
+          onSuccess={() => {
+            loadOverview();
+            if (selectedPatient) {
+              loadPatientAppointments(selectedPatient.id);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
