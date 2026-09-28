@@ -19,7 +19,8 @@ import {
   Plug,
   Blocks,
   Settings,
-  ShieldAlert
+  ShieldAlert,
+  Stethoscope
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 
@@ -35,7 +36,7 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
   const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : fallbackModules;
@@ -48,6 +49,7 @@ export function MobileDock() {
     { id: 'dashboard', label: 'Inicio', href: '/dashboard', icon: Home },
     { id: 'caja', label: 'Caja POS', href: '/caja', icon: ShoppingCart },
     { id: 'calendario', label: 'Citas', href: '/calendario', icon: CalendarDays },
+    { id: 'odontologia', label: 'Dental', href: '/odontologia', icon: Stethoscope },
     { id: 'clientes', label: 'CRM', href: '/clientes', icon: Users },
     { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
     { id: 'kanban', label: 'Kanban', href: '/kanban', icon: LayoutGrid },
@@ -83,7 +85,6 @@ export function MobileDock() {
       >
         {activeItems.map((item) => {
           const IconComponent = (item.icon as any); /* eslint-disable-line */
-item.icon;
           const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
           return (

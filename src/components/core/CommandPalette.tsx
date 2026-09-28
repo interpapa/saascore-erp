@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle } from 'lucide-react';
+import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle, Stethoscope } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface CommandItem {
@@ -22,7 +22,8 @@ const COMMAND_ITEMS: CommandItem[] = [
   { id: '7',  title: 'Equipo — Personal y Nómina',   category: 'módulo', href: '/equipo',       icon: Users },
   { id: '8',  title: 'Calendario — Citas y Turnos',   category: 'módulo', href: '/calendario',  icon: CalendarDays },
   { id: '9',  title: 'WhatsApp — CRM Omnicanal',     category: 'módulo', href: '/whatsapp',    icon: MessageCircle },
-  { id: '10', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
+  { id: '10', title: 'Odontología — Odontograma y Salud Dental', category: 'módulo', href: '/odontologia', icon: Stethoscope },
+  { id: '11', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
 ];
 
 export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {

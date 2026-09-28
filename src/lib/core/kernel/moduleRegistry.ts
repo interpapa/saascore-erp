@@ -146,6 +146,10 @@ export const DEFAULT_ENABLED_MODULES: ModuleId[] = [
   'contabilidad',
   'compras',
   'whatsapp',
+  'kanban',
+  'estadisticas',
+  'franquicias',
+  'odontologia',
 ];
 
 /**

@@ -25,6 +25,7 @@ const ROUTE_LABELS: Record<string, string> = {
   franquicias:  'Franquicias',
   integraciones:'Conexiones',
   configuracion:'Ajustes',
+  odontologia:  'Odontología',
   admin:        'Rendo Hub',
   billing:      'Facturación',
   onboarding:   'Onboarding',

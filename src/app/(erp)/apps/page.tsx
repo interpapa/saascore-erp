@@ -44,7 +44,7 @@ export default function AppsManagerPage() {
 
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeModules, setActiveModules] = useState<string[]>([
-    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'estadisticas', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin'
+    'caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'estadisticas', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'equipo', 'franquicias', 'config', 'admin'
   ]);
   const [isSaving, setIsSaving] = useState(false);
 

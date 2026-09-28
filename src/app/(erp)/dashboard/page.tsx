@@ -19,7 +19,8 @@ import {
   Grid, 
   Sliders, 
   ShieldCheck,
-  Sparkles 
+  Sparkles,
+  Stethoscope
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -108,6 +109,13 @@ export default function LauncherPage() {
       icon: <Store className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
+      id: 'odontologia', 
+      name: 'Odontología', 
+      href: '/odontologia',
+      gradient: 'from-teal-400 to-cyan-600',
+      icon: <Stethoscope className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
       id: 'apps', 
       name: 'Marketplace', 
       href: '/apps',
@@ -131,7 +139,7 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin'];
+  const fallbackModules = ['caja', 'clientes', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'equipo', 'franquicias', 'config', 'admin'];
   const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : fallbackModules;

@@ -235,3 +235,155 @@ export async function createTreatmentKanbanFromChartAction(
     return { success: false, error: (err as Error).message };
   }
 }
+
+/**
+ * Obtiene un resumen general del módulo dental:
+ * - Pacientes con odontograma
+ * - Órdenes de trabajo del pipeline dental
+ * - Estadísticas generales
+ */
+export async function getDentalOverviewAction(
+  tenantId: string,
+  actor: ActionActor
+): Promise<{
+  success: boolean;
+  charts?: Array<{
+    id: string;
+    entityId: string;
+    entityName: string;
+    entityPhone?: string;
+    lastUpdated: string;
+    teethCount: number;
+  }>;
+  dentalOrders?: Array<{
+    id: string;
+    documentNumber: string;
+    patientName: string;
+    title: string;
+    status: string;
+    totalAmount: number;
+    completedSteps: number;
+    totalSteps: number;
+  }>;
+  stats?: {
+    totalPatientsWithChart: number;
+    activeTreatments: number;
+    completedTreatments: number;
+    totalBudgeted: number;
+  };
+  error?: string;
+}> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'odontologia');
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error };
+    }
+
+    // 1. Obtener registros de odontogramas
+    const { data: records, error: recErr } = await supabaseAdmin
+      .from('entity_records')
+      .select('id, entity_id, metadata, updated_at, created_at, entities(id, name, phone)')
+      .eq('tenant_id', tenantId)
+      .eq('record_type', 'dental_chart')
+      .order('updated_at', { ascending: false })
+      .limit(50);
+
+    if (recErr) {
+      console.warn('[getDentalOverviewAction] Error fetching charts:', recErr);
+    }
+
+    const charts = (records || []).map((r) => {
+      const ent = (r as any).entities;
+      const meta = (r.metadata || {}) as DentalChart;
+      const teethObj = meta?.teeth || {};
+      const teethCount = Object.keys(teethObj).length + (meta?.supernumeraryTeeth?.length || 0);
+
+      return {
+        id: r.id,
+        entityId: r.entity_id,
+        entityName: ent?.name || 'Paciente Sin Nombre',
+        entityPhone: ent?.phone || '',
+        lastUpdated: meta?.lastUpdated || r.updated_at || r.created_at,
+        teethCount,
+      };
+    });
+
+    // 2. Obtener órdenes de trabajo con pipeline dental
+    const { data: docs, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .select('id, document_number, status, metadata, entity_id, entities(id, name)')
+      .eq('tenant_id', tenantId)
+      .eq('type', 'work_order')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (docErr) {
+      console.warn('[getDentalOverviewAction] Error fetching dental orders:', docErr);
+    }
+
+    const dentalOrders: Array<{
+      id: string;
+      documentNumber: string;
+      patientName: string;
+      title: string;
+      status: string;
+      totalAmount: number;
+      completedSteps: number;
+      totalSteps: number;
+    }> = [];
+
+    let inTreatmentCount = 0;
+    let completedCount = 0;
+    let totalBudgeted = 0;
+
+    for (const d of docs || []) {
+      const meta = (d.metadata || {}) as Record<string, unknown>;
+      if (meta.pipeline === 'dental' || meta.source === 'dental_chart') {
+        const ent = (d as any).entities;
+        const steps = Array.isArray(meta.steps) ? (meta.steps as Array<{ completed?: boolean }>) : [];
+        const completedSteps = steps.filter((s) => s.completed).length;
+        const amount = typeof meta.total_amount === 'number' ? meta.total_amount : 0;
+
+        totalBudgeted += amount;
+        if (d.status === 'concluido' || d.status === 'invoiced') {
+          completedCount++;
+        } else {
+          inTreatmentCount++;
+        }
+
+        dentalOrders.push({
+          id: d.id,
+          documentNumber: d.document_number,
+          patientName: ent?.name || (meta.title as string) || 'Paciente',
+          title: (meta.title as string) || 'Tratamiento Dental',
+          status: d.status,
+          totalAmount: amount,
+          completedSteps,
+          totalSteps: steps.length,
+        });
+      }
+    }
+
+    return {
+      success: true,
+      charts,
+      dentalOrders,
+      stats: {
+        totalPatientsWithChart: charts.length,
+        activeTreatments: inTreatmentCount,
+        completedTreatments: completedCount,
+        totalBudgeted,
+      },
+    };
+  } catch (err: unknown) {
+    console.error('[getDentalOverviewAction]:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
