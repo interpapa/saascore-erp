@@ -6,6 +6,7 @@ import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
 import Decimal from 'decimal.js';
+import { isValidUUID, isTemporaryId, sanitizeUUID } from '@/lib/core/uuid';
 
 export type DocumentType =
   | 'invoice'
@@ -117,9 +118,11 @@ export async function createDocumentAction(
       ? input.document_number 
       : await generateNextDocumentNumber(tenantId, input.type);
 
+    const safeEntityId = (input.entity_id && input.entity_id !== tenantId) ? (sanitizeUUID(input.entity_id) || null) : null;
+
     const insertData: any = {
       tenant_id: tenantId,
-      entity_id: input.entity_id || null,
+      entity_id: safeEntityId,
       type: input.type,
       status: input.status || 'draft',
       document_number: finalDocNumber,
@@ -165,12 +168,36 @@ export async function createDocumentAction(
       docError = retry.error;
     }
 
+    if (docError && (docError.message.includes('check') || docError.message.includes('constraint') || docError.message.includes('type'))) {
+      // Fallback: Si el esquema PostgreSQL restringe documents.type a ('invoice', 'purchase_order', 'quotation')
+      const originalType = insertData.type;
+      let safeFallbackType = originalType;
+      if (originalType === 'work_order' || originalType === 'quote') {
+        safeFallbackType = 'quotation';
+      } else if (originalType === 'whatsapp_log' || originalType === 'journal_entry' || originalType === 'payroll_slip') {
+        safeFallbackType = 'invoice';
+      }
+      insertData.type = safeFallbackType;
+      insertData.metadata = {
+        ...insertData.metadata,
+        actual_type: originalType,
+      };
+
+      const retryType = await supabaseAdmin
+        .from('documents')
+        .insert([insertData])
+        .select()
+        .single();
+      newDoc = retryType.data;
+      docError = retryType.error;
+    }
+
     if (docError) throw new Error('Error al crear documento: ' + docError.message);
 
     if (input.lines && input.lines.length > 0) {
       const linesToInsert = input.lines.map((line) => ({
         document_id: newDoc.id,
-        item_id: line.item_id || null,
+        item_id: sanitizeUUID(line.item_id) || null,
         description: line.description,
         quantity: line.quantity,
         unit_price: line.unit_price,
@@ -230,7 +257,13 @@ export async function getDocumentsAction(tenantId: string, type: DocumentType | 
       .range(0, limit - 1);
 
     if (type) {
-      baseQuery = baseQuery.eq('type', type);
+      if (type === 'work_order') {
+        baseQuery = baseQuery.in('type', ['work_order', 'quotation']);
+      } else if (type === 'quote') {
+        baseQuery = baseQuery.in('type', ['quote', 'quotation']);
+      } else {
+        baseQuery = baseQuery.eq('type', type);
+      }
     }
 
     let { data: documents, error } = await baseQuery;
@@ -241,14 +274,24 @@ export async function getDocumentsAction(tenantId: string, type: DocumentType | 
         id, document_number, type, status, subtotal_amount, tax_amount, total_amount, metadata, created_at,
         entity:entities (id, name, type, tax_id, email, phone)
       `;
-      const retryQuery = supabaseAdmin
+      let retryQuery = supabaseAdmin
         .from('documents')
         .select(selectFields)
         .eq('tenant_id', tenantId)
         .order('created_at', { ascending: false })
         .range(0, limit - 1);
       
-      const retry = await (type ? retryQuery.eq('type', type) : retryQuery);
+      if (type) {
+        if (type === 'work_order') {
+          retryQuery = retryQuery.in('type', ['work_order', 'quotation']);
+        } else if (type === 'quote') {
+          retryQuery = retryQuery.in('type', ['quote', 'quotation']);
+        } else {
+          retryQuery = retryQuery.eq('type', type);
+        }
+      }
+
+      const retry = await retryQuery;
       
       documents = (retry.data || []).map((doc: any) => ({
         ...doc,
@@ -271,6 +314,13 @@ export async function getDocumentsAction(tenantId: string, type: DocumentType | 
 
     if (error) throw new Error(error.message);
 
+    // Filter in-memory when fallback types are used so work_orders and quotes don't overlap
+    if (documents && type === 'work_order') {
+      documents = documents.filter((doc: any) => doc.type === 'work_order' || doc.metadata?.actual_type === 'work_order');
+    } else if (documents && type === 'quote') {
+      documents = documents.filter((doc: any) => (doc.type === 'quote' || doc.type === 'quotation') && doc.metadata?.actual_type !== 'work_order');
+    }
+
     return { success: true, documents: documents || [] };
   } catch (err: any) {
     console.error('[getDocumentsAction Error]:', (err as Error).message);
@@ -286,6 +336,10 @@ export async function updateDocumentStatusAction(
 ) {
   try {
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      return { success: true, localOnly: true } as any;
+    }
 
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
@@ -324,6 +378,10 @@ export async function receivePurchaseOrderAction(
   try {
     if (!poId || !tenantId) throw new Error('ID de orden y Empresa requeridos.');
 
+    if (isTemporaryId(poId) || !isValidUUID(poId)) {
+      return { success: true, localOnly: true } as any;
+    }
+
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
@@ -350,12 +408,13 @@ export async function receivePurchaseOrderAction(
 
     // Incrementar stock en items si el producto es físico
     for (const line of lines) {
-      if (line.item_id && !line.item_id.startsWith('custom-')) {
+      const cleanItemId = sanitizeUUID(line.item_id);
+      if (cleanItemId) {
         try {
           const { data: itemData } = await supabaseAdmin
             .from('items')
             .select('id, stock, name')
-            .eq('id', line.item_id)
+            .eq('id', cleanItemId)
             .eq('tenant_id', tenantId)
             .maybeSingle();
 
@@ -367,14 +426,14 @@ export async function receivePurchaseOrderAction(
             await supabaseAdmin
               .from('items')
               .update({ stock: newStock })
-              .eq('id', line.item_id)
+              .eq('id', cleanItemId)
               .eq('tenant_id', tenantId);
 
             try {
               await supabaseAdmin
                 .from('inventory_logs')
                 .insert([{
-                  item_id: line.item_id,
+                  item_id: cleanItemId,
                   tenant_id: tenantId,
                   change: addedQty,
                   previous_stock: currentStock,
@@ -387,7 +446,7 @@ export async function receivePurchaseOrderAction(
             }
           }
         } catch (stockErr: any) {
-          console.warn(`[receivePurchaseOrderAction]: Error al actualizar stock de ${line.item_id}:`, stockErr.message);
+          console.warn(`[receivePurchaseOrderAction]: Error al actualizar stock de ${cleanItemId}:`, stockErr.message);
         }
       }
     }
@@ -449,6 +508,10 @@ export async function updatePurchaseOrderMatchAction(
   try {
     if (!poId || !tenantId) throw new Error('ID de orden y Empresa requeridos.');
 
+    if (isTemporaryId(poId) || !isValidUUID(poId)) {
+      return { success: true, localOnly: true } as any;
+    }
+
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
@@ -508,9 +571,13 @@ export async function toggleProcessStepAction(
   isCompleted: boolean,
   tenantId: string,
   actor: ActionActor
-): Promise<{ success: boolean; allCompleted?: boolean; error?: string }> {
+): Promise<{ success: boolean; allCompleted?: boolean; localOnly?: boolean; error?: string }> {
   'use server';
   try {
+    if (isTemporaryId(documentId) || !isValidUUID(documentId)) {
+      return { success: true, allCompleted: isCompleted, localOnly: true };
+    }
+
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };

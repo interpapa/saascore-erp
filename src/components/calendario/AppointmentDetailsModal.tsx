@@ -525,13 +525,18 @@ export function AppointmentDetailsModal({
                 disabled={isUpdating || appointment.metadata?.payment_status === 'paid'}
                 onClick={async () => {
                   if (!onUpdateMetadata) return;
-                  setIsUpdating(true);
-                  await onUpdateMetadata(appointment.id, {
-                    ...appointment.metadata,
-                    payment_status: 'paid',
-                    paid_at: new Date().toISOString()
-                  });
-                  setIsUpdating(false);
+                  try {
+                    setIsUpdating(true);
+                    await onUpdateMetadata(appointment.id, {
+                      ...appointment.metadata,
+                      payment_status: 'paid',
+                      paid_at: new Date().toISOString()
+                    });
+                  } catch (err) {
+                    console.error('Error al registrar pago:', err);
+                  } finally {
+                    setIsUpdating(false);
+                  }
                 }}
                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   appointment.metadata?.payment_status === 'paid'
@@ -547,12 +552,17 @@ export function AppointmentDetailsModal({
                 disabled={isUpdating || appointment.metadata?.payment_status === 'pending'}
                 onClick={async () => {
                   if (!onUpdateMetadata) return;
-                  setIsUpdating(true);
-                  await onUpdateMetadata(appointment.id, {
-                    ...appointment.metadata,
-                    payment_status: 'pending'
-                  });
-                  setIsUpdating(false);
+                  try {
+                    setIsUpdating(true);
+                    await onUpdateMetadata(appointment.id, {
+                      ...appointment.metadata,
+                      payment_status: 'pending'
+                    });
+                  } catch (err) {
+                    console.error('Error al actualizar estado de pago:', err);
+                  } finally {
+                    setIsUpdating(false);
+                  }
                 }}
                 className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   appointment.metadata?.payment_status === 'pending'

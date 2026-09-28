@@ -12,6 +12,7 @@ import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { checkRateLimit } from '@/lib/core/rateLimiter';
 import { getExchangeRate, convertUSDToLocal } from '@/lib/core/currencyEngine';
 import { ActionActor } from './entities';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import Decimal from 'decimal.js';
 
 export interface CartItem {
@@ -27,8 +28,8 @@ export type CheckoutActor = ActionActor;
 
 export async function processSecureCheckout(
   cart: CartItem[], 
-  entityId: string, 
-  paymentMethod: string,
+  entityId: string | null | undefined, 
+  paymentMethod: string = 'cash_usd',
   tenantId: string,
   actor: ActionActor,
   localizationCode: LocalizationCode = 'VE',
@@ -177,7 +178,7 @@ export async function processSecureCheckout(
     }
 
     const itemIds = Array.from(aggregatedDemand.keys());
-    const realItemIds = itemIds.filter(id => !id.startsWith('custom-') && !id.startsWith('appt-'));
+    const realItemIds = itemIds.filter(id => isValidUUID(id) && !isTemporaryId(id));
     
     let dbItems: any[] = [];
     if (realItemIds.length > 0) {
@@ -203,7 +204,7 @@ export async function processSecureCheckout(
         }
       } else {
         const cartItem = cart.find(c => c.itemId === itemId);
-        if (!cartItem?.name && !itemId.startsWith('appt-') && !itemId.startsWith('custom-')) {
+        if (!cartItem?.name && !isTemporaryId(itemId) && !itemId.startsWith('appt-') && !itemId.startsWith('custom-')) {
           throw new Error(`Ítem no existe: ${itemId}`);
         }
       }
@@ -304,11 +305,15 @@ export async function processSecureCheckout(
     const docPrefix = chargeTaxes ? 'FAC' : 'ORD';
     const docLabel = chargeTaxes ? 'Factura Fiscal' : 'Orden de Entrega';
 
+    const safeEntityId = (entityData && isValidUUID(entityData.id) && !isTemporaryId(entityData.id)) 
+      ? entityData.id 
+      : ((entityId && isValidUUID(entityId) && !isTemporaryId(entityId) && entityId !== tenantId) ? entityId : null);
+
     const { data: newDoc, error: docError } = await supabaseAdmin
       .from('documents')
       .insert([{
         tenant_id: tenantId,
-        entity_id: entityId,
+        entity_id: safeEntityId,
         type: 'invoice',
         status: 'invoiced',
         document_number: `${docPrefix}-${Date.now().toString().slice(-6)}`,
@@ -346,7 +351,7 @@ export async function processSecureCheckout(
     if (docError) throw docError;
 
     // Si la venta tiene monto a crédito, actualizar automáticamente la deuda del cliente en el CRM
-    if (totalCreditAmount > 0 && entityData?.id) {
+    if (totalCreditAmount > 0 && entityData?.id && isValidUUID(entityData.id) && !isTemporaryId(entityData.id)) {
       try {
         const currentDebt = Number(entityData.metadata?.total_debt || 0);
         const updatedDebt = currentDebt + totalCreditAmount;

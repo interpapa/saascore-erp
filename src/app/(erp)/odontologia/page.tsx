@@ -68,6 +68,8 @@ export default function OdontologiaPage() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingChart, setIsSavingChart] = useState(false);
+  const [isCreatingKanban, setIsCreatingKanban] = useState(false);
+  const [isSavingService, setIsSavingService] = useState(false);
 
   // Estadísticas del módulo
   const [stats, setStats] = useState({
@@ -181,7 +183,9 @@ export default function OdontologiaPage() {
         setIsLoadingAppts(true);
         const res = await getAppointmentsAction(tenantId, undefined, actor);
         if (res.success && res.appointments) {
-          const filtered = res.appointments.filter((a: any) => a.entity_id === patientId || a.customer_id === patientId);
+          const filtered = res.appointments.filter(
+            (a: any) => a.client_id === patientId || a.entity_id === patientId || a.customer_id === patientId
+          );
           setPatientAppointments(filtered);
         }
       } catch (err) {
@@ -234,8 +238,9 @@ export default function OdontologiaPage() {
 
   // Crear orden Kanban desde el Odontograma
   const handleCreateKanban = async (plan: DentalTreatmentPlan) => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !actor || !selectedPatient || isCreatingKanban) return;
     try {
+      setIsCreatingKanban(true);
       const res = await createTreatmentKanbanFromChartAction(
         selectedPatient.id,
         selectedPatient.name,
@@ -255,7 +260,7 @@ export default function OdontologiaPage() {
         toast({
           variant: 'error',
           title: 'Error al transferir',
-          description: res.error,
+          description: res.error || 'No se pudo crear la orden en Kanban.',
         });
       }
     } catch (err: unknown) {
@@ -264,6 +269,8 @@ export default function OdontologiaPage() {
         title: 'Error',
         description: (err as Error).message,
       });
+    } finally {
+      setIsCreatingKanban(false);
     }
   };
 
@@ -341,15 +348,21 @@ export default function OdontologiaPage() {
 
   // Guardar nuevo servicio en catálogo
   const handleSaveCatalogService = async (serviceData: any) => {
-    if (!tenantId || !actor) return;
-    const res = await createItemAction(serviceData, tenantId, actor);
-    if (res.success) {
-      toast({ variant: 'success', title: 'Servicio Creado', description: `"${serviceData.name}" se guardó en el catálogo.` });
-      setIsCatalogModalOpen(false);
-      loadOverview();
-    } else {
-      toast({ variant: 'error', title: 'Error al registrar servicio', description: res.error });
-      throw new Error(res.error);
+    if (!tenantId || !actor || isSavingService) return;
+    try {
+      setIsSavingService(true);
+      const res = await createItemAction(serviceData, tenantId, actor);
+      if (res.success) {
+        toast({ variant: 'success', title: 'Servicio Creado', description: `"${serviceData.name}" se guardó en el catálogo.` });
+        setIsCatalogModalOpen(false);
+        loadOverview();
+      } else {
+        toast({ variant: 'error', title: 'Error al registrar servicio', description: res.error || 'No se pudo guardar el servicio.' });
+      }
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error al registrar servicio', description: (err as Error).message });
+    } finally {
+      setIsSavingService(false);
     }
   };
 
@@ -691,6 +704,7 @@ export default function OdontologiaPage() {
                   onSave={handleSaveChart}
                   onCreateKanban={handleCreateKanban}
                   isSaving={isSavingChart}
+                  isCreatingKanban={isCreatingKanban}
                 />
               </div>
             )
@@ -743,7 +757,13 @@ export default function OdontologiaPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    try {
+                      window.print();
+                    } catch (e) {
+                      toast({ variant: 'error', title: 'Error de impresión', description: 'No se pudo abrir el cuadro de diálogo de impresión.' });
+                    }
+                  }}
                   className="px-3 py-1.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-800 text-foreground text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic"
                 >
                   <Printer size={14} />
@@ -753,6 +773,10 @@ export default function OdontologiaPage() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (plannedTreatments.length === 0) {
+                      toast({ variant: 'warning', title: 'Sin tratamientos', description: 'No hay procedimientos presupuestados para cobrar en caja.' });
+                      return;
+                    }
                     const totalEst = plannedTreatments.length * 40; // Base referencial
                     router.push(`/caja?client=${selectedPatient.id}&amount=${totalEst}&desc=${encodeURIComponent('Tratamiento Odontológico - ' + selectedPatient.name)}`);
                   }}

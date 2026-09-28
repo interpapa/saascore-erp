@@ -61,6 +61,7 @@ export function ClientDrawer({
   const [dentalChart, setDentalChart] = useState<DentalChart | undefined>(undefined);
   const [isDentalLoading, setIsDentalLoading] = useState(false);
   const [isDentalSaving, setIsDentalSaving] = useState(false);
+  const [isCreatingKanban, setIsCreatingKanban] = useState(false);
 
   // Historial a demanda: se activa por cliente mediante botón para mantener fichas limpias
   const [isHistoryEnabled, setIsHistoryEnabled] = useState<boolean>(() => {
@@ -271,18 +272,27 @@ export function ClientDrawer({
       } else {
         toast({ variant: 'error', title: 'Error al guardar', description: res.error });
       }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error al guardar', description: err?.message || 'Error inesperado' });
     } finally {
       setIsDentalSaving(false);
     }
   };
 
   const handleCreateKanbanFromChart = async (plan: DentalTreatmentPlan) => {
-    if (!client?.id || !tenantId || !actor) return;
-    const res = await createTreatmentKanbanFromChartAction(client.id, client.name || 'Paciente', plan, tenantId, actor);
-    if (res.success) {
-      toast({ variant: 'success', title: '🦷 Orden Kanban creada', description: 'El plan de tratamiento fue convertido en una orden de trabajo.' });
-    } else {
-      toast({ variant: 'error', title: 'Error al crear orden', description: res.error });
+    if (!client?.id || !tenantId || !actor || isCreatingKanban) return;
+    setIsCreatingKanban(true);
+    try {
+      const res = await createTreatmentKanbanFromChartAction(client.id, client.name || 'Paciente', plan, tenantId, actor);
+      if (res.success) {
+        toast({ variant: 'success', title: '🦷 Orden Kanban creada', description: 'El plan de tratamiento fue convertido en una orden de trabajo.' });
+      } else {
+        toast({ variant: 'error', title: 'Error al crear orden', description: res.error });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error al crear orden', description: err?.message || 'Error inesperado' });
+    } finally {
+      setIsCreatingKanban(false);
     }
   };
 
@@ -769,6 +779,7 @@ export function ClientDrawer({
                   onSave={handleSaveDentalChart}
                   onCreateKanban={handleCreateKanbanFromChart}
                   isSaving={isDentalSaving}
+                  isCreatingKanban={isCreatingKanban}
                 />
               )}
             </div>

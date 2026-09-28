@@ -6,6 +6,7 @@ import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
 import { getItemsAction, createItemAction, updateItemAction, deleteItemAction } from '@/app/actions/items';
 import { getAuditLogsAction } from '@/app/actions/audit';
 import { Item } from '@/lib/api/items';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { 
   Plus, 
@@ -73,7 +74,10 @@ export default function InventarioPage() {
       // Ampliado a 250 items para soportar inventarios empresariales
       const res = await getItemsAction(activeTenant.id, undefined, 250, actor);
       if (res.success && res.items) {
-        setItems(res.items as any);
+        setItems((prev) => {
+          const pendingTemporaries = prev.filter((i) => isTemporaryId(i.id) || !isValidUUID(i.id));
+          return [...pendingTemporaries, ...(res.items as any)];
+        });
       }
     } catch (error) {
       console.error('Error cargando inventario:', error);
@@ -128,6 +132,29 @@ export default function InventarioPage() {
     }
 
     if (editingItem) {
+      if (isTemporaryId(editingItem.id) || !isValidUUID(editingItem.id)) {
+        setItems((prev) =>
+          prev.map((item) =>
+            item.id === editingItem.id
+              ? {
+                  ...item,
+                  ...data,
+                  base_price: Number(data.base_price || 0),
+                  cost: Number(data.cost || 0),
+                  stock_quantity: Number(data.stock_quantity || 0),
+                  stock: Number(data.stock_quantity || 0),
+                }
+              : item
+          )
+        );
+        setEditingItem(null);
+        toast({
+          variant: 'success',
+          title: 'Artículo Actualizado en Memoria',
+          description: `"${data.name}" se actualizó localmente.`,
+        });
+        return;
+      }
       try {
         const res = await updateItemAction(
           editingItem.id,
@@ -191,22 +218,50 @@ export default function InventarioPage() {
         );
 
         if (!res.success) {
+          // Rollback reactivo: remover el temporal si falla
+          setItems((prev) => prev.filter((i) => i.id !== tempId));
           toast({ variant: 'warning', title: 'Aviso', description: res.error || 'No se pudo sincronizar con la nube.' });
         } else {
+          // Sustitución atómica reactiva en memoria
+          if (res.item) {
+            setItems((prev) =>
+              prev.map((i) =>
+                i.id === tempId
+                  ? ({
+                      ...res.item,
+                      stock: res.item.stock !== undefined ? res.item.stock : res.item.stock_quantity,
+                      stock_quantity: res.item.stock_quantity !== undefined ? res.item.stock_quantity : (res.item.stock ?? 0),
+                    } as Item)
+                  : i
+              )
+            );
+          }
           toast({ variant: 'success', title: data.type === 'service' ? 'Servicio Registrado' : 'Artículo Creado', description: `"${data.name}" se guardó en el catálogo.` });
           fetchItems();
         }
       } catch (err: unknown) {
-        toast({ variant: 'info', title: 'Modo Offline', description: 'Artículo guardado en esta sesión.' });
+        // Rollback defensivo
+        setItems((prev) => prev.filter((i) => i.id !== tempId));
+        toast({ variant: 'error', title: 'Error al registrar', description: (err as Error).message || 'Artículo no guardado.' });
       }
     }
   };
 
   const handleDeleteItem = async (id: string) => {
     if (!activeTenant || !actor) return;
+
+    // Descarte defensivo directo si es un ID temporal o no es un UUID válido
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      setSelectedItem(null);
+      toast({ variant: 'info', title: 'Artículo temporal descartado', description: 'El artículo ha sido retirado del inventario local.' });
+      return;
+    }
+
     try {
       const res = await deleteItemAction(id, activeTenant.id, actor);
       if (res.success) {
+        setItems((prev) => prev.filter((i) => i.id !== id));
         toast({ variant: 'success', title: 'Artículo Eliminado', description: 'El artículo ha sido retirado del inventario.' });
         setSelectedItem(null);
         fetchItems();

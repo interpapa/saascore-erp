@@ -6,6 +6,7 @@ import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { revalidatePath } from 'next/cache';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 export interface CashMovement {
   id: string;
@@ -368,7 +369,7 @@ export async function recordCashMovementAction(
           .from('documents')
           .insert([{
             tenant_id: tenantId,
-            entity_id: tenantId,
+            entity_id: null,
             type: 'purchase_order',
             status: 'paid',
             document_number: `GAS-${Date.now().toString().slice(-6)}`,
@@ -483,9 +484,11 @@ export async function closeCashSessionAction(
     // Calcular las ventas en efectivo
     const { data: documents } = await supabaseAdmin
       .from('documents')
-      .select('total_amount, metadata, created_at')
+      .select('total_amount, metadata, created_at, status')
       .eq('tenant_id', tenantId)
       .eq('type', 'invoice')
+      .neq('status', 'annulled')
+      .neq('status', 'voided')
       .gte('created_at', session.openedAt);
 
     let salesCashUSD = 0;
@@ -788,7 +791,7 @@ export async function voidSaleAction(
     // 2. Reversión de inventario para productos físicos
     const lines = (invoice.metadata?.cart_lines as any[]) || [];
     for (const line of lines) {
-      if (line.item_id && !line.item_id.startsWith('custom-') && !line.item_id.startsWith('appt-')) {
+      if (line.item_id && isValidUUID(line.item_id) && !isTemporaryId(line.item_id)) {
         const qty = Number(line.quantity) || 0;
         if (qty > 0) {
           try {

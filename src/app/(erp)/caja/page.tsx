@@ -654,7 +654,7 @@ function CajaPageContent() {
 
     setIsSaving(true);
     try {
-      const customerId = selectedCustomer === 'generic_counter_customer' ? currentTenant.id : selectedCustomer;
+      const customerId = (selectedCustomer === 'generic_counter_customer' || selectedCustomer === currentTenant.id) ? undefined : selectedCustomer;
       const effectiveActor = actor || {
         email: session?.userEmail || 'admin@rendo.com',
         role: session?.role || ('owner' as const),

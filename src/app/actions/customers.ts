@@ -3,6 +3,7 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 export interface CustomerHistoryItem {
   id: string;
@@ -56,8 +57,8 @@ export async function getCustomerHistoryAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    if (!tenantId || !customerId || customerId === 'generic_counter_customer') {
-      return { success: false, error: 'Cliente no válido para consulta de historial.' };
+    if (!tenantId || !customerId || customerId === 'generic_counter_customer' || isTemporaryId(customerId) || !isValidUUID(customerId)) {
+      return { success: false, error: 'Cliente no válido o local/temporal para consulta de historial.' };
     }
 
     // 1. Obtener datos del cliente

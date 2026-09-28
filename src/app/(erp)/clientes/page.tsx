@@ -8,6 +8,7 @@ import { getAuditLogsAction } from '@/app/actions/audit';
 import { getTenantEntitySchemaAction } from '@/app/actions/entitySchema';
 import { CustomFieldDefinition } from '@/lib/core/industryTemplates';
 import { Entity } from '@/lib/api/entities';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import { 
   Plus, Download, Users, DollarSign, Activity, Calendar, MessageSquare, 
   ShoppingBag, ArrowRight, Search, Filter, Sparkles, UserCheck, ShieldAlert,
@@ -80,7 +81,10 @@ export default function ClientesPage() {
       ]);
 
       if (entitiesRes.success && entitiesRes.entities) {
-        setClients(entitiesRes.entities as any);
+        setClients(prev => {
+          const pendingTemporaries = prev.filter(c => isTemporaryId(c.id) || !isValidUUID(c.id));
+          return [...pendingTemporaries, ...(entitiesRes.entities as any)];
+        });
       }
       if (schemaRes.success && schemaRes.schema) {
         setCustomSchema(schemaRes.schema);
@@ -132,6 +136,25 @@ export default function ClientesPage() {
     }
 
     if (clientToEdit) {
+      if (isTemporaryId(clientToEdit.id) || !isValidUUID(clientToEdit.id)) {
+        setClients(prev => prev.map(c => c.id === clientToEdit.id ? {
+          ...c,
+          name: data.full_name,
+          email: data.email,
+          phone: data.phone,
+          tax_id: data.tax_id,
+          address: data.address,
+          metadata: {
+            ...c.metadata,
+            ...data.metadata,
+            total_debt: data.total_debt || 0,
+          }
+        } : c));
+        setClientToEdit(null);
+        toast({ variant: 'success', title: 'Ficha Actualizada', description: `Los datos de "${data.full_name}" han sido modificados localmente.` });
+        return;
+      }
+
       const res = await updateEntityAction(
         clientToEdit.id,
         {
@@ -205,6 +228,11 @@ export default function ClientesPage() {
         throw new Error(res.error || 'Error al registrar el cliente');
       }
 
+      // Sustitución atómica reactiva
+      if (res.entity) {
+        setClients(prev => prev.map(c => c.id === tempId ? (res.entity as Entity) : c));
+      }
+
       toast({ variant: 'success', title: 'Cliente Registrado', description: `"${data.full_name}" ha sido agregado al directorio.` });
       await fetchClients();
     }
@@ -213,13 +241,25 @@ export default function ClientesPage() {
 
   const handleDeleteClient = async (id: string) => {
     if (!currentTenant || !actor) return;
-    const res = await deleteEntityAction(id, currentTenant.id, actor);
-    if (res.success) {
-      toast({ variant: 'info', title: 'Cliente Eliminado', description: 'El contacto se removió del directorio.' });
-      setClients(clients.filter(c => c.id !== id));
+
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      setClients(prev => prev.filter(c => c.id !== id));
       setSelectedClient(null);
-    } else {
-      toast({ variant: 'error', title: 'Error al eliminar', description: res.error });
+      toast({ variant: 'info', title: 'Contacto descartado', description: 'El contacto temporal se retiró del directorio local.' });
+      return;
+    }
+
+    try {
+      const res = await deleteEntityAction(id, currentTenant.id, actor);
+      if (res.success) {
+        toast({ variant: 'info', title: 'Cliente Eliminado', description: 'El contacto se removió del directorio.' });
+        setClients(prev => prev.filter(c => c.id !== id));
+        setSelectedClient(null);
+      } else {
+        toast({ variant: 'error', title: 'Error al eliminar', description: res.error || 'No se pudo eliminar el cliente.' });
+      }
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error', description: (err as Error).message });
     }
   };
 

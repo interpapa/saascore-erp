@@ -7,6 +7,7 @@ import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { eventBus } from '@/lib/core/events/eventBus';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
+import { isValidUUID, isTemporaryId, sanitizeUUID } from '@/lib/core/uuid';
 
 function safeRevalidate(path: string, tenantId?: string) {
   try {
@@ -78,9 +79,10 @@ export async function getAppointmentsAction(
 
     if (!error && appts) {
       // Gather unique IDs to fetch related records in batch, bypassing PostgreSQL schema foreign key relationship checks
-      const clientIds = Array.from(new Set(appts.map((a: any) => a.client_id).filter(Boolean)));
-      const employeeIds = Array.from(new Set(appts.map((a: any) => a.employee_id).filter(Boolean)));
-      const serviceIds = Array.from(new Set(appts.map((a: any) => a.service_id).filter(Boolean)));
+      const isValidTargetId = (id: any): id is string => typeof id === 'string' && isValidUUID(id) && !isTemporaryId(id);
+      const clientIds = Array.from(new Set(appts.map((a: any) => a.client_id).filter(isValidTargetId)));
+      const employeeIds = Array.from(new Set(appts.map((a: any) => a.employee_id).filter(isValidTargetId)));
+      const serviceIds = Array.from(new Set(appts.map((a: any) => a.service_id).filter(isValidTargetId)));
 
       const allEntityIds = [...clientIds, ...employeeIds];
       const entitiesMap: Record<string, any> = {};
@@ -244,6 +246,10 @@ export async function createAppointmentAction(
       }
     }
 
+    const safeClientId = sanitizeUUID(payload.client_id) || null;
+    const safeServiceId = sanitizeUUID(payload.service_id) || null;
+    const safeEmployeeId = sanitizeUUID(payload.employee_id) || null;
+
     // 1. Primary Attempt: Insert into 'appointments' table
     const { data: newAppt, error } = await supabaseAdmin
       .from('appointments')
@@ -252,9 +258,9 @@ export async function createAppointmentAction(
         title: payload.title,
         metadata: { ...(payload.metadata || {}), title: payload.title },
         description: payload.description || null,
-        client_id: payload.client_id || null,
-        service_id: payload.service_id || null,
-        employee_id: payload.employee_id || null,
+        client_id: safeClientId,
+        service_id: safeServiceId,
+        employee_id: safeEmployeeId,
         start_time: payload.start_time,
         end_time: calculatedEndTime,
         status: payload.status || 'scheduled',
@@ -305,7 +311,7 @@ export async function createAppointmentAction(
         .from('documents')
         .insert([{
           tenant_id: tenantId,
-          entity_id: payload.client_id || null,
+          entity_id: safeClientId,
           type: 'work_order',
           status: docStatus,
           document_number: `CIT-${Date.now().toString().slice(-6)}`,
@@ -316,8 +322,8 @@ export async function createAppointmentAction(
           metadata: {
             title: payload.title,
             description: payload.description,
-            service_id: payload.service_id,
-            employee_id: payload.employee_id,
+            service_id: safeServiceId || payload.service_id,
+            employee_id: safeEmployeeId || payload.employee_id,
             duration_minutes: payload.duration_minutes || 60,
             price: payload.price || 0,
             created_by: actor.email,
@@ -396,6 +402,10 @@ export async function updateAppointmentMetadataAction(
     }
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      return { success: true, localOnly: true } as any;
+    }
 
     // 1. Obtener metadata actual para fusionar de forma segura sin sobreescribir otros campos
     const { data: currentAppt } = await supabaseAdmin
@@ -491,6 +501,10 @@ export async function updateAppointmentPriceAction(
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      return { success: true, price: Math.max(0, Number(price) || 0), localOnly: true } as any;
+    }
+
     const cleanPrice = Math.max(0, Number(price) || 0);
 
     const { error } = await supabaseAdmin
@@ -548,6 +562,10 @@ export async function updateAppointmentStatusAction(
     }
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      return { success: true, appointment: { id, status } as any, localOnly: true } as any;
+    }
 
     // 1. Primary Attempt: Update 'appointments' table
     const { data: updatedAppt, error } = await supabaseAdmin
@@ -707,6 +725,10 @@ export async function addAttendeeToAppointmentAction(
       return { success: false, error: 'ID de cita y cliente son requeridos.' };
     }
 
+    if (isTemporaryId(appointmentId) || !isValidUUID(appointmentId)) {
+      return { success: true, attendees: [{ id: client.id, name: client.name }], localOnly: true } as any;
+    }
+
     // 1. Intentar en tabla appointments
     const { data: appt, error } = await supabaseAdmin
       .from('appointments')
@@ -799,6 +821,14 @@ export async function removeAttendeeFromAppointmentAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    if (!appointmentId || !clientId) {
+      return { success: false, error: 'ID de cita y cliente son requeridos.' };
+    }
+
+    if (isTemporaryId(appointmentId) || !isValidUUID(appointmentId)) {
+      return { success: true, attendees: [], localOnly: true } as any;
+    }
+
     // 1. Intentar en tabla appointments
     const { data: appt, error } = await supabaseAdmin
       .from('appointments')
@@ -849,6 +879,63 @@ export async function removeAttendeeFromAppointmentAction(
   } catch (err: any) {
     console.error('[removeAttendeeFromAppointmentAction Error]:', err.message);
     return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Elimina una cita de forma segura o descarta citas locales/temporales sin error.
+ */
+export async function deleteAppointmentAction(
+  id: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; localOnly?: boolean; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    if (isTemporaryId(id) || !isValidUUID(id)) {
+      return { success: true, localOnly: true };
+    }
+
+    const { error } = await supabaseAdmin
+      .from('appointments')
+      .delete()
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      if (isMissingTableError(error)) {
+        const { error: docError } = await supabaseAdmin
+          .from('documents')
+          .delete()
+          .eq('id', id)
+          .eq('tenant_id', tenantId);
+        if (docError) throw docError;
+      } else {
+        throw error;
+      }
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.deleted',
+      target_type: 'appointment',
+      target_id: id,
+      metadata: { action: 'appointment_deleted' },
+    });
+
+    safeRevalidate('/calendario', tenantId);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[deleteAppointmentAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
   }
 }
 

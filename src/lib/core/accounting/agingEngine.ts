@@ -29,14 +29,26 @@ export async function calculateAgingReport(
     const docType = type === 'customer' ? 'invoice' : 'purchase_order';
 
     // Obtener documentos pendientes de cobro/pago (excluyendo saldados y anulados)
-    const { data: docs, error } = await supabaseAdmin
+    let { data: docs, error } = await supabaseAdmin
       .from('documents')
-      .select('id, entity_id, total_amount, created_at, status, entities(name)')
+      .select('id, entity_id, total_amount, metadata, created_at, status, entities(name)')
       .eq('tenant_id', tenantId)
       .eq('type', docType)
       .neq('status', 'paid')
       .neq('status', 'annulled')
       .is('deleted_at', null);
+
+    if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
+      const retry = await supabaseAdmin
+        .from('documents')
+        .select('id, entity_id, total_amount, metadata, created_at, status, entities(name)')
+        .eq('tenant_id', tenantId)
+        .eq('type', docType)
+        .neq('status', 'paid')
+        .neq('status', 'annulled');
+      docs = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 
@@ -50,7 +62,9 @@ export async function calculateAgingReport(
       const entityName = (doc.entities as { name?: string } | undefined)?.name ?? 'Desconocido';
       const docDate = new Date(doc.created_at).getTime();
       const ageDays = Math.floor((now - docDate) / (1000 * 60 * 60 * 24));
-      const amount = Number(doc.total_amount || 0);
+      const amount = doc.status === 'partial' 
+        ? Number(doc.metadata?.remaining_balance ?? doc.total_amount ?? 0) 
+        : Number(doc.total_amount || 0);
 
       let bucket = bucketsMap.get(doc.entity_id);
       if (!bucket) {

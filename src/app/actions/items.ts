@@ -9,6 +9,7 @@ import { createModuleAction } from '@/lib/core/kernel/actionKernel';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 function safeRevalidate(path: string) {
   try {
@@ -138,6 +139,11 @@ export async function updateItemAction(
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
+    // Blindaje defensivo contra IDs temporales en memoria
+    if (!isValidUUID(id) || isTemporaryId(id)) {
+      return { success: true, localOnly: true, item: { id, ...updates } };
+    }
+
     if (
       (updates.base_price !== undefined && updates.base_price < 0) ||
       (updates.cost !== undefined && updates.cost < 0)
@@ -145,13 +151,36 @@ export async function updateItemAction(
       return { success: false, error: 'El precio base y el costo no pueden ser importes negativos.' };
     }
 
-    const { data: updatedItem, error } = await supabaseAdmin
+    const updatePayload: any = { ...updates };
+    if (updatePayload.stock_quantity !== undefined) {
+      updatePayload.stock = updatePayload.stock_quantity;
+      delete updatePayload.stock_quantity;
+    }
+
+    let { data: updatedItem, error } = await supabaseAdmin
       .from('items')
-      .update(updates)
+      .update(updatePayload)
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .select()
       .single();
+
+    if (error && (error.message.includes('stock') || error.message.includes('column'))) {
+      // Fallback: Si el esquema de BD usa stock_quantity en vez de stock
+      delete updatePayload.stock;
+      if (updates.stock_quantity !== undefined) {
+        updatePayload.stock_quantity = updates.stock_quantity;
+      }
+      const retry = await supabaseAdmin
+        .from('items')
+        .update(updatePayload)
+        .eq('id', id)
+        .eq('tenant_id', tenantId)
+        .select()
+        .single();
+      updatedItem = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw new Error('Error al actualizar ítem: ' + error.message);
 
@@ -193,6 +222,11 @@ export async function deleteItemAction(
     }
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    // Blindaje defensivo contra IDs temporales: descartar localmente sin error 22P02
+    if (!isValidUUID(id) || isTemporaryId(id)) {
+      return { success: true, localOnly: true };
+    }
 
     // Soft delete: preservar historial e integridad contable/fiscal
     let { error } = await supabaseAdmin
@@ -309,6 +343,10 @@ export async function adjustItemStockAction(
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!isValidUUID(id) || isTemporaryId(id)) {
+      return { success: false, error: 'No se puede ajustar el stock de un ítem temporal o no sincronizado.' };
     }
 
     // 1. Obtener item actual

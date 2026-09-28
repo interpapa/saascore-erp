@@ -7,6 +7,7 @@ import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { createKernelJournalEntry } from '@/lib/core/kernel/ledgerKernel';
 import { revalidatePath } from 'next/cache';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 function safeRevalidate(path: string) {
   try {
@@ -107,6 +108,11 @@ export async function updateEntityAction(
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
+    // Blindaje defensivo contra IDs temporales
+    if (!isValidUUID(id) || isTemporaryId(id)) {
+      return { success: true, localOnly: true, entity: { id, ...updates } as any };
+    }
+
     const { data: updatedEntity, error } = await supabaseAdmin
       .from('entities')
       .update(updates)
@@ -152,12 +158,26 @@ export async function deleteEntityAction(
 
     if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
 
+    // Blindaje defensivo contra IDs temporales: descarte seguro local
+    if (!isValidUUID(id) || isTemporaryId(id)) {
+      return { success: true, localOnly: true };
+    }
+
     // Soft delete: marcar deleted_at en lugar de destruir la fila
-    const { error } = await supabaseAdmin
+    let { error } = await supabaseAdmin
       .from('entities')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
       .eq('tenant_id', tenantId);
+
+    if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
+      const retry = await supabaseAdmin
+        .from('entities')
+        .update({ status: 'inactive' })
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+      error = retry.error;
+    }
 
     if (error) throw new Error('Error al eliminar entidad: ' + error.message);
 
@@ -229,8 +249,8 @@ export async function adjustCustomerDebtAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    if (!tenantId || !entityId) {
-      return { success: false, error: 'ID de entidad y tenant son requeridos.' };
+    if (!tenantId || !entityId || !isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: false, error: 'ID de entidad inválido o temporal para ajuste de deuda.' };
     }
 
     const { data: entity, error: fetchErr } = await supabaseAdmin
@@ -406,7 +426,10 @@ export async function recordClientPaymentAction(
     }
 
     const cleanAmount = Math.round(Number(amount) * 100) / 100;
-    if (!tenantId || !entityId || isNaN(cleanAmount) || cleanAmount <= 0) {
+    if (!tenantId || !entityId || !isValidUUID(entityId) || isTemporaryId(entityId) || isNaN(cleanAmount) || cleanAmount <= 0) {
+      if (isTemporaryId(entityId) || (entityId && !isValidUUID(entityId))) {
+        return { success: false, error: 'No se puede registrar un abono a un cliente temporal sin guardar primero.' };
+      }
       return { success: false, error: 'Monto mayor a 0, ID de cliente y empresa son requeridos.' };
     }
 
@@ -547,6 +570,10 @@ export async function toggleEntityHistoryAction(
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: true, hasHistory: enabled };
     }
 
     const { data: current, error: fetchErr } = await supabaseAdmin

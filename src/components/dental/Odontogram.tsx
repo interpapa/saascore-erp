@@ -25,6 +25,7 @@ interface OdontogramProps {
   onSave: (chart: DentalChart) => Promise<void>;
   onCreateKanban?: (plan: DentalTreatmentPlan) => Promise<void>;
   isSaving?: boolean;
+  isCreatingKanban?: boolean;
 }
 
 // Numeración FDI: cuadrantes 1-4 adultos (11-48), cuadrantes 5-8 infantiles (51-85)
@@ -127,7 +128,7 @@ function ToothCell({ toothNum, toothData, isSelected, onClick }: {
   );
 }
 
-export function Odontogram({ entityId, entityName, initialChart, onSave, onCreateKanban, isSaving }: OdontogramProps) {
+export function Odontogram({ entityId, entityName, initialChart, onSave, onCreateKanban, isSaving, isCreatingKanban = false }: OdontogramProps) {
   const [chart, setChart] = useState<DentalChart>(() => initialChart || {
     mode: 'adult',
     teeth: {},
@@ -217,6 +218,11 @@ export function Odontogram({ entityId, entityName, initialChart, onSave, onCreat
       delete updatedTeeth[number];
       return { ...prev, supernumeraryTeeth: updatedSuper, teeth: updatedTeeth };
     });
+    // Purgar también procedimientos de tratamiento asociados a esta pieza
+    setTreatmentProcedures(prev => prev.filter(p => p.toothNumber !== number));
+    if (selectedTooth === number) {
+      setSelectedTooth(null);
+    }
   };
 
   // Transición evolutiva niño a adulto (Erupcionar diente definitivo)
@@ -735,11 +741,20 @@ export function Odontogram({ entityId, entityName, initialChart, onSave, onCreat
 
               <button
                 type="button"
-                disabled={treatmentProcedures.length === 0}
+                disabled={treatmentProcedures.length === 0 || isCreatingKanban}
                 onClick={() => onCreateKanban(buildTreatmentPlan())}
                 className="w-full py-2.5 px-4 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs btn-haptic"
               >
-                <Zap size={16} /> Crear Orden de Seguimiento en el Tablero de Procesos
+                {isCreatingKanban ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Creando orden...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap size={16} /> Crear Orden de Seguimiento en el Tablero de Procesos
+                  </>
+                )}
               </button>
             </div>
           )}

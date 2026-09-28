@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { writeAuditLog } from '@/lib/core/auditLogger';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 import { 
   type EntityRecord, 
@@ -28,7 +29,7 @@ export async function getEntityRecordsAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    if (!tenantId || !entityId) {
+    if (!tenantId || !entityId || !isValidUUID(entityId) || isTemporaryId(entityId)) {
       return { success: true, records: [] };
     }
 
@@ -83,6 +84,22 @@ export async function createEntityRecordAction(
     }
 
     const recordDate = input.record_date || new Date().toISOString();
+
+    if (!isValidUUID(input.entity_id) || isTemporaryId(input.entity_id)) {
+      const localRecord: EntityRecord = {
+        id: 'rec_' + Date.now(),
+        tenant_id: tenantId,
+        entity_id: input.entity_id,
+        record_type: input.record_type,
+        record_date: recordDate,
+        title: input.title,
+        body: input.body || '',
+        metadata: input.metadata || {},
+        created_by: actor.email,
+        created_at: new Date().toISOString(),
+      };
+      return { success: true, record: localRecord };
+    }
 
     // Intento 1: Insertar en entity_records
     const { data, error } = await supabaseAdmin
@@ -169,6 +186,10 @@ export async function deleteEntityRecordAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    if (!isValidUUID(recordId) || isTemporaryId(recordId) || !isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: true };
+    }
+
     // Intento 1: Soft delete en tabla relacional
     const { error } = await supabaseAdmin
       .from('entity_records')
@@ -223,6 +244,10 @@ export async function getEntityAttachmentsAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    if (!tenantId || !entityId || !isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: true, attachments: [] };
+    }
+
     // Intento 1: Tabla relacional entity_attachments
     const { data, error } = await supabaseAdmin
       .from('entity_attachments')
@@ -266,6 +291,24 @@ export async function createEntityAttachmentAction(
 
     if (!input.file_url || !input.file_name || !input.entity_id) {
       return { success: false, error: 'Nombre de archivo, URL y cliente son obligatorios.' };
+    }
+
+    if (!isValidUUID(input.entity_id) || isTemporaryId(input.entity_id)) {
+      const localAttachment: EntityAttachment = {
+        id: 'att_' + Date.now(),
+        tenant_id: tenantId,
+        entity_id: input.entity_id,
+        record_id: input.record_id || null,
+        file_name: input.file_name,
+        file_url: input.file_url,
+        file_type: input.file_type || 'image/jpeg',
+        file_size: input.file_size || 0,
+        category: input.category || 'general',
+        description: input.description || '',
+        uploaded_by: actor.email,
+        created_at: new Date().toISOString(),
+      };
+      return { success: true, attachment: localAttachment };
     }
 
     // Intento 1: Insertar en entity_attachments
@@ -345,6 +388,10 @@ export async function deleteEntityAttachmentAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    if (!isValidUUID(attachmentId) || isTemporaryId(attachmentId) || !isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: true };
+    }
+
     // Intento 1: Delete de tabla
     const { error } = await supabaseAdmin
       .from('entity_attachments')
@@ -414,6 +461,10 @@ export async function addPhotoToEntityRecordAction(
       category: photoInput.category || 'general',
       created_at: new Date().toISOString(),
     };
+
+    if (!isValidUUID(entityId) || isTemporaryId(entityId) || !isValidUUID(recordId) || isTemporaryId(recordId)) {
+      return { success: true, photo: newPhoto };
+    }
 
     // 1. Intento actualizar en tabla entity_records
     const { data: recordData, error: recordErr } = await supabaseAdmin

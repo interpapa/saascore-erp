@@ -6,6 +6,7 @@ import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import {
   Conversation,
   CustomerTag,
@@ -231,13 +232,19 @@ export async function getMessagesAction(
 
     // 2. Fallback: Query 'documents' table (whatsapp_log)
     if (error && isMissingTableError(error)) {
-      const { data: logs, error: docErr } = await supabaseAdmin
+      let docQuery = supabaseAdmin
         .from('documents')
         .select('*')
         .eq('tenant_id', tenantId)
-        .eq('type', 'whatsapp_log')
-        .or(`entity_id.eq.${conversationId},document_number.eq.${conversationId}`)
-        .order('issue_date', { ascending: true });
+        .eq('type', 'whatsapp_log');
+
+      if (isValidUUID(conversationId)) {
+        docQuery = docQuery.or(`entity_id.eq.${conversationId},document_number.eq.${conversationId}`);
+      } else {
+        docQuery = docQuery.eq('document_number', conversationId);
+      }
+
+      const { data: logs, error: docErr } = await docQuery.order('issue_date', { ascending: true });
 
       if (docErr) throw new Error(docErr.message);
 
@@ -349,11 +356,14 @@ export async function sendMessageAction(
 
     // 2. Fallback: Insert into 'documents' table (whatsapp_log)
     if (error && isMissingTableError(error)) {
+      const candidateId = input.client_id || input.conversation_id;
+      const safeEntityId = (candidateId && isValidUUID(candidateId) && !isTemporaryId(candidateId)) ? candidateId : null;
+
       const { data: newDoc, error: docErr } = await supabaseAdmin
         .from('documents')
         .insert([{
           tenant_id: tenantId,
-          entity_id: input.client_id || input.conversation_id,
+          entity_id: safeEntityId,
           type: 'whatsapp_log',
           status: 'invoiced',
           document_number: input.client_phone || `WA-${Date.now().toString().slice(-6)}`,

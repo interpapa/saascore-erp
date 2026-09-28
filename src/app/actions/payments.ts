@@ -7,6 +7,7 @@ import { eventBus } from '@/lib/core/events/eventBus';
 import { ActionActor } from './entities';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { createKernelJournalEntry } from '@/lib/core/kernel/ledgerKernel';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import Decimal from 'decimal.js';
 
 export async function recordDocumentPayment(
@@ -36,8 +37,8 @@ export async function recordDocumentPayment(
       return { success: false, error: 'Acceso denegado: No tienes permisos para registrar abonos.' };
     }
 
-    if (!documentId || paymentAmount <= 0 || !tenantId) {
-      throw new Error('Monto o datos de pago inválidos');
+    if (!documentId || !isValidUUID(documentId) || isTemporaryId(documentId) || paymentAmount <= 0 || !tenantId) {
+      throw new Error('Monto o datos de pago inválidos (ID de documento inválido o temporal).');
     }
 
     // 2. Fetch Document
@@ -93,6 +94,36 @@ export async function recordDocumentPayment(
       .single();
 
     if (updateError) throw updateError;
+
+    // Sincronización de Cuentas por Cobrar en el CRM: rebajar total_debt de la entidad
+    if (document.entity_id && isValidUUID(document.entity_id) && !isTemporaryId(document.entity_id)) {
+      try {
+        const { data: entityRecord } = await supabaseAdmin
+          .from('entities')
+          .select('id, metadata')
+          .eq('id', document.entity_id)
+          .eq('tenant_id', tenantId)
+          .maybeSingle();
+
+        if (entityRecord) {
+          const currentDebt = Number(entityRecord.metadata?.total_debt || 0);
+          const newDebt = Math.max(0, currentDebt - paymentAmountDecimal.toNumber());
+          await supabaseAdmin
+            .from('entities')
+            .update({
+              metadata: {
+                ...(entityRecord.metadata || {}),
+                total_debt: newDebt,
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', entityRecord.id)
+            .eq('tenant_id', tenantId);
+        }
+      } catch (entityDebtErr) {
+        console.warn('[payments.ts] Advertencia al actualizar saldo de deuda del cliente:', entityDebtErr);
+      }
+    }
 
     // 4. Accounting Journal Entry for Payment (Partida Doble NIIF)
     try {

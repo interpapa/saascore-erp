@@ -5,6 +5,7 @@ import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { ActionActor } from './entities';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 export interface ToothCondition {
   code: string;    // 'caries' | 'obturacion' | 'endodoncia' | 'corona' | 'implante' | 'ausente' | 'fractura' | 'custom'
@@ -64,6 +65,10 @@ export async function saveDentalChartAction(
     const moduleCheck = await assertModuleEnabled(tenantId, 'odontologia');
     if (!moduleCheck.authorized) {
       return { success: false, error: moduleCheck.error };
+    }
+
+    if (!isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: false, error: 'No se puede guardar el odontograma de un paciente temporal no guardado en la base de datos.' };
     }
 
     // Buscar si ya existe un odontograma para este cliente
@@ -148,6 +153,10 @@ export async function getDentalChartAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    if (!isValidUUID(entityId) || isTemporaryId(entityId)) {
+      return { success: true, chart: undefined };
+    }
+
     const { data, error } = await supabaseAdmin
       .from('entity_records')
       .select('metadata')
@@ -192,11 +201,13 @@ export async function createTreatmentKanbanFromChartAction(
       completed_at: null,
     }));
 
-    const { data: newDoc, error: docErr } = await supabaseAdmin
+    const safeEntityId = (entityId && isValidUUID(entityId) && !isTemporaryId(entityId)) ? entityId : null;
+
+    let { data: newDoc, error: docErr } = await supabaseAdmin
       .from('documents')
       .insert({
         tenant_id: tenantId,
-        entity_id: entityId,
+        entity_id: safeEntityId,
         type: 'work_order',
         status: 'presupuestado',
         document_number: `OT-DENTAL-${Date.now().toString().slice(-6)}`,
@@ -216,6 +227,37 @@ export async function createTreatmentKanbanFromChartAction(
       })
       .select('id')
       .single();
+
+    if (docErr && (docErr.message.includes('type') || docErr.message.includes('check') || docErr.message.includes('constraint'))) {
+      // Fallback: Si el esquema de base de datos restringe type
+      const retry = await supabaseAdmin
+        .from('documents')
+        .insert({
+          tenant_id: tenantId,
+          entity_id: safeEntityId,
+          type: 'quotation',
+          status: 'presupuestado',
+          document_number: `OT-DENTAL-${Date.now().toString().slice(-6)}`,
+          issue_date: new Date().toISOString(),
+          metadata: {
+            actual_type: 'work_order',
+            title: treatmentPlan.title || `Plan de Tratamiento — ${entityName}`,
+            priority: 'medium',
+            process_mode: 'step_by_step',
+            pipeline: 'dental',
+            steps,
+            total_amount: treatmentPlan.totalCost,
+            paid_amount: 0,
+            source: 'dental_chart',
+            treatment_plan_id: treatmentPlan.id,
+            notes: treatmentPlan.notes || '',
+          },
+        })
+        .select('id')
+        .single();
+      newDoc = retry.data;
+      docErr = retry.error;
+    }
 
     if (docErr || !newDoc) return { success: false, error: docErr?.message || 'Error al crear la orden de trabajo.' };
 
@@ -319,7 +361,7 @@ export async function getDentalOverviewAction(
       .from('documents')
       .select('id, document_number, status, metadata, entity_id, entities(id, name)')
       .eq('tenant_id', tenantId)
-      .eq('type', 'work_order')
+      .in('type', ['work_order', 'quotation'])
       .order('created_at', { ascending: false })
       .limit(50);
 
