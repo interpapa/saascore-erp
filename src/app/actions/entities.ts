@@ -532,4 +532,65 @@ export async function recordClientPaymentAction(
   }
 }
 
+/**
+ * Habilita o deshabilita la ficha de historial/seguimiento para un cliente específico.
+ * Permite mantener las fichas limpias y ligeras para negocios que no requieren bitácoras.
+ */
+export async function toggleEntityHistoryAction(
+  entityId: string,
+  enabled: boolean,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; hasHistory?: boolean; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const { data: current, error: fetchErr } = await supabaseAdmin
+      .from('entities')
+      .select('metadata')
+      .eq('id', entityId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (fetchErr || !current) {
+      return { success: false, error: 'Cliente no encontrado.' };
+    }
+
+    const currentMeta = (typeof current.metadata === 'object' && current.metadata !== null)
+      ? { ...current.metadata as Record<string, unknown> }
+      : {};
+
+    currentMeta.has_history = enabled;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('entities')
+      .update({ metadata: currentMeta })
+      .eq('id', entityId)
+      .eq('tenant_id', tenantId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.history_toggled',
+      target_type: 'entity',
+      target_id: entityId,
+      metadata: { enabled },
+    });
+
+    safeRevalidate('/clientes');
+    return { success: true, hasHistory: enabled };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
 

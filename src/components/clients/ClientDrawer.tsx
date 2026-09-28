@@ -8,7 +8,7 @@ import {
   PlusCircle, CreditCard, ArrowUpRight, CheckCircle2, Maximize2, Minimize2
 } from 'lucide-react';
 import { Entity } from '@/lib/api/entities';
-import { adjustCustomerDebtAction, recordClientPaymentAction } from '@/app/actions/entities';
+import { adjustCustomerDebtAction, recordClientPaymentAction, toggleEntityHistoryAction } from '@/app/actions/entities';
 import { UISlot } from '@/components/core/UISlot';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/core/ToastProvider';
@@ -61,6 +61,51 @@ export function ClientDrawer({
   const [dentalChart, setDentalChart] = useState<DentalChart | undefined>(undefined);
   const [isDentalLoading, setIsDentalLoading] = useState(false);
   const [isDentalSaving, setIsDentalSaving] = useState(false);
+
+  // Historial a demanda: se activa por cliente mediante botón para mantener fichas limpias
+  const [isHistoryEnabled, setIsHistoryEnabled] = useState<boolean>(() => {
+    return Boolean(
+      (client?.metadata as any)?.has_history ||
+      (client?.metadata as any)?.has_clinical_history ||
+      (client?.metadata as any)?.clinical_history
+    );
+  });
+
+  useEffect(() => {
+    if (client) {
+      setIsHistoryEnabled(
+        Boolean(
+          (client.metadata as any)?.has_history ||
+          (client.metadata as any)?.has_clinical_history ||
+          (client.metadata as any)?.clinical_history
+        )
+      );
+    }
+  }, [client]);
+
+  const handleToggleHistory = async () => {
+    const nextVal = !isHistoryEnabled;
+    setIsHistoryEnabled(nextVal);
+    if (!nextVal && (activeTab === 'registros' || activeTab === 'archivos' || activeTab === 'odontograma')) {
+      setActiveTab('perfil');
+    }
+    if (client?.id && tenantId && actor) {
+      try {
+        const res = await toggleEntityHistoryAction(client.id, nextVal, tenantId, actor);
+        if (res.success) {
+          toast({
+            variant: 'success',
+            title: nextVal ? 'Historial Activado' : 'Historial Oculto',
+            description: nextVal 
+              ? 'Bitácora y seguimiento activados para este cliente.' 
+              : 'Ficha simplificada a datos básicos y ventas.',
+          });
+        }
+      } catch (err: any) {
+        toast({ variant: 'error', title: 'Error', description: err.message });
+      }
+    }
+  };
 
   // Bloquear el scroll de fondo cuando el drawer está abierto para evitar bugs
   useEffect(() => {
@@ -319,6 +364,19 @@ export function ClientDrawer({
                     {calculatedAge} años
                   </span>
                 )}
+                <button
+                  type="button"
+                  onClick={handleToggleHistory}
+                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-black transition-all flex items-center gap-1 border btn-haptic ${
+                    isHistoryEnabled
+                      ? 'bg-primary/10 text-primary border-primary/30'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-foreground border-transparent'
+                  }`}
+                  title={isHistoryEnabled ? 'Desactivar historial para este cliente' : 'Habilitar bitácora / historial para este cliente'}
+                >
+                  <FileText size={11} />
+                  <span>{isHistoryEnabled ? 'Historial Activo' : '+ Habilitar Historial'}</span>
+                </button>
               </div>
 
               <h3 className="text-xl font-black text-foreground mt-1 truncate">{client.name}</h3>
@@ -338,17 +396,28 @@ export function ClientDrawer({
 
           {/* Acciones Rápidas Directas (1 Clic) */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-            <button
-              type="button"
-              onClick={() => {
-                setActiveTab('registros');
-                setTriggerNewRecord(Date.now());
-              }}
-              className="px-2.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs btn-haptic"
-            >
-              <Stethoscope size={14} />
-              <span>+ Consulta</span>
-            </button>
+            {isHistoryEnabled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('registros');
+                  setTriggerNewRecord(Date.now());
+                }}
+                className="px-2.5 py-2 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-xs btn-haptic"
+              >
+                <FileText size={14} />
+                <span>+ Nueva Nota</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleToggleHistory}
+                className="px-2.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-border btn-haptic"
+              >
+                <FileText size={14} />
+                <span>+ Historial</span>
+              </button>
+            )}
 
             <button
               type="button"
@@ -385,7 +454,7 @@ export function ClientDrawer({
           </div>
         </div>
 
-        {/* Barra de Pestañas del Drawer */}
+        {/* Barra de Pestañas del Drawer (Adaptable a la demanda del cliente) */}
         <div className="flex border-b border-border bg-slate-50/50 dark:bg-slate-900/40 px-4 text-xs font-bold shrink-0">
           <button
             type="button"
@@ -400,31 +469,35 @@ export function ClientDrawer({
             <span>Perfil</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('registros')}
-            className={`py-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'registros'
-                ? 'border-primary text-primary font-black'
-                : 'border-transparent text-slate-400 hover:text-foreground'
-            }`}
-          >
-            <Stethoscope size={14} />
-            <span>Historias & Visitas</span>
-          </button>
+          {isHistoryEnabled && (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab('registros')}
+                className={`py-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+                  activeTab === 'registros'
+                    ? 'border-primary text-primary font-black'
+                    : 'border-transparent text-slate-400 hover:text-foreground'
+                }`}
+              >
+                <FileText size={14} />
+                <span>Bitácora & Seguimiento</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setActiveTab('archivos')}
-            className={`py-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
-              activeTab === 'archivos'
-                ? 'border-primary text-primary font-black'
-                : 'border-transparent text-slate-400 hover:text-foreground'
-            }`}
-          >
-            <ImageIcon size={14} />
-            <span>Fotos & RX</span>
-          </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('archivos')}
+                className={`py-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+                  activeTab === 'archivos'
+                    ? 'border-primary text-primary font-black'
+                    : 'border-transparent text-slate-400 hover:text-foreground'
+                }`}
+              >
+                <ImageIcon size={14} />
+                <span>Fotos & Galería</span>
+              </button>
+            </>
+          )}
 
           <button
             type="button"
@@ -439,7 +512,7 @@ export function ClientDrawer({
             <span>Compras</span>
           </button>
 
-          {isDentalModuleActive && (
+          {isHistoryEnabled && isDentalModuleActive && (
             <button
               type="button"
               onClick={() => setActiveTab('odontograma')}

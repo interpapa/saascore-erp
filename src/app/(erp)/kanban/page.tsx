@@ -19,35 +19,22 @@ interface ProcessStep {
   order: number;
 }
 
-const PIPELINE_COLUMNS: Record<string, Array<{ id: string; title: string; color: string; headerColor: string }>> = {
-  general: [
-    { id: 'draft', title: 'Pendiente', color: 'border-amber-200 dark:border-amber-500/30', headerColor: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-    { id: 'in_progress', title: 'En Proceso', color: 'border-blue-200 dark:border-blue-500/30', headerColor: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' },
-    { id: 'invoiced', title: 'Completado', color: 'border-emerald-200 dark:border-emerald-500/30', headerColor: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
-  ],
-  dental: [
-    { id: 'presupuestado', title: 'Presupuestado', color: 'border-slate-200 dark:border-slate-500/30', headerColor: 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-400' },
-    { id: 'en_tratamiento', title: 'En Tratamiento', color: 'border-blue-200 dark:border-blue-500/30', headerColor: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' },
-    { id: 'en_laboratorio', title: 'En Laboratorio', color: 'border-purple-200 dark:border-purple-500/30', headerColor: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400' },
-    { id: 'control_post', title: 'Control Post-Tx', color: 'border-amber-200 dark:border-amber-500/30', headerColor: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-    { id: 'concluido', title: 'Alta Médica', color: 'border-emerald-200 dark:border-emerald-500/30', headerColor: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
-  ],
-  taller: [
-    { id: 'recibido', title: 'Recibido', color: 'border-slate-200 dark:border-slate-500/30', headerColor: 'bg-slate-50 dark:bg-slate-500/10 text-slate-700 dark:text-slate-400' },
-    { id: 'diagnostico', title: 'Diagnóstico', color: 'border-amber-200 dark:border-amber-500/30', headerColor: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400' },
-    { id: 'en_reparacion', title: 'En Reparación', color: 'border-blue-200 dark:border-blue-500/30', headerColor: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' },
-    { id: 'listo', title: 'Listo / Cotizado', color: 'border-violet-200 dark:border-violet-500/30', headerColor: 'bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-400' },
-    { id: 'entregado', title: 'Entregado', color: 'border-emerald-200 dark:border-emerald-500/30', headerColor: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
-  ],
-};
+const UNIVERSAL_COLUMNS = [
+  { id: 'draft', title: 'Por Iniciar', color: 'border-amber-200 dark:border-amber-500/30', headerColor: 'bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400' },
+  { id: 'in_progress', title: 'En Proceso', color: 'border-blue-200 dark:border-blue-500/30', headerColor: 'bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-400' },
+  { id: 'in_review', title: 'En Revisión / Control', color: 'border-purple-200 dark:border-purple-500/30', headerColor: 'bg-purple-50 dark:bg-purple-500/10 text-purple-700 dark:text-purple-400' },
+  { id: 'invoiced', title: 'Completado', color: 'border-emerald-200 dark:border-emerald-500/30', headerColor: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' },
+];
 
 const PRIORITY_LABELS: Record<string, string> = { high: '🔴', medium: '🟡', low: '🟢' };
 
-const PIPELINE_LABELS = [
-  { value: 'general', label: '🏷️ General' },
-  { value: 'dental', label: '🦷 Dental' },
-  { value: 'taller', label: '🔧 Taller' },
-];
+const normalizeColumnStatus = (status: string): string => {
+  if (status === 'draft' || status === 'presupuestado' || status === 'recibido') return 'draft';
+  if (status === 'in_progress' || status === 'en_tratamiento' || status === 'en_reparacion' || status === 'diagnostico') return 'in_progress';
+  if (status === 'in_review' || status === 'en_laboratorio' || status === 'control_post' || status === 'listo') return 'in_review';
+  if (status === 'invoiced' || status === 'concluido' || status === 'entregado') return 'invoiced';
+  return 'draft';
+};
 
 export default function KanbanPage() {
   const currentTenant = useTenantResolver();
@@ -59,10 +46,10 @@ export default function KanbanPage() {
   const [movingId, setMovingId] = useState<string | null>(null);
   const [draggedTicketId, setDraggedTicketId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
-  const [activePipeline, setActivePipeline] = useState('general');
+  const [filterMode, setFilterMode] = useState<'all' | 'with_steps' | 'mine'>('all');
   const [pendingAdvance, setPendingAdvance] = useState<{ ticketId: string; currentColId: string } | null>(null);
 
-  const COLUMNS = PIPELINE_COLUMNS[activePipeline] || PIPELINE_COLUMNS.general;
+  const COLUMNS = UNIVERSAL_COLUMNS;
 
   const fetchTickets = useCallback(async () => {
     try {
@@ -165,7 +152,19 @@ export default function KanbanPage() {
     }
   };
 
-  const ticketsByStatus = (status: string) => tickets.filter(t => t.status === status);
+  const ticketsByStatus = (status: string) => tickets.filter(t => {
+    const colMatch = normalizeColumnStatus(t.status) === status;
+    if (!colMatch) return false;
+    if (filterMode === 'with_steps') {
+      const meta = (t.metadata || {}) as Record<string, unknown>;
+      return Array.isArray(meta.steps) && meta.steps.length > 0;
+    }
+    if (filterMode === 'mine') {
+      const meta = (t.metadata || {}) as Record<string, unknown>;
+      return meta.assigned_to === actor?.email || meta.assigned_to_name?.toString().toLowerCase().includes(actor?.email.split('@')[0].toLowerCase() || '');
+    }
+    return true;
+  });
 
   if (isLoading) {
     return (
@@ -180,23 +179,27 @@ export default function KanbanPage() {
       {/* Header */}
       <div className="flex justify-between items-start mb-6 shrink-0 gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight">Tablero Kanban</h1>
-          <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Flujo visual de órdenes — {tickets.length} en total</p>
+          <h1 className="text-3xl font-black text-foreground tracking-tight">Tablero de Procesos</h1>
+          <p className="text-slate-500 dark:text-slate-400 font-medium mt-1">Seguimiento visual de órdenes y flujos de trabajo — {tickets.length} en total</p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Pipeline Selector */}
+          {/* Universal Filters */}
           <div className="flex items-center gap-1.5 bg-card border border-border rounded-xl p-1">
-            {PIPELINE_LABELS.map(pl => (
+            {[
+              { id: 'all', label: 'Todas' },
+              { id: 'with_steps', label: 'Con Pasos' },
+              { id: 'mine', label: 'Mis Asignadas' },
+            ].map(f => (
               <button
-                key={pl.value}
-                onClick={() => setActivePipeline(pl.value)}
+                key={f.id}
+                onClick={() => setFilterMode(f.id as any)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  activePipeline === pl.value
+                  filterMode === f.id
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'text-slate-500 hover:text-foreground'
                 }`}
               >
-                {pl.label}
+                {f.label}
               </button>
             ))}
           </div>

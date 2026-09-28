@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-  Plus, Calendar, Trash2, FileText, Stethoscope, Sparkles, 
+  Plus, Calendar, Trash2, FileText, Sparkles, 
   CheckCircle2, Image as ImageIcon, Camera, Upload, X, ZoomIn, 
-  Download, SplitSquareVertical, Clipboard, Pill, Scissors, Smile
+  Download, SplitSquareVertical, Clipboard, Scissors, Wrench, Smile, Stethoscope
 } from 'lucide-react';
 import { 
   getEntityRecordsAction, 
@@ -45,7 +45,7 @@ export function ClientRecordsTab({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Formulario nuevo registro
-  const [recordType, setRecordType] = useState<EntityRecord['record_type']>('clinical_note');
+  const [recordType, setRecordType] = useState<EntityRecord['record_type']>('visit_note');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [recordDate, setRecordDate] = useState(new Date().toISOString().split('T')[0]);
@@ -90,10 +90,10 @@ export function ClientRecordsTab({
     loadRecords();
   }, [entityId, tenantId]);
 
-  // Si desde la cabecera del drawer se pulsa "+ Consulta", abrir formulario inmediatamente
+  // Si se dispara triggerNewRecord desde el exterior, abrir formulario inmediatamente
   useEffect(() => {
     if (triggerNewRecord && triggerNewRecord > 0) {
-      startNewWithTemplate('clinical_note');
+      startNewRecord('visit_note');
     }
   }, [triggerNewRecord]);
 
@@ -126,7 +126,7 @@ export function ClientRecordsTab({
             toast({
               variant: 'success',
               title: 'Foto Pegada (Ctrl + V)',
-              description: 'La imagen fue añadida a la consulta actual.',
+              description: 'La imagen fue añadida a la entrada actual.',
             });
           };
           reader.readAsDataURL(blob);
@@ -139,23 +139,23 @@ export function ClientRecordsTab({
     return () => window.removeEventListener('paste', handlePaste);
   }, []);
 
-  // Iniciar registro con plantilla en 1 solo clic
-  const startNewWithTemplate = (type: EntityRecord['record_type']) => {
+  // Iniciar nuevo registro con plantillas universales o limpias
+  const startNewRecord = (type: EntityRecord['record_type'] = 'visit_note', templatePreset?: 'service' | 'before_after' | 'clinical' | 'blank') => {
     setRecordType(type);
     setIsCreating(true);
 
-    if (type === 'clinical_note') {
-      setTitle('Consulta Médica General');
-      setBody('• Motivo de consulta:\n• Síntomas / Evolución:\n• Examen físico:\n• Diagnóstico:\n• Plan de tratamiento:');
-    } else if (type === 'dental_chart') {
-      setTitle('Procedimiento Odontológico');
-      setBody('• Pieza(s) tratadas:\n• Hallazgos bucales:\n• Procedimiento realizado:\n• Materiales / Anestesia:\n• Indicaciones al paciente:');
-    } else if (type === 'prescription') {
-      setTitle('Recipe e Indicaciones Médicas');
-      setBody('1. [Medicamento / Dosis] — 1 cada 8 horas por 5 días.\n2. [Medicamento 2]\n\n• Medidas generales:\n• Próximo control:');
-    } else if (type === 'visit_note') {
-      setTitle('Nota de Servicio / Visita');
-      setBody('• Servicio realizado:\n• Fórmulas / Materiales:\n• Preferencias o notas del cliente:');
+    if (templatePreset === 'service') {
+      setTitle('');
+      setBody('• Trabajo / Servicio realizado:\n• Materiales, piezas o fórmulas utilizadas:\n• Observaciones o recomendaciones:');
+    } else if (templatePreset === 'before_after') {
+      setTitle('Registro de Trabajo y Evolución');
+      setBody('• Estado inicial:\n• Procedimiento aplicado:\n• Resultado obtenido:');
+    } else if (templatePreset === 'clinical') {
+      setTitle('Atención / Procedimiento Clínico');
+      setBody('• Motivo de consulta o revisión:\n• Procedimiento realizado:\n• Indicaciones y plan de seguimiento:');
+    } else {
+      setTitle('');
+      setBody('');
     }
 
     setTimeout(() => {
@@ -220,7 +220,7 @@ export function ClientRecordsTab({
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast({ variant: 'warning', title: 'Título requerido', description: 'Ingresa un título para la consulta o registro.' });
+      toast({ variant: 'warning', title: 'Título requerido', description: 'Ingresa un título o motivo para el registro.' });
       return;
     }
 
@@ -253,10 +253,10 @@ export function ClientRecordsTab({
       if (res.success && res.record) {
         toast({ 
           variant: 'success', 
-          title: 'Registro e Historia Guardada', 
+          title: 'Entrada Guardada', 
           description: formattedPhotos.length > 0 
-            ? `Se guardó la evolución con ${formattedPhotos.length} foto(s) adjuntas.` 
-            : 'La evolución ha sido agregada a la ficha.' 
+            ? `Se registró con ${formattedPhotos.length} foto(s) de evidencia.` 
+            : 'La entrada ha sido agregada a la bitácora.' 
         });
         setRecords([res.record, ...records]);
         setTitle('');
@@ -264,7 +264,7 @@ export function ClientRecordsTab({
         setPendingPhotos([]);
         setIsCreating(false);
       } else {
-        toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo guardar el registro.' });
+        toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo guardar la entrada.' });
       }
     } catch (err: any) {
       toast({ variant: 'error', title: 'Error', description: err.message });
@@ -315,7 +315,7 @@ export function ClientRecordsTab({
         );
 
         if (res.success && res.photo) {
-          toast({ variant: 'success', title: 'Foto Agregada', description: 'La foto fue añadida a esta historia.' });
+          toast({ variant: 'success', title: 'Foto Agregada', description: 'La foto fue añadida a este registro.' });
           setRecords((prev) =>
             prev.map((r) => {
               if (r.id === targetRecordId) {
@@ -346,12 +346,12 @@ export function ClientRecordsTab({
   };
 
   const handleDelete = async (recordId: string) => {
-    if (!confirm('¿Deseas eliminar este registro de la historia clínica?')) return;
+    if (!confirm('¿Deseas eliminar esta entrada de la bitácora?')) return;
     try {
       const res = await deleteEntityRecordAction(recordId, entityId, tenantId, actor);
       if (res.success) {
         setRecords(records.filter((r) => r.id !== recordId));
-        toast({ variant: 'info', title: 'Registro Eliminado', description: 'Se removió la entrada de la historia.' });
+        toast({ variant: 'info', title: 'Entrada Eliminada', description: 'Se removió el registro de la bitácora.' });
       }
     } catch (err: any) {
       toast({ variant: 'error', title: 'Error', description: err.message });
@@ -360,39 +360,42 @@ export function ClientRecordsTab({
 
   const getBadgeStyle = (type: EntityRecord['record_type']) => {
     switch (type) {
+      case 'visit_note':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
+      case 'custom':
+        return 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20';
       case 'clinical_note':
         return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20';
       case 'dental_chart':
         return 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20';
       case 'prescription':
         return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20';
-      case 'visit_note':
-        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
       default:
-        return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20';
+        return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20';
     }
   };
 
   const getTypeLabel = (type: EntityRecord['record_type']) => {
     switch (type) {
-      case 'clinical_note': return '🩺 Consulta Médica';
-      case 'dental_chart': return '🦷 Odontología';
-      case 'prescription': return '💊 Receta / Indicación';
-      case 'visit_note': return '✂️ Nota de Visita';
-      default: return '📋 Registro General';
+      case 'visit_note': return '📝 Nota de Servicio / Trabajo';
+      case 'custom': return '📋 Bitácora & Seguimiento';
+      case 'dental_chart': return '🦷 Procedimiento Dental';
+      case 'clinical_note': return '🩺 Atención Clínica';
+      case 'prescription': return '📄 Comprobante / Receta';
+      default: return '📋 Entrada';
     }
   };
 
   const getPhotoCategoryBadge = (category?: string) => {
     switch (category) {
       case 'foto_antes':
-        return <span className="bg-amber-500/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">📸 Antes</span>;
+        return <span className="bg-amber-500/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">📸 Antes / Inicial</span>;
       case 'foto_despues':
-        return <span className="bg-emerald-500/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">✨ Después</span>;
+        return <span className="bg-emerald-500/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">✨ Después / Final</span>;
       case 'rx':
-        return <span className="bg-purple-600/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">☢️ RX</span>;
+        return <span className="bg-purple-600/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">☢️ Escaneo / RX</span>;
       case 'receta':
-        return <span className="bg-blue-600/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">💊 Receta</span>;
+        return <span className="bg-blue-600/90 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">📄 Documento</span>;
       default:
         return <span className="bg-slate-700/80 text-white px-2 py-0.5 rounded-md text-[10px] font-black uppercase shadow-xs">🔍 Evidencia</span>;
     }
@@ -419,53 +422,57 @@ export function ClientRecordsTab({
         className="hidden"
       />
 
-      {/* BARRA DE ACCIÓN RÁPIDA EN 1 CLIC */}
-      <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-border/80 space-y-2.5 shadow-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Sparkles size={13} className="text-primary" />
-            <span>Iniciar Consulta o Procedimiento en 1 Clic:</span>
-          </span>
-          <span className="text-[10px] text-slate-400 hidden sm:inline">
-            💡 Puedes pegar fotos con <strong>Ctrl + V</strong>
-          </span>
+      {/* BARRA SUPERIOR DE ACCIÓN RÁPIDA UNIVERSAL */}
+      <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-border/80 space-y-3 shadow-xs">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <h4 className="text-xs font-bold text-foreground flex items-center gap-1.5">
+              <Sparkles size={14} className="text-primary" />
+              <span>Bitácora y Registro de Trabajos</span>
+            </h4>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              Registra qué pasó, cómo se resolvió y adjunta fotos de evidencia o pega con <strong>Ctrl + V</strong>.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => startNewRecord('visit_note', 'blank')}
+            className="px-3.5 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic shadow-xs hover:bg-primary/90"
+          >
+            <Plus size={15} />
+            <span>+ Nueva Entrada</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {/* Acceso rápido a plantillas comunes */}
+        <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-border/50 text-[11px]">
+          <span className="text-slate-400 font-semibold mr-1">Plantillas rápidas:</span>
           <button
             type="button"
-            onClick={() => startNewWithTemplate('clinical_note')}
-            className="p-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/25 text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs"
+            onClick={() => startNewRecord('visit_note', 'service')}
+            className="px-2.5 py-1 rounded-lg bg-card border border-border/80 text-foreground hover:border-primary/40 font-medium transition-colors flex items-center gap-1 shadow-2xs"
           >
-            <Stethoscope size={14} />
-            <span>Médica</span>
+            <Wrench size={12} className="text-amber-500" />
+            <span>Servicio / Taller / Barbería</span>
           </button>
 
           <button
             type="button"
-            onClick={() => startNewWithTemplate('dental_chart')}
-            className="p-2.5 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 border border-teal-500/25 text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs"
+            onClick={() => startNewRecord('visit_note', 'before_after')}
+            className="px-2.5 py-1 rounded-lg bg-card border border-border/80 text-foreground hover:border-primary/40 font-medium transition-colors flex items-center gap-1 shadow-2xs"
           >
-            <Smile size={14} />
-            <span>Odontología</span>
+            <SplitSquareVertical size={12} className="text-emerald-500" />
+            <span>Antes & Después</span>
           </button>
 
           <button
             type="button"
-            onClick={() => startNewWithTemplate('prescription')}
-            className="p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs"
+            onClick={() => startNewRecord('clinical_note', 'clinical')}
+            className="px-2.5 py-1 rounded-lg bg-card border border-border/80 text-foreground hover:border-primary/40 font-medium transition-colors flex items-center gap-1 shadow-2xs"
           >
-            <Pill size={14} />
-            <span>Receta</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => startNewWithTemplate('visit_note')}
-            className="p-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/25 text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs"
-          >
-            <Scissors size={14} />
-            <span>Servicio</span>
+            <Stethoscope size={12} className="text-blue-500" />
+            <span>Atención Clínica / Salud</span>
           </button>
 
           <button
@@ -474,10 +481,10 @@ export function ClientRecordsTab({
               setIsCreating(true);
               setTimeout(() => cameraInputRef.current?.click(), 100);
             }}
-            className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/25 text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs"
+            className="px-2.5 py-1 rounded-lg bg-card border border-border/80 text-foreground hover:border-primary/40 font-medium transition-colors flex items-center gap-1 shadow-2xs"
           >
-            <Camera size={14} />
-            <span>+ Foto / RX</span>
+            <Camera size={12} className="text-indigo-500" />
+            <span>+ Subir Foto Directa</span>
           </button>
         </div>
       </div>
@@ -491,8 +498,8 @@ export function ClientRecordsTab({
         >
           <div className="flex items-center justify-between pb-3 border-b border-border/50">
             <span className="text-sm font-black text-foreground flex items-center gap-2">
-              <Stethoscope size={17} className="text-primary" />
-              <span>Registrar Evolución / Visita Médica</span>
+              <FileText size={17} className="text-primary" />
+              <span>Nueva Entrada en la Bitácora</span>
             </span>
             <button
               type="button"
@@ -508,22 +515,22 @@ export function ClientRecordsTab({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Tipo de Registro</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Categoría de Entrada</label>
               <select
                 value={recordType}
                 onChange={(e) => setRecordType(e.target.value as any)}
                 className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground"
               >
-                <option value="clinical_note">🩺 Consulta / Evolución Médica</option>
-                <option value="dental_chart">🦷 Procedimiento Odontológico</option>
-                <option value="prescription">💊 Receta / Indicaciones</option>
-                <option value="visit_note">✂️ Nota de Visita / Servicio</option>
-                <option value="custom">📋 Otro Registro</option>
+                <option value="visit_note">📝 Servicio / Trabajo Realizado</option>
+                <option value="custom">📋 Nota de Seguimiento General</option>
+                <option value="dental_chart">🦷 Procedimiento Dental</option>
+                <option value="clinical_note">🩺 Atención Médica / Clínica</option>
+                <option value="prescription">📄 Comprobante / Receta / Documento</option>
               </select>
             </div>
 
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Fecha de Atención</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Fecha</label>
               <input
                 type="date"
                 value={recordDate}
@@ -534,12 +541,12 @@ export function ClientRecordsTab({
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Motivo / Título *</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Título o Asunto *</label>
             <input
               ref={titleInputRef}
               type="text"
               required
-              placeholder="Ej. Control de ortodoncia / Limpieza profunda / Evaluación dermatológica"
+              placeholder="¿Qué trabajo o procedimiento se realizó? (Ej. Mantenimiento, Cambio de pieza, Sesión de corte)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-xs font-bold text-foreground focus:ring-2 focus:ring-primary/20"
@@ -547,26 +554,26 @@ export function ClientRecordsTab({
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Detalle / Hallazgos / Plan de Tratamiento</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Descripción / ¿Qué pasó y cómo se realizó?</label>
             <textarea
               rows={4}
-              placeholder="Escribe aquí los síntomas, diagnóstico, procedimiento realizado o notas de evolución..."
+              placeholder="Describe los detalles de lo realizado, diagnóstico, observaciones técnicas, materiales utilizados o recomendaciones..."
               value={body}
               onChange={(e) => setBody(e.target.value)}
               className="w-full bg-background border border-border rounded-xl p-3 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 resize-none leading-relaxed font-sans"
             />
           </div>
 
-          {/* SECCIÓN ADJUNTAR FOTOS / RX DE LA HISTORIA */}
+          {/* SECCIÓN ADJUNTAR FOTOS Y EVIDENCIAS */}
           <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border/80 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
                 <span className="text-xs font-black text-foreground flex items-center gap-1.5">
                   <ImageIcon size={15} className="text-indigo-500" />
-                  <span>Fotos, Radiografías y Evidencias</span>
+                  <span>Fotos y Evidencias Visuales</span>
                 </span>
                 <p className="text-[10px] text-slate-400">
-                  Sube fotos de antes/después, radiografías o presiona <strong>Ctrl + V</strong> para pegar
+                  Agrega fotos del estado inicial, resultado final o pega directamente con <strong>Ctrl + V</strong>.
                 </p>
               </div>
 
@@ -587,7 +594,7 @@ export function ClientRecordsTab({
                   className="px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-colors flex items-center gap-1.5 border border-indigo-500/20 btn-haptic"
                 >
                   <Upload size={14} />
-                  <span>Seleccionar Archivos</span>
+                  <span>Seleccionar Fotos</span>
                 </button>
               </div>
 
@@ -631,17 +638,17 @@ export function ClientRecordsTab({
                           className="w-full bg-background border border-border rounded-lg px-2 py-1 text-[11px] font-bold text-foreground"
                         >
                           <option value="general">🔍 General / Evidencia</option>
-                          <option value="foto_antes">📸 Foto Antes</option>
-                          <option value="foto_despues">✨ Foto Después</option>
-                          <option value="rx">☢️ Radiografía / RX</option>
-                          <option value="receta">💊 Receta / Documento</option>
+                          <option value="foto_antes">📸 Antes / Inicial</option>
+                          <option value="foto_despues">✨ Después / Resultado</option>
+                          <option value="receta">📄 Comprobante / Documento</option>
+                          <option value="rx">☢️ Radiografía / Escaneo</option>
                         </select>
                       </div>
 
                       <div>
                         <input
                           type="text"
-                          placeholder="Nota o pieza dental (opcional)"
+                          placeholder="Nota o descripción (opcional)"
                           value={photo.caption}
                           onChange={(e) => handleUpdatePendingPhotoCaption(photo.id, e.target.value)}
                           className="w-full bg-background border border-border rounded-lg px-2 py-1 text-[11px] text-foreground placeholder:text-slate-400"
@@ -678,7 +685,7 @@ export function ClientRecordsTab({
               ) : (
                 <>
                   <CheckCircle2 size={15} />
-                  <span>Guardar Historia {pendingPhotos.length > 0 ? `(${pendingPhotos.length} Fotos)` : ''}</span>
+                  <span>Guardar Entrada {pendingPhotos.length > 0 ? `(${pendingPhotos.length} Fotos)` : ''}</span>
                 </>
               )}
             </button>
@@ -690,14 +697,14 @@ export function ClientRecordsTab({
       {isLoading ? (
         <div className="py-12 text-center text-xs text-slate-400 space-y-2">
           <div className="w-7 h-7 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p>Cargando historia de {clientName}...</p>
+          <p>Cargando bitácora de {clientName}...</p>
         </div>
       ) : records.length === 0 ? (
         <div className="text-center py-12 border border-dashed border-border rounded-3xl p-8 text-slate-400 space-y-3">
           <FileText size={36} className="mx-auto opacity-30 text-indigo-500" />
-          <p className="text-sm font-bold text-foreground">Sin historias ni consultas registradas aún</p>
-          <p className="text-xs max-w-sm mx-auto">
-            Utiliza la barra rápida superior para abrir una consulta médica, odontología o receta en un solo clic.
+          <p className="text-sm font-bold text-foreground">Sin registros en la bitácora aún</p>
+          <p className="text-xs max-w-sm mx-auto text-slate-500">
+            Haz clic en <strong>+ Nueva Entrada</strong> para registrar los trabajos realizados, notas de evolución o evidencias fotográficas.
           </p>
         </div>
       ) : (
@@ -744,10 +751,10 @@ export function ClientRecordsTab({
                         onClick={() => handleAppendPhotoToRecord(rec.id)}
                         disabled={isAppendingPhoto && activeRecordForUpload === rec.id}
                         className="p-1.5 px-2.5 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-500/10 rounded-xl transition-colors flex items-center gap-1 text-xs font-bold border border-border/60 btn-haptic"
-                        title="Adjuntar foto o radiografía a esta historia"
+                        title="Adjuntar foto o evidencia a esta entrada"
                       >
                         <Camera size={14} className="text-indigo-500" />
-                        <span>+ Foto / RX</span>
+                        <span>+ Foto</span>
                       </button>
 
                       <button
@@ -761,7 +768,7 @@ export function ClientRecordsTab({
                     </div>
                   </div>
 
-                  {/* Cuerpo / Texto de la Consulta */}
+                  {/* Cuerpo / Texto del Registro */}
                   {rec.body && (
                     <div className="text-xs text-slate-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-border/50 font-sans">
                       {rec.body}
@@ -840,11 +847,11 @@ export function ClientRecordsTab({
                     </div>
                   )}
 
-                  {/* GALERÍA INTEGRAL DE FOTOS DENTRO DE LA HISTORIA */}
+                  {/* GALERÍA INTEGRAL DE FOTOS */}
                   {photos.length > 0 && (
                     <div className="space-y-2.5 pt-1">
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Fotografías y Radiografías Adjuntas a esta Consulta ({photos.length})
+                        Fotografías y Evidencias Adjuntas ({photos.length})
                       </span>
 
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -891,7 +898,7 @@ export function ClientRecordsTab({
 
                   {/* Pie de Auditoría */}
                   <div className="flex justify-between items-center text-[10px] text-slate-400 pt-2 border-t border-border/40">
-                    <span>Registrado por: <strong>{rec.created_by?.split('@')[0] || 'Especialista'}</strong></span>
+                    <span>Registrado por: <strong>{rec.created_by?.split('@')[0] || 'Operador'}</strong></span>
                     {photos.length > 0 && (
                       <span className="text-slate-400 font-medium">
                         {photos.length} {photos.length === 1 ? 'adjunto gráfico' : 'adjuntos gráficos'}
@@ -924,7 +931,7 @@ export function ClientRecordsTab({
             <div className="flex items-center gap-2">
               <a
                 href={activeLightboxPhoto.url}
-                download={`historia_${clientName}_${Date.now()}.jpg`}
+                download={`evidencia_${clientName}_${Date.now()}.jpg`}
                 onClick={(e) => e.stopPropagation()}
                 className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
                 title="Descargar imagen"

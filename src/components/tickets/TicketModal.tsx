@@ -36,12 +36,6 @@ const PRIORITIES = [
   { value: 'high', label: 'Alta', color: 'text-red-600' },
 ];
 
-const PIPELINES = [
-  { value: 'general', label: '🏷️ General', columns: ['draft', 'in_progress', 'invoiced'] },
-  { value: 'dental', label: '🦷 Dental / Salud', columns: ['presupuestado', 'en_tratamiento', 'en_laboratorio', 'control_post', 'concluido'] },
-  { value: 'taller', label: '🔧 Taller / Reparación', columns: ['recibido', 'diagnostico', 'en_reparacion', 'listo', 'entregado'] },
-];
-
 export function TicketModal({ isOpen, onClose, onSave, tenantId }: TicketModalProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -174,26 +168,6 @@ export function TicketModal({ isOpen, onClose, onSave, tenantId }: TicketModalPr
             </div>
           )}
 
-          {/* Pipeline Selector */}
-          <div>
-            <label className="block text-sm font-semibold text-foreground mb-2">Tipo de Pipeline</label>
-            <div className="flex gap-2 flex-wrap">
-              {PIPELINES.map(p => (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => setSelectedPipeline(p.value)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-                    selectedPipeline === p.value
-                      ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                      : 'bg-background border-border text-foreground hover:border-primary/50'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Cliente */}
           <div>
