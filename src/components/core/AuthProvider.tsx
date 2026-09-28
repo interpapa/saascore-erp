@@ -5,6 +5,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { getUserTenant } from '@/app/actions/tenant';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 interface AuthContextType {
   isLoading: boolean;
@@ -35,9 +36,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleSessionSync = useCallback(async (user: { email?: string; id?: string } | null | undefined, accessToken?: string) => {
     if (!user || !user.email) return;
 
+    const cleanEmail = user.email.trim().toLowerCase();
+    const isSuper = isSuperAdminEmail(cleanEmail);
+
     try {
       // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
-      const result = await getUserTenant(user.email, user.id);
+      const result = await getUserTenant(cleanEmail, user.id);
 
       if (result.success && result.tenant) {
         setCurrentTenant({
@@ -48,10 +52,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           metadata: result.tenant.metadata
         });
         setSession({
-          userEmail: user.email,
-          role: (result.role as any) || 'owner',
+          userEmail: cleanEmail,
+          role: isSuper ? 'superadmin' : ((result.role as any) || 'owner'),
           tenantId: result.tenant.id,
           token: accessToken
+        });
+        return;
+      }
+
+      // Si getUserTenant no devolvió tenant pero es Superadmin, darle acceso global sin forzar onboarding
+      if (isSuper || result.role === 'superadmin') {
+        setSession({
+          userEmail: cleanEmail,
+          role: 'superadmin',
+          tenantId: 'global-admin',
+          token: accessToken
+        });
+        setCurrentTenant({
+          id: 'global-admin',
+          name: 'Superadmin Console',
+          blocked: false,
+          active_modules: ['admin', 'config', 'estadisticas']
         });
         return;
       }
@@ -65,15 +86,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.warn('[AuthProvider] Preservando tenant activo existente frente a desincronización de getUserTenant');
         setSession({
           ...existingSession,
-          userEmail: user.email,
+          userEmail: cleanEmail,
           token: accessToken || existingSession.token
         });
         return;
       }
 
-      // Usuario sin empresa previa, va al onboarding
+      // Usuario normal sin empresa previa, va al onboarding
       setSession({
-        userEmail: user.email,
+        userEmail: cleanEmail,
         role: 'owner' as any,
         tenantId: '',
         token: accessToken
@@ -148,12 +169,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session && !isPublic) {
       router.push('/login');
     } 
-    // Solo redirigir a onboarding si falta el tenantId y no está ya en onboarding
-    else if (session && !session.tenantId && pathname !== '/onboarding') {
+    // Superadmin sin tenant va directo a /admin
+    else if (session && session.role === 'superadmin' && (pathname === '/login' || pathname === '/onboarding')) {
+      router.push('/admin');
+    }
+    // Usuario normal sin tenant va a onboarding
+    else if (session && session.role !== 'superadmin' && !session.tenantId && pathname !== '/onboarding') {
       router.push('/onboarding');
     } 
-    // Solo redirigir a dashboard si está en /login o /onboarding teniendo sesión
-    else if (session && session.tenantId && (pathname === '/login' || pathname === '/onboarding')) {
+    // Usuario normal con tenant no debe estar en /login ni en /onboarding
+    else if (session && session.tenantId && session.tenantId !== 'global-admin' && (pathname === '/login' || pathname === '/onboarding')) {
       router.push('/dashboard');
     }
   }, [session, isLoading, pathname, router]);

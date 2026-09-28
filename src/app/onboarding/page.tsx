@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -68,22 +68,27 @@ export default function OnboardingPage() {
           <Building2 size={32} />
         </div>
         
-        <h1 className="text-2xl font-bold text-center mb-2">Configura tu Empresa</h1>
-        <p className="text-slate-500 text-center mb-8">
+        <h1 className="text-2xl font-bold text-center mb-1">Configura tu Empresa</h1>
+        <p className="text-slate-500 text-center mb-2 text-sm">
           Para empezar a usar Rendo, necesitamos el nombre de tu negocio o taller.
         </p>
+        {userEmail && (
+          <p className="text-xs text-primary font-semibold text-center mb-6 bg-primary/5 py-1 px-3 rounded-full w-fit mx-auto border border-primary/20">
+            Conectado como: {userEmail}
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-medium">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 p-3 rounded-xl text-sm font-medium">
               {error}
             </div>
           )}
           
           <Input 
             name="businessName"
-            label="Nombre del Negocio" 
-            placeholder="Ej: Taller Mecánico Los Hermanos"
+            label="Nombre del Negocio *" 
+            placeholder="Ej: Dental Care Center / Rendo Corp"
             icon={<Building2 size={18} />}
             required
             autoFocus
@@ -98,6 +103,19 @@ export default function OnboardingPage() {
             Comenzar a usar el sistema
             <ArrowRight size={18} className="ml-2 group-hover:translate-x-1 transition-transform" />
           </Button>
+
+          <div className="pt-2 text-center">
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                router.push('/login');
+              }}
+              className="text-xs text-slate-400 hover:text-foreground transition-colors underline"
+            >
+              ¿No es tu cuenta? Cerrar sesión
+            </button>
+          </div>
         </form>
       </div>
     </div>

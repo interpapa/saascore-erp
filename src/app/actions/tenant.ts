@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { ActionActor } from './entities';
 import { UserRole } from '@/lib/rbac';
 import { validateUserTenantAccess, isSuperAdminEmail, isSuperAdminAuthUser, SUPERADMIN_EMAILS } from '@/lib/core/tenantSecurity';
+import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 
 async function verifySuperAdminActor(
   callerOrActor: ActionActor | string,
@@ -137,14 +138,46 @@ export async function createTenant(userId: string, userEmail: string, businessNa
   try {
     const db = supabaseAdmin;
     const cleanEmail = (userEmail || '').trim().toLowerCase();
+    const cleanName = (businessName || '').trim();
 
-    // 1. Crear el Tenant con permisos de servidor
-    let insertTenant: unknown = {
-      name: businessName,
+    if (!cleanName || cleanName.length < 2) {
+      return { success: false, error: 'El nombre de la empresa debe tener al menos 2 caracteres.' };
+    }
+
+    // 0. Idempotencia: Verificar si el usuario ya tiene una empresa vinculada previamente
+    if (cleanEmail || userId) {
+      let query = db.from('user_tenants').select('tenant_id, role');
+      if (cleanEmail) query = query.ilike('user_email', cleanEmail);
+      else if (userId) query = query.eq('user_id', userId);
+
+      const { data: existingLinks } = await query.limit(1);
+      if (existingLinks && existingLinks.length > 0) {
+        const { data: existingTenant } = await db
+          .from('tenants')
+          .select('*')
+          .eq('id', existingLinks[0].tenant_id)
+          .single();
+
+        if (existingTenant) {
+          return { success: true, tenant: existingTenant };
+        }
+      }
+    }
+
+    // 1. Crear el Tenant con permisos de servidor y módulos predeterminados completos
+    const insertTenant = {
+      name: cleanName,
+      status: 'active',
       is_active: true,
       currency: 'USD',
       symbol: '$',
       country_code: 'VE',
+      active_modules: DEFAULT_ENABLED_MODULES,
+      metadata: {
+        created_at: new Date().toISOString(),
+        plan: 'pro',
+        active_modules: DEFAULT_ENABLED_MODULES,
+      }
     };
 
     let { data: tenant, error: tenantError } = await db
@@ -153,51 +186,49 @@ export async function createTenant(userId: string, userEmail: string, businessNa
       .select()
       .single();
 
-    if (tenantError && (tenantError.message.includes('is_active') || tenantError.message.includes('column'))) {
-      // Fallback: If DB schema doesn't have is_active / currency columns, save them in metadata
-      insertTenant = {
-        name: businessName,
+    if (tenantError) {
+      // Fallback en caso de que alguna columna estricta varíe
+      const fallbackInsert = {
+        name: cleanName,
         status: 'active',
         metadata: {
           is_active: true,
           currency: 'USD',
           symbol: '$',
           country_code: 'VE',
+          active_modules: DEFAULT_ENABLED_MODULES,
         }
       };
       const retry = await db
         .from('tenants')
-        .insert([insertTenant])
+        .insert([fallbackInsert])
         .select()
         .single();
       tenant = retry.data;
       tenantError = retry.error;
     }
 
-    if (tenantError) throw new Error('Error al crear la empresa: ' + tenantError.message);
+    if (tenantError || !tenant) {
+      throw new Error('Error al crear la empresa: ' + (tenantError?.message || 'Error desconocido'));
+    }
 
     // 2. Vincular el Usuario con el Tenant en user_tenants
-    let linkData: unknown = {
-      user_email: cleanEmail,
+    const linkPayload: Record<string, unknown> = {
       tenant_id: tenant.id,
-      role: 'owner'
+      role: 'owner',
     };
+    if (cleanEmail) linkPayload.user_email = cleanEmail;
+    if (userId) linkPayload.user_id = userId;
 
     let { error: linkError } = await db
       .from('user_tenants')
-      .insert([linkData]);
+      .insert([linkPayload]);
 
-    if (linkError && (linkError.message.includes('user_email') || linkError.message.includes('column'))) {
-      // Fallback: If DB schema uses user_id instead of user_email (as in migration_run)
-      linkData = {
-        user_id: userId,
-        tenant_id: tenant.id,
-        role: 'owner'
-      };
-      const retry = await db
-        .from('user_tenants')
-        .insert([linkData]);
-      linkError = retry.error;
+    if (linkError) {
+      // Reintentar solo con user_email o solo con user_id
+      const fallbackLink = cleanEmail ? { user_email: cleanEmail, tenant_id: tenant.id, role: 'owner' } : { user_id: userId, tenant_id: tenant.id, role: 'owner' };
+      const retryLink = await db.from('user_tenants').insert([fallbackLink]);
+      linkError = retryLink.error;
     }
 
     if (linkError) {
@@ -205,9 +236,21 @@ export async function createTenant(userId: string, userEmail: string, businessNa
       throw new Error('Error al vincular el usuario con la empresa: ' + linkError.message);
     }
 
+    await writeAuditLog({
+      tenant_id: tenant.id,
+      actor_email: cleanEmail || 'onboarding',
+      actor_role: 'owner',
+      action: 'tenant.created_via_onboarding',
+      target_type: 'tenant',
+      target_id: tenant.id,
+      metadata: { name: cleanName }
+    });
+
     revalidatePath('/dashboard');
+    revalidatePath('/onboarding');
     return { success: true, tenant };
   } catch (error: any) {
+    console.error('[createTenant Error]:', error);
     return { success: false, error: error.message };
   }
 }

@@ -6,12 +6,8 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return supabaseResponse;
-  }
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://pfgfsnoblxasiixeveue.supabase.co";
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZ2Zzbm9ibHhhc2lpeGV2ZXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MjUzNzQsImV4cCI6MjEwNDIwMTM3NH0.aCJ_3GWs6kta4LRqGDd6QKNvKqAKjwdc-Daef8Bgwv8";
 
   const supabase = createServerClient(
     supabaseUrl,
@@ -39,6 +35,7 @@ export async function middleware(request: NextRequest) {
   // Rutas públicas que no requieren autenticación
   const isPublicRoute =
     pathname === '/login' ||
+    pathname === '/onboarding' ||
     pathname === '/reservar-demo' ||
     pathname === '/reservas' ||
     pathname.startsWith('/reservas/') ||
