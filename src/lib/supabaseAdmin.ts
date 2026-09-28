@@ -16,7 +16,7 @@ function getSupabaseAdmin(): SupabaseClient {
     throw new Error('supabaseAdmin es exclusivo de backend/Server Actions y no puede ejecutarse en el navegador.');
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://example.supabase.co";
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://pfgfsnoblxasiixeveue.supabase.co";
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY 
     || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     || "dummy-build-key-for-prerendering";
