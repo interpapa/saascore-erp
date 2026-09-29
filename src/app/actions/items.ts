@@ -47,7 +47,11 @@ export async function createItemAction(
 
     const moduleCheck = await assertModuleEnabled(tenantId, 'catalogo');
     if (!moduleCheck.authorized) {
-      return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
+      const invCheck = await assertModuleEnabled(tenantId, 'inventario');
+      const dentalCheck = await assertModuleEnabled(tenantId, 'odontologia');
+      if (!invCheck.authorized && !dentalCheck.authorized) {
+        return { success: false, error: moduleCheck.error || 'El módulo de Catálogo/Inventario está desactivado.' };
+      }
     }
 
     if (!tenantId) {

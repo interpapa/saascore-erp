@@ -198,6 +198,10 @@ function HorseshoeToothWidget({
 
   const handleFaceClick = (face: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (activeCondition === 'select') {
+      onSelectTooth(tooth.number);
+      return;
+    }
     if (onToggleFace) {
       onToggleFace(tooth.number, face, clinicalStatus);
     } else {

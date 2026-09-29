@@ -49,6 +49,14 @@ function isMissingColumnError(error: any): boolean {
   return code === '42703' || (msg.includes('column') && msg.includes('does not exist'));
 }
 
+async function assertCalendarOrDentalEnabled(tenantId: string) {
+  const calCheck = await assertModuleEnabled(tenantId, 'calendario');
+  if (calCheck.authorized) return { authorized: true };
+  const dentalCheck = await assertModuleEnabled(tenantId, 'odontologia');
+  if (dentalCheck.authorized) return { authorized: true };
+  return { authorized: false, error: 'El módulo de citas/odontología está desactivado.' };
+}
+
 /**
  * Recovers appointments for tenant with fallback to 'documents' table.
  */
@@ -63,7 +71,7 @@ export async function getAppointmentsAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.', appointments: [] };
     }
 
-    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
     if (!moduleCheck.authorized) {
       return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.', appointments: [] };
     }
@@ -208,7 +216,7 @@ export async function createAppointmentAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
     if (!moduleCheck.authorized) {
       return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
     }
@@ -304,8 +312,12 @@ export async function createAppointmentAction(
       return { success: true, appointment: newAppt };
     }
 
-    // 2. Fallback: Insert into 'documents' table
-    if (error && isMissingTableError(error)) {
+    // 2. Fallback: If appointments table has an error (missing table, schema mismatch, FK constraint, etc.), fall back to 'documents' table
+    if (error) {
+      if (error?.message?.includes('unique_appointment_slot') || error?.code === '23505') {
+        throw new Error('El profesional ya tiene una cita agendada en este horario exacto. Selecciona otra hora.');
+      }
+      console.warn('[createAppointmentAction] Falling back to documents table:', error.message || error);
       const docStatus = mapApptStatusToDocStatus(payload.status || 'scheduled');
       let { data: newDoc, error: docErr } = await supabaseAdmin
         .from('documents')
@@ -403,11 +415,7 @@ export async function createAppointmentAction(
       };
     }
 
-    if (error?.message?.includes('unique_appointment_slot') || error?.code === '23505') {
-      throw new Error('El profesional ya tiene una cita agendada en este horario exacto. Selecciona otra hora.');
-    }
-
-    throw new Error(error?.message || 'Error al crear la cita.');
+    throw new Error('Error al crear la cita.');
   } catch (err: any) {
     console.error('[createAppointmentAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
@@ -429,7 +437,7 @@ export async function updateAppointmentMetadataAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
     if (!moduleCheck.authorized) {
       return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
     }
@@ -527,7 +535,7 @@ export async function updateAppointmentPriceAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
     if (!moduleCheck.authorized) {
       return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
     }
@@ -589,7 +597,7 @@ export async function updateAppointmentStatusAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    const moduleCheck = await assertModuleEnabled(tenantId, 'calendario');
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
     if (!moduleCheck.authorized) {
       return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
     }

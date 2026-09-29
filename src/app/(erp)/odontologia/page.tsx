@@ -41,6 +41,8 @@ import { ClientRecordsTab } from '@/components/clients/ClientRecordsTab';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { DentalCheckoutModal } from '@/components/dental/DentalCheckoutModal';
 import { DentalScheduleModal } from '@/components/dental/DentalScheduleModal';
+import { PatientProfileModal } from '@/components/dental/PatientProfileModal';
+import { NewConsumableModal } from '@/components/dental/NewConsumableModal';
 import { mergeTenantDentalServices, DentalProcedureDefinition, DENTAL_PROCEDURES_MASTER } from '@/lib/dental/proceduresCatalog';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 import { 
@@ -125,6 +127,8 @@ export default function OdontologiaPage() {
 
   // Modales
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isNewConsumableModalOpen, setIsNewConsumableModalOpen] = useState(false);
   const [isSubmittingPatient, setIsSubmittingPatient] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
@@ -357,11 +361,20 @@ export default function OdontologiaPage() {
     ).slice(0, 8);
   }, [searchQuery, customers]);
 
-  // Insumos físicos descartables disponibles para consumo clínico
+  // Insumos físicos descartables disponibles para consumo clínico (filtrados por categoría médica o consumible)
   const availableConsumables = useMemo(() => {
-    return inventoryItems.filter(
-      (i) => i.type === 'product' || i.category?.toLowerCase().includes('insumo') || i.category?.toLowerCase().includes('médic')
-    );
+    const clinicalCategories = ['insumo', 'consumible', 'material', 'odontología', 'odontologia', 'farmacia', 'dental'];
+    const supplies = inventoryItems.filter((i) => {
+      const cat = (i.category || '').toLowerCase();
+      const isMarkedConsumable = Boolean(i.metadata?.is_consumable || i.metadata?.clinical_supply);
+      const matchesCategory = clinicalCategories.some((c) => cat.includes(c));
+      return isMarkedConsumable || matchesCategory;
+    });
+    // Si no hay insumos categorizados explícitamente, mostrar los productos físicos con inventario
+    if (supplies.length === 0) {
+      return inventoryItems.filter((i) => i.type === 'product');
+    }
+    return supplies;
   }, [inventoryItems]);
 
   // GUARDAR ODONTOGRAMA
@@ -723,8 +736,51 @@ export default function OdontologiaPage() {
           </div>
         </div>
 
-        {/* Acciones Rápidas del Módulo */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Acciones Rápidas del Módulo & Estado del Sillón */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {selectedPatient ? (
+            <div className="flex items-center gap-1.5 p-1 bg-teal-500/10 border border-teal-500/30 rounded-2xl">
+              <span className="text-xs font-black text-teal-600 dark:text-teal-400 px-2 py-1">
+                Sillón: <strong className="text-foreground">{selectedPatient.name.split(' ')[0]}</strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="px-2.5 py-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-2xs btn-haptic flex items-center gap-1"
+                title="Ver/Editar Ficha Médica"
+              >
+                <UserCheck size={13} />
+                <span>Ficha</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsCheckoutModalOpen(true)}
+                disabled={plannedTreatments.length === 0}
+                className="px-2.5 py-1 bg-slate-900 hover:bg-black dark:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all disabled:opacity-40 flex items-center gap-1 btn-haptic"
+                title="Cobrar Tratamientos Planificados"
+              >
+                <CreditCard size={13} />
+                <span>Cobrar (${totalBudgetUSD.toFixed(0)})</span>
+              </button>
+            </div>
+          ) : (
+            <div className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-border flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-slate-400" />
+              <span>Sillón Desocupado</span>
+            </div>
+          )}
+
+          {selectedPatient && (
+            <button
+              type="button"
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-blue-500/50 hover:text-blue-600 transition-all shadow-xs btn-haptic"
+            >
+              <Clock size={13} />
+              <span>+ Cita</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleSyncMasterCatalog}
@@ -733,7 +789,7 @@ export default function OdontologiaPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-xs font-bold text-slate-600 dark:text-slate-300 hover:border-teal-500/50 hover:text-teal-600 transition-all shadow-xs btn-haptic"
           >
             <RefreshCw size={13} className={isSyncingCatalog ? 'animate-spin text-teal-500' : ''} />
-            <span>Sincronizar Catálogo</span>
+            <span className="hidden sm:inline">Sincronizar</span> Catálogo
           </button>
 
           <button
@@ -760,7 +816,7 @@ export default function OdontologiaPage() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-black hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 btn-haptic"
           >
             <Plus size={15} />
-            <span>+ Nuevo Paciente</span>
+            <span>+ Paciente</span>
           </button>
         </div>
       </div>
@@ -903,7 +959,17 @@ export default function OdontologiaPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 text-xs font-bold transition-all border border-teal-500/30 btn-haptic shadow-2xs"
+                title="Ver y editar ficha completa, antecedentes e historia médica del paciente"
+              >
+                <UserCheck size={14} />
+                <span>Ver / Editar Ficha</span>
+              </button>
+
               {selectedPatient.phone && (
                 <a
                   href={`https://wa.me/${selectedPatient.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${selectedPatient.name}, te escribimos de la clínica dental.`)}`}
@@ -967,7 +1033,7 @@ export default function OdontologiaPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setIsEditingAllergies(true)}
+                  onClick={() => setIsProfileModalOpen(true)}
                   className="text-[11px] font-bold text-teal-600 hover:underline"
                 >
                   {patientMeta.allergies ? 'Editar Alerta' : '+ Agregar Alerta'}
@@ -1252,7 +1318,14 @@ export default function OdontologiaPage() {
                       <Package size={14} className="text-teal-500" />
                       Insumos Especiales Gastados
                     </span>
-                    <span className="text-[10px] text-slate-400">Descarga stock físico</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsNewConsumableModalOpen(true)}
+                      className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
+                    >
+                      <Plus size={12} />
+                      <span>+ Nuevo Insumo</span>
+                    </button>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -1485,7 +1558,24 @@ export default function OdontologiaPage() {
 
             {/* PESTAÑA 4: EXPEDIENTE, ARCHIVOS & RADIOGRAFÍAS */}
             {activeTab === 'expediente' && (
-              <div className="space-y-3">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-2xl">
+                  <div>
+                    <h4 className="text-xs font-bold text-foreground">Ficha del Paciente & Antecedentes</h4>
+                    <p className="text-[10px] text-slate-400">
+                      {patientMeta.allergies ? `⚠️ Alertas: ${patientMeta.allergies}` : 'Sin antecedentes de riesgo reportados'}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsProfileModalOpen(true)}
+                    className="px-3 py-1.5 bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition-all border border-teal-500/20 flex items-center gap-1.5 btn-haptic"
+                  >
+                    <UserCheck size={14} />
+                    <span>Editar Ficha</span>
+                  </button>
+                </div>
+
                 <ClientRecordsTab 
                   entityId={selectedPatient.id} 
                   tenantId={tenantId} 
@@ -1709,6 +1799,35 @@ export default function OdontologiaPage() {
           procedureHint="Control y Tratamiento Odontológico"
           onSuccess={() => {
             loadClinicalData();
+          }}
+        />
+      )}
+
+      {/* MODAL DE FICHA Y ANTECEDENTES DEL PACIENTE */}
+      {selectedPatient && actor && (
+        <PatientProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          patient={selectedPatient}
+          tenantId={tenantId}
+          actor={actor}
+          onSuccess={(updated) => {
+            setSelectedPatient(updated);
+            setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          }}
+        />
+      )}
+
+      {/* MODAL DE REGISTRO RÁPIDO DE INSUMO EN INVENTARIO */}
+      {actor && (
+        <NewConsumableModal
+          isOpen={isNewConsumableModalOpen}
+          onClose={() => setIsNewConsumableModalOpen(false)}
+          tenantId={tenantId}
+          actor={actor}
+          onSuccess={(newItem) => {
+            setInventoryItems((prev) => [newItem, ...prev]);
+            setSelectedConsumableId(newItem.id);
           }}
         />
       )}

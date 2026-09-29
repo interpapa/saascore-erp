@@ -59,6 +59,7 @@ const CHILD_TEETH = [
 
 // Simbología clínica FDI con color de alto contraste y soporte oscuro/claro
 export const CONDITIONS: Record<string, { label: string; color: string; bg: string; symbol: string; desc: string }> = {
+  select:     { label: 'Inspeccionar', color: '#64748b', bg: 'bg-slate-500',   symbol: '🔍', desc: 'Seleccionar pieza sin modificar patología' },
   caries:     { label: 'Caries',       color: '#ef4444', bg: 'bg-red-500',      symbol: 'C',  desc: 'Lesión activa en esmalte o dentina' },
   obturacion: { label: 'Obturación',   color: '#3b82f6', bg: 'bg-blue-500',     symbol: 'O',  desc: 'Restauración en resina o amalgama' },
   endodoncia: { label: 'Endodoncia',   color: '#8b5cf6', bg: 'bg-violet-500',   symbol: 'E',  desc: 'Tratamiento de conducto pulpar' },
@@ -69,15 +70,15 @@ export const CONDITIONS: Record<string, { label: string; color: string; bg: stri
   custom:     { label: 'Personalizado',color: '#14b8a6', bg: 'bg-teal-500',     symbol: '?',  desc: 'Condición clínica personalizada' },
 };
 
-// Ubicaciones comunes para dientes supernumerarios
+// Ubicaciones comunes para dientes supernumerarios con descripciones anatómicas claras
 const SUPERNUMERARY_SPACES = [
-  { id: 'mesiodens', label: 'Mesiodens (Entre 11 y 21 - Línea Media)', number: '11+' },
-  { id: 'distomolar_18', label: 'Distomolar Sup. Derecho (Detrás de 18)', number: '18+' },
-  { id: 'distomolar_28', label: 'Distomolar Sup. Izquierdo (Detrás de 28)', number: '28+' },
-  { id: 'distomolar_38', label: 'Distomolar Inf. Izquierdo (Detrás de 38)', number: '38+' },
-  { id: 'distomolar_48', label: 'Distomolar Inf. Derecho (Detrás de 48)', number: '48+' },
-  { id: 'paramolar_upper', label: 'Paramolar Superior (Vestibular)', number: 'PM+' },
-  { id: 'custom_pos', label: 'Posición Personalizada...', number: 'X+' },
+  { id: 'mesiodens', label: 'Mesiodens — Línea Media Superior (Entre 11 y 21)', number: '11+', desc: 'El supernumerario más frecuente, entre incisivos centrales' },
+  { id: 'distomolar_18', label: 'Distomolar Sup. Derecho (Detrás de 18)', number: '18+', desc: 'Cuarto molar maxilar derecho' },
+  { id: 'distomolar_28', label: 'Distomolar Sup. Izquierdo (Detrás de 28)', number: '28+', desc: 'Cuarto molar maxilar izquierdo' },
+  { id: 'distomolar_48', label: 'Distomolar Inf. Derecho (Detrás de 48)', number: '48+', desc: 'Cuarto molar mandibular derecho' },
+  { id: 'distomolar_38', label: 'Distomolar Inf. Izquierdo (Detrás de 38)', number: '38+', desc: 'Cuarto molar mandibular izquierdo' },
+  { id: 'paramolar_upper', label: 'Paramolar — Premolares / Molares', number: 'PM+', desc: 'Supernumerario en cara vestibular o palatina' },
+  { id: 'custom_pos', label: 'Código o Posición Libre...', number: 'SN+', desc: 'Escribe una identificación manual para la pieza' },
 ];
 
 function ToothCell({ toothNum, toothData, isSelected, onClick }: {
@@ -175,7 +176,7 @@ export function Odontogram({
 
   const [viewMode, setViewMode] = useState<'arch' | 'grid'>('arch');
   const [selectedTooth, setSelectedTooth] = useState<string | null>(null);
-  const [activeCondition, setActiveCondition] = useState<string>('caries');
+  const [activeCondition, setActiveCondition] = useState<string>('select');
   const [clinicalStatus, setClinicalStatus] = useState<'existente' | 'planificado' | 'realizado'>('planificado');
   const [customConditionLabel, setCustomConditionLabel] = useState('');
   const [customConditionColor, setCustomConditionColor] = useState('#14b8a6');
@@ -252,19 +253,23 @@ export function Odontogram({
 
   // Alternar cara específica (Vestibular, Lingual, Mesial, Distal, Oclusal) en la patología activa
   const toggleFaceOnCondition = (toothNum: string, faceName: string, statusOverride?: 'existente' | 'planificado' | 'realizado') => {
-    const finalStatus = statusOverride || clinicalStatus;
     setSelectedTooth(toothNum);
+    const targetCondition = activeCondition === 'select' ? 'caries' : activeCondition;
+    if (activeCondition === 'select') {
+      setActiveCondition('caries');
+    }
+    const finalStatus = statusOverride || clinicalStatus;
     setChart(prev => {
       const existing = prev.teeth[toothNum] || { number: toothNum, conditions: [] };
       const currentConditions = [...(existing.conditions || [])];
 
       // Buscar si el diente ya tiene la condición activa
-      const condIndex = currentConditions.findIndex(c => c.code === activeCondition);
+      const condIndex = currentConditions.findIndex(c => c.code === targetCondition);
       if (condIndex === -1) {
         // Si no la tiene, agregar la condición con esta cara seleccionada
-        const newCond: ToothCondition = activeCondition === 'custom'
+        const newCond: ToothCondition = targetCondition === 'custom'
           ? { code: 'custom', label: customConditionLabel || 'Personalizado', color: customConditionColor, faces: [faceName], status: finalStatus }
-          : { code: activeCondition, faces: [faceName], status: finalStatus };
+          : { code: targetCondition, faces: [faceName], status: finalStatus };
         currentConditions.push(newCond);
       } else {
         // Si ya existe, alternar la cara
@@ -277,7 +282,7 @@ export function Odontogram({
         }
 
         // Si se desmarcan todas las caras de caries u obturación, remover la condición
-        if (cond.faces.length === 0 && (activeCondition === 'caries' || activeCondition === 'obturacion')) {
+        if (cond.faces.length === 0 && (targetCondition === 'caries' || targetCondition === 'obturacion')) {
           currentConditions.splice(condIndex, 1);
         } else {
           currentConditions[condIndex] = cond;
@@ -300,7 +305,9 @@ export function Odontogram({
 
   const handleToothClick = (toothNum: string) => {
     setSelectedTooth(toothNum);
-    toggleConditionOnTooth(toothNum, activeCondition);
+    if (activeCondition !== 'select') {
+      toggleConditionOnTooth(toothNum, activeCondition);
+    }
   };
 
   // Agregar diente supernumerario con espacio específico
@@ -385,12 +392,9 @@ export function Odontogram({
   });
 
   const handleSaveWithPlan = () => {
-    const updatedPlan = buildTreatmentPlan();
-    const chartWithPlan: DentalChart = {
-      ...chart,
-      treatmentPlan: updatedPlan,
-    };
-    onSave(chartWithPlan);
+    if (onSave) {
+      onSave(chart);
+    }
   };
 
   const handleAddProcedureFromCatalog = (proc: DentalProcedureDefinition, toothNum: string) => {
@@ -543,7 +547,7 @@ export function Odontogram({
             className="flex items-center gap-1.5 px-4 py-1.5 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-all disabled:opacity-50 btn-haptic shadow-xs"
           >
             {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-            Guardar Odontograma & Plan
+            Guardar Odontograma
           </button>
         </div>
       </div>
@@ -600,13 +604,19 @@ export function Odontogram({
 
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-            <span>Patología Activa para Aplicar:</span>
-            <span className="text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full font-bold">
-              Haz clic en cualquier cara o diente
-            </span>
+            <span>Herramienta:</span>
+            {activeCondition === 'select' ? (
+              <span className="text-[10px] text-slate-700 dark:text-slate-300 bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded-full font-bold">
+                🔍 Modo Inspección — Haz clic en un diente para examinarlo sin alterarlo
+              </span>
+            ) : (
+              <span className="text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full font-bold">
+                Haz clic en cualquier cara o diente para marcar {CONDITIONS[activeCondition]?.label}
+              </span>
+            )}
           </p>
           <span className="text-[11px] text-slate-400 font-medium">
-            {CONDITIONS[activeCondition]?.label} ({clinicalStatus})
+            {CONDITIONS[activeCondition]?.label} {activeCondition !== 'select' ? `(${clinicalStatus})` : ''}
           </span>
         </div>
 
@@ -984,40 +994,51 @@ export function Odontogram({
               Selecciona el espacio interdental o cuadrante donde se ubica la pieza adicional:
             </p>
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {SUPERNUMERARY_SPACES.map(space => (
                 <label
                   key={space.id}
-                  className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                  className={`flex items-start justify-between p-3 rounded-2xl border cursor-pointer transition-all ${
                     selectedSuperSpace === space.id
-                      ? 'border-primary bg-primary/5 text-primary font-bold'
-                      : 'border-border text-foreground hover:border-primary/40'
+                      ? 'border-primary bg-primary/5 text-primary shadow-xs'
+                      : 'border-border text-foreground hover:border-primary/40 bg-background'
                   }`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-start gap-2.5">
                     <input
                       type="radio"
                       name="superSpace"
                       value={space.id}
                       checked={selectedSuperSpace === space.id}
                       onChange={() => setSelectedSuperSpace(space.id)}
-                      className="accent-primary"
+                      className="accent-primary mt-0.5"
                     />
-                    <span className="text-xs">{space.label}</span>
+                    <div>
+                      <span className="text-xs font-bold block">{space.label}</span>
+                      <span className="text-[10px] text-slate-400 block mt-0.5">{space.desc}</span>
+                    </div>
                   </div>
-                  <span className="text-xs font-mono font-black text-slate-400">{space.number}</span>
+                  <span className="text-xs font-mono font-black text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md shrink-0">
+                    {space.number}
+                  </span>
                 </label>
               ))}
             </div>
 
             {selectedSuperSpace === 'custom_pos' && (
-              <input
-                type="text"
-                value={customToothCode}
-                onChange={e => setCustomToothCode(e.target.value)}
-                placeholder="Código del diente extra (ej: S1, 14B, SUP-1)"
-                className="w-full text-xs bg-background border border-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
+              <div className="pt-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                  Identificador de la Pieza Extra:
+                </label>
+                <input
+                  type="text"
+                  value={customToothCode}
+                  onChange={e => setCustomToothCode(e.target.value)}
+                  placeholder="Ej: SN1, 19, SUP-1..."
+                  className="w-full text-xs bg-background border border-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  autoFocus
+                />
+              </div>
             )}
 
             <div className="flex gap-2 pt-2">
@@ -1037,142 +1058,6 @@ export function Odontogram({
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Plan de Tratamiento y Conversión a Kanban */}
-      {onCreateKanban && (
-        <div className="p-4 bg-teal-50/50 dark:bg-teal-950/20 border border-teal-500/20 rounded-2xl space-y-3">
-          <button
-            type="button"
-            onClick={() => setShowTreatmentPanel(v => !v)}
-            className="flex items-center justify-between text-xs font-bold text-teal-700 dark:text-teal-400 w-full"
-          >
-            <span className="flex items-center gap-2">
-              <Zap size={16} />
-              Presupuesto Dental y Plan de Tratamiento → Enviar a Proceso
-            </span>
-            <ChevronDown size={16} className={`transition-transform ${showTreatmentPanel ? 'rotate-180' : ''}`} />
-          </button>
-
-          {showTreatmentPanel && (
-            <div className="space-y-3 pt-2 border-t border-teal-500/20">
-              <input
-                type="text"
-                value={treatmentTitle}
-                onChange={e => setTreatmentTitle(e.target.value)}
-                placeholder={`Plan de Tratamiento Dental — ${entityName}`}
-                className="w-full text-xs bg-background border border-input rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-
-              {treatmentProcedures.map((proc, idx) => (
-                <div key={idx} className="flex gap-2 flex-wrap items-center">
-                  <input
-                    type="text"
-                    value={proc.toothNumber}
-                    onChange={e => setTreatmentProcedures(prev => prev.map((p, i) => i === idx ? { ...p, toothNumber: e.target.value } : p))}
-                    placeholder="# Diente"
-                    className="w-20 text-xs bg-background border border-input rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
-                  />
-                  <input
-                    type="text"
-                    value={proc.procedure}
-                    onChange={e => setTreatmentProcedures(prev => prev.map((p, i) => i === idx ? { ...p, procedure: e.target.value } : p))}
-                    placeholder="Procedimiento (ej: Obturación con resina compuesta cara oclusal)"
-                    className="flex-1 min-w-40 text-xs bg-background border border-input rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
-                  <input
-                    type="number"
-                    value={proc.cost}
-                    onChange={e => setTreatmentProcedures(prev => prev.map((p, i) => i === idx ? { ...p, cost: e.target.value } : p))}
-                    placeholder="Costo"
-                    min="0"
-                    step="0.01"
-                    className="w-24 text-xs bg-background border border-input rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary/30 font-mono"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setTreatmentProcedures(prev => prev.filter((_, i) => i !== idx))}
-                    className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={addTreatmentProcedure}
-                className="flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:underline"
-              >
-                <Plus size={14} /> + Agregar Procedimiento / Pieza
-              </button>
-
-              {treatmentProcedures.length > 0 && (
-                <div className="flex justify-between items-center p-3 bg-card border border-border rounded-xl">
-                  <span className="text-xs font-bold text-slate-500">Monto Total Presupuestado:</span>
-                  <span className="text-base font-black text-foreground font-mono">
-                    ${treatmentProcedures.reduce((sum, p) => sum + (parseFloat(p.cost) || 0), 0).toFixed(2)}
-                  </span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-2">
-                {onOpenCheckout && (
-                  <button
-                    type="button"
-                    disabled={treatmentProcedures.length === 0}
-                    onClick={onOpenCheckout}
-                    className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-xs flex items-center justify-center gap-2 btn-haptic disabled:opacity-50"
-                  >
-                    <Receipt size={16} />
-                    <span>Cobrar en Consulta (${treatmentProcedures.reduce((sum, p) => sum + (parseFloat(p.cost) || 0), 0).toFixed(2)})</span>
-                  </button>
-                )}
-
-                {onOpenSchedule && (
-                  <button
-                    type="button"
-                    onClick={() => onOpenSchedule(treatmentProcedures[0]?.procedure || 'Seguimiento de Tratamiento')}
-                    className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 btn-haptic"
-                  >
-                    <Clock size={16} />
-                    <span>Agendar Próxima Cita</span>
-                  </button>
-                )}
-
-                {onCreateKanban && (
-                  <button
-                    type="button"
-                    disabled={treatmentProcedures.length === 0 || isCreatingKanban}
-                    onClick={() => onCreateKanban(buildTreatmentPlan())}
-                    className="py-2.5 px-4 bg-primary text-primary-foreground rounded-xl text-xs font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs btn-haptic"
-                  >
-                    {isCreatingKanban ? (
-                      <>
-                        <RefreshCw size={14} className="animate-spin" />
-                        <span>Creando orden...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap size={16} /> Enviar a Kanban Clínico
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleSaveWithPlan}
-                  disabled={isSaving}
-                  className="py-2.5 px-4 bg-card border border-border text-foreground rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-2xs btn-haptic"
-                >
-                  {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-                  <span>Guardar Odontograma & Plan</span>
-                </button>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
