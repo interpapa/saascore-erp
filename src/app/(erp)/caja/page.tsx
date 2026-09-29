@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef, Suspense } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
 import { processSecureCheckout } from '@/app/actions/checkout';
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
-import { createDocumentAction } from '@/app/actions/documents';
+import { createDocumentAction, getDocumentsAction, updateDocumentStatusAction } from '@/app/actions/documents';
 import { getCashSessionStatusAction, CashSession } from '@/app/actions/cashRegister';
 import { getBankAccountsAction, createBankAccountAction, BankAccount } from '@/app/actions/bankAccounts';
 import { getExchangeRateAction, updateExchangeRateAction, syncLiveBCVRateAction } from '@/app/actions/currency';
@@ -34,6 +34,7 @@ import {
   X, 
   ChevronDown, 
   ChevronUp, 
+  ChevronRight, 
   Truck, 
   LayoutGrid, 
   List, 
@@ -157,6 +158,11 @@ function CajaPageContent() {
   const [isSaving, setIsSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
+
+  // Consultas Odontológicas Pendientes de Cobro (Despachadas desde Sillón)
+  const [pendingDentalOrders, setPendingDentalOrders] = useState<any[]>([]);
+  const [linkedDentalDocId, setLinkedDentalDocId] = useState<string | null>(null);
+  const [isDentalOrdersModalOpen, setIsDentalOrdersModalOpen] = useState(false);
 
   // Formulario Nuevo Cliente Rápido
   const [docPrefix, setDocPrefix] = useState<'V' | 'J' | 'E' | 'G'>('V');
@@ -294,11 +300,87 @@ function CajaPageContent() {
         });
         setRateInput((rateRes.rateData.rate || 36.5).toFixed(2));
       }
+
+      // Cargar órdenes de consulta dental pendientes de cobro
+      try {
+        const dentalDocsRes = await getDocumentsAction(currentTenant.id, 'quote', 20, actor);
+        if (dentalDocsRes?.success && dentalDocsRes.documents) {
+          const pending = dentalDocsRes.documents.filter((d: any) =>
+            (d.status === 'draft' || d.status === 'pending') &&
+            (d.metadata?.payment_status === 'pending_cashier' || d.metadata?.source === 'dental_consultation')
+          );
+          setPendingDentalOrders(pending);
+        }
+      } catch (dErr) {
+        console.error('Error buscando órdenes dentales:', dErr);
+      }
     } catch (err) {
       console.error('Error cargando POS:', err);
     } finally {
       setLoadingData(false);
     }
+  };
+
+  const loadPendingDentalOrders = useCallback(async () => {
+    if (!currentTenant?.id || !actor) return;
+    try {
+      const res = await getDocumentsAction(currentTenant.id, 'quote', 20, actor);
+      if (res?.success && res.documents) {
+        const pending = res.documents.filter((d: any) =>
+          (d.status === 'draft' || d.status === 'pending') &&
+          (d.metadata?.payment_status === 'pending_cashier' || d.metadata?.source === 'dental_consultation')
+        );
+        setPendingDentalOrders(pending);
+      }
+    } catch (err) {
+      console.error('Error cargando órdenes dentales:', err);
+    }
+  }, [currentTenant?.id, actor]);
+
+  const handleLoadDentalOrder = (order: any) => {
+    const meta = order.metadata || {};
+    const items = meta.items || [];
+    const customerId = order.entity_id || order.entity?.id;
+
+    if (items.length > 0) {
+      const lines = items.map((it: any) => ({
+        item: {
+          id: it.id || `dental-${it.toothNum}-${(it.procedureName || 'tx').replace(/\s+/g, '-').toLowerCase()}`,
+          name: `${it.procedureName} (Pieza ${it.toothNum})`,
+          base_price: Number(it.cost || 0),
+          type: 'service',
+          category: 'Odontología',
+        },
+        quantity: 1,
+      }));
+      setTicketLines(lines);
+    } else if (order.total_amount > 0) {
+      setTicketLines([
+        {
+          item: {
+            id: `dental-order-${order.id}`,
+            name: meta.title || `Consulta Odontológica #${order.document_number}`,
+            base_price: Number(order.total_amount),
+            type: 'service',
+            category: 'Odontología',
+          },
+          quantity: 1,
+        },
+      ]);
+    }
+
+    if (customerId) {
+      setSelectedCustomer(customerId);
+    }
+
+    setLinkedDentalDocId(order.id);
+    setIsDentalOrdersModalOpen(false);
+
+    toast({
+      variant: 'success',
+      title: 'Consulta Dental Cargada',
+      description: `Orden #${order.document_number} cargada en caja. Procede a registrar el cobro.`,
+    });
   };
 
   useEffect(() => {
@@ -797,6 +879,13 @@ function CajaPageContent() {
           });
         }
 
+        // Liquidar orden dental vinculada si existía
+        if (linkedDentalDocId) {
+          updateDocumentStatusAction(linkedDentalDocId, 'invoiced', currentTenant.id, effectiveActor).catch(console.error);
+          setLinkedDentalDocId(null);
+          loadPendingDentalOrders();
+        }
+
         // Generar datos para Comprobante Térmico y WhatsApp
         const saleReceipt: SaleReceiptData = {
           documentNumber: result.document?.document_number || `DOC-${Date.now().toString().slice(-6)}`,
@@ -977,6 +1066,37 @@ function CajaPageContent() {
           </button>
         </div>
       </div>
+
+      {/* BANNER DE CONSULTAS ODONTOLÓGICAS PENDIENTES DE COBRO */}
+      {pendingDentalOrders.length > 0 && (
+        <div className="bg-linear-to-r from-teal-500/15 via-cyan-500/10 to-transparent border border-teal-500/30 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-xs animate-in slide-in-from-top duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-teal-500 text-white flex items-center justify-center font-black text-lg shadow-sm shadow-teal-500/30 shrink-0">
+              🦷
+            </div>
+            <div>
+              <p className="text-xs font-black text-foreground flex items-center gap-2">
+                <span>{pendingDentalOrders.length} Consulta(s) Odontológica(s) por Cobrar</span>
+                <span className="text-[10px] px-2 py-0.2 rounded-full bg-teal-500 text-white font-bold">
+                  Sillón Dental
+                </span>
+              </p>
+              <p className="text-[11px] text-slate-500">
+                El odontólogo ha enviado la orden de consulta para liquidación en mostrador.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsDentalOrdersModalOpen(true)}
+            className="px-4 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black transition-all shadow-md shadow-teal-500/20 flex items-center gap-1.5 shrink-0 btn-haptic"
+          >
+            <span>Ver y Cargar ({pendingDentalOrders.length})</span>
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           2. LAYOUT PRINCIPAL EN 2 COLUMNAS (CATÁLOGO + TICKET)
@@ -2627,6 +2747,96 @@ function CajaPageContent() {
                 type="button"
                 onClick={() => setIsHeldModalOpen(false)}
                 className="px-4 py-2 rounded-xl border border-border text-foreground font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONSULTAS ODONTOLÓGICAS POR COBRAR EN MOSTRADOR */}
+      {isDentalOrdersModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in" onClick={() => setIsDentalOrdersModalOpen(false)} />
+          <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
+              <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                <span className="text-lg">🦷</span>
+                <span>Consultas Odontológicas por Cobrar</span>
+              </h3>
+              <button onClick={() => setIsDentalOrdersModalOpen(false)} className="text-slate-400 hover:text-foreground">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+              {pendingDentalOrders.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 space-y-1">
+                  <p className="text-xs font-bold">No hay consultas odontológicas pendientes de cobro</p>
+                  <p className="text-[11px] text-slate-500">
+                    Cuando los odontólogos despachen una orden desde el sillón, aparecerá aquí automáticamente.
+                  </p>
+                </div>
+              ) : (
+                pendingDentalOrders.map((order) => {
+                  const meta = order.metadata || {};
+                  const items = meta.items || [];
+                  const patientName = order.entity?.name || meta.title || 'Paciente';
+
+                  return (
+                    <div
+                      key={order.id}
+                      className="p-4 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/40 space-y-2.5 hover:border-teal-500/50 transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-black text-foreground">{patientName}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">
+                            Orden: #{order.document_number} · Dr: {meta.created_by_doctor || 'Odontólogo'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black font-mono text-teal-600 dark:text-teal-400 block">
+                            ${Number(order.total_amount || 0).toFixed(2)}
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            Bs. {(Number(order.total_amount || 0) * exchangeRate.rate).toLocaleString('es-VE', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Procedimientos incluidos */}
+                      {items.length > 0 && (
+                        <div className="space-y-1 py-1.5 border-t border-border/40 text-[11px]">
+                          {items.map((it: any, iIdx: number) => (
+                            <div key={iIdx} className="flex justify-between text-slate-600 dark:text-slate-300">
+                              <span>• {it.procedureName} (Pieza {it.toothNum})</span>
+                              <span className="font-mono font-bold">${Number(it.cost || 0).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => handleLoadDentalOrder(order)}
+                        className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 btn-haptic"
+                      >
+                        <ShoppingCart size={14} />
+                        <span>Cargar al Ticket de Caja</span>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-border shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsDentalOrdersModalOpen(false)}
+                className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 Cerrar
               </button>

@@ -176,6 +176,7 @@ export function Odontogram({
   const [viewMode, setViewMode] = useState<'arch' | 'grid'>('arch');
   const [selectedTooth, setSelectedTooth] = useState<string | null>(null);
   const [activeCondition, setActiveCondition] = useState<string>('caries');
+  const [clinicalStatus, setClinicalStatus] = useState<'existente' | 'planificado' | 'realizado'>('planificado');
   const [customConditionLabel, setCustomConditionLabel] = useState('');
   const [customConditionColor, setCustomConditionColor] = useState('#14b8a6');
   const [showSupernumeraryModal, setShowSupernumeraryModal] = useState(false);
@@ -233,8 +234,8 @@ export function Odontogram({
         newConditions = currentConditions.filter(c => c.code !== condCode);
       } else {
         const newCond: ToothCondition = condCode === 'custom'
-          ? { code: 'custom', label: customConditionLabel || 'Personalizado', color: customConditionColor, faces: [] }
-          : { code: condCode, faces: [] };
+          ? { code: 'custom', label: customConditionLabel || 'Personalizado', color: customConditionColor, faces: [], status: clinicalStatus }
+          : { code: condCode, faces: [], status: clinicalStatus };
         newConditions = [...currentConditions, newCond];
       }
 
@@ -247,10 +248,11 @@ export function Odontogram({
 
       return { ...prev, teeth: updatedTeeth };
     });
-  }, [customConditionLabel, customConditionColor]);
+  }, [customConditionLabel, customConditionColor, clinicalStatus]);
 
   // Alternar cara específica (Vestibular, Lingual, Mesial, Distal, Oclusal) en la patología activa
-  const toggleFaceOnCondition = (toothNum: string, faceName: string) => {
+  const toggleFaceOnCondition = (toothNum: string, faceName: string, statusOverride?: 'existente' | 'planificado' | 'realizado') => {
+    const finalStatus = statusOverride || clinicalStatus;
     setSelectedTooth(toothNum);
     setChart(prev => {
       const existing = prev.teeth[toothNum] || { number: toothNum, conditions: [] };
@@ -261,12 +263,12 @@ export function Odontogram({
       if (condIndex === -1) {
         // Si no la tiene, agregar la condición con esta cara seleccionada
         const newCond: ToothCondition = activeCondition === 'custom'
-          ? { code: 'custom', label: customConditionLabel || 'Personalizado', color: customConditionColor, faces: [faceName] }
-          : { code: activeCondition, faces: [faceName] };
+          ? { code: 'custom', label: customConditionLabel || 'Personalizado', color: customConditionColor, faces: [faceName], status: finalStatus }
+          : { code: activeCondition, faces: [faceName], status: finalStatus };
         currentConditions.push(newCond);
       } else {
         // Si ya existe, alternar la cara
-        const cond = { ...currentConditions[condIndex] };
+        const cond = { ...currentConditions[condIndex], status: finalStatus };
         const faces = Array.isArray(cond.faces) ? [...cond.faces] : [];
         if (faces.includes(faceName)) {
           cond.faces = faces.filter(f => f !== faceName);
@@ -546,17 +548,65 @@ export function Odontogram({
         </div>
       </div>
 
-      {/* Paleta de Patologías y Tratamientos con Estilo Cerámico */}
-      <div className="p-4 bg-card border border-border rounded-2xl space-y-2.5 shadow-xs">
+      {/* Paleta de Patologías y Tratamientos con Selector de Estado Clínico */}
+      <div className="p-4 bg-card border border-border rounded-2xl space-y-3 shadow-xs">
+        {/* Selector de Estado Clínico de la Condición */}
+        <div className="flex items-center justify-between pb-2.5 border-b border-border flex-wrap gap-2">
+          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+            Estado de la Patología / Procedimiento:
+          </span>
+          <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-border">
+            <button
+              type="button"
+              onClick={() => setClinicalStatus('existente')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                clinicalStatus === 'existente'
+                  ? 'bg-slate-700 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
+              title="Lo que el paciente ya traía hecho de antes por otro odontólogo (Informativo, no suma al presupuesto)"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
+              <span>⚪ Existente Previo (No cobra)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setClinicalStatus('planificado')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                clinicalStatus === 'planificado'
+                  ? 'bg-rose-500 text-white shadow-xs font-black'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
+              title="Diagnóstico activo o procedimiento propuesto hoy para realizar (Suma al presupuesto y a cobrar)"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-white" />
+              <span>🔴 Planificado Hoy (Presupuesta)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setClinicalStatus('realizado')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                clinicalStatus === 'realizado'
+                  ? 'bg-emerald-600 text-white shadow-xs font-black'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
+              title="Procedimiento concluido con éxito por nuestro equipo en clínica"
+            >
+              <span className="w-2.5 h-2.5 rounded-full bg-white" />
+              <span>🟢 Realizado en Clínica</span>
+            </button>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
             <span>Patología Activa para Aplicar:</span>
             <span className="text-[10px] text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-full font-bold">
-              Haz clic en cualquier diente o cara
+              Haz clic en cualquier cara o diente
             </span>
           </p>
           <span className="text-[11px] text-slate-400 font-medium">
-            {CONDITIONS[activeCondition]?.label} seleccionado
+            {CONDITIONS[activeCondition]?.label} ({clinicalStatus})
           </span>
         </div>
 
@@ -605,15 +655,16 @@ export function Odontogram({
         )}
       </div>
 
-      {/* Render Principal: Vista de Arcada Anatómica (Boca 3D) o Cuadrícula FDI */}
+      {/* Render Principal: Vista de Arcada Anatómica en Herradura o Cuadrícula FDI */}
       {viewMode === 'arch' ? (
         <DentalArch
           teeth={chart.teeth}
           selectedTooth={selectedTooth}
           onSelectTooth={handleToothClick}
           mode={chart.mode}
+          clinicalStatus={clinicalStatus}
           onExfoliateAndErupt={handleExfoliateAndErupt}
-          onToggleFace={(toothNum, face) => toggleFaceOnCondition(toothNum, face)}
+          onToggleFace={(toothNum, face, status) => toggleFaceOnCondition(toothNum, face, status)}
           activeCondition={activeCondition}
           supernumeraryTeeth={chart.supernumeraryTeeth}
         />
@@ -720,68 +771,42 @@ export function Odontogram({
         </div>
       )}
 
-      {/* ESTUDIO ANATÓMICO 3D DEL DIENTE SELECCIONADO (INSPECTOR DE ALTA PRECISIÓN) */}
-      {selectedTooth && specimen3D && (
-        <div className="p-6 bg-linear-to-br from-slate-900 via-slate-950 to-slate-900 border-2 border-teal-500/40 rounded-3xl space-y-5 animate-in fade-in zoom-in-95 duration-200 shadow-2xl text-white">
-          {/* Cabecera del Inspector */}
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4 flex-wrap gap-2">
-            <div className="flex items-center gap-3">
-              <span className="text-xl font-black font-mono text-teal-400 bg-teal-500/10 border border-teal-500/30 px-3 py-1 rounded-xl">
+      {/* INSPECTOR COMPACTO DEL DIENTE SELECCIONADO */}
+      {selectedTooth && (
+        <div className="p-4 bg-slate-900 border border-teal-500/40 rounded-3xl shadow-xl space-y-3 animate-in fade-in zoom-in-95 duration-150 text-white">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 flex-wrap gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="text-base font-black font-mono text-teal-400 bg-teal-500/10 border border-teal-500/30 px-2.5 py-0.5 rounded-lg">
                 #{selectedTooth}
               </span>
               <div>
-                <h4 className="text-base font-black text-white flex items-center gap-2">
+                <h4 className="text-sm font-black text-white flex items-center gap-2">
                   <span>{TOOTH_NAMES[selectedTooth] || `Pieza ${selectedTooth}`}</span>
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold">
-                    {specimen3D.badge}
-                  </span>
+                  {specimen3D && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 font-bold border border-teal-500/30">
+                      {specimen3D.badge}
+                    </span>
+                  )}
                 </h4>
-                <p className="text-xs text-slate-400 font-medium">
-                  {specimen3D.desc}
-                </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setSelectedTooth(null)}
-              className="text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 transition-colors font-bold"
+              className="text-xs text-slate-400 hover:text-white px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors font-bold"
             >
-              Cerrar Estudio ✕
+              ✕ Cerrar
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* 1. Visor Fotográfico 3D de la Pieza */}
-            <div className="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center relative overflow-hidden group shadow-inner">
-              <div className="relative w-48 h-48 sm:w-56 sm:h-56 rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl">
-                <img
-                  src={specimen3D.src}
-                  alt={`Modelo 3D Pieza ${selectedTooth}`}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none" />
-                <span className="absolute bottom-2 left-2 text-[10px] font-black uppercase tracking-wider text-teal-400 bg-slate-900/90 px-2 py-0.5 rounded-md border border-teal-500/30">
-                  Render 3D 8K
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 text-center mt-3 font-medium">
-                {specimen3D.type} · Visualización Oclusal & Radicular
-              </p>
-            </div>
-
-            {/* 2. Selector Anatómico de 5 Caras Clínicas FDI */}
-            <div className="lg:col-span-4 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h5 className="text-xs font-black text-teal-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Activity size={14} />
-                  <span>Caras Clínicas Afectadas:</span>
-                </h5>
-                <span className="text-[10px] text-slate-400">Clic en cara para marcar</span>
-              </div>
-
-              {/* Roseta / Cruciforme Clínico de las 5 Caras Dentales */}
-              <div className="flex flex-col items-center justify-center py-2 space-y-1.5">
-                {/* Vestibular (Arriba) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            {/* Roseta de 5 Caras Clínicas */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-teal-400 flex items-center gap-1">
+                <Activity size={13} /> Marcar Cara:
+              </span>
+              <div className="flex flex-col items-center justify-center space-y-1">
+                {/* Vestibular */}
                 {(() => {
                   const activeFaces = selectedToothData?.conditions.flatMap(c => c.faces || []) || [];
                   const isVActive = activeFaces.includes('vestibular');
@@ -789,10 +814,10 @@ export function Odontogram({
                     <button
                       type="button"
                       onClick={() => toggleFaceOnCondition(selectedTooth, 'vestibular')}
-                      className={`w-36 py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      className={`w-32 py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
                         isVActive
-                          ? 'bg-teal-500 text-white border-teal-400 shadow-md font-black'
-                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-teal-500/50'
+                          ? 'bg-teal-500 text-white border-teal-400 shadow-xs font-black'
+                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-teal-500/50'
                       }`}
                     >
                       Vestibular (V)
@@ -800,8 +825,8 @@ export function Odontogram({
                   );
                 })()}
 
-                {/* Mesial - Oclusal - Distal (Fila Central) */}
-                <div className="flex items-center gap-1.5">
+                {/* Mesial / Oclusal / Distal */}
+                <div className="flex items-center gap-1">
                   {(() => {
                     const activeFaces = selectedToothData?.conditions.flatMap(c => c.faces || []) || [];
                     const isMActive = activeFaces.includes('mesial');
@@ -812,42 +837,42 @@ export function Odontogram({
                         <button
                           type="button"
                           onClick={() => toggleFaceOnCondition(selectedTooth, 'mesial')}
-                          className={`w-24 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          className={`w-20 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                             isMActive
-                              ? 'bg-teal-500 text-white border-teal-400 shadow-md font-black'
-                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-teal-500/50'
+                              ? 'bg-teal-500 text-white border-teal-400 shadow-xs font-black'
+                              : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-teal-500/50'
                           }`}
                         >
-                          Mesial (M)
+                          Mesial
                         </button>
                         <button
                           type="button"
                           onClick={() => toggleFaceOnCondition(selectedTooth, 'oclusal')}
-                          className={`w-28 py-3 rounded-xl text-xs font-black transition-all border ${
+                          className={`w-24 py-2 rounded-lg text-xs font-black transition-all border ${
                             isOActive
-                              ? 'bg-cyan-500 text-white border-cyan-400 shadow-lg scale-105'
-                              : 'bg-slate-800 border-slate-600 text-white hover:border-cyan-500/50'
+                              ? 'bg-cyan-500 text-white border-cyan-400 shadow-md scale-102 font-black'
+                              : 'bg-slate-700 border-slate-600 text-white hover:border-cyan-500/50'
                           }`}
                         >
-                          Oclusal (O)
+                          Oclusal
                         </button>
                         <button
                           type="button"
                           onClick={() => toggleFaceOnCondition(selectedTooth, 'distal')}
-                          className={`w-24 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          className={`w-20 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                             isDActive
-                              ? 'bg-teal-500 text-white border-teal-400 shadow-md font-black'
-                              : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-teal-500/50'
+                              ? 'bg-teal-500 text-white border-teal-400 shadow-xs font-black'
+                              : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-teal-500/50'
                           }`}
                         >
-                          Distal (D)
+                          Distal
                         </button>
                       </>
                     );
                   })()}
                 </div>
 
-                {/* Lingual / Palatino (Abajo) */}
+                {/* Lingual / Palatino */}
                 {(() => {
                   const activeFaces = selectedToothData?.conditions.flatMap(c => c.faces || []) || [];
                   const isLActive = activeFaces.includes('lingual');
@@ -855,92 +880,72 @@ export function Odontogram({
                     <button
                       type="button"
                       onClick={() => toggleFaceOnCondition(selectedTooth, 'lingual')}
-                      className={`w-36 py-2 px-3 rounded-xl text-xs font-bold transition-all border ${
+                      className={`w-32 py-1.5 px-2 rounded-lg text-xs font-bold transition-all border ${
                         isLActive
-                          ? 'bg-teal-500 text-white border-teal-400 shadow-md font-black'
-                          : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-teal-500/50'
+                          ? 'bg-teal-500 text-white border-teal-400 shadow-xs font-black'
+                          : 'bg-slate-800 border-slate-700 text-slate-300 hover:border-teal-500/50'
                       }`}
                     >
-                      Lingual / Palatino (L)
+                      Lingual (L)
                     </button>
                   );
                 })()}
               </div>
-
-              {/* Condiciones y Caras Registradas */}
-              <div className="pt-2 border-t border-slate-800 space-y-1.5">
-                <span className="text-[11px] font-bold text-slate-400">Patologías registradas en pieza:</span>
-                {(selectedToothData?.conditions || []).length === 0 ? (
-                  <p className="text-xs text-slate-500 italic">Pieza sana (sin lesiones registradas).</p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {selectedToothData?.conditions.map((cond, idx) => {
-                      const def = CONDITIONS[cond.code];
-                      const facesText = (cond.faces && cond.faces.length > 0)
-                        ? ` (${cond.faces.map(f => f.slice(0, 1).toUpperCase()).join(',')})`
-                        : '';
-                      return (
-                        <div
-                          key={idx}
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border"
-                          style={{
-                            backgroundColor: (cond.color || def?.color || '#3b82f6') + '33',
-                            borderColor: cond.color || def?.color || '#3b82f6',
-                            color: cond.color || def?.color || '#38bdf8',
-                          }}
-                        >
-                          <span>{def?.symbol || '•'}</span>
-                          <span>{(cond.label || def?.label || cond.code) + facesText}</span>
-                          <button
-                            type="button"
-                            onClick={() => toggleConditionOnTooth(selectedTooth, cond.code)}
-                            className="hover:scale-125 transition-transform ml-1 text-slate-400 hover:text-red-400"
-                            title="Remover patología"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
 
-            {/* 3. Aranceles Oficiales y Presupuesto Inmediato */}
-            <div className="lg:col-span-4 bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <h5 className="text-xs font-black text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Sparkles size={14} />
-                  <span>Tratamientos para Pieza #{selectedTooth}:</span>
-                </h5>
-                <span className="text-[10px] text-slate-400">Arancel Oficial</span>
-              </div>
-
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
-                {catalog
-                  .filter(p => p.applicableTo === 'tooth' || p.applicableTo === 'mouth')
-                  .slice(0, 7)
-                  .map(proc => (
-                    <button
-                      key={proc.id}
-                      type="button"
-                      onClick={() => handleAddProcedureFromCatalog(proc, selectedTooth)}
-                      className="w-full p-2.5 rounded-xl border border-slate-800 bg-slate-900/90 hover:border-teal-500/60 hover:bg-slate-800/80 text-left transition-all flex items-center justify-between group shadow-xs btn-haptic"
-                    >
-                      <div className="truncate pr-2">
-                        <p className="text-xs font-bold text-white group-hover:text-teal-400 transition-colors truncate">
-                          {proc.name}
-                        </p>
-                        <span className="text-[10px] text-slate-400">
-                          {proc.categoryLabel} · {proc.sessionsRequired > 1 ? `${proc.sessionsRequired} sesiones` : '1 cita'}
-                        </span>
+            {/* Condiciones Registradas y Tratamientos */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold text-slate-400">Patologías en pieza #{selectedTooth}:</span>
+              {(selectedToothData?.conditions || []).length === 0 ? (
+                <p className="text-xs text-slate-500 italic">Pieza sana (sin lesiones registradas).</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedToothData?.conditions.map((cond, idx) => {
+                    const def = CONDITIONS[cond.code];
+                    const facesText = (cond.faces && cond.faces.length > 0)
+                      ? ` (${cond.faces.map(f => f.slice(0, 1).toUpperCase()).join(',')})`
+                      : '';
+                    const statusText = cond.status === 'existente' ? '⚪ Previo' : cond.status === 'realizado' ? '🟢 Hecho' : '🔴 Plan';
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border"
+                        style={{
+                          backgroundColor: (cond.color || def?.color || '#3b82f6') + '22',
+                          borderColor: cond.color || def?.color || '#3b82f6',
+                          color: cond.color || def?.color || '#38bdf8',
+                        }}
+                      >
+                        <span>{statusText}</span>
+                        <span>{(cond.label || def?.label || cond.code) + facesText}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleConditionOnTooth(selectedTooth, cond.code)}
+                          className="hover:scale-125 transition-transform ml-1 text-slate-400 hover:text-red-400"
+                          title="Remover patología"
+                        >
+                          ✕
+                        </button>
                       </div>
-                      <span className="text-xs font-mono font-black text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg shrink-0 border border-teal-500/20">
-                        ${proc.defaultPriceUSD.toFixed(2)}
-                      </span>
-                    </button>
-                  ))}
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Botón rápido para agregar procedimiento sugerido al plan */}
+              <div className="pt-2 border-t border-slate-800 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const match = catalog.find(p => p.conditionCode === activeCondition);
+                    if (match) {
+                      handleAddProcedureFromCatalog(match, selectedTooth);
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Plus size={14} /> + Agregar {CONDITIONS[activeCondition]?.label} al Plan
+                </button>
               </div>
 
               {/* Observación de la Pieza */}
@@ -961,7 +966,7 @@ export function Odontogram({
                   });
                 }}
                 placeholder={`Notas clínicas sobre pieza #${selectedTooth}...`}
-                className="w-full text-xs bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                className="w-full text-xs bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 mt-1"
               />
             </div>
           </div>

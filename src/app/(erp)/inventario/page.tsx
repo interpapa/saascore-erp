@@ -39,6 +39,8 @@ import { useRouter } from 'next/navigation';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { exportToCSV } from '@/lib/core/exportToCSV';
+import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
+import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 
 type TabType = 'items' | 'services' | 'reorder' | 'audit';
 
@@ -66,6 +68,34 @@ export default function InventarioPage() {
   const { toast } = useToast();
   const router = useRouter();
   const actor = useActionActor();
+
+  const isDentalActive = isModuleActive(
+    activeTenant?.active_modules || (activeTenant?.metadata as any)?.active_modules,
+    'odontologia'
+  );
+  const [isSyncingDental, setIsSyncingDental] = useState(false);
+
+  const handleSyncDentalProcedures = async () => {
+    if (!activeTenant?.id || !actor || isSyncingDental) return;
+    try {
+      setIsSyncingDental(true);
+      const res = await syncDentalCatalogToInventoryAction(activeTenant.id, actor);
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Procedimientos Dentales Sincronizados',
+          description: `Se sembraron ${res.seededCount} nuevos procedimientos dentales en el catálogo.`,
+        });
+        fetchItems();
+      } else {
+        toast({ variant: 'error', title: 'Error', description: res.error });
+      }
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error', description: (err as Error).message });
+    } finally {
+      setIsSyncingDental(false);
+    }
+  };
 
   const fetchItems = useCallback(async () => {
     try {
@@ -327,14 +357,32 @@ export default function InventarioPage() {
   const categories = useMemo(() => {
     const set = new Set<string>();
     items.forEach((i) => {
+      if (
+        !isDentalActive &&
+        (i.category?.toLowerCase() === 'odontología' ||
+          i.category?.toLowerCase() === 'odontologia' ||
+          (i.metadata as any)?.is_dental)
+      ) {
+        return;
+      }
       if (i.category) set.add(i.category);
     });
     return Array.from(set).sort();
-  }, [items]);
+  }, [items, isDentalActive]);
 
   // Filtrado de Artículos
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
+      // Ocultar ítems de odontología si el módulo está inactivo
+      if (
+        !isDentalActive &&
+        (item.category?.toLowerCase() === 'odontología' ||
+          item.category?.toLowerCase() === 'odontologia' ||
+          (item.metadata as any)?.is_dental)
+      ) {
+        return false;
+      }
+
       // Filtro por Tab Principal
       if (activeTab === 'items' && item.type !== 'product') return false;
       if (activeTab === 'services' && item.type !== 'service') return false;
@@ -469,6 +517,18 @@ export default function InventarioPage() {
             <FileSpreadsheet size={15} />
             Importar
           </button>
+
+          {isDentalActive && (
+            <button
+              onClick={handleSyncDentalProcedures}
+              disabled={isSyncingDental}
+              className="btn-base bg-teal-600/10 hover:bg-teal-600/20 text-teal-700 dark:text-teal-400 font-bold text-xs px-3 py-2.5 rounded-xl border border-teal-500/30 btn-haptic flex items-center gap-1.5"
+              title="Sincronizar procedimientos maestros de odontología en este catálogo"
+            >
+              <span>🦷</span>
+              <span>{isSyncingDental ? 'Sincronizando...' : 'Sincronizar Odontología'}</span>
+            </button>
+          )}
 
           <button
             onClick={() => {

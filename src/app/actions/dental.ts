@@ -13,6 +13,9 @@ export interface ToothCondition {
   label?: string;  // Para condiciones personalizadas
   notes?: string;
   color?: string;  // Para condiciones personalizadas
+  status?: 'existente' | 'planificado' | 'realizado'; // ⚪ Existente (otro dentista, no cobra), 🔴 Planificado (hoy, presupuesta), 🟢 Realizado (hecho por nosotros)
+  date?: string;
+  performer?: string;
 }
 
 export interface ToothData {
@@ -435,6 +438,234 @@ export async function getDentalOverviewAction(
     };
   } catch (err: unknown) {
     console.error('[getDentalOverviewAction]:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+export interface DentalEvolutionEntry {
+  id: string;
+  patientId: string;
+  note: string;
+  teethInvolved?: string[];
+  doctorName?: string;
+  createdAt: string;
+  extraConsumables?: Array<{ itemId: string; name: string; quantity: number; cost?: number }>;
+  prescription?: {
+    medications: Array<{ drug: string; dosage: string; frequency: string; duration: string }>;
+    indications?: string;
+  };
+}
+
+/**
+ * Guarda una nota médica de evolución en la historia clínica del paciente.
+ * Si se especificaron insumos descartables especiales consumidos, descuenta su stock físico en `items`.
+ */
+export async function saveDentalEvolutionAction(
+  patientId: string,
+  payload: Omit<DentalEvolutionEntry, 'id' | 'createdAt'>,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; evolutionId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) {
+      return { success: false, error: 'ID de paciente no válido.' };
+    }
+
+    const evolutionData: DentalEvolutionEntry = {
+      id: `evo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      patientId,
+      note: payload.note,
+      teethInvolved: payload.teethInvolved || [],
+      doctorName: payload.doctorName || actor.email,
+      createdAt: new Date().toISOString(),
+      extraConsumables: payload.extraConsumables || [],
+      prescription: payload.prescription,
+    };
+
+    // Guardar en entity_records como registro de evolución
+    const { data: record, error: insertErr } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        tenant_id: tenantId,
+        entity_id: patientId,
+        record_type: 'dental_evolution',
+        title: `Evolución Dental — ${new Date().toLocaleDateString('es-VE')}`,
+        notes: payload.note,
+        metadata: evolutionData,
+      })
+      .select('id')
+      .single();
+
+    if (insertErr || !record) {
+      return { success: false, error: insertErr?.message || 'Error al guardar la evolución médica.' };
+    }
+
+    // Descontar inventario de insumos especiales consumidos (si aplica)
+    if (payload.extraConsumables && payload.extraConsumables.length > 0) {
+      for (const item of payload.extraConsumables) {
+        if (isValidUUID(item.itemId)) {
+          const { data: currentItem } = await supabaseAdmin
+            .from('items')
+            .select('stock_quantity')
+            .eq('id', item.itemId)
+            .eq('tenant_id', tenantId)
+            .single();
+
+          if (currentItem && typeof currentItem.stock_quantity === 'number') {
+            const newQty = Math.max(0, currentItem.stock_quantity - item.quantity);
+            await supabaseAdmin
+              .from('items')
+              .update({ stock_quantity: newQty })
+              .eq('id', item.itemId)
+              .eq('tenant_id', tenantId);
+          }
+        }
+      }
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'dental_evolution.saved',
+      target_type: 'entity',
+      target_id: patientId,
+      metadata: { evolutionId: record.id, teethInvolved: payload.teethInvolved },
+    });
+
+    return { success: true, evolutionId: record.id };
+  } catch (err: unknown) {
+    console.error('[saveDentalEvolutionAction]:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Obtiene la lista cronológica de evoluciones médicas de un paciente.
+ */
+export async function getDentalEvolutionsAction(
+  patientId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; evolutions?: DentalEvolutionEntry[]; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) {
+      return { success: false, error: 'ID de paciente no válido.' };
+    }
+
+    const { data: records, error } = await supabaseAdmin
+      .from('entity_records')
+      .select('id, metadata, created_at')
+      .eq('entity_id', patientId)
+      .eq('tenant_id', tenantId)
+      .eq('record_type', 'dental_evolution')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    const evolutions = (records || []).map((r) => {
+      const meta = (r.metadata || {}) as DentalEvolutionEntry;
+      return {
+        ...meta,
+        id: r.id,
+        createdAt: meta.createdAt || r.created_at,
+      };
+    });
+
+    return { success: true, evolutions };
+  } catch (err: unknown) {
+    console.error('[getDentalEvolutionsAction]:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Despacha una orden de consulta dental hacia la Caja POS (Recepción) para que el asistente cobre,
+ * liberando inmediatamente al odontólogo en el sillón para pasar al siguiente paciente.
+ */
+export async function sendDentalOrderToCashierAction(
+  patientId: string,
+  patientName: string,
+  itemsToCharge: Array<{
+    id?: string;
+    toothNum: string;
+    procedureName: string;
+    cost: number;
+    category?: string;
+    notes?: string;
+  }>,
+  amountToCharge: number,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; documentId?: string; documentNumber?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const docNumber = `ORD-DENT-${Date.now().toString().slice(-6)}`;
+    const safeEntityId = isValidUUID(patientId) && !isTemporaryId(patientId) ? patientId : null;
+
+    const docMetadata = {
+      title: `Consulta Odontológica — ${patientName}`,
+      source: 'dental_consultation',
+      pipeline: 'dental',
+      payment_status: 'pending_cashier',
+      items: itemsToCharge,
+      suggested_amount: amountToCharge,
+      created_by_doctor: actor.email,
+    };
+
+    const { data: newDoc, error: docErr } = await supabaseAdmin
+      .from('documents')
+      .insert({
+        tenant_id: tenantId,
+        entity_id: safeEntityId,
+        type: 'quotation',
+        status: 'draft',
+        document_number: docNumber,
+        subtotal_amount: amountToCharge,
+        tax_amount: 0,
+        total_amount: amountToCharge,
+        metadata: docMetadata,
+      })
+      .select('id, document_number')
+      .single();
+
+    if (docErr || !newDoc) {
+      console.error('[sendDentalOrderToCashierAction]:', docErr);
+      return { success: false, error: docErr?.message || 'Error al despachar orden a caja.' };
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'dental_order.dispatched_to_cashier',
+      target_type: 'document',
+      target_id: newDoc.id,
+      metadata: { patientId, patientName, amount: amountToCharge },
+    });
+
+    return { success: true, documentId: newDoc.id, documentNumber: newDoc.document_number };
+  } catch (err: unknown) {
+    console.error('[sendDentalOrderToCashierAction]:', err);
     return { success: false, error: (err as Error).message };
   }
 }
