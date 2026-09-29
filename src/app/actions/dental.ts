@@ -200,15 +200,31 @@ export async function createTreatmentKanbanFromChartAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
-    const steps = treatmentPlan.procedures.map((proc, idx) => ({
-      id: `step-dental-${idx + 1}-${Math.random().toString(36).slice(2, 6)}`,
+    const procedures = Array.isArray(treatmentPlan?.procedures) ? treatmentPlan.procedures : [];
+    const steps = procedures.map((proc, idx) => ({
+      id: proc.id || `step-dental-${idx + 1}-${Math.random().toString(36).slice(2, 6)}`,
       title: `${proc.toothNumber ? `[D${proc.toothNumber}] ` : ''}${proc.procedure}`,
       order: idx + 1,
-      completed: proc.completed,
-      completed_at: null,
+      completed: proc.completed || false,
+      completed_at: proc.completed ? new Date().toISOString() : null,
     }));
 
     const safeEntityId = (entityId && isValidUUID(entityId) && !isTemporaryId(entityId)) ? entityId : null;
+    const nowIso = new Date().toISOString();
+
+    const docMetadata = {
+      title: treatmentPlan.title || `Plan de Tratamiento — ${entityName}`,
+      priority: 'medium',
+      process_mode: 'step_by_step',
+      pipeline: 'dental',
+      steps,
+      total_amount: treatmentPlan.totalCost || 0,
+      paid_amount: 0,
+      source: 'dental_chart',
+      treatment_plan_id: treatmentPlan.id,
+      notes: treatmentPlan.notes || '',
+      issue_date: nowIso,
+    };
 
     let { data: newDoc, error: docErr } = await supabaseAdmin
       .from('documents')
@@ -218,25 +234,16 @@ export async function createTreatmentKanbanFromChartAction(
         type: 'work_order',
         status: 'presupuestado',
         document_number: `OT-DENTAL-${Date.now().toString().slice(-6)}`,
-        issue_date: new Date().toISOString(),
-        metadata: {
-          title: treatmentPlan.title || `Plan de Tratamiento — ${entityName}`,
-          priority: 'medium',
-          process_mode: 'step_by_step',
-          pipeline: 'dental',
-          steps,
-          total_amount: treatmentPlan.totalCost,
-          paid_amount: 0,
-          source: 'dental_chart',
-          treatment_plan_id: treatmentPlan.id,
-          notes: treatmentPlan.notes || '',
-        },
+        subtotal_amount: treatmentPlan.totalCost || 0,
+        tax_amount: 0,
+        total_amount: treatmentPlan.totalCost || 0,
+        metadata: docMetadata,
       })
       .select('id')
       .single();
 
-    if (docErr && (docErr.message.includes('type') || docErr.message.includes('check') || docErr.message.includes('constraint'))) {
-      // Fallback: Si el esquema de base de datos restringe type
+    if (docErr && (docErr.message.includes('type') || docErr.message.includes('check') || docErr.message.includes('constraint') || docErr.message.includes('column') || docErr.message.includes('schema cache'))) {
+      // Fallback: Si el esquema de base de datos restringe type a ('invoice', 'purchase_order', 'quotation')
       const retry = await supabaseAdmin
         .from('documents')
         .insert({
@@ -245,19 +252,12 @@ export async function createTreatmentKanbanFromChartAction(
           type: 'quotation',
           status: 'presupuestado',
           document_number: `OT-DENTAL-${Date.now().toString().slice(-6)}`,
-          issue_date: new Date().toISOString(),
+          subtotal_amount: treatmentPlan.totalCost || 0,
+          tax_amount: 0,
+          total_amount: treatmentPlan.totalCost || 0,
           metadata: {
+            ...docMetadata,
             actual_type: 'work_order',
-            title: treatmentPlan.title || `Plan de Tratamiento — ${entityName}`,
-            priority: 'medium',
-            process_mode: 'step_by_step',
-            pipeline: 'dental',
-            steps,
-            total_amount: treatmentPlan.totalCost,
-            paid_amount: 0,
-            source: 'dental_chart',
-            treatment_plan_id: treatmentPlan.id,
-            notes: treatmentPlan.notes || '',
           },
         })
         .select('id')
@@ -266,7 +266,10 @@ export async function createTreatmentKanbanFromChartAction(
       docErr = retry.error;
     }
 
-    if (docErr || !newDoc) return { success: false, error: docErr?.message || 'Error al crear la orden de trabajo.' };
+    if (docErr || !newDoc) {
+      console.error('[createTreatmentKanbanFromChartAction]:', docErr);
+      return { success: false, error: docErr?.message || 'Error al crear la orden de trabajo.' };
+    }
 
     await writeAuditLog({
       tenant_id: tenantId,

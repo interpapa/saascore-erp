@@ -307,7 +307,7 @@ export async function createAppointmentAction(
     // 2. Fallback: Insert into 'documents' table
     if (error && isMissingTableError(error)) {
       const docStatus = mapApptStatusToDocStatus(payload.status || 'scheduled');
-      const { data: newDoc, error: docErr } = await supabaseAdmin
+      let { data: newDoc, error: docErr } = await supabaseAdmin
         .from('documents')
         .insert([{
           tenant_id: tenantId,
@@ -318,10 +318,10 @@ export async function createAppointmentAction(
           subtotal_amount: payload.price || 0,
           tax_amount: 0,
           total_amount: payload.price || 0,
-          notes: payload.notes || payload.description || null,
           metadata: {
             title: payload.title,
             description: payload.description,
+            notes: payload.notes || payload.description || null,
             service_id: safeServiceId || payload.service_id,
             employee_id: safeEmployeeId || payload.employee_id,
             duration_minutes: payload.duration_minutes || 60,
@@ -334,6 +334,39 @@ export async function createAppointmentAction(
         }])
         .select()
         .single();
+
+      if (docErr && (docErr.message.includes('type') || docErr.message.includes('check') || docErr.message.includes('constraint') || docErr.message.includes('column') || docErr.message.includes('schema cache'))) {
+        const retry = await supabaseAdmin
+          .from('documents')
+          .insert([{
+            tenant_id: tenantId,
+            entity_id: safeClientId,
+            type: 'quotation',
+            status: docStatus,
+            document_number: `CIT-${Date.now().toString().slice(-6)}`,
+            subtotal_amount: payload.price || 0,
+            tax_amount: 0,
+            total_amount: payload.price || 0,
+            metadata: {
+              actual_type: 'work_order',
+              title: payload.title,
+              description: payload.description,
+              notes: payload.notes || payload.description || null,
+              service_id: safeServiceId || payload.service_id,
+              employee_id: safeEmployeeId || payload.employee_id,
+              duration_minutes: payload.duration_minutes || 60,
+              price: payload.price || 0,
+              created_by: actor.email,
+              issue_date: payload.start_time,
+              due_date: calculatedEndTime,
+              ...payload.metadata,
+            },
+          }])
+          .select()
+          .single();
+        newDoc = retry.data;
+        docErr = retry.error;
+      }
 
       if (docErr) throw new Error('Error al guardar cita en respaldo: ' + docErr.message);
 

@@ -105,8 +105,8 @@ export async function getConversationsAction(
           .from('documents')
           .select('*')
           .eq('tenant_id', tenantId)
-          .eq('type', 'whatsapp_log')
-          .order('issue_date', { ascending: false }),
+          .in('type', ['whatsapp_log', 'invoice'])
+          .order('created_at', { ascending: false }),
       ]);
 
       const conversationMap = new Map<string, Conversation>();
@@ -244,7 +244,7 @@ export async function getMessagesAction(
         docQuery = docQuery.eq('document_number', conversationId);
       }
 
-      const { data: logs, error: docErr } = await docQuery.order('issue_date', { ascending: true });
+      const { data: logs, error: docErr } = await docQuery.order('created_at', { ascending: true });
 
       if (docErr) throw new Error(docErr.message);
 
@@ -254,9 +254,9 @@ export async function getMessagesAction(
         tenant_id: log.tenant_id,
         sender_type: log.metadata?.direction === 'inbound' ? 'client' : 'agent',
         sender_name: log.metadata?.direction === 'inbound' ? (log.metadata?.client_name || 'Cliente') : (log.metadata?.created_by || 'Rendo Bot'),
-        text: log.notes || '',
+        text: log.notes || log.metadata?.notes || log.metadata?.text || '',
         status: log.status === 'invoiced' ? 'delivered' : log.status === 'annulled' ? 'failed' : 'sent',
-        timestamp: log.issue_date || log.created_at,
+        timestamp: log.issue_date || log.metadata?.issue_date || log.created_at,
         metadata: log.metadata || {},
         created_at: log.created_at,
       }));
@@ -359,21 +359,21 @@ export async function sendMessageAction(
       const candidateId = input.client_id || input.conversation_id;
       const safeEntityId = (candidateId && isValidUUID(candidateId) && !isTemporaryId(candidateId)) ? candidateId : null;
 
-      const { data: newDoc, error: docErr } = await supabaseAdmin
+      let { data: newDoc, error: docErr } = await supabaseAdmin
         .from('documents')
         .insert([{
           tenant_id: tenantId,
           entity_id: safeEntityId,
-          type: 'whatsapp_log',
+          type: 'invoice',
           status: 'invoiced',
           document_number: input.client_phone || `WA-${Date.now().toString().slice(-6)}`,
-          issue_date: timestamp,
-          due_date: null,
           subtotal_amount: 0,
           tax_amount: 0,
           total_amount: 0,
-          notes: input.text,
           metadata: {
+            actual_type: 'whatsapp_log',
+            issue_date: timestamp,
+            notes: input.text,
             platform: 'whatsapp',
             direction: isInternalNote ? 'internal' : 'outbound',
             created_by: actor.email,

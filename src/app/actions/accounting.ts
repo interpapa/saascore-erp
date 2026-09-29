@@ -153,10 +153,10 @@ export async function getJournalEntriesAction(
         .from('documents')
         .select('*')
         .eq('tenant_id', tenantId)
-        .order('issue_date', { ascending: false });
+        .order('created_at', { ascending: false });
 
-      if (filter?.startDate) docQuery = docQuery.gte('issue_date', filter.startDate);
-      if (filter?.endDate) docQuery = docQuery.lte('issue_date', filter.endDate);
+      if (filter?.startDate) docQuery = docQuery.gte('created_at', filter.startDate);
+      if (filter?.endDate) docQuery = docQuery.lte('created_at', filter.endDate);
 
       const { data: docs } = await docQuery;
 
