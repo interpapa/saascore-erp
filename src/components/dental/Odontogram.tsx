@@ -251,6 +251,7 @@ export function Odontogram({
 
   // Alternar cara específica (Vestibular, Lingual, Mesial, Distal, Oclusal) en la patología activa
   const toggleFaceOnCondition = (toothNum: string, faceName: string) => {
+    setSelectedTooth(toothNum);
     setChart(prev => {
       const existing = prev.teeth[toothNum] || { number: toothNum, conditions: [] };
       const currentConditions = [...(existing.conditions || [])];
@@ -272,15 +273,25 @@ export function Odontogram({
         } else {
           cond.faces = [...faces, faceName];
         }
-        currentConditions[condIndex] = cond;
+
+        // Si se desmarcan todas las caras de caries u obturación, remover la condición
+        if (cond.faces.length === 0 && (activeCondition === 'caries' || activeCondition === 'obturacion')) {
+          currentConditions.splice(condIndex, 1);
+        } else {
+          currentConditions[condIndex] = cond;
+        }
+      }
+
+      const updatedTeeth = { ...prev.teeth };
+      if (currentConditions.length === 0) {
+        delete updatedTeeth[toothNum];
+      } else {
+        updatedTeeth[toothNum] = { ...existing, conditions: currentConditions };
       }
 
       return {
         ...prev,
-        teeth: {
-          ...prev.teeth,
-          [toothNum]: { ...existing, conditions: currentConditions }
-        }
+        teeth: updatedTeeth,
       };
     });
   };
@@ -602,6 +613,9 @@ export function Odontogram({
           onSelectTooth={handleToothClick}
           mode={chart.mode}
           onExfoliateAndErupt={handleExfoliateAndErupt}
+          onToggleFace={(toothNum, face) => toggleFaceOnCondition(toothNum, face)}
+          activeCondition={activeCondition}
+          supernumeraryTeeth={chart.supernumeraryTeeth}
         />
       ) : (
         /* Vista de Cuadrícula FDI Cerámica */

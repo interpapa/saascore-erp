@@ -3,14 +3,17 @@
 import React, { useState } from 'react';
 import { ToothData, ToothCondition } from '@/app/actions/dental';
 import { CONDITIONS } from './Odontogram';
-import { Sparkles, Eye, Layers, ZoomIn, Info } from 'lucide-react';
+import { Sparkles, Layers, ArrowUpCircle, Plus, Eye, Check, X, ShieldAlert } from 'lucide-react';
 
-interface DentalArchProps {
+export interface DentalArchProps {
   teeth: Record<string, ToothData>;
   selectedTooth: string | null;
   onSelectTooth: (toothNum: string) => void;
   mode: 'adult' | 'child' | 'mixed';
   onExfoliateAndErupt?: (childNum: string, adultNum: string) => void;
+  onToggleFace?: (toothNum: string, face: string) => void;
+  activeCondition?: string;
+  supernumeraryTeeth?: ToothData[];
 }
 
 // Relación anatómica de sustitución de dientes de leche por permanentes
@@ -21,7 +24,7 @@ export const CHILD_TO_ADULT_MAP: Record<string, string> = {
   '71': '31', '72': '32', '73': '33', '74': '34', '75': '35',
 };
 
-// Nombres anatómicos en español para tooltips clínicos
+// Nombres anatómicos en español para tooltips y fichas clínicas
 export const TOOTH_NAMES: Record<string, string> = {
   // Cuadrante 1 - Adulto Superior Derecho
   '18': 'Tercer Molar (Cordal)', '17': 'Segundo Molar', '16': 'Primer Molar',
@@ -46,414 +49,668 @@ export const TOOTH_NAMES: Record<string, string> = {
   '81': 'Incisivo Central Inf. Der. (Temporal)', '82': 'Incisivo Lat. Inf. Der. (Temporal)', '83': 'Canino Inf. Der. (Temporal)', '84': 'Primer Molar Inf. Der. (Temporal)', '85': 'Segundo Molar Inf. Der. (Temporal)',
 };
 
-// Coordenadas exactas en porcentaje (%) sobre el render 3D real de estudio (arch_occlusal.jpg 1376x768)
-interface Tooth3DHotspot {
+export type ToothMorphType = 'molar' | 'premolar' | 'canine' | 'incisor';
+
+export interface ToothDef {
   number: string;
-  x: number; // Porcentaje horizontal (0 - 100%)
-  y: number; // Porcentaje vertical (0 - 100%)
+  name: string;
+  type: ToothMorphType;
   arch: 'upper' | 'lower';
-  type: 'molar' | 'premolar' | 'canine' | 'incisor';
+  quadrant: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   isChild?: boolean;
 }
 
-const REAL_3D_TEETH_HOTSPOTS: Tooth3DHotspot[] = [
-  // ==========================================
-  // ARCADA SUPERIOR (MAXILAR - Cuadrantes 1 y 2)
-  // ==========================================
-  { number: '18', x: 15.5, y: 37.0, arch: 'upper', type: 'molar' },
-  { number: '17', x: 19.5, y: 36.0, arch: 'upper', type: 'molar' },
-  { number: '16', x: 24.0, y: 34.5, arch: 'upper', type: 'molar' },
-  { number: '15', x: 29.0, y: 33.5, arch: 'upper', type: 'premolar' },
-  { number: '14', x: 34.0, y: 33.0, arch: 'upper', type: 'premolar' },
-  { number: '13', x: 39.0, y: 33.0, arch: 'upper', type: 'canine' },
-  { number: '12', x: 44.0, y: 34.5, arch: 'upper', type: 'incisor' },
-  { number: '11', x: 48.0, y: 36.0, arch: 'upper', type: 'incisor' },
+// Catálogo maestro de piezas permanentes FDI (32 dientes)
+export const ADULT_TEETH_LIST: ToothDef[] = [
+  // Cuadrante 1 (18 al 11)
+  { number: '18', name: 'Tercer Molar Sup. Der.', type: 'molar', arch: 'upper', quadrant: 1 },
+  { number: '17', name: 'Segundo Molar Sup. Der.', type: 'molar', arch: 'upper', quadrant: 1 },
+  { number: '16', name: 'Primer Molar Sup. Der.', type: 'molar', arch: 'upper', quadrant: 1 },
+  { number: '15', name: 'Segundo Premolar Sup. Der.', type: 'premolar', arch: 'upper', quadrant: 1 },
+  { number: '14', name: 'Primer Premolar Sup. Der.', type: 'premolar', arch: 'upper', quadrant: 1 },
+  { number: '13', name: 'Canino Sup. Der.', type: 'canine', arch: 'upper', quadrant: 1 },
+  { number: '12', name: 'Incisivo Lateral Sup. Der.', type: 'incisor', arch: 'upper', quadrant: 1 },
+  { number: '11', name: 'Incisivo Central Sup. Der.', type: 'incisor', arch: 'upper', quadrant: 1 },
+  // Cuadrante 2 (21 al 28)
+  { number: '21', name: 'Incisivo Central Sup. Izq.', type: 'incisor', arch: 'upper', quadrant: 2 },
+  { number: '22', name: 'Incisivo Lateral Sup. Izq.', type: 'incisor', arch: 'upper', quadrant: 2 },
+  { number: '23', name: 'Canino Sup. Izq.', type: 'canine', arch: 'upper', quadrant: 2 },
+  { number: '24', name: 'Primer Premolar Sup. Izq.', type: 'premolar', arch: 'upper', quadrant: 2 },
+  { number: '25', name: 'Segundo Premolar Sup. Izq.', type: 'premolar', arch: 'upper', quadrant: 2 },
+  { number: '26', name: 'Primer Molar Sup. Izq.', type: 'molar', arch: 'upper', quadrant: 2 },
+  { number: '27', name: 'Segundo Molar Sup. Izq.', type: 'molar', arch: 'upper', quadrant: 2 },
+  { number: '28', name: 'Tercer Molar Sup. Izq.', type: 'molar', arch: 'upper', quadrant: 2 },
 
-  { number: '21', x: 52.0, y: 36.0, arch: 'upper', type: 'incisor' },
-  { number: '22', x: 56.0, y: 34.5, arch: 'upper', type: 'incisor' },
-  { number: '23', x: 61.0, y: 33.0, arch: 'upper', type: 'canine' },
-  { number: '24', x: 66.0, y: 33.0, arch: 'upper', type: 'premolar' },
-  { number: '25', x: 71.0, y: 33.5, arch: 'upper', type: 'premolar' },
-  { number: '26', x: 76.0, y: 34.5, arch: 'upper', type: 'molar' },
-  { number: '27', x: 80.5, y: 36.0, arch: 'upper', type: 'molar' },
-  { number: '28', x: 84.5, y: 37.0, arch: 'upper', type: 'molar' },
-
-  // ==========================================
-  // ARCADA INFERIOR (MANDÍBULA - Cuadrantes 4 y 3)
-  // ==========================================
-  { number: '48', x: 15.0, y: 59.0, arch: 'lower', type: 'molar' },
-  { number: '47', x: 19.0, y: 61.0, arch: 'lower', type: 'molar' },
-  { number: '46', x: 23.5, y: 63.0, arch: 'lower', type: 'molar' },
-  { number: '45', x: 28.5, y: 65.0, arch: 'lower', type: 'premolar' },
-  { number: '44', x: 33.5, y: 66.5, arch: 'lower', type: 'premolar' },
-  { number: '43', x: 38.8, y: 68.0, arch: 'lower', type: 'canine' },
-  { number: '42', x: 43.5, y: 69.0, arch: 'lower', type: 'incisor' },
-  { number: '41', x: 47.8, y: 69.5, arch: 'lower', type: 'incisor' },
-
-  { number: '31', x: 52.2, y: 69.5, arch: 'lower', type: 'incisor' },
-  { number: '32', x: 56.5, y: 69.0, arch: 'lower', type: 'incisor' },
-  { number: '33', x: 61.2, y: 68.0, arch: 'lower', type: 'canine' },
-  { number: '34', x: 66.5, y: 66.5, arch: 'lower', type: 'premolar' },
-  { number: '35', x: 71.5, y: 65.0, arch: 'lower', type: 'premolar' },
-  { number: '36', x: 76.5, y: 63.0, arch: 'lower', type: 'molar' },
-  { number: '37', x: 81.0, y: 61.0, arch: 'lower', type: 'molar' },
-  { number: '38', x: 85.0, y: 59.0, arch: 'lower', type: 'molar' },
+  // Cuadrante 4 (48 al 41)
+  { number: '48', name: 'Tercer Molar Inf. Der.', type: 'molar', arch: 'lower', quadrant: 4 },
+  { number: '47', name: 'Segundo Molar Inf. Der.', type: 'molar', arch: 'lower', quadrant: 4 },
+  { number: '46', name: 'Primer Molar Inf. Der.', type: 'molar', arch: 'lower', quadrant: 4 },
+  { number: '45', name: 'Segundo Premolar Inf. Der.', type: 'premolar', arch: 'lower', quadrant: 4 },
+  { number: '44', name: 'Primer Premolar Inf. Der.', type: 'premolar', arch: 'lower', quadrant: 4 },
+  { number: '43', name: 'Canino Inf. Der.', type: 'canine', arch: 'lower', quadrant: 4 },
+  { number: '42', name: 'Incisivo Lateral Inf. Der.', type: 'incisor', arch: 'lower', quadrant: 4 },
+  { number: '41', name: 'Incisivo Central Inf. Der.', type: 'incisor', arch: 'lower', quadrant: 4 },
+  // Cuadrante 3 (31 al 38)
+  { number: '31', name: 'Incisivo Central Inf. Izq.', type: 'incisor', arch: 'lower', quadrant: 3 },
+  { number: '32', name: 'Incisivo Lateral Inf. Izq.', type: 'incisor', arch: 'lower', quadrant: 3 },
+  { number: '33', name: 'Canino Inf. Izq.', type: 'canine', arch: 'lower', quadrant: 3 },
+  { number: '34', name: 'Primer Premolar Inf. Izq.', type: 'premolar', arch: 'lower', quadrant: 3 },
+  { number: '35', name: 'Segundo Premolar Inf. Izq.', type: 'premolar', arch: 'lower', quadrant: 3 },
+  { number: '36', name: 'Primer Molar Inf. Izq.', type: 'molar', arch: 'lower', quadrant: 3 },
+  { number: '37', name: 'Segundo Molar Inf. Izq.', type: 'molar', arch: 'lower', quadrant: 3 },
+  { number: '38', name: 'Tercer Molar Inf. Izq.', type: 'molar', arch: 'lower', quadrant: 3 },
 ];
 
+// Catálogo maestro de piezas infantiles temporales (20 dientes)
+export const CHILD_TEETH_LIST: ToothDef[] = [
+  // Cuadrante 5 (55 al 51)
+  { number: '55', name: 'Segundo Molar Sup. Der. (Temp)', type: 'molar', arch: 'upper', quadrant: 5, isChild: true },
+  { number: '54', name: 'Primer Molar Sup. Der. (Temp)', type: 'molar', arch: 'upper', quadrant: 5, isChild: true },
+  { number: '53', name: 'Canino Sup. Der. (Temp)', type: 'canine', arch: 'upper', quadrant: 5, isChild: true },
+  { number: '52', name: 'Incisivo Lat. Sup. Der. (Temp)', type: 'incisor', arch: 'upper', quadrant: 5, isChild: true },
+  { number: '51', name: 'Incisivo Central Sup. Der. (Temp)', type: 'incisor', arch: 'upper', quadrant: 5, isChild: true },
+  // Cuadrante 6 (61 al 65)
+  { number: '61', name: 'Incisivo Central Sup. Izq. (Temp)', type: 'incisor', arch: 'upper', quadrant: 6, isChild: true },
+  { number: '62', name: 'Incisivo Lat. Sup. Izq. (Temp)', type: 'incisor', arch: 'upper', quadrant: 6, isChild: true },
+  { number: '63', name: 'Canino Sup. Izq. (Temp)', type: 'canine', arch: 'upper', quadrant: 6, isChild: true },
+  { number: '64', name: 'Primer Molar Sup. Izq. (Temp)', type: 'molar', arch: 'upper', quadrant: 6, isChild: true },
+  { number: '65', name: 'Segundo Molar Sup. Izq. (Temp)', type: 'molar', arch: 'upper', quadrant: 6, isChild: true },
+
+  // Cuadrante 8 (85 al 81)
+  { number: '85', name: 'Segundo Molar Inf. Der. (Temp)', type: 'molar', arch: 'lower', quadrant: 8, isChild: true },
+  { number: '84', name: 'Primer Molar Inf. Der. (Temp)', type: 'molar', arch: 'lower', quadrant: 8, isChild: true },
+  { number: '83', name: 'Canino Inf. Der. (Temp)', type: 'canine', arch: 'lower', quadrant: 8, isChild: true },
+  { number: '82', name: 'Incisivo Lat. Inf. Der. (Temp)', type: 'incisor', arch: 'lower', quadrant: 8, isChild: true },
+  { number: '81', name: 'Incisivo Central Inf. Der. (Temp)', type: 'incisor', arch: 'lower', quadrant: 8, isChild: true },
+  // Cuadrante 7 (71 al 75)
+  { number: '71', name: 'Incisivo Central Inf. Izq. (Temp)', type: 'incisor', arch: 'lower', quadrant: 7, isChild: true },
+  { number: '72', name: 'Incisivo Lat. Inf. Izq. (Temp)', type: 'incisor', arch: 'lower', quadrant: 7, isChild: true },
+  { number: '73', name: 'Canino Inf. Izq. (Temp)', type: 'canine', arch: 'lower', quadrant: 7, isChild: true },
+  { number: '74', name: 'Primer Molar Inf. Izq. (Temp)', type: 'molar', arch: 'lower', quadrant: 7, isChild: true },
+  { number: '75', name: 'Segundo Molar Inf. Izq. (Temp)', type: 'molar', arch: 'lower', quadrant: 7, isChild: true },
+];
+
+/**
+ * COMPONENTE ANATÓMICO INDIVIDUAL DE DIENTE CLÍNICO (MOTOR 5 CARAS)
+ * Cada cara es un polígono interactivo directo (Vestibular, Lingual, Oclusal, Mesial, Distal).
+ * El odontólogo hace clic DIRECTO sobre la cara deseada y se marca de inmediato.
+ */
+function ClinicalToothWidget({
+  tooth,
+  data,
+  isSelected,
+  activeCondition,
+  onSelectTooth,
+  onToggleFace,
+  onErupt,
+  mode,
+}: {
+  tooth: ToothDef;
+  data?: ToothData;
+  isSelected: boolean;
+  activeCondition?: string;
+  onSelectTooth: (num: string) => void;
+  onToggleFace?: (num: string, face: string) => void;
+  onErupt?: () => void;
+  mode: 'adult' | 'child' | 'mixed';
+}) {
+  const conditions = data?.conditions || [];
+  const isAbsent = conditions.some(c => c.code === 'ausente');
+  const isCrown = conditions.some(c => c.code === 'corona');
+  const isImplant = conditions.some(c => c.code === 'implante');
+  const isEndo = conditions.some(c => c.code === 'endodoncia');
+
+  // Mapear caras afectadas y colores
+  const faceColors: Record<string, string> = {};
+  conditions.forEach(cond => {
+    const def = CONDITIONS[cond.code];
+    const color = cond.color || def?.color || '#ef4444';
+    (cond.faces || []).forEach(f => {
+      faceColors[f] = color;
+    });
+  });
+
+  // Determinación de orientación anatómica Mesial / Distal según cuadrante:
+  // Línea media está entre 11-21 y 41-31. Mesial siempre apunta hacia la línea media.
+  const isRightSide = [1, 4, 5, 8].includes(tooth.quadrant);
+  const leftFace = isRightSide ? 'distal' : 'mesial';
+  const rightFace = isRightSide ? 'mesial' : 'distal';
+  const topFace = tooth.arch === 'upper' ? 'vestibular' : 'lingual';
+  const bottomFace = tooth.arch === 'upper' ? 'lingual' : 'vestibular';
+
+  const handleFaceClick = (face: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleFace) {
+      onToggleFace(tooth.number, face);
+    } else {
+      onSelectTooth(tooth.number);
+    }
+  };
+
+  // Color de fondo por cara si está marcada
+  const getFaceFill = (face: string) => {
+    if (faceColors[face]) return faceColors[face];
+    return 'url(#tooth-enamel-grad)';
+  };
+
+  return (
+    <div
+      onClick={() => onSelectTooth(tooth.number)}
+      className={`relative flex flex-col items-center p-1 rounded-2xl transition-all select-none cursor-pointer group ${
+        isSelected
+          ? 'bg-teal-500/15 ring-2 ring-teal-400 ring-offset-2 ring-offset-slate-950 scale-105 z-20 shadow-xl'
+          : 'hover:bg-slate-900/80 hover:scale-102 z-10'
+      } ${isAbsent ? 'opacity-40' : ''}`}
+      style={{ minWidth: tooth.type === 'molar' ? '46px' : tooth.type === 'premolar' ? '42px' : '38px' }}
+    >
+      {/* Botón rápido de mudar diente de leche en modo mixto */}
+      {mode === 'mixed' && tooth.isChild && onErupt && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onErupt(); }}
+          className="absolute -top-3 left-1/2 -translate-x-1/2 bg-amber-500 hover:bg-amber-400 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-black shadow-md z-30 animate-bounce"
+          title={`Erupcionar a pieza definitiva (${CHILD_TO_ADULT_MAP[tooth.number]})`}
+        >
+          ⬆
+        </button>
+      )}
+
+      {/* Pill Número FDI superior (para dientes superiores) */}
+      {tooth.arch === 'upper' && (
+        <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md mb-1 transition-colors ${
+          isSelected
+            ? 'bg-teal-500 text-white font-black shadow-xs'
+            : tooth.isChild
+            ? 'text-amber-400 bg-amber-500/10'
+            : 'text-slate-400 group-hover:text-white'
+        }`}>
+          {tooth.number}
+        </span>
+      )}
+
+      {/* RAÍZ ANATÓMICA SVG (SUPERIOR) */}
+      {tooth.arch === 'upper' && (
+        <svg viewBox="0 0 60 30" className="w-10 h-5 mb-0.5 overflow-visible">
+          {isImplant ? (
+            /* Implante de titanio */
+            <g>
+              <rect x="24" y="2" width="12" height="26" rx="2" fill="url(#titanium-screw-grad)" stroke="#0284c7" strokeWidth="1" />
+              <line x1="24" y1="8" x2="36" y2="8" stroke="#38bdf8" strokeWidth="1.2" />
+              <line x1="24" y1="14" x2="36" y2="14" stroke="#38bdf8" strokeWidth="1.2" />
+              <line x1="24" y1="20" x2="36" y2="20" stroke="#38bdf8" strokeWidth="1.2" />
+            </g>
+          ) : tooth.type === 'molar' ? (
+            /* 3 Raíces de Molar Superior */
+            <g>
+              <path d="M 12 30 C 12 15, 16 4, 20 4 C 23 4, 24 15, 24 30 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              <path d="M 36 30 C 36 15, 37 4, 40 4 C 44 4, 48 15, 48 30 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              <path d="M 26 30 C 26 12, 28 2, 30 2 C 32 2, 34 12, 34 30 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              {isEndo && <path d="M 30 2 L 30 30" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" className="animate-pulse" />}
+            </g>
+          ) : (
+            /* Raíz única cónica de Incisivo / Canino / Premolar */
+            <g>
+              <path d="M 22 30 C 22 12, 27 2, 30 2 C 33 2, 38 12, 38 30 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              {isEndo && <line x1="30" y1="3" x2="30" y2="30" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" className="animate-pulse" />}
+            </g>
+          )}
+        </svg>
+      )}
+
+      {/* CORONA PENTASECTORIAL (5 CARAS CLÍNICAS INTERACTIVAS) */}
+      <div className="relative w-10 h-10 sm:w-11 sm:h-11">
+        <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-md">
+          {/* Cara Superior (Vestibular en superior / Lingual en inferior) */}
+          <polygon
+            points="10,10 90,10 70,30 30,30"
+            fill={getFaceFill(topFace)}
+            stroke="#475569"
+            strokeWidth="1.5"
+            onClick={(e) => handleFaceClick(topFace, e)}
+            className="hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <title>{`${tooth.number} — Cara ${topFace}`}</title>
+          </polygon>
+
+          {/* Cara Izquierda (Mesial o Distal según cuadrante) */}
+          <polygon
+            points="10,10 30,30 30,70 10,90"
+            fill={getFaceFill(leftFace)}
+            stroke="#475569"
+            strokeWidth="1.5"
+            onClick={(e) => handleFaceClick(leftFace, e)}
+            className="hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <title>{`${tooth.number} — Cara ${leftFace}`}</title>
+          </polygon>
+
+          {/* Cara Central (Oclusal en molares / Incisal en anteriores) */}
+          <polygon
+            points="30,30 70,30 70,70 30,70"
+            fill={getFaceFill('oclusal')}
+            stroke="#475569"
+            strokeWidth="1.5"
+            onClick={(e) => handleFaceClick('oclusal', e)}
+            className="hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <title>{`${tooth.number} — Cara Oclusal/Incisal`}</title>
+          </polygon>
+
+          {/* Cara Derecha (Distal o Mesial según cuadrante) */}
+          <polygon
+            points="70,30 90,10 90,90 70,70"
+            fill={getFaceFill(rightFace)}
+            stroke="#475569"
+            strokeWidth="1.5"
+            onClick={(e) => handleFaceClick(rightFace, e)}
+            className="hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <title>{`${tooth.number} — Cara ${rightFace}`}</title>
+          </polygon>
+
+          {/* Cara Inferior (Lingual en superior / Vestibular en inferior) */}
+          <polygon
+            points="30,70 70,70 90,90 10,90"
+            fill={getFaceFill(bottomFace)}
+            stroke="#475569"
+            strokeWidth="1.5"
+            onClick={(e) => handleFaceClick(bottomFace, e)}
+            className="hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <title>{`${tooth.number} — Cara ${bottomFace}`}</title>
+          </polygon>
+
+          {/* Corona Protésica de Oro / Zirconia si aplica */}
+          {isCrown && (
+            <rect
+              x="8"
+              y="8"
+              width="84"
+              height="84"
+              rx="12"
+              fill="none"
+              stroke="#f59e0b"
+              strokeWidth="4"
+              strokeDasharray="4 2"
+              className="animate-pulse"
+            />
+          )}
+
+          {/* Símbolo de Diente Ausente (Extracción) */}
+          {isAbsent && (
+            <g>
+              <line x1="12" y1="12" x2="88" y2="88" stroke="#ef4444" strokeWidth="5" strokeLinecap="round" />
+              <line x1="88" y1="12" x2="12" y2="88" stroke="#ef4444" strokeWidth="5" strokeLinecap="round" />
+            </g>
+          )}
+        </svg>
+
+        {/* Badge de Implante Biomecánico */}
+        {isImplant && (
+          <span className="absolute -top-1 -right-1 bg-cyan-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[9px] shadow-sm">
+            🔩
+          </span>
+        )}
+      </div>
+
+      {/* RAÍZ ANATÓMICA SVG (INFERIOR) */}
+      {tooth.arch === 'lower' && (
+        <svg viewBox="0 0 60 30" className="w-10 h-5 mt-0.5 overflow-visible">
+          {isImplant ? (
+            <g>
+              <rect x="24" y="2" width="12" height="26" rx="2" fill="url(#titanium-screw-grad)" stroke="#0284c7" strokeWidth="1" />
+              <line x1="24" y1="8" x2="36" y2="8" stroke="#38bdf8" strokeWidth="1.2" />
+              <line x1="24" y1="14" x2="36" y2="14" stroke="#38bdf8" strokeWidth="1.2" />
+              <line x1="24" y1="20" x2="36" y2="20" stroke="#38bdf8" strokeWidth="1.2" />
+            </g>
+          ) : tooth.type === 'molar' ? (
+            /* 2 Raíces de Molar Inferior */
+            <g>
+              <path d="M 16 0 C 16 15, 20 28, 24 28 C 28 28, 28 15, 28 0 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              <path d="M 32 0 C 32 15, 32 28, 36 28 C 40 28, 44 15, 44 0 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              {isEndo && <line x1="24" y1="2" x2="24" y2="28" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" className="animate-pulse" />}
+            </g>
+          ) : (
+            /* Raíz única de premolar / canino / incisivo inferior */
+            <g>
+              <path d="M 22 0 C 22 18, 27 28, 30 28 C 33 28, 38 18, 38 0 Z" fill="url(#root-grad)" stroke="#64748b" strokeWidth="0.8" />
+              {isEndo && <line x1="30" y1="0" x2="30" y2="28" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" className="animate-pulse" />}
+            </g>
+          )}
+        </svg>
+      )}
+
+      {/* Pill Número FDI inferior (para dientes inferiores) */}
+      {tooth.arch === 'lower' && (
+        <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded-md mt-1 transition-colors ${
+          isSelected
+            ? 'bg-teal-500 text-white font-black shadow-xs'
+            : tooth.isChild
+            ? 'text-amber-400 bg-amber-500/10'
+            : 'text-slate-400 group-hover:text-white'
+        }`}>
+          {tooth.number}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * MOTOR DE ODONTOGRAMA CLÍNICO Y PARAMÉTRICO
+ * Maneja dentición adulta (32), infantil (20), mixta, piezas supernumerarias dinámicas
+ * y marcado directo cara por cara.
+ */
 export function DentalArch({
   teeth,
   selectedTooth,
   onSelectTooth,
   mode,
   onExfoliateAndErupt,
+  onToggleFace,
+  activeCondition,
+  supernumeraryTeeth = [],
 }: DentalArchProps) {
-  // Selector de arco / zoom para pantallas móviles
-  const [archFocus, setArchFocus] = useState<'both' | 'upper' | 'lower'>('both');
-  const [hoveredTooth, setHoveredTooth] = useState<string | null>(null);
-  const [displayMode, setDisplayMode] = useState<'3d_scanner' | 'clinical_chart'>('3d_scanner');
+  const [archFilter, setArchFilter] = useState<'both' | 'upper' | 'lower'>('both');
 
-  // Filtrado de dientes visibles según el enfoque
-  const visibleTeeth = REAL_3D_TEETH_HOTSPOTS.filter(t => {
-    if (archFocus === 'upper') return t.arch === 'upper';
-    if (archFocus === 'lower') return t.arch === 'lower';
-    return true;
-  });
+  // Selección de lista de dientes según la etapa clínica
+  const baseList = mode === 'child' ? CHILD_TEETH_LIST : ADULT_TEETH_LIST;
 
-  // Transformación de zoom para móvil según el arco seleccionado
-  const zoomStyle = archFocus === 'upper'
-    ? 'scale-[1.8] translate-y-[18%]'
-    : archFocus === 'lower'
-    ? 'scale-[1.8] -translate-y-[18%]'
-    : 'scale-100 translate-y-0';
+  // Dientes superiores e inferiores
+  const upperTeeth = baseList.filter(t => t.arch === 'upper');
+  const lowerTeeth = baseList.filter(t => t.arch === 'lower');
+
+  // Separación por cuadrantes para el odontograma clínico universal
+  const q1 = upperTeeth.filter(t => [1, 5].includes(t.quadrant));
+  const q2 = upperTeeth.filter(t => [2, 6].includes(t.quadrant));
+  const q4 = lowerTeeth.filter(t => [4, 8].includes(t.quadrant));
+  const q3 = lowerTeeth.filter(t => [3, 7].includes(t.quadrant));
+
+  // Separar supernumerarios por maxilar y mandíbula
+  const upperSuper = supernumeraryTeeth.filter(t => t.number.startsWith('1') || t.number.startsWith('2') || t.number.includes('+'));
+  const lowerSuper = supernumeraryTeeth.filter(t => t.number.startsWith('3') || t.number.startsWith('4') || t.number.includes('-'));
 
   return (
     <div className="w-full bg-slate-950 border border-slate-800 rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-2xl space-y-4">
-      {/* Barra de Controles y Selector de Zoom (Responsive para Móviles y Escritorio) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+      {/* DEFS GLOBALES SVG PARA ESMALTE Y MATERIALES */}
+      <svg className="w-0 h-0 absolute">
+        <defs>
+          {/* Esmalte cerámico pulido con brillo nacarado */}
+          <radialGradient id="tooth-enamel-grad" cx="40%" cy="35%" r="65%">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="45%" stopColor="#f8fafc" />
+            <stop offset="85%" stopColor="#e2e8f0" />
+            <stop offset="100%" stopColor="#cbd5e1" />
+          </radialGradient>
+
+          {/* Gradiente natural para raíz dental */}
+          <linearGradient id="root-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#f1f5f9" />
+            <stop offset="60%" stopColor="#e2e8f0" />
+            <stop offset="100%" stopColor="#cbd5e1" />
+          </linearGradient>
+
+          {/* Rosca de titanio de implante biomecánico */}
+          <linearGradient id="titanium-screw-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#0c4a6e" />
+            <stop offset="35%" stopColor="#0284c7" />
+            <stop offset="70%" stopColor="#38bdf8" />
+            <stop offset="100%" stopColor="#075985" />
+          </linearGradient>
+        </defs>
+      </svg>
+
+      {/* Cabecera del Motor Clínico */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-3 border-b border-slate-800">
         <div className="flex items-center gap-2.5 w-full sm:w-auto">
           <div className="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
             <Sparkles size={16} />
           </div>
           <div>
             <h3 className="text-sm font-black text-white flex items-center gap-2">
-              <span>Escáner Dental 3D</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-bold uppercase tracking-wider">
-                FDI
+              <span>Odontograma Anatómico Clínico</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                mode === 'child' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+              }`}>
+                {mode === 'child' ? '🍼 Dentición Temporal (20)' : mode === 'mixed' ? '🔀 Dentición Mixta' : '🦷 Permanente FDI (32)'}
               </span>
             </h3>
             <p className="text-[11px] text-slate-400">
-              Toca directamente cualquier diente en el modelo 3D para diagnosticarlo
+              Toca directamente cualquier cara (V, O, L, M, D) de un diente para registrar patologías
             </p>
           </div>
         </div>
 
-        {/* Acciones de Vista: Selector de Arco Móvil & Alternador 3D / Clínico */}
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end flex-wrap">
-          {/* Selector de Arco / Zoom para Móvil */}
-          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-            <button
-              type="button"
-              onClick={() => setArchFocus('upper')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                archFocus === 'upper'
-                  ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              🦷 Superior
-            </button>
-            <button
-              type="button"
-              onClick={() => setArchFocus('lower')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                archFocus === 'lower'
-                  ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              🦷 Inferior
-            </button>
-            <button
-              type="button"
-              onClick={() => setArchFocus('both')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                archFocus === 'both'
-                  ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              👄 Ambas
-            </button>
-          </div>
-
-          {/* Toggle entre Escáner 3D y Esquema Clínico */}
+        {/* Selector de Arco / Zoom para Móvil */}
+        <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 w-full sm:w-auto justify-center">
           <button
             type="button"
-            onClick={() => setDisplayMode(m => m === '3d_scanner' ? 'clinical_chart' : '3d_scanner')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border ${
-              displayMode === '3d_scanner'
-                ? 'bg-slate-800 text-teal-300 border-teal-500/40'
-                : 'bg-slate-900 text-slate-300 border-slate-700'
+            onClick={() => setArchFilter('upper')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              archFilter === 'upper'
+                ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
             }`}
           >
-            {displayMode === '3d_scanner' ? (
-              <>
-                <Eye size={13} className="text-teal-400" />
-                <span>Vista 3D Real</span>
-              </>
-            ) : (
-              <>
-                <Layers size={13} className="text-cyan-400" />
-                <span>Esquema Clínico</span>
-              </>
-            )}
+            🦷 Superior
+          </button>
+          <button
+            type="button"
+            onClick={() => setArchFilter('lower')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              archFilter === 'lower'
+                ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            🦷 Inferior
+          </button>
+          <button
+            type="button"
+            onClick={() => setArchFilter('both')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              archFilter === 'both'
+                ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            👄 Ambas
           </button>
         </div>
       </div>
 
-      {/* ============================================================== */}
-      {/* VISTA 1: ESCÁNER 3D REAL (INTERACCIÓN DIRECTA SOBRE EL RENDER) */}
-      {/* ============================================================== */}
-      {displayMode === '3d_scanner' ? (
-        <div className="relative w-full aspect-video max-h-[520px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-2xl flex items-center justify-center select-none">
-          {/* Contenedor con zoom móvil fluido */}
-          <div className={`relative w-full h-full transition-transform duration-500 ease-out origin-center ${zoomStyle}`}>
-            {/* Render 3D Dental Real en Alta Definición */}
-            <img
-              src="/dental/arch_occlusal.jpg"
-              alt="Modelo Dental 3D Real"
-              className="w-full h-full object-cover pointer-events-none"
-            />
-
-            {/* Viñeta sutil de contraste para destacar los dientes */}
-            <div className="absolute inset-0 bg-radial from-transparent via-transparent to-black/60 pointer-events-none" />
-
-            {/* HOTSPOTS INTERACTIVOS CALIBRADOS DIRECTAMENTE SOBRE CADA DIENTE */}
-            {visibleTeeth.map(pos => {
-              const data = teeth[pos.number];
-              const isSelected = selectedTooth === pos.number;
-              const isHovered = hoveredTooth === pos.number;
-              const conditions = data?.conditions || [];
-              const isAbsent = conditions.some(c => c.code === 'ausente');
-              const isCrown = conditions.some(c => c.code === 'corona');
-              const isImplant = conditions.some(c => c.code === 'implante');
-              const cond1 = conditions[0] ? CONDITIONS[conditions[0].code] : null;
-
-              return (
-                <div
-                  key={pos.number}
-                  style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                  onClick={() => onSelectTooth(pos.number)}
-                  onMouseEnter={() => setHoveredTooth(pos.number)}
-                  onMouseLeave={() => setHoveredTooth(null)}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10 group"
-                >
-                  {/* Hit-target ampliado para toque con el pulgar en teléfonos */}
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 -m-1 sm:-m-1.5 flex items-center justify-center relative">
-                    {/* Anillo de selección quirúrgica holográfico */}
-                    {isSelected && (
-                      <div className="absolute inset-0 rounded-full border-2 border-teal-400 bg-teal-400/25 animate-pulse shadow-[0_0_20px_rgba(20,184,166,0.9)]" />
-                    )}
-
-                    {/* Resplandor al pasar el cursor */}
-                    {!isSelected && isHovered && (
-                      <div className="absolute inset-0.5 rounded-full border border-cyan-400/80 bg-cyan-400/20 shadow-[0_0_12px_rgba(6,182,212,0.6)]" />
-                    )}
-
-                    {/* Badge de Tratamiento sobre el Diente */}
-                    {isAbsent ? (
-                      <div className="w-5 h-5 rounded-full bg-slate-900/90 border border-red-500/80 flex items-center justify-center shadow-lg">
-                        <span className="text-red-400 font-black text-[11px] leading-none">✕</span>
-                      </div>
-                    ) : isCrown ? (
-                      <div className="w-5 h-5 rounded-full bg-amber-500/90 border border-amber-300 flex items-center justify-center shadow-lg text-[10px]">
-                        👑
-                      </div>
-                    ) : isImplant ? (
-                      <div className="w-5 h-5 rounded-full bg-cyan-500/90 border border-cyan-200 flex items-center justify-center shadow-lg text-[10px]">
-                        🔩
-                      </div>
-                    ) : cond1 ? (
-                      <div
-                        className="w-4 h-4 rounded-full flex items-center justify-center shadow-lg animate-pulse"
-                        style={{ backgroundColor: cond1.color }}
-                      >
-                        <span className="text-white font-black text-[8px] leading-none">{cond1.symbol}</span>
-                      </div>
-                    ) : (
-                      /* Diente sano: punto de referencia sutil */
-                      <div className={`w-2 h-2 rounded-full transition-all ${
-                        isSelected
-                          ? 'bg-teal-300 scale-125'
-                          : 'bg-white/40 group-hover:bg-cyan-300 group-hover:scale-150'
-                      }`} />
-                    )}
-
-                    {/* Pill con el Número FDI de la Pieza */}
-                    <div className={`absolute left-1/2 -translate-x-1/2 pointer-events-none transition-all ${
-                      pos.arch === 'upper' ? '-top-5 sm:-top-6' : '-bottom-5 sm:-bottom-6'
-                    }`}>
-                      <span className={`px-1.5 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-black transition-colors ${
-                        isSelected
-                          ? 'bg-teal-500 text-white shadow-md'
-                          : isHovered
-                          ? 'bg-slate-900 text-teal-300 border border-teal-500/40'
-                          : 'bg-slate-900/80 text-slate-300 border border-slate-700/60'
-                      }`}>
-                        {pos.number}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Guías clínicas sutiles sobre el modelo 3D */}
-          <div className="absolute top-2 left-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest pointer-events-none">
-            {archFocus === 'upper' ? '🦷 Maxilar Superior (11-28)' : archFocus === 'lower' ? '🦷 Mandíbula Inferior (31-48)' : '👄 Vista Dual 3D'}
-          </div>
-        </div>
-      ) : (
-        /* ============================================================== */
-        /* VISTA 2: ESQUEMA CLÍNICO PROFESIONAL LIMPIO (SIN MANCHAS ROJAS) */
-        /* ============================================================== */
-        <div className="p-6 bg-slate-950 border border-slate-800 rounded-2xl space-y-6">
-          {/* Maxilar Superior */}
-          {(archFocus === 'both' || archFocus === 'upper') && (
-            <div className="space-y-2">
-              <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">
-                <span>◀ Cuadrante 1 (Sup. Der.)</span>
-                <span className="text-teal-400 font-black">Maxilar Superior</span>
-                <span>Cuadrante 2 (Sup. Izq.) ▶</span>
-              </div>
-              <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
-                {REAL_3D_TEETH_HOTSPOTS.filter(t => t.arch === 'upper').map(t => {
-                  const data = teeth[t.number];
-                  const isSelected = selectedTooth === t.number;
-                  const conditions = data?.conditions || [];
-                  const isAbsent = conditions.some(c => c.code === 'ausente');
-                  const cond1 = conditions[0] ? CONDITIONS[conditions[0].code] : null;
-
-                  return (
-                    <button
-                      key={t.number}
-                      type="button"
-                      onClick={() => onSelectTooth(t.number)}
-                      className={`w-10 h-14 sm:w-11 sm:h-16 rounded-xl border-2 flex flex-col items-center justify-between p-1 transition-all ${
-                        isSelected
-                          ? 'border-teal-400 bg-teal-500/20 ring-2 ring-teal-400 scale-105 shadow-lg'
-                          : conditions.length > 0
-                          ? 'border-slate-500 bg-slate-900 hover:border-teal-500/60'
-                          : 'border-slate-800 bg-slate-900/60 hover:border-slate-600'
-                      }`}
-                    >
-                      <span className="text-[10px] font-mono font-bold text-slate-400">{t.number}</span>
-                      <div className="w-6 h-6 rounded-lg bg-linear-to-b from-slate-100 to-slate-300 dark:from-slate-200 dark:to-slate-400 flex items-center justify-center shadow-inner">
-                        {isAbsent ? (
-                          <span className="text-red-600 font-black text-xs">✕</span>
-                        ) : cond1 ? (
-                          <span style={{ color: cond1.color }} className="font-black text-xs">{cond1.symbol}</span>
-                        ) : (
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                        )}
-                      </div>
-                      <span className="text-[9px] text-slate-500 capitalize">{t.type.slice(0, 3)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Línea Divisoria */}
-          {archFocus === 'both' && (
-            <div className="relative py-1">
-              <div className="border-t border-dashed border-slate-800" />
-              <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-950 px-3 text-[10px] text-teal-400 font-bold uppercase tracking-widest">
-                Línea Media Oclusal
+      {/* LIENZO CLÍNICO DEL MOTOR: CUADRANTES FDI CON CARAS ACTIVAS */}
+      <div className="space-y-6 overflow-x-auto py-2">
+        {/* ============================================================== */}
+        {/* MAXILAR SUPERIOR (CUADRANTES 1 Y 2 / 5 Y 6) */}
+        {/* ============================================================== */}
+        {(archFilter === 'both' || archFilter === 'upper') && (
+          <div className="space-y-2 bg-slate-900/40 p-3 sm:p-4 rounded-2xl border border-slate-800/80">
+            {/* Etiquetas de Cuadrante Superior */}
+            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
+              <span>◀ Cuadrante {mode === 'child' ? '5' : '1'} (Sup. Der.)</span>
+              <span className="text-teal-400 font-black flex items-center gap-1 bg-teal-500/10 px-2.5 py-0.5 rounded-full border border-teal-500/20">
+                🦷 Maxilar Superior
               </span>
+              <span>Cuadrante {mode === 'child' ? '6' : '2'} (Sup. Izq.) ▶</span>
             </div>
-          )}
 
-          {/* Mandíbula Inferior */}
-          {(archFocus === 'both' || archFocus === 'lower') && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-center gap-1.5 sm:gap-2 flex-wrap">
-                {REAL_3D_TEETH_HOTSPOTS.filter(t => t.arch === 'lower').map(t => {
-                  const data = teeth[t.number];
-                  const isSelected = selectedTooth === t.number;
-                  const conditions = data?.conditions || [];
-                  const isAbsent = conditions.some(c => c.code === 'ausente');
-                  const cond1 = conditions[0] ? CONDITIONS[conditions[0].code] : null;
-
-                  return (
-                    <button
-                      key={t.number}
-                      type="button"
-                      onClick={() => onSelectTooth(t.number)}
-                      className={`w-10 h-14 sm:w-11 sm:h-16 rounded-xl border-2 flex flex-col items-center justify-between p-1 transition-all ${
-                        isSelected
-                          ? 'border-teal-400 bg-teal-500/20 ring-2 ring-teal-400 scale-105 shadow-lg'
-                          : conditions.length > 0
-                          ? 'border-slate-500 bg-slate-900 hover:border-teal-500/60'
-                          : 'border-slate-800 bg-slate-900/60 hover:border-slate-600'
-                      }`}
-                    >
-                      <span className="text-[9px] text-slate-500 capitalize">{t.type.slice(0, 3)}</span>
-                      <div className="w-6 h-6 rounded-lg bg-linear-to-b from-slate-100 to-slate-300 dark:from-slate-200 dark:to-slate-400 flex items-center justify-center shadow-inner">
-                        {isAbsent ? (
-                          <span className="text-red-600 font-black text-xs">✕</span>
-                        ) : cond1 ? (
-                          <span style={{ color: cond1.color }} className="font-black text-xs">{cond1.symbol}</span>
-                        ) : (
-                          <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                        )}
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-slate-400">{t.number}</span>
-                    </button>
-                  );
-                })}
+            {/* Fila de Dientes Superiores (Centrada con Línea Media) */}
+            <div className="flex items-center justify-center gap-1 sm:gap-2 flex-nowrap min-w-max px-2">
+              {/* Cuadrante 1 / 5 (Derecha del paciente) */}
+              <div className="flex items-center gap-1">
+                {q1.map(tooth => (
+                  <ClinicalToothWidget
+                    key={tooth.number}
+                    tooth={tooth}
+                    data={teeth[tooth.number]}
+                    isSelected={selectedTooth === tooth.number}
+                    activeCondition={activeCondition}
+                    onSelectTooth={onSelectTooth}
+                    onToggleFace={onToggleFace}
+                    onErupt={onExfoliateAndErupt && CHILD_TO_ADULT_MAP[tooth.number] ? () => onExfoliateAndErupt(tooth.number, CHILD_TO_ADULT_MAP[tooth.number]) : undefined}
+                    mode={mode}
+                  />
+                ))}
               </div>
-              <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2">
-                <span>◀ Cuadrante 4 (Inf. Der.)</span>
-                <span className="text-teal-400 font-black">Mandíbula Inferior</span>
-                <span>Cuadrante 3 (Inf. Izq.) ▶</span>
+
+              {/* LÍNEA MEDIA FACIAL DIVISORIA */}
+              <div className="h-20 w-0.5 bg-teal-500/40 mx-1 relative flex items-center justify-center">
+                <span className="absolute -top-3 text-[8px] font-black text-teal-400 uppercase tracking-tighter whitespace-nowrap bg-slate-900 px-1 rounded">
+                  Línea Media
+                </span>
+              </div>
+
+              {/* Cuadrante 2 / 6 (Izquierda del paciente) */}
+              <div className="flex items-center gap-1">
+                {q2.map(tooth => (
+                  <ClinicalToothWidget
+                    key={tooth.number}
+                    tooth={tooth}
+                    data={teeth[tooth.number]}
+                    isSelected={selectedTooth === tooth.number}
+                    activeCondition={activeCondition}
+                    onSelectTooth={onSelectTooth}
+                    onToggleFace={onToggleFace}
+                    onErupt={onExfoliateAndErupt && CHILD_TO_ADULT_MAP[tooth.number] ? () => onExfoliateAndErupt(tooth.number, CHILD_TO_ADULT_MAP[tooth.number]) : undefined}
+                    mode={mode}
+                  />
+                ))}
               </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* Banner flotante de información de pieza al tocar o pasar el ratón */}
-      {hoveredTooth && (
-        <div className="bg-slate-900/95 border border-teal-500/40 backdrop-blur-md px-4 py-2 rounded-2xl shadow-2xl flex items-center gap-2.5 animate-in fade-in duration-150 z-20 flex-wrap justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-black text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg border border-teal-500/20">
-              #{hoveredTooth}
-            </span>
-            <span className="text-xs font-bold text-white">
-              {TOOTH_NAMES[hoveredTooth] || `Pieza ${hoveredTooth}`}
+            {/* Dientes Supernumerarios Superiores si existen */}
+            {upperSuper.length > 0 && (
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold text-teal-400">Piezas Extra Superiores:</span>
+                {upperSuper.map(sup => (
+                  <button
+                    key={sup.number}
+                    type="button"
+                    onClick={() => onSelectTooth(sup.number)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-mono font-black border transition-all ${
+                      selectedTooth === sup.number
+                        ? 'bg-teal-500 text-white border-teal-400 shadow-md'
+                        : 'bg-slate-800 text-teal-300 border-slate-700 hover:border-teal-500/50'
+                    }`}
+                  >
+                    #{sup.number}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Separador Oclusal Central si se muestran ambas arcadas */}
+        {archFilter === 'both' && (
+          <div className="relative py-1">
+            <div className="border-t border-dashed border-slate-800" />
+            <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-950 px-3 text-[10px] text-teal-400 font-bold uppercase tracking-widest">
+              Plano de Oclusión Dental
             </span>
           </div>
-          {teeth[hoveredTooth]?.conditions && teeth[hoveredTooth].conditions.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {teeth[hoveredTooth].conditions.map((c, i) => (
-                <span
-                  key={i}
-                  className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-                  style={{
-                    backgroundColor: (CONDITIONS[c.code]?.color || '#0ea5e9') + '25',
-                    color: CONDITIONS[c.code]?.color || '#38bdf8',
-                  }}
-                >
-                  {c.label || CONDITIONS[c.code]?.label || c.code}
+        )}
+
+        {/* ============================================================== */}
+        {/* MANDÍBULA INFERIOR (CUADRANTES 4 Y 3 / 8 Y 7) */}
+        {/* ============================================================== */}
+        {(archFilter === 'both' || archFilter === 'lower') && (
+          <div className="space-y-2 bg-slate-900/40 p-3 sm:p-4 rounded-2xl border border-slate-800/80">
+            {/* Fila de Dientes Inferiores (Centrada con Línea Media) */}
+            <div className="flex items-center justify-center gap-1 sm:gap-2 flex-nowrap min-w-max px-2">
+              {/* Cuadrante 4 / 8 (Derecha del paciente) */}
+              <div className="flex items-center gap-1">
+                {q4.map(tooth => (
+                  <ClinicalToothWidget
+                    key={tooth.number}
+                    tooth={tooth}
+                    data={teeth[tooth.number]}
+                    isSelected={selectedTooth === tooth.number}
+                    activeCondition={activeCondition}
+                    onSelectTooth={onSelectTooth}
+                    onToggleFace={onToggleFace}
+                    onErupt={onExfoliateAndErupt && CHILD_TO_ADULT_MAP[tooth.number] ? () => onExfoliateAndErupt(tooth.number, CHILD_TO_ADULT_MAP[tooth.number]) : undefined}
+                    mode={mode}
+                  />
+                ))}
+              </div>
+
+              {/* LÍNEA MEDIA FACIAL DIVISORIA */}
+              <div className="h-20 w-0.5 bg-teal-500/40 mx-1 relative flex items-center justify-center">
+                <span className="absolute -bottom-3 text-[8px] font-black text-teal-400 uppercase tracking-tighter whitespace-nowrap bg-slate-900 px-1 rounded">
+                  Línea Media
                 </span>
-              ))}
+              </div>
+
+              {/* Cuadrante 3 / 7 (Izquierda del paciente) */}
+              <div className="flex items-center gap-1">
+                {q3.map(tooth => (
+                  <ClinicalToothWidget
+                    key={tooth.number}
+                    tooth={tooth}
+                    data={teeth[tooth.number]}
+                    isSelected={selectedTooth === tooth.number}
+                    activeCondition={activeCondition}
+                    onSelectTooth={onSelectTooth}
+                    onToggleFace={onToggleFace}
+                    onErupt={onExfoliateAndErupt && CHILD_TO_ADULT_MAP[tooth.number] ? () => onExfoliateAndErupt(tooth.number, CHILD_TO_ADULT_MAP[tooth.number]) : undefined}
+                    mode={mode}
+                  />
+                ))}
+              </div>
             </div>
-          )}
+
+            {/* Dientes Supernumerarios Inferiores si existen */}
+            {lowerSuper.length > 0 && (
+              <div className="pt-2 border-t border-slate-800 flex items-center justify-center gap-2 flex-wrap">
+                <span className="text-[10px] font-bold text-teal-400">Piezas Extra Inferiores:</span>
+                {lowerSuper.map(sup => (
+                  <button
+                    key={sup.number}
+                    type="button"
+                    onClick={() => onSelectTooth(sup.number)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-mono font-black border transition-all ${
+                      selectedTooth === sup.number
+                        ? 'bg-teal-500 text-white border-teal-400 shadow-md'
+                        : 'bg-slate-800 text-teal-300 border-slate-700 hover:border-teal-500/50'
+                    }`}
+                  >
+                    #{sup.number}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Etiquetas de Cuadrante Inferior */}
+            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2">
+              <span>◀ Cuadrante {mode === 'child' ? '8' : '4'} (Inf. Der.)</span>
+              <span className="text-teal-400 font-black flex items-center gap-1 bg-teal-500/10 px-2.5 py-0.5 rounded-full border border-teal-500/20">
+                🦷 Mandíbula Inferior
+              </span>
+              <span>Cuadrante {mode === 'child' ? '7' : '3'} (Inf. Izq.) ▶</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Guía Visual Rápida de Caras para el Odontólogo */}
+      <div className="flex items-center justify-between text-[11px] text-slate-400 bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-800 flex-wrap gap-2">
+        <span className="flex items-center gap-1.5 font-bold text-teal-400">
+          <Eye size={13} />
+          <span>Esquema de Caras:</span>
+        </span>
+        <div className="flex items-center gap-3 text-[10px]">
+          <span><strong>V</strong> = Vestibular</span>
+          <span><strong>O</strong> = Oclusal / Incisal</span>
+          <span><strong>L/P</strong> = Lingual / Palatino</span>
+          <span><strong>M</strong> = Mesial</span>
+          <span><strong>D</strong> = Distal</span>
         </div>
-      )}
+        <span className="text-[10px] text-slate-500">
+          Haz clic directo en cualquier cuadrante de la corona para marcar
+        </span>
+      </div>
     </div>
   );
 }
