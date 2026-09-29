@@ -1,8 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ToothData } from '@/app/actions/dental';
 import { CONDITIONS } from './Odontogram';
+import { Sparkles, Eye, Layers, ZoomIn } from 'lucide-react';
 
 interface DentalArchProps {
   teeth: Record<string, ToothData>;
@@ -135,12 +136,19 @@ export function DentalArch({
   mode,
   onExfoliateAndErupt,
 }: DentalArchProps) {
+  // Selector de estilo de visualización: Escáner 3D Fotorrealista vs Esquema Porcelana CAD
+  const [visualStyle, setVisualStyle] = useState<'3d_scanner' | 'cad_porcelain'>('3d_scanner');
+  const [hoveredTooth, setHoveredTooth] = useState<string | null>(null);
+
   // Render anatómico de cada diente con silueta real y detalles oclusales
   const renderTooth = (pos: ToothPosition) => {
     const data = teeth[pos.number];
     const isSelected = selectedTooth === pos.number;
+    const isHovered = hoveredTooth === pos.number;
     const conditions = data?.conditions || [];
     const isAbsent = conditions.some((c) => c.code === 'ausente');
+    const isImplant = conditions.some((c) => c.code === 'implante');
+    const isCrown = conditions.some((c) => c.code === 'corona');
 
     const cond1 = conditions[0] ? CONDITIONS[conditions[0].code] : null;
     const cond2 = conditions[1] ? CONDITIONS[conditions[1].code] : null;
@@ -150,19 +158,26 @@ export function DentalArch({
     const scale = pos.isChild ? 0.78 : 1;
     const toothName = TOOTH_NAMES[pos.number] || `Pieza ${pos.number}`;
 
-    // Estilos de color para la superficie dental
-    let toothFill = 'url(#enamel-gradient)';
+    // Estilos de color para la superficie dental según material o patología
+    let toothFill = 'url(#porcelain-ceramic-gradient)';
     let toothStroke = '#cbd5e1';
-    let strokeWidth = isSelected ? 2.5 : 1.2;
+    let strokeWidth = isSelected ? 3 : 1.4;
 
     if (isAbsent) {
-      toothFill = 'url(#absent-pattern)';
+      toothFill = 'url(#absent-translucent-pattern)';
       toothStroke = '#94a3b8';
+    } else if (isCrown) {
+      toothFill = 'url(#gold-crown-gradient)';
+      toothStroke = '#f59e0b';
+    } else if (isImplant) {
+      toothFill = 'url(#titanium-implant-gradient)';
+      toothStroke = '#06b6d4';
     } else if (hasMultiple && cond1 && cond2) {
       toothStroke = cond1.color;
+      toothFill = 'url(#porcelain-ceramic-gradient)';
     } else if (cond1) {
       toothStroke = cond1.color;
-      toothFill = cond1.color + '26'; // 15% opacity tint
+      toothFill = cond1.color + '2c'; // Tinte translúcido sobre el esmalte
     }
 
     return (
@@ -171,189 +186,275 @@ export function DentalArch({
         transform={`translate(${pos.x}, ${pos.y}) rotate(${pos.angle}) scale(${scale})`}
         className="cursor-pointer group transition-all"
         onClick={() => onSelectTooth(pos.number)}
+        onMouseEnter={() => setHoveredTooth(pos.number)}
+        onMouseLeave={() => setHoveredTooth(null)}
       >
         <title>{`Pieza ${pos.number} — ${toothName}${conditions.length > 0 ? ` (${conditions.map(c => CONDITIONS[c.code]?.label || c.code).join(', ')})` : ''}`}</title>
 
-        {/* Halo de selección clínica / Focus Glow */}
+        {/* Halo de selección clínica / Holographic Glow */}
         {isSelected && (
+          <g>
+            <ellipse
+              cx={0}
+              cy={0}
+              rx={pos.type === 'molar' ? 26 : pos.type === 'premolar' ? 22 : 20}
+              ry={pos.type === 'molar' ? 24 : pos.type === 'premolar' ? 20 : 18}
+              className="fill-teal-400/20 stroke-teal-400 animate-pulse"
+              strokeWidth={3}
+              filter="url(#glow-filter)"
+            />
+            {/* Anillo de enfoque quirúrgico */}
+            <circle cx={0} cy={0} r={2} fill="#14b8a6" />
+          </g>
+        )}
+
+        {/* Halo al hacer hover si no está seleccionado */}
+        {!isSelected && isHovered && (
           <ellipse
             cx={0}
             cy={0}
             rx={pos.type === 'molar' ? 24 : pos.type === 'premolar' ? 20 : 18}
             ry={pos.type === 'molar' ? 22 : pos.type === 'premolar' ? 18 : 16}
-            className="fill-teal-400/20 stroke-teal-500 animate-pulse"
-            strokeWidth={3}
-            filter="drop-shadow(0 0 6px rgba(20, 184, 166, 0.6))"
+            className="fill-cyan-400/15 stroke-cyan-400/80"
+            strokeWidth={2}
           />
         )}
 
-        {/* SILUETA ANATÓMICA SEGÚN TIPO DE DIENTE */}
+        {/* SILUETA ANATÓMICA ESCULPIDA SEGÚN TIPO DE DIENTE */}
 
-        {/* 1. MOLAR: Corona con 4 cúspides redondeadas y surcos en cruz */}
+        {/* 1. MOLAR: Corona con 4 cúspides redondeadas, relieve oclusal y brillo cerámico */}
         {pos.type === 'molar' && (
-          <g className="transition-transform group-hover:scale-105 duration-150">
-            {/* Contorno corona molar */}
+          <g className="transition-transform group-hover:scale-108 duration-150">
+            {/* Sombra proyectada */}
+            <ellipse cx={0} cy={2} rx={18} ry={14} fill="rgba(0,0,0,0.18)" filter="blur(3px)" />
+
+            {/* Contorno corona molar cerámico */}
             <path
-              d="M -18 -14 C -12 -17, 12 -17, 18 -14 C 21 -10, 21 10, 18 14 C 12 17, -12 17, -18 14 C -21 10, -21 -10, -18 -14 Z"
+              d="M -18 -14 C -12 -18, 12 -18, 18 -14 C 22 -10, 22 10, 18 14 C 12 18, -12 18, -18 14 C -22 10, -22 -10, -18 -14 Z"
               fill={toothFill}
               stroke={isSelected ? '#0ea5e9' : toothStroke}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
-              className={isAbsent ? 'stroke-dashed' : ''}
-              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
+              className={isAbsent ? 'stroke-dashed opacity-50' : ''}
+              filter="drop-shadow(0 3px 5px rgba(0,0,0,0.25))"
             />
-            {/* Surcos y fosas oclusales de desarrollo (anatomía del molar) */}
+
+            {/* Reflejo especular de esmalte cerámico pulido */}
+            {!isAbsent && (
+              <ellipse cx={-4} cy={-7} rx={7} ry={3.5} fill="#ffffff" opacity={0.65} transform="rotate(-15 -4 -7)" />
+            )}
+
+            {/* Surcos y fosas oclusales anatómicas */}
             {!isAbsent && (
               <>
                 {/* Surco central mesiodistal */}
                 <path
-                  d="M -13 0 Q 0 -1 13 0"
+                  d="M -13 0 Q 0 -1.5 13 0"
                   fill="none"
                   stroke="#94a3b8"
-                  strokeWidth="1"
+                  strokeWidth="1.2"
                   strokeLinecap="round"
-                  opacity="0.85"
+                  opacity="0.9"
                 />
-                {/* Surco vestibulolingual con fosa central */}
+                {/* Surco vestibulolingual */}
                 <path
                   d="M 0 -11 Q -1 0 0 11"
                   fill="none"
                   stroke="#94a3b8"
-                  strokeWidth="1"
+                  strokeWidth="1.2"
                   strokeLinecap="round"
-                  opacity="0.85"
+                  opacity="0.9"
                 />
-                {/* Fosa central / fovea */}
-                <circle cx={0} cy={0} r={2} fill="#64748b" opacity="0.6" />
-                {/* Micro fisuras triangulares marginales */}
-                <path d="M -10 -4 L -13 0 L -10 4" fill="none" stroke="#cbd5e1" strokeWidth="0.8" />
-                <path d="M 10 -4 L 13 0 L 10 4" fill="none" stroke="#cbd5e1" strokeWidth="0.8" />
+                {/* Fosa central anatómica con sombra */}
+                <circle cx={0} cy={0} r={2.5} fill="#475569" opacity="0.75" />
+                <circle cx={-0.5} cy={-0.5} r={1} fill="#1e293b" opacity="0.9" />
+
+                {/* Micro fisuras marginales */}
+                <path d="M -10 -4 L -13 0 L -10 4" fill="none" stroke="#cbd5e1" strokeWidth="0.9" />
+                <path d="M 10 -4 L 13 0 L 10 4" fill="none" stroke="#cbd5e1" strokeWidth="0.9" />
               </>
+            )}
+
+            {/* Rosca de Implante Biomecánico si aplica */}
+            {isImplant && (
+              <g>
+                <circle cx={0} cy={0} r={7} fill="#0284c7" opacity={0.8} />
+                <text x={0} y={3} textAnchor="middle" className="fill-white font-black text-[9px] pointer-events-none">🔩</text>
+              </g>
             )}
           </g>
         )}
 
         {/* 2. PREMOLAR: Corona ovoide con 2 cúspides y surco transversal */}
         {pos.type === 'premolar' && (
-          <g className="transition-transform group-hover:scale-105 duration-150">
+          <g className="transition-transform group-hover:scale-108 duration-150">
+            <ellipse cx={0} cy={2} rx={14} ry={12} fill="rgba(0,0,0,0.18)" filter="blur(2.5px)" />
             <path
-              d="M -14 -12 C -8 -15, 8 -15, 14 -12 C 17 -8, 17 8, 14 12 C 8 15, -8 15, -14 12 C -17 8, -17 -8, -14 -12 Z"
+              d="M -14 -12 C -8 -16, 8 -16, 14 -12 C 18 -8, 18 8, 14 12 C 8 16, -8 16, -14 12 C -18 8, -18 -8, -14 -12 Z"
               fill={toothFill}
               stroke={isSelected ? '#0ea5e9' : toothStroke}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
-              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
+              className={isAbsent ? 'stroke-dashed opacity-50' : ''}
+              filter="drop-shadow(0 3px 5px rgba(0,0,0,0.22))"
             />
             {!isAbsent && (
               <>
+                {/* Reflejo especular */}
+                <ellipse cx={-3} cy={-6} rx={5} ry={2.5} fill="#ffffff" opacity={0.65} transform="rotate(-15 -3 -6)" />
                 <path
-                  d="M -10 0 Q 0 -0.5 10 0"
+                  d="M -10 0 Q 0 -0.8 10 0"
                   fill="none"
                   stroke="#94a3b8"
-                  strokeWidth="1"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  opacity="0.9"
+                />
+                <circle cx={-5} cy={0} r={1.5} fill="#475569" opacity="0.8" />
+                <circle cx={5} cy={0} r={1.5} fill="#475569" opacity="0.8" />
+              </>
+            )}
+            {isImplant && (
+              <g>
+                <circle cx={0} cy={0} r={6} fill="#0284c7" opacity={0.8} />
+                <text x={0} y={2.5} textAnchor="middle" className="fill-white font-black text-[8px] pointer-events-none">🔩</text>
+              </g>
+            )}
+          </g>
+        )}
+
+        {/* 3. CANINO: Silueta en punta diamantada con cresta labial y vertientes */}
+        {pos.type === 'canine' && (
+          <g className="transition-transform group-hover:scale-108 duration-150">
+            <ellipse cx={0} cy={2} rx={13} ry={13} fill="rgba(0,0,0,0.18)" filter="blur(2.5px)" />
+            <path
+              d="M 0 -16 C 9 -12, 15 -4, 14 6 C 11 13, -11 13, -14 6 C -15 -4, -9 -12, 0 -16 Z"
+              fill={toothFill}
+              stroke={isSelected ? '#0ea5e9' : toothStroke}
+              strokeWidth={strokeWidth}
+              strokeLinejoin="round"
+              className={isAbsent ? 'stroke-dashed opacity-50' : ''}
+              filter="drop-shadow(0 3px 5px rgba(0,0,0,0.22))"
+            />
+            {!isAbsent && (
+              <>
+                <ellipse cx={-3} cy={-7} rx={4.5} ry={2} fill="#ffffff" opacity={0.65} transform="rotate(-20 -3 -7)" />
+                <path
+                  d="M 0 -13 L 0 6"
+                  fill="none"
+                  stroke="#cbd5e1"
+                  strokeWidth="1.2"
                   strokeLinecap="round"
                   opacity="0.85"
                 />
-                <circle cx={-5} cy={0} r={1.2} fill="#64748b" opacity="0.7" />
-                <circle cx={5} cy={0} r={1.2} fill="#64748b" opacity="0.7" />
               </>
             )}
-          </g>
-        )}
-
-        {/* 3. CANINO: Silueta en punta de diamante redondeada (cúspide y vertientes) */}
-        {pos.type === 'canine' && (
-          <g className="transition-transform group-hover:scale-105 duration-150">
-            <path
-              d="M 0 -15 C 8 -11, 14 -4, 13 6 C 11 12, -11 12, -13 6 C -14 -4, -8 -11, 0 -15 Z"
-              fill={toothFill}
-              stroke={isSelected ? '#0ea5e9' : toothStroke}
-              strokeWidth={strokeWidth}
-              strokeLinejoin="round"
-              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
-            />
-            {!isAbsent && (
-              <path
-                d="M 0 -12 L 0 5"
-                fill="none"
-                stroke="#cbd5e1"
-                strokeWidth="1"
-                strokeLinecap="round"
-                opacity="0.8"
-              />
+            {isImplant && (
+              <g>
+                <circle cx={0} cy={0} r={6} fill="#0284c7" opacity={0.8} />
+                <text x={0} y={2.5} textAnchor="middle" className="fill-white font-black text-[8px] pointer-events-none">🔩</text>
+              </g>
             )}
           </g>
         )}
 
-        {/* 4. INCISIVO: Corona alargada en arco con borde incisal liso */}
+        {/* 4. INCISIVO: Corona alargada en arco con borde incisal liso y brillo de porcelana */}
         {pos.type === 'incisor' && (
-          <g className="transition-transform group-hover:scale-105 duration-150">
+          <g className="transition-transform group-hover:scale-108 duration-150">
+            <ellipse cx={0} cy={2} rx={13} ry={11} fill="rgba(0,0,0,0.18)" filter="blur(2px)" />
             <path
-              d="M -13 -10 C -8 -13, 8 -13, 13 -10 C 15 -4, 14 6, 12 11 C 6 13, -6 13, -12 11 C -14 6, -15 -4, -13 -10 Z"
+              d="M -13 -10 C -8 -14, 8 -14, 13 -10 C 16 -4, 15 6, 12 11 C 6 14, -6 14, -12 11 C -15 6, -16 -4, -13 -10 Z"
               fill={toothFill}
               stroke={isSelected ? '#0ea5e9' : toothStroke}
               strokeWidth={strokeWidth}
               strokeLinejoin="round"
-              filter="drop-shadow(0 2px 3px rgba(0,0,0,0.15))"
+              className={isAbsent ? 'stroke-dashed opacity-50' : ''}
+              filter="drop-shadow(0 3px 5px rgba(0,0,0,0.22))"
             />
             {!isAbsent && (
-              <path
-                d="M -9 8 Q 0 9 9 8"
-                fill="none"
-                stroke="#cbd5e1"
-                strokeWidth="1"
-                strokeLinecap="round"
-                opacity="0.8"
-              />
+              <>
+                <ellipse cx={-3} cy={-5} rx={5} ry={2} fill="#ffffff" opacity={0.7} transform="rotate(-10 -3 -5)" />
+                <path
+                  d="M -9 8 Q 0 9.5 9 8"
+                  fill="none"
+                  stroke="#cbd5e1"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  opacity="0.85"
+                />
+              </>
+            )}
+            {isImplant && (
+              <g>
+                <circle cx={0} cy={0} r={6} fill="#0284c7" opacity={0.8} />
+                <text x={0} y={2.5} textAnchor="middle" className="fill-white font-black text-[8px] pointer-events-none">🔩</text>
+              </g>
             )}
           </g>
         )}
 
         {/* RENDERIZADO VISUAL DE TRATAMIENTO(S) */}
         {isAbsent ? (
-          // Símbolo de pieza ausente
+          // Símbolo de pieza ausente de alto contraste
           <g>
-            <line x1={-9} y1={-9} x2={9} y2={9} stroke="#64748b" strokeWidth={2.5} strokeLinecap="round" />
-            <line x1={9} y1={-9} x2={-9} y2={9} stroke="#64748b" strokeWidth={2.5} strokeLinecap="round" />
+            <circle cx={0} cy={0} r={10} fill="rgba(15, 23, 42, 0.75)" stroke="#e2e8f0" strokeWidth={1} />
+            <line x1={-6} y1={-6} x2={6} y2={6} stroke="#f87171" strokeWidth={2.5} strokeLinecap="round" />
+            <line x1={6} y1={-6} x2={-6} y2={6} stroke="#f87171" strokeWidth={2.5} strokeLinecap="round" />
           </g>
         ) : hasMultiple && cond1 && cond2 ? (
-          // Múltiples condiciones: indicador visual dual
+          // Múltiples condiciones: indicador visual dual con badge holográfico
           <g>
-            {/* Círculo central con badge numérico de tratamientos */}
-            <circle cx={0} cy={0} r={6.5} fill="#0f172a" stroke="#ffffff" strokeWidth={1} />
+            <circle cx={0} cy={0} r={8} fill="#0f172a" stroke="#38bdf8" strokeWidth={1.5} filter="drop-shadow(0 2px 4px rgba(0,0,0,0.4))" />
             <text
               x={0}
-              y={2.5}
+              y={3}
               textAnchor="middle"
-              className="fill-white font-black text-[8px] select-none pointer-events-none"
+              className="fill-cyan-300 font-black text-[9px] select-none pointer-events-none"
             >
               {conditions.length}
             </text>
           </g>
-        ) : cond1 ? (
-          // Tratamiento único con su color y símbolo clínico
+        ) : cond1 && !isCrown && !isImplant ? (
+          // Tratamiento único con su color y símbolo clínico en relieve
           <g>
-            <circle cx={0} cy={0} r={6} fill={cond1.color} opacity={0.9} />
+            <circle cx={0} cy={0} r={7.5} fill={cond1.color} filter="drop-shadow(0 2px 4px rgba(0,0,0,0.35))" />
+            <circle cx={0} cy={0} r={7.5} fill="none" stroke="#ffffff" strokeWidth={1} opacity={0.6} />
             <text
               x={0}
-              y={2.5}
+              y={3}
               textAnchor="middle"
-              className="fill-white font-black text-[7.5px] select-none pointer-events-none"
+              className="fill-white font-black text-[8.5px] select-none pointer-events-none"
             >
               {cond1.symbol}
             </text>
           </g>
         ) : null}
 
-        {/* ETIQUETA NUMÉRICA FDI */}
-        {/* Desrotar el texto para que el número siempre esté perfectamente horizontal */}
+        {/* ETIQUETA NUMÉRICA FDI DESROTADA (SIEMPRE HORIZONTAL) */}
         <g transform={`rotate(${-pos.angle})`}>
+          {/* Pill de fondo para máxima legibilidad sobre cualquier superficie */}
+          <rect
+            x={-12}
+            y={pos.y > 340 ? 17 : -30}
+            width={24}
+            height={15}
+            rx={5}
+            className={`transition-colors ${
+              isSelected
+                ? 'fill-teal-500'
+                : isHovered
+                ? 'fill-slate-800'
+                : 'fill-slate-900/80 dark:fill-slate-900/90'
+            }`}
+            stroke={isSelected ? '#14b8a6' : 'rgba(255,255,255,0.15)'}
+            strokeWidth={1}
+          />
           <text
             x={0}
-            y={pos.y > 340 ? 25 : -20}
+            y={pos.y > 340 ? 28 : -19}
             textAnchor="middle"
-            className={`font-mono font-bold select-none text-[10px] ${
-              pos.isChild ? 'fill-amber-500 font-black' : isSelected ? 'fill-primary font-black' : 'fill-slate-600 dark:fill-slate-300'
+            className={`font-mono font-bold select-none text-[9.5px] ${
+              isSelected ? 'fill-white font-black' : pos.isChild ? 'fill-amber-300 font-black' : 'fill-slate-200'
             }`}
           >
             {pos.number}
@@ -364,7 +465,7 @@ export function DentalArch({
         {mode === 'mixed' && pos.isChild && onExfoliateAndErupt && (
           <g
             className="opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-            transform={`rotate(${-pos.angle}) translate(0, -28)`}
+            transform={`rotate(${-pos.angle}) translate(0, -36)`}
             onClick={(e) => {
               e.stopPropagation();
               const adultNum = CHILD_TO_ADULT_MAP[pos.number];
@@ -372,8 +473,8 @@ export function DentalArch({
             }}
           >
             <title>{`Mudar y Erupcionar a pieza permanente (${CHILD_TO_ADULT_MAP[pos.number]})`}</title>
-            <circle cx={0} cy={0} r={8} className="fill-amber-500 hover:fill-amber-600 shadow-md" />
-            <text x={0} y={3} textAnchor="middle" className="fill-white font-black text-[9px] pointer-events-none">
+            <circle cx={0} cy={0} r={9} className="fill-amber-500 hover:fill-amber-600 shadow-md" />
+            <text x={0} y={3.5} textAnchor="middle" className="fill-white font-black text-[10px] pointer-events-none">
               ⬆
             </text>
           </g>
@@ -386,116 +487,198 @@ export function DentalArch({
   const showChild = mode === 'child' || mode === 'mixed';
 
   return (
-    <div className="w-full bg-linear-to-b from-slate-50 to-slate-100 dark:from-slate-900/60 dark:to-slate-950/80 border border-border rounded-3xl p-6 relative overflow-x-auto shadow-inner">
-      {/* Guías clínicas de orientación anatómica */}
-      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest px-8 mb-2">
-        <span>◀ Cuadrante Derecho (1 & 4)</span>
-        <span className="text-teal-600 dark:text-teal-400 font-black flex items-center gap-1.5 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
-          🦷 Arcada Superior (Maxilar)
-        </span>
-        <span>Cuadrante Izquierdo (2 & 3) ▶</span>
+    <div className="w-full bg-linear-to-b from-slate-900 via-slate-950 to-slate-900 border border-slate-800 rounded-3xl p-6 relative overflow-hidden shadow-2xl">
+      {/* Barra de Herramientas de la Arcada */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pb-4 mb-2 border-b border-slate-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center text-teal-400">
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <h3 className="text-sm font-black text-white flex items-center gap-2">
+              <span>Visor Anatómico Bucal</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20 font-bold uppercase tracking-wider">
+                FDI 3D
+              </span>
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Arcada anatómica interactiva con texturas de esmalte cerámico y mapeo oclusal
+            </p>
+          </div>
+        </div>
+
+        {/* Selector de Estilo de Vista */}
+        <div className="flex items-center gap-1.5 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+          <button
+            type="button"
+            onClick={() => setVisualStyle('3d_scanner')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              visualStyle === '3d_scanner'
+                ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Eye size={13} />
+            <span>Escáner 3D Realista</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisualStyle('cad_porcelain')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              visualStyle === 'cad_porcelain'
+                ? 'bg-linear-to-r from-teal-500 to-cyan-600 text-white shadow-md'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Layers size={13} />
+            <span>Esquema Porcelana CAD</span>
+          </button>
+        </div>
       </div>
 
-      {/* Lienzo SVG Anatómico Ultra Realista */}
-      <div className="min-w-[780px] flex justify-center py-2">
+      {/* Guías clínicas de orientación anatómica superior */}
+      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-8 mb-2">
+        <span className="flex items-center gap-1">◀ Cuadrante 1 (Sup. Der.)</span>
+        <span className="text-teal-400 font-black flex items-center gap-1.5 bg-teal-500/10 px-3.5 py-1 rounded-full border border-teal-500/30 shadow-xs">
+          🦷 Arcada Superior (Maxilar)
+        </span>
+        <span className="flex items-center gap-1">Cuadrante 2 (Sup. Izq.) ▶</span>
+      </div>
+
+      {/* Lienzo Anatómico con Modo Fotorrealista o Porcelana */}
+      <div className="min-w-[780px] flex justify-center py-2 relative">
         <svg
           viewBox="0 0 780 670"
-          className="w-full max-w-3xl h-auto select-none drop-shadow-md"
+          className="w-full max-w-3xl h-auto select-none drop-shadow-2xl"
         >
           <defs>
-            {/* Gradiente de Esmalte Dental Perlado con Iluminación Superior */}
-            <radialGradient id="enamel-gradient" cx="40%" cy="35%" r="65%">
+            {/* Filtro de resplandor para selección quirúrgica */}
+            <filter id="glow-filter" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+
+            {/* Gradiente de Esmalte Dental de Porcelana Multicapa con Brillo de Estudio */}
+            <radialGradient id="porcelain-ceramic-gradient" cx="35%" cy="30%" r="75%">
               <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="65%" stopColor="#fdfdfc" />
-              <stop offset="100%" stopColor="#f1f5f9" />
+              <stop offset="30%" stopColor="#fdfdfc" />
+              <stop offset="70%" stopColor="#f1f5f9" />
+              <stop offset="100%" stopColor="#cbd5e1" />
             </radialGradient>
 
-            {/* Gradiente Realista de Encía Superior (Rosa / Salmón gingival) */}
-            <linearGradient id="upper-gum-grad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.45" />
-              <stop offset="50%" stopColor="#f43f5e" stopOpacity="0.65" />
-              <stop offset="100%" stopColor="#fda4af" stopOpacity="0.35" />
+            {/* Gradiente Metálico de Corona de Oro / Zirconia */}
+            <radialGradient id="gold-crown-gradient" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#fef08a" />
+              <stop offset="40%" stopColor="#f59e0b" />
+              <stop offset="85%" stopColor="#b45309" />
+              <stop offset="100%" stopColor="#78350f" />
+            </radialGradient>
+
+            {/* Gradiente Titanio para Implantes Biomecánicos */}
+            <radialGradient id="titanium-implant-gradient" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stopColor="#e0f2fe" />
+              <stop offset="40%" stopColor="#0284c7" />
+              <stop offset="85%" stopColor="#0369a1" />
+              <stop offset="100%" stopColor="#0c4a6e" />
+            </radialGradient>
+
+            {/* Gradiente Realista de Encía Superior con Profundidad Volumétrica */}
+            <linearGradient id="upper-gum-grad-3d" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.6" />
+              <stop offset="40%" stopColor="#e11d48" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#9f1239" stopOpacity="0.5" />
             </linearGradient>
 
             {/* Gradiente Realista de Encía Inferior */}
-            <linearGradient id="lower-gum-grad" x1="0%" y1="100%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.45" />
-              <stop offset="50%" stopColor="#f43f5e" stopOpacity="0.65" />
-              <stop offset="100%" stopColor="#fda4af" stopOpacity="0.35" />
+            <linearGradient id="lower-gum-grad-3d" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.6" />
+              <stop offset="40%" stopColor="#e11d48" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#9f1239" stopOpacity="0.5" />
             </linearGradient>
 
-            {/* Sombra suave y anatomía del Paladar */}
-            <radialGradient id="palate-gradient" cx="50%" cy="30%" r="50%">
-              <stop offset="0%" stopColor="#fda4af" stopOpacity="0.3" />
-              <stop offset="80%" stopColor="#f43f5e" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#e11d48" stopOpacity="0" />
+            {/* Paladar Superior con Sombra Cóncava */}
+            <radialGradient id="palate-gradient-3d" cx="50%" cy="30%" r="55%">
+              <stop offset="0%" stopColor="#fda4af" stopOpacity="0.35" />
+              <stop offset="60%" stopColor="#f43f5e" stopOpacity="0.18" />
+              <stop offset="100%" stopColor="#881337" stopOpacity="0.05" />
             </radialGradient>
 
             {/* Anatomía de la Lengua en Arcada Inferior */}
-            <radialGradient id="tongue-gradient" cx="50%" cy="40%" r="60%">
-              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.55" />
-              <stop offset="70%" stopColor="#e11d48" stopOpacity="0.75" />
-              <stop offset="100%" stopColor="#be123c" stopOpacity="0.9" />
+            <radialGradient id="tongue-gradient-3d" cx="50%" cy="40%" r="60%">
+              <stop offset="0%" stopColor="#fb7185" stopOpacity="0.45" />
+              <stop offset="65%" stopColor="#e11d48" stopOpacity="0.65" />
+              <stop offset="100%" stopColor="#881337" stopOpacity="0.8" />
             </radialGradient>
 
-            {/* Patrón rayado para Dientes Ausentes */}
-            <pattern id="absent-pattern" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-              <line x1="0" y1="0" x2="0" y2="8" stroke="#cbd5e1" strokeWidth="2" />
+            {/* Patrón rayado translúcido para Dientes Ausentes */}
+            <pattern id="absent-translucent-pattern" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <line x1="0" y1="0" x2="0" y2="8" stroke="#475569" strokeWidth="2" opacity="0.6" />
             </pattern>
           </defs>
 
-          {/* FONDO ANATÓMICO: PALADAR SUPERIOR */}
-          <path
-            d="M 170 170 C 230 40, 550 40, 610 170 C 530 250, 250 250, 170 170 Z"
-            fill="url(#palate-gradient)"
-          />
-          {/* Rugosidades palatinas sutiles */}
-          <path d="M 330 90 Q 390 100 450 90" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.3" />
-          <path d="M 340 120 Q 390 132 440 120" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.25" />
-          <path d="M 350 150 Q 390 160 430 150" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.2" />
+          {/* CAPA DE FONDO 3D FOTORREALISTA (SI ESTÁ ACTIVO EL ESCÁNER 3D) */}
+          {visualStyle === '3d_scanner' ? (
+            <g>
+              {/* Imagen 3D Oclusal Fotorrealista de Alta Resolución con mezcla clínica */}
+              <image
+                href="/dental/arch_horseshoe.jpg"
+                x="60"
+                y="15"
+                width="660"
+                height="640"
+                preserveAspectRatio="xMidYMid meet"
+                className="opacity-40 mix-blend-screen rounded-3xl"
+              />
+              {/* Viñeta oscura periférica para destacar los dientes */}
+              <radialGradient id="scanner-vignette" cx="50%" cy="50%" r="50%">
+                <stop offset="60%" stopColor="#020617" stopOpacity="0" />
+                <stop offset="100%" stopColor="#020617" stopOpacity="0.85" />
+              </radialGradient>
+              <rect x="0" y="0" width="780" height="670" fill="url(#scanner-vignette)" pointerEvents="none" />
+            </g>
+          ) : (
+            /* CAPA DE PALADAR Y LENGUA EN MODO CAD */
+            <g>
+              {/* Paladar Superior */}
+              <path
+                d="M 170 170 C 230 40, 550 40, 610 170 C 530 250, 250 250, 170 170 Z"
+                fill="url(#palate-gradient-3d)"
+              />
+              {/* Rugosidades palatinas anatómicas */}
+              <path d="M 330 90 Q 390 100 450 90" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.25" />
+              <path d="M 340 120 Q 390 132 440 120" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.2" />
+              <path d="M 350 150 Q 390 160 430 150" fill="none" stroke="#fb7185" strokeWidth="1.5" opacity="0.15" />
 
-          {/* ARCO DE ENCÍA SUPERIOR (Herradura Gingival Maxilar) */}
+              {/* Lengua en Arcada Inferior */}
+              <path
+                d="M 230 500 C 240 400, 540 400, 550 500 C 530 570, 250 570, 230 500 Z"
+                fill="url(#tongue-gradient-3d)"
+                filter="drop-shadow(0 4px 10px rgba(0,0,0,0.5))"
+              />
+              <line x1="390" y1="435" x2="390" y2="525" stroke="#9f1239" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
+            </g>
+          )}
+
+          {/* ARCOS GINGIVALES ANATÓMICOS (HERRADURAS MAXILAR Y MANDIBULAR) */}
           <path
             d="M 60 285 C 80 40, 700 40, 720 285"
             fill="none"
-            stroke="url(#upper-gum-grad)"
-            strokeWidth="48"
+            stroke="url(#upper-gum-grad-3d)"
+            strokeWidth="50"
             strokeLinecap="round"
-            filter="drop-shadow(0 2px 4px rgba(244,63,94,0.15))"
+            filter="drop-shadow(0 4px 8px rgba(0,0,0,0.4))"
           />
 
-          {/* FONDO ANATÓMICO: LENGUA EN LA ARCADA INFERIOR */}
-          <g>
-            {/* Silueta de la Lengua */}
-            <path
-              d="M 230 500 C 240 400, 540 400, 550 500 C 530 570, 250 570, 230 500 Z"
-              fill="url(#tongue-gradient)"
-              filter="drop-shadow(0 4px 6px rgba(0,0,0,0.2))"
-            />
-            {/* Surco medio lingual */}
-            <line
-              x1="390"
-              y1="435"
-              x2="390"
-              y2="525"
-              stroke="#9f1239"
-              strokeWidth="2"
-              strokeLinecap="round"
-              opacity="0.4"
-            />
-          </g>
-
-          {/* ARCO DE ENCÍA INFERIOR (Herradura Gingival Mandibular) */}
           <path
             d="M 70 385 C 90 635, 690 635, 710 385"
             fill="none"
-            stroke="url(#lower-gum-grad)"
-            strokeWidth="48"
+            stroke="url(#lower-gum-grad-3d)"
+            strokeWidth="50"
             strokeLinecap="round"
-            filter="drop-shadow(0 2px 4px rgba(244,63,94,0.15))"
+            filter="drop-shadow(0 4px 8px rgba(0,0,0,0.4))"
           />
 
-          {/* LÍNEA MEDIA FACIAL / INTERINCISIVA */}
+          {/* LÍNEA MEDIA FACIAL / INTERINCISIVA QUIRÚRGICA */}
           <line
             x1="390"
             y1="25"
@@ -504,13 +687,13 @@ export function DentalArch({
             stroke="#14b8a6"
             strokeWidth="1.5"
             strokeDasharray="4 4"
-            opacity="0.5"
+            opacity="0.45"
           />
           <text
             x="390"
             y="340"
             textAnchor="middle"
-            className="fill-slate-400 dark:fill-slate-500 text-[10px] font-black tracking-widest uppercase select-none"
+            className="fill-teal-400 text-[10px] font-black tracking-widest uppercase select-none"
           >
             Línea Media Facial
           </text>
@@ -529,14 +712,42 @@ export function DentalArch({
         </svg>
       </div>
 
-      {/* Guías clínicas de orientación mandibular */}
-      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500 uppercase tracking-widest px-8 mt-2">
-        <span>◀ Cuadrante Derecho</span>
-        <span className="text-teal-600 dark:text-teal-400 font-black flex items-center gap-1.5 bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
+      {/* Guías clínicas de orientación mandibular inferior */}
+      <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest px-8 mt-2">
+        <span className="flex items-center gap-1">◀ Cuadrante 4 (Inf. Der.)</span>
+        <span className="text-teal-400 font-black flex items-center gap-1.5 bg-teal-500/10 px-3.5 py-1 rounded-full border border-teal-500/30 shadow-xs">
           🦷 Arcada Inferior (Mandíbula)
         </span>
-        <span>Cuadrante Izquierdo ▶</span>
+        <span className="flex items-center gap-1">Cuadrante 3 (Inf. Izq.) ▶</span>
       </div>
+
+      {/* Banner flotante de diente bajo el cursor */}
+      {hoveredTooth && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 border border-teal-500/30 backdrop-blur-md px-4 py-2 rounded-2xl shadow-xl flex items-center gap-3 animate-in fade-in duration-150 z-20">
+          <span className="text-xs font-mono font-black text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded-lg border border-teal-500/20">
+            #{hoveredTooth}
+          </span>
+          <span className="text-xs font-bold text-white">
+            {TOOTH_NAMES[hoveredTooth] || `Pieza ${hoveredTooth}`}
+          </span>
+          {teeth[hoveredTooth]?.conditions && teeth[hoveredTooth].conditions.length > 0 && (
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-700">
+              {teeth[hoveredTooth].conditions.map((c, i) => (
+                <span
+                  key={i}
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                  style={{
+                    backgroundColor: (CONDITIONS[c.code]?.color || '#0ea5e9') + '25',
+                    color: CONDITIONS[c.code]?.color || '#38bdf8',
+                  }}
+                >
+                  {c.label || CONDITIONS[c.code]?.label || c.code}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
