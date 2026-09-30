@@ -14,6 +14,8 @@ import { CashRegisterModal } from '@/components/caja/CashRegisterModal';
 import { CustomerHistoryModal } from '@/components/caja/CustomerHistoryModal';
 import { ReceiptModal, SaleReceiptData } from '@/components/caja/ReceiptModal';
 import { CashMovementModal } from '@/components/caja/CashMovementModal';
+import { HeldTicketsModal } from '@/components/caja/HeldTicketsModal';
+import { PendingDentalOrdersModal } from '@/components/caja/PendingDentalOrdersModal';
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { 
@@ -2651,199 +2653,24 @@ function CajaPageContent() {
       {/* ─────────────────────────────────────────────────────────────
           11. MODAL DE TICKETS EN ESPERA (PARK / HOLD CART)
          ───────────────────────────────────────────────────────────── */}
-      {isHeldModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-card border border-border rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-slate-50 dark:bg-slate-900/40">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center font-black">
-                  <Pause size={18} />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-foreground">Tickets en Espera</h3>
-                  <p className="text-xs text-slate-500 font-medium">
-                    {heldTickets.length === 1 ? '1 ticket pausado' : `${heldTickets.length} tickets pausados`}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsHeldModalOpen(false)}
-                className="w-8 h-8 rounded-xl border border-border flex items-center justify-center text-slate-400 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X size={16} />
-              </button>
-            </div>
+      <HeldTicketsModal
+        isOpen={isHeldModalOpen}
+        onClose={() => setIsHeldModalOpen(false)}
+        heldTickets={heldTickets}
+        onDiscard={discardHeldTicket}
+        onResume={resumeHeldTicket}
+      />
 
-            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1">
-              {heldTickets.length === 0 ? (
-                <div className="text-center py-10 text-slate-400">
-                  <Pause size={32} className="mx-auto mb-2 opacity-40" />
-                  <p className="text-sm font-bold">No hay tickets en espera</p>
-                  <p className="text-xs text-slate-500 mt-0.5">Pausa una venta activa para atender a otro cliente.</p>
-                </div>
-              ) : (
-                heldTickets.map((ticket) => (
-                  <div
-                    key={ticket.id}
-                    className="p-3.5 rounded-2xl border border-border bg-background hover:border-amber-500/40 transition-all space-y-2.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <span className="text-xs font-black text-foreground block">
-                          {ticket.customerName}
-                        </span>
-                        <span className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                          <Clock size={11} />
-                          <span>Pausado a las {ticket.timestamp}</span>
-                          <span>•</span>
-                          <span>{ticket.lines.reduce((sum, l) => sum + l.quantity, 0)} ítem(s)</span>
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-mono font-black text-sm text-foreground block">
-                          ${ticket.totalUSD.toFixed(2)}
-                        </span>
-                        <span className="font-mono text-[10px] text-blue-600 dark:text-blue-400 font-bold block">
-                          Bs. {ticket.totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="bg-slate-50 dark:bg-slate-900/30 rounded-xl p-2 text-[11px] text-slate-600 dark:text-slate-400 space-y-0.5 max-h-24 overflow-y-auto">
-                      {ticket.lines.map((l, idx) => (
-                        <div key={idx} className="flex justify-between">
-                          <span className="truncate pr-2">• {l.item.name} x{l.quantity}</span>
-                          <span className="font-mono font-bold shrink-0">${((l.item.base_price || 0) * l.quantity).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex items-center justify-end gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => discardHeldTicket(ticket.id)}
-                        className="px-3 py-1.5 rounded-xl border border-border hover:border-rose-500/30 hover:bg-rose-500/10 text-slate-500 hover:text-rose-600 text-xs font-bold transition-all flex items-center gap-1"
-                      >
-                        <Trash2 size={13} />
-                        <span>Descartar</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => resumeHeldTicket(ticket)}
-                        className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-xs btn-haptic"
-                      >
-                        <Play size={13} fill="currentColor" />
-                        <span>Recuperar Ticket</span>
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-
-            <div className="p-4 border-t border-border bg-slate-50 dark:bg-slate-900/40 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsHeldModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-border text-foreground font-bold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL DE CONSULTAS ODONTOLÓGICAS POR COBRAR EN MOSTRADOR */}
-      {isDentalOrdersModalOpen && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in" onClick={() => setIsDentalOrdersModalOpen(false)} />
-          <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
-              <h3 className="text-base font-black text-foreground flex items-center gap-2">
-                <span className="text-lg">🦷</span>
-                <span>Consultas Odontológicas por Cobrar</span>
-              </h3>
-              <button onClick={() => setIsDentalOrdersModalOpen(false)} className="text-slate-400 hover:text-foreground">
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-3 overflow-y-auto pr-1 flex-1">
-              {pendingDentalOrders.length === 0 ? (
-                <div className="text-center py-12 text-slate-400 space-y-1">
-                  <p className="text-xs font-bold">No hay consultas odontológicas pendientes de cobro</p>
-                  <p className="text-[11px] text-slate-500">
-                    Cuando los odontólogos despachen una orden desde el sillón, aparecerá aquí automáticamente.
-                  </p>
-                </div>
-              ) : (
-                pendingDentalOrders.map((order) => {
-                  const meta = order.metadata || {};
-                  const items = meta.items || [];
-                  const patientName = order.entity?.name || meta.title || 'Paciente';
-
-                  return (
-                    <div
-                      key={order.id}
-                      className="p-4 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/40 space-y-2.5 hover:border-teal-500/50 transition-all"
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-black text-foreground">{patientName}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">
-                            Orden: #{order.document_number} · Dr: {meta.created_by_doctor || 'Odontólogo'}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-sm font-black font-mono text-teal-600 dark:text-teal-400 block">
-                            ${Number(order.total_amount || 0).toFixed(2)}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            Bs. {(Number(order.total_amount || 0) * exchangeRate.rate).toLocaleString('es-VE', { maximumFractionDigits: 0 })}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Procedimientos incluidos */}
-                      {items.length > 0 && (
-                        <div className="space-y-1 py-1.5 border-t border-border/40 text-[11px]">
-                          {items.map((it: any, iIdx: number) => (
-                            <div key={iIdx} className="flex justify-between text-slate-600 dark:text-slate-300">
-                              <span>• {it.procedureName} (Pieza {it.toothNum})</span>
-                              <span className="font-mono font-bold">${Number(it.cost || 0).toFixed(2)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => handleLoadDentalOrder(order)}
-                        className="w-full py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 btn-haptic"
-                      >
-                        <ShoppingCart size={14} />
-                        <span>Cargar al Ticket de Caja</span>
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="flex justify-end pt-2 border-t border-border shrink-0">
-              <button
-                type="button"
-                onClick={() => setIsDentalOrdersModalOpen(false)}
-                className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ─────────────────────────────────────────────────────────────
+          12. MODAL DE CONSULTAS ODONTOLÓGICAS POR COBRAR EN MOSTRADOR
+         ───────────────────────────────────────────────────────────── */}
+      <PendingDentalOrdersModal
+        isOpen={isDentalOrdersModalOpen}
+        onClose={() => setIsDentalOrdersModalOpen(false)}
+        orders={pendingDentalOrders}
+        exchangeRate={exchangeRate.rate}
+        onLoadOrder={handleLoadDentalOrder}
+      />
     </div>
   );
 }

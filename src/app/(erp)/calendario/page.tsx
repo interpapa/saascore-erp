@@ -30,6 +30,7 @@ import {
 
 import { BookingConfigModal } from '@/components/calendario/BookingConfigModal';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
+import { supabase } from '@/lib/supabase';
 
 export default function CalendarioPage() {
   const currentTenant = useTenantResolver();
@@ -155,6 +156,31 @@ export default function CalendarioPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Supabase Realtime WebSocket Subscription (Instant <100ms updates)
+  useEffect(() => {
+    if (!currentTenant?.id) return;
+
+    const channel = supabase
+      .channel(`realtime-appointments-${currentTenant.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'appointments',
+          filter: `tenant_id=eq.${currentTenant.id}`,
+        },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentTenant?.id, fetchData]);
 
   // Handler for Create Appointment with Optimistic UI Update
   const handleCreateAppointment = async (input: CreateAppointmentInput) => {

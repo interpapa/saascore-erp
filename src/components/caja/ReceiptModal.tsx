@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { X, Printer, Share2, Plus, Check, MessageSquare } from 'lucide-react';
+import { X, Printer, Share2, Plus, Check, MessageSquare, Zap } from 'lucide-react';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
 import { logExternalWhatsAppMessageAction } from '@/app/actions/whatsapp';
+import { generateEscPosBuffer, printViaWebSerial } from '@/lib/core/thermalPrinter';
 
 export interface SaleReceiptData {
   documentNumber: string;
@@ -54,8 +55,43 @@ export function ReceiptModal({ isOpen, onClose, saleData }: ReceiptModalProps) {
 
   if (!isOpen || !saleData) return null;
 
+  const [isEscPosPrinting, setIsEscPosPrinting] = useState(false);
+
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleEscPosDirectPrint = async () => {
+    if (!saleData) return;
+    setIsEscPosPrinting(true);
+    try {
+      const paperWidth = (currentTenant?.metadata as any)?.printer_paper_width || '80mm';
+      const buffer = generateEscPosBuffer(saleData, {
+        paperWidth: paperWidth === '58mm' ? '58mm' : '80mm',
+        openDrawer: true,
+        cutPaper: true,
+      });
+
+      const res = await printViaWebSerial(buffer);
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Ticket Térmico Enviado',
+          description: 'Comandos ESC/POS y pulso de apertura de gaveta enviados a la impresora USB.',
+        });
+      } else {
+        toast({
+          variant: 'info',
+          title: 'Impresión estándar',
+          description: res.error || 'Abriendo diálogo de impresión estándar del sistema.',
+        });
+        window.print();
+      }
+    } catch {
+      window.print();
+    } finally {
+      setIsEscPosPrinting(false);
+    }
   };
 
   const getPaymentMethodLabel = (method: string) => {
@@ -311,11 +347,23 @@ export function ReceiptModal({ isOpen, onClose, saleData }: ReceiptModalProps) {
           <button
             type="button"
             onClick={handlePrint}
-            className="flex-1 py-2.5 px-3 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 transition-all btn-haptic"
+            className="py-2.5 px-3 rounded-xl bg-slate-800 text-white hover:bg-slate-900 dark:bg-white dark:text-slate-900 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm hover:opacity-90 transition-all btn-haptic"
             title="Imprimir ticket en impresora térmica (80mm o 58mm)"
           >
             <Printer size={15} />
-            <span>Imprimir</span>
+            <span>Navegador</span>
+          </button>
+
+          {/* Imprimir Térmica ESC/POS USB & Abrir Gaveta */}
+          <button
+            type="button"
+            onClick={handleEscPosDirectPrint}
+            disabled={isEscPosPrinting}
+            className="flex-1 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm transition-all btn-haptic"
+            title="Impresión directa USB ESC/POS con apertura automática de gaveta de dinero"
+          >
+            <Zap size={15} />
+            <span>{isEscPosPrinting ? 'Enviando...' : 'Térmica USB + Gaveta'}</span>
           </button>
 
           {/* Enviar WhatsApp */}

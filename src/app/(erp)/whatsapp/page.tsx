@@ -22,6 +22,7 @@ import { WhatsAppModal } from '@/components/whatsapp/WhatsAppModal';
 import { useActionActor } from '@/hooks/useActionActor';
 import { Button } from '@/components/ui/Button';
 import { useSearchParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 
 function WhatsAppPageContent() {
   const currentTenant = useERPStore((s) => s.currentTenant);
@@ -126,7 +127,67 @@ function WhatsAppPageContent() {
     }
   }, [activeConvId, loadMessages]);
 
-  // 12-second refetch polling for real-time synchronization
+  // Supabase Realtime WebSocket Subscription (Instant <100ms updates)
+  useEffect(() => {
+    if (!currentTenant?.id) return;
+
+    const channel = supabase
+      .channel(`realtime-wa-${currentTenant.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'whatsapp_messages',
+          filter: `tenant_id=eq.${currentTenant.id}`,
+        },
+        (payload) => {
+          const newMsg = payload.new as any;
+          if (payload.eventType === 'INSERT') {
+            if (activeConvId && newMsg.conversation_id === activeConvId) {
+              setMessages((prev) => {
+                const exists = prev.some((m) => m.id === newMsg.id);
+                if (exists) return prev;
+                const tempIndex = prev.findIndex(
+                  (m) => m.id.startsWith('temp-') && m.text === newMsg.text && m.sender_type === newMsg.sender_type
+                );
+                if (tempIndex !== -1) {
+                  const updated = [...prev];
+                  updated[tempIndex] = newMsg;
+                  return updated;
+                }
+                return [...prev, newMsg];
+              });
+            }
+            loadConversations();
+          } else if (payload.eventType === 'UPDATE') {
+            if (activeConvId && newMsg.conversation_id === activeConvId) {
+              setMessages((prev) => prev.map((m) => (m.id === newMsg.id ? newMsg : m)));
+            }
+            loadConversations();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'whatsapp_conversations',
+          filter: `tenant_id=eq.${currentTenant.id}`,
+        },
+        () => {
+          loadConversations();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentTenant?.id, activeConvId, loadConversations]);
+
+  // Fallback heartbeat polling (30s) in case WebSocket reconnects
   useEffect(() => {
     if (!currentTenant) return;
     const interval = setInterval(() => {
@@ -134,7 +195,7 @@ function WhatsAppPageContent() {
       if (activeConvId) {
         loadMessages(activeConvId);
       }
-    }, 12000);
+    }, 30000);
     return () => clearInterval(interval);
   }, [currentTenant, loadConversations, loadMessages, activeConvId]);
 

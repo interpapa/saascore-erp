@@ -12,6 +12,7 @@ import { runContabilidadTests } from './06_contabilidad.test';
 import { runEquipoTests } from './07_equipo.test';
 import { runOdontologiaKanbanTests } from './08_odontologia_kanban.test';
 import { runQASchemaResilienceTests } from './09_qa_schema_resilience.test';
+import { runEnterpriseEnhancementsTests } from './10_enterprise_enhancements.test';
 
 async function main() {
   console.log('====================================================');
@@ -29,6 +30,7 @@ async function main() {
     { name: '07. Personal & Nómina', fn: runEquipoTests },
     { name: '08. Odontología Especializada & Kanban', fn: runOdontologiaKanbanTests },
     { name: '09. QA de Esquema & Resiliencia de Columnas', fn: runQASchemaResilienceTests },
+    { name: '10. Mejoras de Grado Enterprise (ESC/POS & Worker Queue)', fn: runEnterpriseEnhancementsTests },
   ];
 
   let passed = 0;
