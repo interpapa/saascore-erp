@@ -33,7 +33,9 @@ import {
   CreditCard,
   ExternalLink,
   ShieldAlert,
-  ClipboardList
+  ClipboardList,
+  Sliders,
+  Tag
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Odontogram } from '@/components/dental/Odontogram';
@@ -46,6 +48,10 @@ import { NewConsumableModal } from '@/components/dental/NewConsumableModal';
 import { OrthodonticsTracker } from '@/components/dental/OrthodonticsTracker';
 import { EndodonticsSheet } from '@/components/dental/EndodonticsSheet';
 import { PeriodonticsMiniChart } from '@/components/dental/PeriodonticsMiniChart';
+import { DentalStaffTab } from '@/components/dental/DentalStaffTab';
+import { DentalPricingTab } from '@/components/dental/DentalPricingTab';
+import { getModuleStaffAction, ModuleStaffMember } from '@/app/actions/moduleStaff';
+import { getModulePricingConfigAction, DentalPricingConfig, DEFAULT_DENTAL_PRICING } from '@/app/actions/modulePricing';
 import { mergeTenantDentalServices, DentalProcedureDefinition, DENTAL_PROCEDURES_MASTER } from '@/lib/dental/proceduresCatalog';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 import { 
@@ -60,7 +66,7 @@ import {
   getDentalEvolutionsAction,
   sendDentalOrderToCashierAction
 } from '@/app/actions/dental';
-import { getEntitiesAction, createEntityAction, updateEntityAction } from '@/app/actions/entities';
+import { getEntitiesAction, createEntityAction, updateEntityAction, ActionActor } from '@/app/actions/entities';
 import { getAppointmentsAction, updateAppointmentStatusAction } from '@/app/actions/appointments';
 import { getItemsAction } from '@/app/actions/items';
 import { Entity } from '@/lib/api/entities';
@@ -85,12 +91,20 @@ export default function OdontologiaPage() {
   const currentTenant = useTenantResolver();
   const session = useERPStore((s) => s.session);
   const actor = useActionActor();
+  const effectiveActor: ActionActor = actor || { 
+    email: session?.userEmail || 'dental@rendorp.com', 
+    role: (session?.role as any) || 'admin' 
+  };
   const { toast } = useToast();
   const viewMode = useViewModeStore((s) => s.viewMode);
 
   const tenantId = currentTenant?.id || session?.tenantId || '';
 
   // Estado general de datos
+  const [mainTab, setMainTab] = useState<'sillon' | 'staff' | 'pricing'>('sillon');
+  const [dentalStaff, setDentalStaff] = useState<ModuleStaffMember[]>([]);
+  const [dentalPricingConfig, setDentalPricingConfig] = useState<DentalPricingConfig>(DEFAULT_DENTAL_PRICING);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [customers, setCustomers] = useState<Entity[]>([]);
   const [todayAppointments, setTodayAppointments] = useState<any[]>([]);
@@ -145,17 +159,24 @@ export default function OdontologiaPage() {
   const tenantMeta = (currentTenant?.metadata as Record<string, any>) || {};
   const currentExchangeRate = Number(tenantMeta.exchange_rate?.rate || tenantMeta.exchange_rate || 850.0);
 
-  // 1. CARGA INICIAL DE DATOS CLÍNICOS Y CITAS DE HOY
+  // Especialista seleccionado actualmente
+  const selectedDoctor = useMemo(() => {
+    return dentalStaff.find((s) => s.id === selectedDoctorId);
+  }, [dentalStaff, selectedDoctorId]);
+
+  // 1. CARGA INICIAL DE DATOS CLÍNICOS, EQUIPO, TARIFAS Y CITAS DE HOY
   const loadClinicalData = useCallback(async () => {
     if (!tenantId || !actor) return;
     try {
       setIsLoading(true);
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const [custRes, apptRes, itemsRes] = await Promise.all([
+      const [custRes, apptRes, itemsRes, staffRes, pricingRes] = await Promise.all([
         getEntitiesAction(tenantId, 'customer', 250, actor),
         getAppointmentsAction(tenantId, undefined, actor),
         getItemsAction(tenantId, undefined, 200, actor),
+        getModuleStaffAction(tenantId, 'odontologia', actor),
+        getModulePricingConfigAction(tenantId, 'odontologia', actor),
       ]);
 
       if (custRes.success && custRes.entities) {
@@ -176,6 +197,20 @@ export default function OdontologiaPage() {
         setDentalServices(
           itemsRes.items.filter((i: any) => i.type === 'service' || i.category?.toLowerCase().includes('odon'))
         );
+      }
+
+      if (staffRes.success && staffRes.staff) {
+        const staffList = staffRes.staff;
+        setDentalStaff(staffList);
+        setSelectedDoctorId((prev) => {
+          if (prev) return prev;
+          const firstActive = staffList.find((s: ModuleStaffMember) => s.isActive);
+          return firstActive ? firstActive.id : '';
+        });
+      }
+
+      if (pricingRes.success && pricingRes.config) {
+        setDentalPricingConfig(pricingRes.config as DentalPricingConfig);
       }
     } catch (err: unknown) {
       console.error('[OdontologiaPage] Error cargando estación clínica:', err);
@@ -433,13 +468,22 @@ export default function OdontologiaPage() {
         notes: t.notes,
       }));
 
+      const doctorInfo = selectedDoctor
+        ? {
+            doctorId: selectedDoctor.id,
+            doctorName: selectedDoctor.name,
+            doctorCommissionPercent: selectedDoctor.commissionPercent,
+          }
+        : undefined;
+
       const res = await sendDentalOrderToCashierAction(
         selectedPatient.id,
         selectedPatient.name,
         itemsToCharge,
         todaySuggestedUSD,
         tenantId,
-        actor
+        actor,
+        doctorInfo
       );
 
       if (res.success) {
@@ -482,13 +526,22 @@ export default function OdontologiaPage() {
     if (!tenantId || !actor || !selectedPatient) return;
     const totalCost = items.reduce((acc, curr) => acc + curr.cost, 0);
     try {
+      const doctorInfo = selectedDoctor
+        ? {
+            doctorId: selectedDoctor.id,
+            doctorName: selectedDoctor.name,
+            doctorCommissionPercent: selectedDoctor.commissionPercent,
+          }
+        : undefined;
+
       const res = await sendDentalOrderToCashierAction(
         selectedPatient.id,
         selectedPatient.name,
         items,
         totalCost,
         tenantId,
-        actor
+        actor,
+        doctorInfo
       );
 
       if (res.success) {
@@ -887,8 +940,78 @@ export default function OdontologiaPage() {
         </div>
       </div>
 
-      {/* 2. BARRA DE CITAS DEL DÍA & BUSCADOR OMNICANAL */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
+      {/* SUBNAVEGACIÓN DE MÓDULO */}
+      <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setMainTab('sillon')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
+            mainTab === 'sillon'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20'
+              : 'bg-card border border-border text-slate-500 hover:text-foreground'
+          }`}
+        >
+          <Stethoscope size={15} />
+          <span>Sillón & Consulta Clínica</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab('staff')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
+            mainTab === 'staff'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20'
+              : 'bg-card border border-border text-slate-500 hover:text-foreground'
+          }`}
+        >
+          <Users size={15} />
+          <span>Especialistas & Honorarios ({dentalStaff.filter((s) => s.isActive).length})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setMainTab('pricing')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-xs font-bold transition-all shrink-0 ${
+            mainTab === 'pricing'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20'
+              : 'bg-card border border-border text-slate-500 hover:text-foreground'
+          }`}
+        >
+          <ClipboardList size={15} />
+          <span>Aranceles & Procedimientos ({unifiedDentalCatalog.length})</span>
+        </button>
+      </div>
+
+      {/* PESTAÑA: ESPECIALISTAS Y HONORARIOS */}
+      {mainTab === 'staff' && (
+        <div className="pt-2 animate-in fade-in duration-200">
+          <DentalStaffTab
+            staff={dentalStaff}
+            onRefresh={loadClinicalData}
+            tenantId={tenantId}
+            actor={effectiveActor}
+          />
+        </div>
+      )}
+
+      {/* PESTAÑA: ARANCELES Y PROCEDIMIENTOS */}
+      {mainTab === 'pricing' && (
+        <div className="pt-2 animate-in fade-in duration-200">
+          <DentalPricingTab
+            procedures={unifiedDentalCatalog}
+            pricingConfig={dentalPricingConfig}
+            onRefresh={loadClinicalData}
+            tenantId={tenantId}
+            actor={effectiveActor}
+          />
+        </div>
+      )}
+
+      {/* PESTAÑA: SILLÓN DENTAL Y CONSULTA CLÍNICA */}
+      {mainTab === 'sillon' && (
+        <>
+          {/* 2. BARRA DE CITAS DEL DÍA & BUSCADOR OMNICANAL */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-center">
         {/* Tira de Citas de Hoy (7 columnas en desktop) */}
         <div className="lg:col-span-8 bg-card border border-border rounded-2xl p-2.5 shadow-xs overflow-hidden">
           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -1104,6 +1227,38 @@ export default function OdontologiaPage() {
                 >
                   {patientMeta.allergies ? 'Editar Alerta' : '+ Agregar Alerta'}
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Selector de Especialista Tratante para la Consulta */}
+          <div className="pt-2.5 border-t border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+                Especialista a Cargo:
+              </span>
+              <select
+                value={selectedDoctorId}
+                onChange={(e) => setSelectedDoctorId(e.target.value)}
+                className="bg-background border border-border rounded-xl px-2.5 py-1 text-xs font-bold text-foreground focus:ring-2 focus:ring-teal-500/20"
+              >
+                <option value="">Seleccionar odontólogo tratante...</option>
+                {dentalStaff.filter((d) => d.isActive).map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.avatar || '🦷'} {doc.name} — {doc.role || 'Especialista'} ({doc.commissionPercent || 45}% honorarios)
+                  </option>
+                ))}
+              </select>
+            </div>
+            {selectedDoctor && (
+              <div className="flex items-center gap-2 text-xs font-bold text-teal-600 dark:text-teal-400">
+                <span>Honorario pactado: {selectedDoctor.commissionPercent || 45}%</span>
+                {selectedDoctor.licenseNumber && (
+                  <>
+                    <span className="text-slate-300 dark:text-slate-700">|</span>
+                    <span className="text-slate-500 font-medium">MPPS/Col: {selectedDoctor.licenseNumber}</span>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -1768,6 +1923,8 @@ export default function OdontologiaPage() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
 
       {/* 6. MODALES COMPLEMENTARIOS */}

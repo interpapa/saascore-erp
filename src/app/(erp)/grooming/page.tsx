@@ -43,6 +43,10 @@ import {
 } from '@/app/actions/grooming';
 import { getItemsAction } from '@/app/actions/items';
 import { ActionActor } from '@/app/actions/entities';
+import { ModuleStaffMember, getModuleStaffAction } from '@/app/actions/moduleStaff';
+import { GroomingPricingConfig, getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import { GroomerStaffTab } from '@/components/grooming/GroomerStaffTab';
+import { GroomingPricingTab } from '@/components/grooming/GroomingPricingTab';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -66,9 +70,19 @@ export default function GroomingPage() {
   const viewMode = useViewModeStore((s) => s.viewMode);
   const tenantId = currentTenant?.id || '';
 
+  // Pestaña activa
+  const [currentTab, setCurrentTab] = useState<'pipeline' | 'equipo' | 'tarifas'>('pipeline');
+
   const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState<GroomingOrder[]>([]);
   const [servicesCatalog, setServicesCatalog] = useState<GroomingServiceDefinition[]>(GROOMING_SERVICES_MASTER);
+  const [groomerStaff, setGroomerStaff] = useState<ModuleStaffMember[]>([]);
+  const [selectedGroomerId, setSelectedGroomerId] = useState('');
+  const [pricingConfig, setPricingConfig] = useState<GroomingPricingConfig>({
+    sizeBasePrices: { toy: 18, small: 22, medium: 28, large: 38, giant: 50 },
+    supplementPrices: { matting: 10, tickFlea: 10, nails: 5, ears: 5, teeth: 6, reactiveFee: 8 },
+    defaultCommissionPercent: 45
+  });
 
   // Modal Check-In de Entrada
   const [isCheckInOpen, setIsCheckInOpen] = useState(false);
@@ -95,9 +109,11 @@ export default function GroomingPage() {
     if (!tenantId) return;
     setIsLoading(true);
     try {
-      const [ordersRes, itemsRes] = await Promise.all([
+      const [ordersRes, itemsRes, staffRes, configRes] = await Promise.all([
         getGroomingOrdersAction(tenantId, effectiveActor),
-        getItemsAction(tenantId, undefined, 200, effectiveActor)
+        getItemsAction(tenantId, undefined, 200, effectiveActor),
+        getModuleStaffAction(tenantId, 'grooming', effectiveActor),
+        getModulePricingConfigAction<GroomingPricingConfig>(tenantId, 'grooming', effectiveActor)
       ]);
 
       if (ordersRes.success && ordersRes.orders) {
@@ -106,11 +122,23 @@ export default function GroomingPage() {
       if (itemsRes.success && itemsRes.items) {
         setServicesCatalog(mergeTenantGroomingServices(itemsRes.items as any));
       }
+      if (staffRes.success && staffRes.staff && staffRes.staff.length > 0) {
+        setGroomerStaff(staffRes.staff);
+        const firstActive = staffRes.staff.find(s => s.isActive) || staffRes.staff[0];
+        setSelectedGroomerId(prev => prev || firstActive.id);
+      }
+      if (configRes.success && configRes.config) {
+        setConfigState(configRes.config);
+      }
     } catch (err) {
       console.error(err);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const setConfigState = (cfg: GroomingPricingConfig) => {
+    setPricingConfig(cfg);
   };
 
   useEffect(() => {
@@ -125,16 +153,19 @@ export default function GroomingPage() {
     const sizeConfig = PET_SIZES_CONFIG[selectedSize];
     const selectedServices: Array<{ name: string; priceUSD: number }> = [];
 
+    const sizeBasePrice = pricingConfig.sizeBasePrices[selectedSize] || sizeConfig.baseFullGroomPriceUSD;
+    const bathBasePrice = Math.round(sizeBasePrice * 0.7);
+
     // Servicio Base según tipo y tamaño
     if (serviceType === 'full_groom') {
       selectedServices.push({
         name: `Baño, Corte de Raza & Spa (${sizeConfig.label})`,
-        priceUSD: sizeConfig.baseFullGroomPriceUSD
+        priceUSD: sizeBasePrice
       });
     } else if (serviceType === 'bath_only') {
       selectedServices.push({
         name: `Baño Tradicional & Mascarilla (${sizeConfig.label})`,
-        priceUSD: sizeConfig.baseBathPriceUSD
+        priceUSD: bathBasePrice
       });
     } else {
       selectedServices.push({
@@ -143,19 +174,33 @@ export default function GroomingPage() {
       });
     }
 
-    // Suplementos automáticos por inspección
+    // Suplementos automáticos configurables por inspección
     if (mattingLevel === 'severe') {
-      selectedServices.push({ name: 'Suplemento: Desanudado Manto Apelmazado', priceUSD: 10.0 });
+      selectedServices.push({ 
+        name: 'Suplemento: Desanudado Manto Apelmazado', 
+        priceUSD: pricingConfig.supplementPrices.matting || 10.0 
+      });
     }
     if (parasitesDetected) {
-      selectedServices.push({ name: 'Tratamiento: Baño Medicado Antipulgas/Garrapatas', priceUSD: 8.0 });
+      selectedServices.push({ 
+        name: 'Tratamiento: Baño Medicado Antipulgas/Garrapatas', 
+        priceUSD: pricingConfig.supplementPrices.tickFlea || 10.0 
+      });
     }
     if (teethBrushed) {
-      selectedServices.push({ name: 'Spa Adicional: Cepillado Dental Enzimático', priceUSD: 5.0 });
+      selectedServices.push({ 
+        name: 'Spa Adicional: Cepillado Dental Enzimático', 
+        priceUSD: pricingConfig.supplementPrices.teeth || 6.0 
+      });
     }
     if (temperament === 'reactive_bites') {
-      selectedServices.push({ name: 'Suplemento: Manejo Especial / Reactivo', priceUSD: 8.0 });
+      selectedServices.push({ 
+        name: 'Suplemento: Manejo Especial / Reactivo', 
+        priceUSD: pricingConfig.supplementPrices.reactiveFee || 8.0 
+      });
     }
+
+    const assignedGroomer = groomerStaff.find(g => g.id === selectedGroomerId) || groomerStaff[0];
 
     try {
       const res = await createGroomingOrderAction(
@@ -178,6 +223,9 @@ export default function GroomingPage() {
             skinWartsNotes: skinNotes
           },
           services: selectedServices,
+          groomerId: assignedGroomer?.id,
+          groomerName: assignedGroomer?.name,
+          groomerCommissionPercent: assignedGroomer?.commissionPercent || pricingConfig.defaultCommissionPercent,
           notes: skinNotes
         },
         tenantId,
@@ -304,8 +352,74 @@ export default function GroomingPage() {
         </div>
       </div>
 
-      {/* Pipeline Visual / Columnas Kanban */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* Sub-Navegación de Módulo */}
+      <div className="flex items-center gap-2 border-b border-border pb-2 overflow-x-auto">
+        <button
+          onClick={() => setCurrentTab('pipeline')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+            currentTab === 'pipeline'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <span>🐾</span>
+          <span>Tablero & Pipeline</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('equipo')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+            currentTab === 'equipo'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Dog className="w-3.5 h-3.5" />
+          <span>Groomers & Comisiones</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10">
+            {groomerStaff.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('tarifas')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+            currentTab === 'tarifas'
+              ? 'bg-emerald-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          <span>Matriz de Tarifas</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10">
+            {servicesCatalog.length}
+          </span>
+        </button>
+      </div>
+
+      {currentTab === 'equipo' && (
+        <GroomerStaffTab
+          staff={groomerStaff}
+          onRefresh={loadData}
+          tenantId={tenantId}
+          actor={effectiveActor}
+        />
+      )}
+
+      {currentTab === 'tarifas' && (
+        <GroomingPricingTab
+          services={servicesCatalog}
+          pricingConfig={pricingConfig}
+          onRefresh={loadData}
+          tenantId={tenantId}
+          actor={effectiveActor}
+        />
+      )}
+
+      {currentTab === 'pipeline' && (
+        <>
+          {/* Pipeline Visual / Columnas Kanban */}
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {PIPELINE_STAGES.map((stage) => {
           const StageIcon = stage.icon;
           const stageOrders = orders.filter(o => o.stage === stage.id);
@@ -362,6 +476,12 @@ export default function GroomingPage() {
                           <span>Tamaño: {PET_SIZES_CONFIG[order.size]?.label}</span>
                           <span className="text-emerald-600 font-mono font-black">${order.totalUSD.toFixed(2)} USD</span>
                         </div>
+                        {order.groomerName && (
+                          <div className="flex justify-between items-center text-[10px] text-cyan-600 dark:text-cyan-400 font-bold border-t border-slate-200/60 dark:border-slate-800/60 pt-1">
+                            <span>Groomer: {order.groomerName}</span>
+                            <span>${(((order.totalUSD * (order.groomerCommissionPercent || 45)) / 100)).toFixed(2)} ({order.groomerCommissionPercent || 45}%)</span>
+                          </div>
+                        )}
                         {order.inspection?.parasitesDetected && (
                           <span className="text-rose-500 font-bold block">⚠️ Alerta Pulgas</span>
                         )}
@@ -448,6 +568,8 @@ export default function GroomingPage() {
           );
         })}
       </div>
+    </>
+  )}
 
       {/* Modal: Check-In de Mascota & Inspección Inicial */}
       {isCheckInOpen && (
@@ -494,6 +616,7 @@ export default function GroomingPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   {(['toy', 'small', 'medium', 'large', 'giant'] as PetSize[]).map((sz) => {
                     const cfg = PET_SIZES_CONFIG[sz];
+                    const dynamicPrice = pricingConfig.sizeBasePrices[sz] || cfg.baseFullGroomPriceUSD;
                     return (
                       <button
                         key={sz}
@@ -508,7 +631,7 @@ export default function GroomingPage() {
                         <span className="block text-xs font-black">{cfg.label}</span>
                         <span className="block text-[10px] text-slate-400">{cfg.weightRange}</span>
                         <span className="block text-[10px] font-mono font-bold mt-1 text-emerald-600">
-                          ${cfg.baseFullGroomPriceUSD}
+                          ${dynamicPrice}
                         </span>
                       </button>
                     );
@@ -516,8 +639,8 @@ export default function GroomingPage() {
                 </div>
               </div>
 
-              {/* Datos del Tutor */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Datos del Tutor & Estilista */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="text-[11px] font-bold text-slate-500 block mb-1">Nombre del Tutor/Dueño *</label>
                   <input
@@ -531,7 +654,7 @@ export default function GroomingPage() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-500 block mb-1">WhatsApp del Tutor (Aviso de Retiro)</label>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">WhatsApp del Tutor</label>
                   <input
                     type="text"
                     placeholder="ej. 584121234567"
@@ -539,6 +662,21 @@ export default function GroomingPage() {
                     onChange={(e) => setOwnerPhone(e.target.value)}
                     className="w-full bg-background border border-border rounded-xl p-2.5 font-mono text-foreground"
                   />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 block mb-1">Estilista / Groomer *</label>
+                  <select
+                    value={selectedGroomerId}
+                    onChange={(e) => setSelectedGroomerId(e.target.value)}
+                    className="w-full bg-background border border-border rounded-xl p-2.5 font-bold text-foreground"
+                  >
+                    {groomerStaff.map(g => (
+                      <option key={g.id} value={g.id}>
+                        {g.avatar} {g.name} ({g.commissionPercent}%)
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

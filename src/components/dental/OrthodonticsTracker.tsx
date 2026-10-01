@@ -16,7 +16,9 @@ import {
   ShieldAlert,
   Send,
   Check,
-  Palette
+  Palette,
+  Stethoscope,
+  Users
 } from 'lucide-react';
 import { 
   OrthodonticCase, 
@@ -27,6 +29,8 @@ import {
   LigatureType 
 } from '@/types/dentalSpecialties';
 import { saveOrthodonticCaseAction, getOrthodonticCaseAction, sendDentalOrderToCashierAction } from '@/app/actions/dental';
+import { ModuleStaffMember, getModuleStaffAction } from '@/app/actions/moduleStaff';
+import { DentalPricingConfig, getModulePricingConfigAction } from '@/app/actions/modulePricing';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
@@ -61,6 +65,17 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
   const [isSendingCashier, setIsSendingCashier] = useState(false);
   const [orthoCase, setOrthoCase] = useState<OrthodonticCase | null>(null);
 
+  // Doctores y Aranceles dinámicos
+  const [dentalStaff, setDentalStaff] = useState<ModuleStaffMember[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
+  const [clinicPricing, setClinicPricing] = useState<DentalPricingConfig>({
+    orthoMonthlyFeeUSD: 35,
+    bracketReplacementFeeUSD: 10,
+    endoCanalBaseUSD: 40,
+    perioCleaningBaseUSD: 30,
+    defaultDoctorCommissionPercent: 50
+  });
+
   // Formulario de nueva visita de activación
   const [isAddingVisit, setIsAddingVisit] = useState(false);
   const [upperMaterial, setUpperMaterial] = useState<WireMaterial>('niti_thermal');
@@ -80,16 +95,41 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
   const [hygieneStatus, setHygieneStatus] = useState<'excellent' | 'good' | 'poor_warning'>('good');
   const [visitNotes, setVisitNotes] = useState('');
 
-  // Cargar caso de ortodoncia
+  // Cargar caso de ortodoncia y configuración clínica
   useEffect(() => {
-    async function loadCase() {
+    async function loadData() {
       setIsLoading(true);
       try {
-        const res = await getOrthodonticCaseAction(patientId, tenantId, effectiveActor);
+        const [res, staffRes, pricingRes] = await Promise.all([
+          getOrthodonticCaseAction(patientId, tenantId, effectiveActor),
+          getModuleStaffAction(tenantId, 'odontologia', effectiveActor),
+          getModulePricingConfigAction<DentalPricingConfig>(tenantId, 'odontologia', effectiveActor)
+        ]);
+
+        if (staffRes.success && staffRes.staff) {
+          setDentalStaff(staffRes.staff);
+        }
+
+        let defaultMonthly = 35.0;
+        let defaultBracketCost = 10.0;
+        if (pricingRes.success && pricingRes.config) {
+          setClinicPricing(pricingRes.config);
+          defaultMonthly = pricingRes.config.orthoMonthlyFeeUSD || 35.0;
+          defaultBracketCost = pricingRes.config.bracketReplacementFeeUSD || 10.0;
+        }
+
         if (res.success && res.orthoCase) {
           setOrthoCase(res.orthoCase);
+          if (res.orthoCase.doctorId) {
+            setSelectedDoctorId(res.orthoCase.doctorId);
+          } else if (staffRes.staff && staffRes.staff.length > 0) {
+            setSelectedDoctorId(staffRes.staff[0].id);
+          }
         } else {
-          // Caso inicial por defecto
+          const firstDoctor = staffRes.staff?.[0];
+          setSelectedDoctorId(firstDoctor?.id || '');
+
+          // Caso inicial por defecto con tarifas del consultorio
           setOrthoCase({
             patientId,
             technique: 'metal_roth',
@@ -102,8 +142,11 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
             plannedExtractions: [],
             startDate: new Date().toISOString().split('T')[0],
             estimatedMonths: 18,
-            monthlyFeeUSD: 35.0,
-            bracketReplacementFeeUSD: 10.0,
+            monthlyFeeUSD: defaultMonthly,
+            bracketReplacementFeeUSD: defaultBracketCost,
+            doctorId: firstDoctor?.id,
+            doctorName: firstDoctor?.name,
+            doctorCommissionPercent: firstDoctor?.commissionPercent || 50,
             status: 'active',
             visits: []
           });
@@ -115,7 +158,7 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
       }
     }
     if (patientId && tenantId) {
-      loadCase();
+      loadData();
     }
   }, [patientId, tenantId]);
 
@@ -163,6 +206,7 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
   const handleRegisterVisit = async () => {
     if (!orthoCase) return;
 
+    const activeDoctor = dentalStaff.find(d => d.id === selectedDoctorId);
     const droppedCost = chargeDropped ? (droppedTeeth.length * (orthoCase.bracketReplacementFeeUSD || 10)) : 0;
     const totalChargeUSD = (orthoCase.monthlyFeeUSD || 35) + droppedCost;
 
@@ -170,7 +214,10 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
       id: `visit-${Date.now()}`,
       date: new Date().toISOString(),
       sessionNumber: (orthoCase.visits?.length || 0) + 1,
-      performer: effectiveActor.email,
+      performer: activeDoctor ? `${activeDoctor.name} (${activeDoctor.role})` : effectiveActor.email,
+      doctorId: activeDoctor?.id,
+      doctorName: activeDoctor?.name,
+      doctorCommissionPercent: activeDoctor?.commissionPercent || clinicPricing.defaultDoctorCommissionPercent,
       archUpper: {
         wireMaterial: upperMaterial,
         wireSize: upperSize,
@@ -205,6 +252,9 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
 
     const updatedCase: OrthodonticCase = {
       ...orthoCase,
+      doctorId: activeDoctor?.id || orthoCase.doctorId,
+      doctorName: activeDoctor?.name || orthoCase.doctorName,
+      doctorCommissionPercent: activeDoctor?.commissionPercent || orthoCase.doctorCommissionPercent,
       visits: [newVisit, ...(orthoCase.visits || [])]
     };
 
@@ -236,13 +286,19 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
 
       const total = items.reduce((sum, item) => sum + item.cost, 0);
 
+      const activeDoctor = dentalStaff.find(d => d.id === (visit.doctorId || selectedDoctorId));
       const res = await sendDentalOrderToCashierAction(
         patientId,
         patientName,
         items,
         total,
         tenantId,
-        effectiveActor
+        effectiveActor,
+        activeDoctor ? {
+          doctorId: activeDoctor.id,
+          doctorName: activeDoctor.name,
+          doctorCommissionPercent: activeDoctor.commissionPercent
+        } : undefined
       );
 
       if (res.success) {
@@ -321,61 +377,100 @@ export function OrthodonticsTracker({ patientId, patientName }: OrthodonticsTrac
         </div>
 
         {orthoCase && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Técnica / Brackets</label>
-              <select
-                value={orthoCase.technique}
-                onChange={(e) => setOrthoCase({ ...orthoCase, technique: e.target.value as OrthoTechnique })}
-                className="w-full bg-background border border-border rounded-xl px-2.5 py-2 font-medium text-foreground focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="metal_roth">Metálicos Roth .022</option>
-                <option value="metal_mbt">Metálicos MBT .022</option>
-                <option value="esthetic_sapphire">Estéticos Cristal de Zafiro</option>
-                <option value="ceramic">Cerámicos Policristalinos</option>
-                <option value="self_ligating_damon">Autoligables Pasivos (Damon)</option>
-                <option value="lingual">Ortodoncia Lingual</option>
-                <option value="clear_aligners">Alineadores Transparentes</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Maloclusión (Angle)</label>
-              <select
-                value={orthoCase.angleClassification}
-                onChange={(e) => setOrthoCase({ ...orthoCase, angleClassification: e.target.value as any })}
-                className="w-full bg-background border border-border rounded-xl px-2.5 py-2 font-medium text-foreground focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="class_I">Clase I (Normoclusión molar)</option>
-                <option value="class_II_div_1">Clase II División 1</option>
-                <option value="class_II_div_2">Clase II División 2</option>
-                <option value="class_III">Clase III (Prognatismo)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Mensualidad Pactada</label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-2 text-slate-400 font-bold">$</span>
-                <input
-                  type="number"
-                  value={orthoCase.monthlyFeeUSD}
-                  onChange={(e) => setOrthoCase({ ...orthoCase, monthlyFeeUSD: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-background border border-border rounded-xl pl-6 pr-2.5 py-2 font-black text-foreground focus:ring-2 focus:ring-primary/20"
-                />
+          <div className="space-y-3">
+            {/* Selector de Especialista Tratante */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-border">
+              <div className="flex items-center gap-2">
+                <Stethoscope className="w-4 h-4 text-indigo-500" />
+                <span className="text-xs font-bold text-foreground">Ortodoncista Tratante:</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <select
+                  value={selectedDoctorId}
+                  onChange={(e) => {
+                    setSelectedDoctorId(e.target.value);
+                    const doc = dentalStaff.find(d => d.id === e.target.value);
+                    if (doc) {
+                      setOrthoCase({
+                        ...orthoCase,
+                        doctorId: doc.id,
+                        doctorName: doc.name,
+                        doctorCommissionPercent: doc.commissionPercent
+                      });
+                    }
+                  }}
+                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground"
+                >
+                  {dentalStaff.map(doc => (
+                    <option key={doc.id} value={doc.id}>
+                      {doc.avatar} {doc.name} ({doc.role} — {doc.commissionPercent}% honorarios)
+                    </option>
+                  ))}
+                </select>
+                {selectedDoctorId && (
+                  <span className="text-[10px] bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 font-bold px-2 py-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                    Honorario: {dentalStaff.find(d => d.id === selectedDoctorId)?.commissionPercent || 50}%
+                  </span>
+                )}
               </div>
             </div>
 
-            <div>
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Reposición por Bracket</label>
-              <div className="relative">
-                <span className="absolute left-2.5 top-2 text-slate-400 font-bold">$</span>
-                <input
-                  type="number"
-                  value={orthoCase.bracketReplacementFeeUSD}
-                  onChange={(e) => setOrthoCase({ ...orthoCase, bracketReplacementFeeUSD: parseFloat(e.target.value) || 0 })}
-                  className="w-full bg-background border border-border rounded-xl pl-6 pr-2.5 py-2 font-black text-foreground focus:ring-2 focus:ring-primary/20"
-                />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Técnica / Brackets</label>
+                <select
+                  value={orthoCase.technique}
+                  onChange={(e) => setOrthoCase({ ...orthoCase, technique: e.target.value as OrthoTechnique })}
+                  className="w-full bg-background border border-border rounded-xl px-2.5 py-2 font-medium text-foreground focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="metal_roth">Metálicos Roth .022</option>
+                  <option value="metal_mbt">Metálicos MBT .022</option>
+                  <option value="esthetic_sapphire">Estéticos Cristal de Zafiro</option>
+                  <option value="ceramic">Cerámicos Policristalinos</option>
+                  <option value="self_ligating_damon">Autoligables Pasivos (Damon)</option>
+                  <option value="lingual">Ortodoncia Lingual</option>
+                  <option value="clear_aligners">Alineadores Transparentes</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Maloclusión (Angle)</label>
+                <select
+                  value={orthoCase.angleClassification}
+                  onChange={(e) => setOrthoCase({ ...orthoCase, angleClassification: e.target.value as any })}
+                  className="w-full bg-background border border-border rounded-xl px-2.5 py-2 font-medium text-foreground focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="class_I">Clase I (Normoclusión molar)</option>
+                  <option value="class_II_div_1">Clase II División 1</option>
+                  <option value="class_II_div_2">Clase II División 2</option>
+                  <option value="class_III">Clase III (Prognatismo)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Mensualidad Pactada</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-2 text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    value={orthoCase.monthlyFeeUSD}
+                    onChange={(e) => setOrthoCase({ ...orthoCase, monthlyFeeUSD: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-background border border-border rounded-xl pl-6 pr-2.5 py-2 font-black text-foreground focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Reposición por Bracket</label>
+                <div className="relative">
+                  <span className="absolute left-2.5 top-2 text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    value={orthoCase.bracketReplacementFeeUSD}
+                    onChange={(e) => setOrthoCase({ ...orthoCase, bracketReplacementFeeUSD: parseFloat(e.target.value) || 0 })}
+                    className="w-full bg-background border border-border rounded-xl pl-6 pr-2.5 py-2 font-black text-foreground focus:ring-2 focus:ring-primary/20"
+                  />
+                </div>
               </div>
             </div>
           </div>

@@ -34,6 +34,10 @@ export interface GroomingOrder {
   services: Array<{ name: string; priceUSD: number }>;
   totalUSD: number;
   pickupNotified: boolean;
+  groomerId?: string;
+  groomerName?: string;
+  groomerCommissionPercent?: number;
+  tipUSD?: number;
   createdAt: string;
   notes?: string;
 }
@@ -92,6 +96,10 @@ export async function getGroomingOrdersAction(
         services: meta.services || [],
         totalUSD: Number(meta.totalUSD || 0),
         pickupNotified: Boolean(meta.pickupNotified),
+        groomerId: meta.groomerId,
+        groomerName: meta.groomerName,
+        groomerCommissionPercent: typeof meta.groomerCommissionPercent === 'number' ? meta.groomerCommissionPercent : 45,
+        tipUSD: Number(meta.tipUSD || 0),
         createdAt: row.created_at,
         notes: meta.notes
       };
@@ -119,6 +127,10 @@ export async function createGroomingOrderAction(
     ownerId?: string | null;
     inspection: GroomingInspection;
     services: Array<{ name: string; priceUSD: number }>;
+    groomerId?: string;
+    groomerName?: string;
+    groomerCommissionPercent?: number;
+    tipUSD?: number;
     notes?: string;
   },
   tenantId: string,
@@ -242,6 +254,13 @@ export async function sendGroomingOrderToCashierAction(
       source: 'grooming',
       pipeline: 'grooming',
       payment_status: 'pending_cashier',
+      groomer: {
+        id: order.groomerId,
+        name: order.groomerName,
+        commissionPercent: order.groomerCommissionPercent || 45,
+        estimatedCommissionUSD: Number(((order.totalUSD * (order.groomerCommissionPercent || 45)) / 100).toFixed(2)),
+        tipUSD: order.tipUSD || 0
+      },
       pet: {
         name: order.petName,
         breed: order.breed,

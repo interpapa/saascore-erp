@@ -611,7 +611,8 @@ export async function sendDentalOrderToCashierAction(
   }>,
   amountToCharge: number,
   tenantId: string,
-  actor: ActionActor
+  actor: ActionActor,
+  doctorInfo?: { doctorId?: string; doctorName?: string; doctorCommissionPercent?: number }
 ): Promise<{ success: boolean; documentId?: string; documentNumber?: string; error?: string }> {
   'use server';
   try {
@@ -628,6 +629,12 @@ export async function sendDentalOrderToCashierAction(
       source: 'dental_consultation',
       pipeline: 'dental',
       payment_status: 'pending_cashier',
+      doctor: doctorInfo ? {
+        id: doctorInfo.doctorId,
+        name: doctorInfo.doctorName,
+        commissionPercent: doctorInfo.doctorCommissionPercent || 50,
+        estimatedHonorariumUSD: Number(((amountToCharge * (doctorInfo.doctorCommissionPercent || 50)) / 100).toFixed(2))
+      } : undefined,
       items: itemsToCharge,
       suggested_amount: amountToCharge,
       created_by_doctor: actor.email,

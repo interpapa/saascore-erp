@@ -36,24 +36,15 @@ import {
 } from '@/app/actions/barberia';
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, ActionActor } from '@/app/actions/entities';
+import { ModuleStaffMember, getModuleStaffAction } from '@/app/actions/moduleStaff';
+import { BarberPricingConfig, getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import { BarberStaffTab } from '@/components/barberia/BarberStaffTab';
+import { BarberPricingTab } from '@/components/barberia/BarberPricingTab';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
 import { useViewModeStore } from '@/store/useViewModeStore';
-
-interface BarberStaff {
-  id: string;
-  name: string;
-  avatar: string;
-  commissionPercent: number;
-}
-
-const DEFAULT_BARBERS: BarberStaff[] = [
-  { id: 'barb-1', name: 'Carlos "Master" Fade', avatar: '✂️', commissionPercent: 50 },
-  { id: 'barb-2', name: 'Alejandro Estilista', avatar: '💈', commissionPercent: 50 },
-  { id: 'barb-3', name: 'Daniel Barbero', avatar: '🔥', commissionPercent: 45 }
-];
 
 export default function BarberiaPage() {
   const currentTenant = useTenantResolver();
@@ -64,11 +55,30 @@ export default function BarberiaPage() {
   const viewMode = useViewModeStore((s) => s.viewMode);
   const tenantId = currentTenant?.id || '';
 
+  // Pestaña activa
+  const [currentTab, setCurrentTab] = useState<'sillon' | 'equipo' | 'tarifas'>('sillon');
+
   // Estado general
   const [isLoading, setIsLoading] = useState(true);
   const [queue, setQueue] = useState<BarberQueueItem[]>([]);
   const [barberServices, setBarberServices] = useState<BarberServiceDefinition[]>(BARBER_SERVICES_MASTER);
-  const [selectedBarber, setSelectedBarber] = useState<BarberStaff>(DEFAULT_BARBERS[0]);
+  const [barberStaff, setBarberStaff] = useState<ModuleStaffMember[]>([]);
+  const [pricingConfig, setPricingConfig] = useState<BarberPricingConfig>({
+    defaultCommissionPercent: 50,
+    defaultDurationMin: 30,
+    tipSplitWithShop: false
+  });
+
+  const [selectedBarber, setSelectedBarber] = useState<ModuleStaffMember>({
+    id: 'barb-1',
+    name: 'Carlos "Master" Fade',
+    role: 'Master Barber',
+    specialty: 'Degradados & Barba',
+    avatar: '✂️',
+    commissionPercent: 50,
+    module: 'barberia',
+    isActive: true
+  });
 
   // Turno actual en Silla
   const [activeSession, setActiveSession] = useState<BarberQueueItem | null>(null);
@@ -84,7 +94,7 @@ export default function BarberiaPage() {
   const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [newClientPhone, setNewClientPhone] = useState('');
-  const [newClientBarberId, setNewClientBarberId] = useState(selectedBarber.id);
+  const [newClientBarberId, setNewClientBarberId] = useState('');
 
   // Concepto libre
   const [customName, setCustomName] = useState('');
@@ -96,9 +106,11 @@ export default function BarberiaPage() {
     if (!tenantId) return;
     setIsLoading(true);
     try {
-      const [queueRes, itemsRes] = await Promise.all([
+      const [queueRes, itemsRes, staffRes, configRes] = await Promise.all([
         getBarberQueueAction(tenantId, effectiveActor),
-        getItemsAction(tenantId, undefined, 200, effectiveActor)
+        getItemsAction(tenantId, undefined, 200, effectiveActor),
+        getModuleStaffAction(tenantId, 'barberia', effectiveActor),
+        getModulePricingConfigAction<BarberPricingConfig>(tenantId, 'barberia', effectiveActor)
       ]);
 
       if (queueRes.success && queueRes.queue) {
@@ -114,6 +126,21 @@ export default function BarberiaPage() {
       if (itemsRes.success && itemsRes.items) {
         const merged = mergeTenantBarberServices(itemsRes.items as any);
         setBarberServices(merged);
+      }
+
+      if (staffRes.success && staffRes.staff && staffRes.staff.length > 0) {
+        setBarberStaff(staffRes.staff);
+        // Si no hay seleccionado o el seleccionado ya no existe, tomar el primero activo
+        const firstActive = staffRes.staff.find(s => s.isActive) || staffRes.staff[0];
+        setSelectedBarber((prev) => {
+          const match = staffRes.staff?.find(s => s.id === prev.id);
+          return match || firstActive;
+        });
+        setNewClientBarberId((prev) => prev || firstActive.id);
+      }
+
+      if (configRes.success && configRes.config) {
+        setPricingConfig(configRes.config);
       }
     } catch (err) {
       console.error(err);
@@ -131,7 +158,7 @@ export default function BarberiaPage() {
     e.preventDefault();
     if (!newClientName.trim()) return;
 
-    const assignedBarber = DEFAULT_BARBERS.find(b => b.id === newClientBarberId) || selectedBarber;
+    const assignedBarber = barberStaff.find(b => b.id === newClientBarberId) || selectedBarber;
 
     try {
       const res = await addWalkInToQueueAction(
@@ -306,7 +333,7 @@ export default function BarberiaPage() {
           <div className="flex items-center gap-2 bg-background border border-border p-1.5 rounded-2xl shadow-2xs">
             <span className="text-xs font-bold text-slate-400 pl-2">Estilista:</span>
             <div className="flex items-center gap-1">
-              {DEFAULT_BARBERS.map((barber) => (
+              {barberStaff.map((barber) => (
                 <button
                   key={barber.id}
                   type="button"
@@ -319,6 +346,7 @@ export default function BarberiaPage() {
                 >
                   <span>{barber.avatar}</span>
                   <span>{barber.name.split(' ')[0]}</span>
+                  <span className="text-[10px] opacity-75">({barber.commissionPercent}%)</span>
                 </button>
               ))}
             </div>
@@ -335,8 +363,74 @@ export default function BarberiaPage() {
         </div>
       </div>
 
-      {/* Grid Principal: Cola de Espera (Izquierda) + Estación de Silla (Derecha) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Sub-Navegación de Módulo */}
+      <div className="flex items-center gap-2 border-b border-border pb-2 overflow-x-auto">
+        <button
+          onClick={() => setCurrentTab('sillon')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+            currentTab === 'sillon'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <span>💈</span>
+          <span>Sillón & Turnero</span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('equipo')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+            currentTab === 'equipo'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Scissors className="w-3.5 h-3.5" />
+          <span>Barberos & Comisiones</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10">
+            {barberStaff.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setCurrentTab('tarifas')}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+            currentTab === 'tarifas'
+              ? 'bg-amber-600 text-white shadow-sm'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <DollarSign className="w-3.5 h-3.5" />
+          <span>Precios & Servicios</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-black/10 dark:bg-white/10">
+            {barberServices.length}
+          </span>
+        </button>
+      </div>
+
+      {currentTab === 'equipo' && (
+        <BarberStaffTab
+          staff={barberStaff}
+          onRefresh={loadData}
+          tenantId={tenantId}
+          actor={effectiveActor}
+        />
+      )}
+
+      {currentTab === 'tarifas' && (
+        <BarberPricingTab
+          services={barberServices}
+          pricingConfig={pricingConfig}
+          onRefresh={loadData}
+          tenantId={tenantId}
+          actor={effectiveActor}
+        />
+      )}
+
+      {currentTab === 'sillon' && (
+        <>
+          {/* Grid Principal: Cola de Espera (Izquierda) + Estación de Silla (Derecha) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* COLUMNA 1: TURNERO / COLA DE ESPERA DIGITAL */}
         <div className="lg:col-span-4 space-y-4">
           <div className="bg-card border border-border rounded-3xl p-5 shadow-xs space-y-3">
@@ -647,6 +741,8 @@ export default function BarberiaPage() {
           </div>
         </div>
       </div>
+    </>
+  )}
 
       {/* Modal: Agregar Walk-in a la cola */}
       {isWalkInModalOpen && (
@@ -688,7 +784,7 @@ export default function BarberiaPage() {
                   onChange={(e) => setNewClientBarberId(e.target.value)}
                   className="w-full bg-background border border-border rounded-xl p-2.5 text-xs text-foreground font-bold"
                 >
-                  {DEFAULT_BARBERS.map(b => (
+                  {barberStaff.map(b => (
                     <option key={b.id} value={b.id}>{b.name} ({b.commissionPercent}%)</option>
                   ))}
                 </select>

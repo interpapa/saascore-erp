@@ -64,6 +64,9 @@ export interface OrthodonticVisit {
   date: string;
   sessionNumber: number;
   performer: string;
+  doctorId?: string;
+  doctorName?: string;
+  doctorCommissionPercent?: number;
   archUpper: OrthoArchState;
   archLower: OrthoArchState;
   elastics: OrthoElastics;
@@ -88,6 +91,9 @@ export interface OrthodonticCase {
   estimatedMonths: number;
   monthlyFeeUSD: number;
   bracketReplacementFeeUSD: number;
+  doctorId?: string;
+  doctorName?: string;
+  doctorCommissionPercent?: number;
   status: 'active' | 'retention' | 'finished' | 'suspended';
   retentionType?: 'hawley' | 'essix_clear' | 'fixed_lingual_wire';
   visits: OrthodonticVisit[];
