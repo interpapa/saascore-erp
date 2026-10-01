@@ -47,7 +47,6 @@ export async function getModuleStaffAction(
   moduleType: 'barberia' | 'grooming' | 'odontologia',
   actor: ActionActor
 ): Promise<{ success: boolean; staff?: ModuleStaffMember[]; error?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
@@ -122,7 +121,6 @@ export async function saveModuleStaffAction(
   },
   actor: ActionActor
 ): Promise<{ success: boolean; staff?: ModuleStaffMember; error?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
@@ -243,7 +241,6 @@ export async function toggleModuleStaffStatusAction(
   isActive: boolean,
   actor: ActionActor
 ): Promise<{ success: boolean; error?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };

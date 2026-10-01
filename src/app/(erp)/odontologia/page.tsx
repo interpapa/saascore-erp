@@ -93,7 +93,8 @@ export default function OdontologiaPage() {
   const actor = useActionActor();
   const effectiveActor: ActionActor = actor || { 
     email: session?.userEmail || 'dental@rendorp.com', 
-    role: (session?.role as any) || 'admin' 
+    role: (session?.role as any) || 'admin',
+    token: session?.token
   };
   const { toast } = useToast();
   const viewMode = useViewModeStore((s) => s.viewMode);
@@ -166,41 +167,41 @@ export default function OdontologiaPage() {
 
   // 1. CARGA INICIAL DE DATOS CLÍNICOS, EQUIPO, TARIFAS Y CITAS DE HOY
   const loadClinicalData = useCallback(async () => {
-    if (!tenantId || !actor) return;
+    if (!tenantId) return;
     try {
       setIsLoading(true);
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const [custRes, apptRes, itemsRes, staffRes, pricingRes] = await Promise.all([
-        getEntitiesAction(tenantId, 'customer', 250, actor),
-        getAppointmentsAction(tenantId, undefined, actor),
-        getItemsAction(tenantId, undefined, 200, actor),
-        getModuleStaffAction(tenantId, 'odontologia', actor),
-        getModulePricingConfigAction(tenantId, 'odontologia', actor),
+      const [custRes, apptRes, itemsRes, staffRes, pricingRes] = await Promise.allSettled([
+        getEntitiesAction(tenantId, 'customer', 250, effectiveActor),
+        getAppointmentsAction(tenantId, undefined, effectiveActor),
+        getItemsAction(tenantId, undefined, 200, effectiveActor),
+        getModuleStaffAction(tenantId, 'odontologia', effectiveActor),
+        getModulePricingConfigAction(tenantId, 'odontologia', effectiveActor),
       ]);
 
-      if (custRes.success && custRes.entities) {
-        setCustomers(custRes.entities);
+      if (custRes.status === 'fulfilled' && custRes.value?.success && custRes.value?.entities) {
+        setCustomers(custRes.value.entities);
       }
 
-      if (apptRes.success && apptRes.appointments) {
+      if (apptRes.status === 'fulfilled' && apptRes.value?.success && apptRes.value?.appointments) {
         // Filtrar citas correspondientes a hoy
-        const todayList = apptRes.appointments.filter((a: any) => {
+        const todayList = apptRes.value.appointments.filter((a: any) => {
           const aDate = a.date || (a.start_time ? a.start_time.split('T')[0] : '');
           return aDate === todayStr;
         });
         setTodayAppointments(todayList);
       }
 
-      if (itemsRes.success && itemsRes.items) {
-        setInventoryItems(itemsRes.items);
+      if (itemsRes.status === 'fulfilled' && itemsRes.value?.success && itemsRes.value?.items) {
+        setInventoryItems(itemsRes.value.items);
         setDentalServices(
-          itemsRes.items.filter((i: any) => i.type === 'service' || i.category?.toLowerCase().includes('odon'))
+          itemsRes.value.items.filter((i: any) => i.type === 'service' || i.category?.toLowerCase().includes('odon'))
         );
       }
 
-      if (staffRes.success && staffRes.staff) {
-        const staffList = staffRes.staff;
+      if (staffRes.status === 'fulfilled' && staffRes.value?.success && staffRes.value?.staff) {
+        const staffList = staffRes.value.staff;
         setDentalStaff(staffList);
         setSelectedDoctorId((prev) => {
           if (prev) return prev;
@@ -209,20 +210,15 @@ export default function OdontologiaPage() {
         });
       }
 
-      if (pricingRes.success && pricingRes.config) {
-        setDentalPricingConfig(pricingRes.config as DentalPricingConfig);
+      if (pricingRes.status === 'fulfilled' && pricingRes.value?.success && pricingRes.value?.config) {
+        setDentalPricingConfig(pricingRes.value.config as DentalPricingConfig);
       }
     } catch (err: unknown) {
       console.error('[OdontologiaPage] Error cargando estación clínica:', err);
-      toast({
-        variant: 'error',
-        title: 'Error de conexión',
-        description: 'No se pudieron sincronizar las citas y fichas clínicas.',
-      });
     } finally {
       setIsLoading(false);
     }
-  }, [tenantId, actor, toast]);
+  }, [tenantId, effectiveActor]);
 
   useEffect(() => {
     loadClinicalData();
@@ -231,16 +227,16 @@ export default function OdontologiaPage() {
   // 2. CARGA DE EXPEDIENTE DEL PACIENTE SELECCIONADO
   const loadPatientChartAndEvolutions = useCallback(
     async (patientId: string) => {
-      if (!tenantId || !actor) return;
+      if (!tenantId) return;
       try {
         setIsLoadingChart(true);
-        const [chartRes, evoRes] = await Promise.all([
-          getDentalChartAction(patientId, tenantId, actor),
-          getDentalEvolutionsAction(patientId, tenantId, actor),
+        const [chartRes, evoRes] = await Promise.allSettled([
+          getDentalChartAction(patientId, tenantId, effectiveActor),
+          getDentalEvolutionsAction(patientId, tenantId, effectiveActor),
         ]);
 
-        if (chartRes.success && chartRes.chart) {
-          setCurrentChart(chartRes.chart);
+        if (chartRes.status === 'fulfilled' && chartRes.value?.success && chartRes.value?.chart) {
+          setCurrentChart(chartRes.value.chart);
         } else {
           // Iniciar odontograma limpio si no existe previo
           setCurrentChart({
@@ -251,8 +247,8 @@ export default function OdontologiaPage() {
           });
         }
 
-        if (evoRes.success && evoRes.evolutions) {
-          setPatientEvolutions(evoRes.evolutions);
+        if (evoRes.status === 'fulfilled' && evoRes.value?.success && evoRes.value?.evolutions) {
+          setPatientEvolutions(evoRes.value.evolutions);
         } else {
           setPatientEvolutions([]);
         }
@@ -262,7 +258,7 @@ export default function OdontologiaPage() {
         setIsLoadingChart(false);
       }
     },
-    [tenantId, actor]
+    [tenantId, effectiveActor]
   );
 
   useEffect(() => {
@@ -420,10 +416,10 @@ export default function OdontologiaPage() {
 
   // GUARDAR ODONTOGRAMA
   const handleSaveChart = async (newChart: DentalChart) => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
     try {
       setIsSavingChart(true);
-      const res = await saveDentalChartAction(selectedPatient.id, newChart, tenantId, actor);
+      const res = await saveDentalChartAction(selectedPatient.id, newChart, tenantId, effectiveActor);
       if (res.success) {
         setCurrentChart(newChart);
         toast({
@@ -447,7 +443,7 @@ export default function OdontologiaPage() {
 
   // ENVIAR ORDEN A CAJA MOSTRADOR (RECEPCIÓN DESACOPLADA)
   const handleSendOrderToCashier = async () => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
     if (plannedTreatments.length === 0) {
       toast({
         variant: 'warning',
@@ -482,7 +478,7 @@ export default function OdontologiaPage() {
         itemsToCharge,
         todaySuggestedUSD,
         tenantId,
-        actor,
+        effectiveActor,
         doctorInfo
       );
 
@@ -498,7 +494,7 @@ export default function OdontologiaPage() {
           (a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id
         );
         if (currentAppt) {
-          await updateAppointmentStatusAction(currentAppt.id, 'completed', tenantId, actor);
+          await updateAppointmentStatusAction(currentAppt.id, 'completed', tenantId, effectiveActor);
           loadClinicalData();
         }
 
@@ -523,7 +519,7 @@ export default function OdontologiaPage() {
     items: Array<{ toothNum: string; procedureName: string; cost: number; category?: string; notes?: string }>,
     notes?: string
   ) => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
     const totalCost = items.reduce((acc, curr) => acc + curr.cost, 0);
     try {
       const doctorInfo = selectedDoctor
@@ -540,7 +536,7 @@ export default function OdontologiaPage() {
         items,
         totalCost,
         tenantId,
-        actor,
+        effectiveActor,
         doctorInfo
       );
 
@@ -552,10 +548,10 @@ export default function OdontologiaPage() {
               patientId: selectedPatient.id,
               note: notes.trim(),
               teethInvolved: items.map((i) => i.toothNum).filter(Boolean),
-              doctorName: session?.userEmail || actor.email,
+              doctorName: session?.userEmail || effectiveActor.email,
             },
             tenantId,
-            actor
+            effectiveActor
           );
         }
 
@@ -570,7 +566,7 @@ export default function OdontologiaPage() {
           (a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id
         );
         if (currentAppt) {
-          await updateAppointmentStatusAction(currentAppt.id, 'completed', tenantId, actor);
+          await updateAppointmentStatusAction(currentAppt.id, 'completed', tenantId, effectiveActor);
         }
 
         setSelectedPatient(null);
@@ -589,7 +585,7 @@ export default function OdontologiaPage() {
 
   // GUARDAR EVOLUCIÓN CLÍNICA DE HOY
   const handleSaveEvolution = async () => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
     if (!evolutionText.trim()) {
       toast({
         variant: 'warning',
@@ -609,12 +605,12 @@ export default function OdontologiaPage() {
           patientId: selectedPatient.id,
           note: evolutionText.trim(),
           teethInvolved,
-          doctorName: session?.userEmail || actor.email,
+          doctorName: session?.userEmail || effectiveActor.email,
           extraConsumables: selectedConsumables,
           prescription: prescriptionMeds.length > 0 ? { medications: prescriptionMeds } : undefined,
         },
         tenantId,
-        actor
+        effectiveActor
       );
 
       if (res.success) {
@@ -708,7 +704,7 @@ export default function OdontologiaPage() {
 
   // ACTUALIZAR ALERTA MÉDICA (ALERGIAS / ANTECEDENTES)
   const handleSaveAllergies = async () => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
     try {
       const updatedMeta = {
         ...(selectedPatient.metadata || {}),
@@ -718,7 +714,7 @@ export default function OdontologiaPage() {
         selectedPatient.id,
         { metadata: updatedMeta },
         tenantId,
-        actor
+        effectiveActor
       );
 
       if (res.success) {
@@ -735,10 +731,10 @@ export default function OdontologiaPage() {
 
   // SINCRONIZAR CATÁLOGO MAESTRO CON INVENTARIO
   const handleSyncMasterCatalog = async () => {
-    if (!tenantId || !actor || isSyncingCatalog) return;
+    if (!tenantId || !effectiveActor || isSyncingCatalog) return;
     try {
       setIsSyncingCatalog(true);
-      const res = await syncDentalCatalogToInventoryAction(tenantId, actor);
+      const res = await syncDentalCatalogToInventoryAction(tenantId, effectiveActor);
       if (res.success) {
         toast({
           variant: 'success',
@@ -759,7 +755,7 @@ export default function OdontologiaPage() {
   // CREAR NUEVO PACIENTE DESDE MODAL
   const handleCreatePatientSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!tenantId || !actor) return;
+    if (!tenantId || !effectiveActor) return;
     setIsSubmittingPatient(true);
     const form = new FormData(e.currentTarget);
     const name = (form.get('name') as string)?.trim();
@@ -785,7 +781,7 @@ export default function OdontologiaPage() {
           },
         },
         tenantId,
-        actor
+        effectiveActor
       );
 
       if (res.success && res.entity) {
@@ -809,14 +805,14 @@ export default function OdontologiaPage() {
 
   // ENVIAR A TABLERO KANBAN
   const handleCreateKanban = async (plan: DentalTreatmentPlan) => {
-    if (!tenantId || !actor || !selectedPatient) return;
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
     try {
       const res = await createTreatmentKanbanFromChartAction(
         selectedPatient.id,
         selectedPatient.name,
         plan,
         tenantId,
-        actor
+        effectiveActor
       );
       if (res.success) {
         toast({
@@ -1557,7 +1553,7 @@ export default function OdontologiaPage() {
                       Nota Clínica de la Consulta
                     </label>
                     <span className="text-[10px] text-slate-400 font-mono">
-                      Dr: {session?.userEmail || actor?.email}
+                      Dr: {session?.userEmail || effectiveActor.email}
                     </span>
                   </div>
                   <textarea
@@ -1856,7 +1852,7 @@ export default function OdontologiaPage() {
                 <ClientRecordsTab 
                   entityId={selectedPatient.id} 
                   tenantId={tenantId} 
-                  actor={actor} 
+                  actor={effectiveActor} 
                   clientName={selectedPatient.name} 
                 />
               </div>
@@ -2032,7 +2028,7 @@ export default function OdontologiaPage() {
       )}
 
       {/* MODAL DE COBRO EN SILLÓN */}
-      {selectedPatient && actor && (
+      {selectedPatient && (
         <DentalCheckoutModal
           isOpen={isCheckoutModalOpen}
           onClose={() => setIsCheckoutModalOpen(false)}
@@ -2052,7 +2048,7 @@ export default function OdontologiaPage() {
             notes: t.notes,
           }))}
           tenantId={tenantId}
-          actor={actor}
+          actor={effectiveActor}
           exchangeRate={currentExchangeRate}
           onSuccess={() => {
             loadClinicalData();
@@ -2064,7 +2060,7 @@ export default function OdontologiaPage() {
       )}
 
       {/* MODAL DE AGENDAMIENTO DE PRÓXIMA CITA */}
-      {selectedPatient && actor && (
+      {selectedPatient && (
         <DentalScheduleModal
           isOpen={isScheduleModalOpen}
           onClose={() => setIsScheduleModalOpen(false)}
@@ -2074,7 +2070,7 @@ export default function OdontologiaPage() {
             phone: selectedPatient.phone,
           }}
           tenantId={tenantId}
-          actor={actor}
+          actor={effectiveActor}
           procedureHint="Control y Tratamiento Odontológico"
           onSuccess={() => {
             loadClinicalData();
@@ -2083,13 +2079,13 @@ export default function OdontologiaPage() {
       )}
 
       {/* MODAL DE FICHA Y ANTECEDENTES DEL PACIENTE */}
-      {selectedPatient && actor && (
+      {selectedPatient && (
         <PatientProfileModal
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
           patient={selectedPatient}
           tenantId={tenantId}
-          actor={actor}
+          actor={effectiveActor}
           onSuccess={(updated) => {
             setSelectedPatient(updated);
             setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
@@ -2098,18 +2094,16 @@ export default function OdontologiaPage() {
       )}
 
       {/* MODAL DE REGISTRO RÁPIDO DE INSUMO EN INVENTARIO */}
-      {actor && (
-        <NewConsumableModal
-          isOpen={isNewConsumableModalOpen}
-          onClose={() => setIsNewConsumableModalOpen(false)}
-          tenantId={tenantId}
-          actor={actor}
-          onSuccess={(newItem) => {
-            setInventoryItems((prev) => [newItem, ...prev]);
-            setSelectedConsumableId(newItem.id);
-          }}
-        />
-      )}
+      <NewConsumableModal
+        isOpen={isNewConsumableModalOpen}
+        onClose={() => setIsNewConsumableModalOpen(false)}
+        tenantId={tenantId}
+        actor={effectiveActor}
+        onSuccess={(newItem) => {
+          setInventoryItems((prev) => [newItem, ...prev]);
+          setSelectedConsumableId(newItem.id);
+        }}
+      />
     </div>
   );
 }

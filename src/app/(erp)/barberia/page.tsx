@@ -50,7 +50,11 @@ export default function BarberiaPage() {
   const currentTenant = useTenantResolver();
   const session = useERPStore((s) => s.session);
   const actor = useActionActor();
-  const effectiveActor: ActionActor = actor || { email: session?.userEmail || 'barber@rendorp.com', role: (session?.role as any) || 'technician' };
+  const effectiveActor: ActionActor = actor || { 
+    email: session?.userEmail || 'barber@rendorp.com', 
+    role: (session?.role as any) || 'technician',
+    token: session?.token
+  };
   const { toast } = useToast();
   const viewMode = useViewModeStore((s) => s.viewMode);
   const tenantId = currentTenant?.id || '';

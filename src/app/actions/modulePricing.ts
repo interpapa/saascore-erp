@@ -88,7 +88,6 @@ export async function getModulePricingConfigAction<T = any>(
   moduleType: 'barberia' | 'grooming' | 'odontologia',
   actor: ActionActor
 ): Promise<{ success: boolean; config?: T; error?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
@@ -130,7 +129,6 @@ export async function saveModulePricingConfigAction(
   config: Record<string, any>,
   actor: ActionActor
 ): Promise<{ success: boolean; error?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
@@ -193,7 +191,6 @@ export async function quickUpdateItemPriceAction(
   actor: ActionActor,
   fallbackItemData?: { name: string; category?: string; type?: string; metadata?: any }
 ): Promise<{ success: boolean; error?: string; updatedItemId?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
@@ -260,7 +257,6 @@ export async function quickCreateModuleServiceAction(
   },
   actor: ActionActor
 ): Promise<{ success: boolean; service?: any; error?: string }> {
-  'use server';
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
