@@ -43,6 +43,9 @@ import { DentalCheckoutModal } from '@/components/dental/DentalCheckoutModal';
 import { DentalScheduleModal } from '@/components/dental/DentalScheduleModal';
 import { PatientProfileModal } from '@/components/dental/PatientProfileModal';
 import { NewConsumableModal } from '@/components/dental/NewConsumableModal';
+import { OrthodonticsTracker } from '@/components/dental/OrthodonticsTracker';
+import { EndodonticsSheet } from '@/components/dental/EndodonticsSheet';
+import { PeriodonticsMiniChart } from '@/components/dental/PeriodonticsMiniChart';
 import { mergeTenantDentalServices, DentalProcedureDefinition, DENTAL_PROCEDURES_MASTER } from '@/lib/dental/proceduresCatalog';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 import { 
@@ -105,7 +108,7 @@ export default function OdontologiaPage() {
   const [isSavingChart, setIsSavingChart] = useState(false);
 
   // Pestaña activa del Panel Clínico Derecho
-  type ClinicalTab = 'presupuesto' | 'evolucion' | 'citas' | 'expediente';
+  type ClinicalTab = 'presupuesto' | 'ortodoncia' | 'especialidades' | 'evolucion' | 'citas' | 'expediente';
   const [activeTab, setActiveTab] = useState<ClinicalTab>('presupuesto');
 
   // Evolución Médica de la Consulta de Hoy
@@ -1207,6 +1210,32 @@ export default function OdontologiaPage() {
 
               <button
                 type="button"
+                onClick={() => setActiveTab('ortodoncia')}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'ortodoncia'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-slate-500 hover:text-foreground'
+                }`}
+              >
+                <Sparkles size={14} className="text-amber-500" />
+                <span>Brackets</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('especialidades')}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  activeTab === 'especialidades'
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-slate-500 hover:text-foreground'
+                }`}
+              >
+                <Activity size={14} className="text-emerald-500" />
+                <span>Endo/Perio</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setActiveTab('evolucion')}
                 className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                   activeTab === 'evolucion'
@@ -1215,7 +1244,7 @@ export default function OdontologiaPage() {
                 }`}
               >
                 <FileText size={14} className="text-cyan-500" />
-                <span>Evolución Hoy</span>
+                <span>Evolución</span>
               </button>
 
               <button
@@ -1343,6 +1372,23 @@ export default function OdontologiaPage() {
                     <span>Transferir a Tablero Kanban de Casos</span>
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* PESTAÑA ORTODONCIA & BRACKETS */}
+            {activeTab === 'ortodoncia' && selectedPatient && (
+              <div className="pt-2">
+                <OrthodonticsTracker patientId={selectedPatient.id} patientName={selectedPatient.name} />
+              </div>
+            )}
+
+            {/* PESTAÑA ESPECIALIDADES: ENDODONCIA Y PERIODONCIA */}
+            {activeTab === 'especialidades' && selectedPatient && (
+              <div className="pt-2 space-y-6">
+                <EndodonticsSheet patientId={selectedPatient.id} patientName={selectedPatient.name} />
+                <div className="border-t border-border pt-6">
+                  <PeriodonticsMiniChart patientId={selectedPatient.id} patientName={selectedPatient.name} />
+                </div>
               </div>
             )}
 

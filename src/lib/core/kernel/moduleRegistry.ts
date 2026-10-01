@@ -20,6 +20,8 @@ export type ModuleId =
   | 'integraciones' 
   | 'estadisticas'
   | 'odontologia'
+  | 'barberia'
+  | 'grooming'
   | 'config' 
   | 'admin';
 
@@ -130,8 +132,22 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     id: 'odontologia',
     name: 'Odontología & Salud Dental',
     category: 'operaciones',
-    description: 'Odontograma digital interactivo, historial clínico por diente, tratamientos y procesos Kanban dentales.',
+    description: 'Odontograma digital interactivo, ortodoncia con brackets, endodoncia, periodoncia y procesos Kanban dentales.',
     dependencies: ['clientes', 'calendario', 'kanban'],
+  },
+  barberia: {
+    id: 'barberia',
+    name: 'Barbería & Estilo Masculino',
+    category: 'operaciones',
+    description: 'Estación de silla de barbero, turnos walk-in, ritual de toalla caliente, cortes degradados/fade, venta de productos y comisiones.',
+    dependencies: ['clientes', 'caja'],
+  },
+  grooming: {
+    id: 'grooming',
+    name: 'Peluquería & Spa Canino',
+    category: 'operaciones',
+    description: 'Ficha de mascotas, razas, tipos de manto, control de temperamento, inspección de nudos/parásitos y pipeline de baño/corte.',
+    dependencies: ['clientes', 'caja'],
   },
 };
 
@@ -150,6 +166,8 @@ export const DEFAULT_ENABLED_MODULES: ModuleId[] = [
   'estadisticas',
   'franquicias',
   'odontologia',
+  'barberia',
+  'grooming',
 ];
 
 /**

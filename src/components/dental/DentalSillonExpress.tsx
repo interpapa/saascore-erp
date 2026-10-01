@@ -341,14 +341,29 @@ export function DentalSillonExpress({
             </span>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsCustomModalOpen(true)}
-            className="self-start sm:self-auto text-xs font-black text-teal-600 hover:text-teal-700 bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1.5 rounded-xl border border-teal-500/20 flex items-center gap-1 transition-colors btn-haptic"
-          >
-            <Plus size={13} />
-            <span>+ Concepto Libre / Precio Editable</span>
-          </button>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const orthoProc = dynamicProcedures.find(p => p.name.toLowerCase().includes('ortodoncia') || p.name.toLowerCase().includes('control mensual')) 
+                  || { name: 'Control de Ortodoncia / Brackets', cost: 35.0, category: 'Ortodoncia' };
+                handleAddProcedure(orthoProc, 'General');
+              }}
+              className="text-xs font-black text-amber-600 hover:text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 px-2.5 py-1.5 rounded-xl border border-amber-500/20 flex items-center gap-1 transition-colors btn-haptic"
+            >
+              <Sparkles size={13} />
+              <span>⚡ Control Ortodoncia</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsCustomModalOpen(true)}
+              className="text-xs font-black text-teal-600 hover:text-teal-700 bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1.5 rounded-xl border border-teal-500/20 flex items-center gap-1 transition-colors btn-haptic"
+            >
+              <Plus size={13} />
+              <span>+ Concepto Libre</span>
+            </button>
+          </div>
         </div>
 
         {/* Buscador & Categorías Dinámicas */}

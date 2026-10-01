@@ -16,9 +16,11 @@ import {
   PlugZap,
   CheckCircle2,
   XCircle,
-  LayoutGrid,
   ShieldCheck,
-  Stethoscope
+  Stethoscope,
+  Scissors,
+  Dog,
+  LayoutGrid
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -65,7 +67,9 @@ export default function AppsManagerPage() {
     { id: 'calendario', name: 'Citas y Turnos', category: 'operaciones', icon: CalendarDays, gradient: 'from-blue-400 to-blue-600', description: 'Agenda de atención a clientes, asignación de técnicos y programación de servicios.' },
     { id: 'whatsapp', name: 'WhatsApp CRM', category: 'comercial', icon: MessageCircle, gradient: 'from-green-400 to-emerald-600', description: 'Bandeja omnicanal de soporte con chat en tiempo real y vinculación a clientes.' },
     { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones', icon: KanbanSquare, gradient: 'from-yellow-400 to-orange-500', description: 'Tablero visual de seguimiento de servicios, diagnósticos y reparaciones.' },
-    { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'operaciones', icon: Stethoscope, gradient: 'from-teal-400 to-cyan-600', description: 'Odontograma digital FDI interactivo, historial clínico por diente, piezas supernumerarias y planes de tratamiento Kanban.' },
+    { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'operaciones', icon: Stethoscope, gradient: 'from-teal-400 to-cyan-600', description: 'Odontograma digital FDI interactivo, ortodoncia con brackets, endodoncia, periodoncia y planes de tratamiento.' },
+    { id: 'barberia', name: 'Barbería & Estilo Masculino', category: 'operaciones', icon: Scissors, gradient: 'from-amber-600 to-stone-800', description: 'Estación de silla de barbero, turnos walk-in en sala, ritual de toalla caliente, cortes fade y comisiones de estilistas.' },
+    { id: 'grooming', name: 'Peluquería & Spa Canino', category: 'operaciones', icon: Dog, gradient: 'from-emerald-500 to-teal-700', description: 'Ficha de mascotas, razas, tipos de manto, control de temperamento, inspección de nudos/parásitos y pipeline de baño/corte.' },
     { id: 'equipo', name: 'Personal & Nómina', category: 'administracion', icon: Users, gradient: 'from-indigo-400 to-indigo-600', description: 'Registro de empleados, marcaje de asistencia y liquidación de sueldos.' },
     { id: 'franquicias', name: 'Franquicias & Sedes', category: 'administracion', icon: Building2, gradient: 'from-cyan-500 to-blue-600', description: 'Control de múltiples locales, sucursales y consolidación de ingresos.' },
     { id: 'config', name: 'Ajustes del Sistema', category: 'administracion', icon: Settings, gradient: 'from-slate-500 to-slate-700', description: 'Datos del negocio, logotipo y moneda principal.', isCore: true },

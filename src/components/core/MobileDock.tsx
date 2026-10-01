@@ -20,7 +20,9 @@ import {
   Blocks,
   Settings,
   ShieldAlert,
-  Stethoscope
+  Stethoscope,
+  Scissors,
+  Dog
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 
@@ -36,7 +38,7 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
   const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : fallbackModules;
@@ -49,6 +51,8 @@ export function MobileDock() {
     { id: 'dashboard', label: 'Inicio', href: '/dashboard', icon: Home },
     { id: 'caja', label: 'Caja POS', href: '/caja', icon: ShoppingCart },
     { id: 'calendario', label: 'Citas', href: '/calendario', icon: CalendarDays },
+    { id: 'barberia', label: 'Barbería', href: '/barberia', icon: Scissors },
+    { id: 'grooming', label: 'Grooming', href: '/grooming', icon: Dog },
     { id: 'odontologia', label: 'Dental', href: '/odontologia', icon: Stethoscope },
     { id: 'clientes', label: 'CRM', href: '/clientes', icon: Users },
     { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },

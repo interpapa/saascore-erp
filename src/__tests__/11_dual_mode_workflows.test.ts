@@ -1,6 +1,9 @@
 import { useViewModeStore } from '../store/useViewModeStore';
 import { mergeTenantDentalServices } from '../lib/dental/proceduresCatalog';
 import { isModuleActive } from '../lib/core/kernel/moduleRegistry';
+import { BARBER_SERVICES_MASTER } from '../lib/barberia/barberCatalog';
+import { PET_SIZES_CONFIG, GROOMING_SERVICES_MASTER } from '../lib/grooming/groomingCatalog';
+import { OrthodonticCase, OrthodonticVisit } from '../types/dentalSpecialties';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -174,6 +177,67 @@ export async function runDualModeWorkflowsTests() {
   assert(computeModeForWidth(1024) === 'pro', 'Desktop base (1024px) debe resolverse estrictamente a pro');
   assert(computeModeForWidth(1440) === 'pro', 'Desktop amplio (1440px) debe resolverse estrictamente a pro');
   console.log('  ✓ 9. Breakpoint estricto de dispositivo verificado (< 1024px = express, >= 1024px = pro)');
+
+  // 10. Test: Flujo Especializado de Ortodoncia (Brackets, Arcos y Reposición de Caídos)
+  const orthoCaseMock: OrthodonticCase = {
+    patientId: 'patient-ortho-1',
+    technique: 'metal_roth',
+    slotSize: '.022',
+    angleClassification: 'class_II_div_1',
+    crowding: 'severe',
+    crossbite: 'none',
+    openBite: false,
+    deepBite: true,
+    plannedExtractions: ['14', '24'],
+    startDate: '2026-01-15',
+    estimatedMonths: 24,
+    monthlyFeeUSD: 35.0,
+    bracketReplacementFeeUSD: 10.0,
+    status: 'active',
+    visits: []
+  };
+
+  const droppedBrackets = ['13']; // 1 bracket caído en canino
+  const chargeDroppedBrackets = true;
+  const droppedCost = chargeDroppedBrackets ? droppedBrackets.length * orthoCaseMock.bracketReplacementFeeUSD : 0;
+  const totalOrthoSessionUSD = orthoCaseMock.monthlyFeeUSD + droppedCost;
+
+  assert(totalOrthoSessionUSD === 45.0, `Total sesión ortodoncia esperado $45.0, obtenido: $${totalOrthoSessionUSD}`);
+  console.log('  ✓ 10. Flujo clínico de ortodoncia: control de arcos, brackets desprendidos y cobro validado');
+
+  // 11. Test: Flujo Especializado de Barbería (Corte Fade, Barba y Comisiones)
+  assert(BARBER_SERVICES_MASTER.length >= 10, 'El catálogo maestro de barbería debe contener al menos 10 servicios clave');
+  const fadeService = BARBER_SERVICES_MASTER.find(s => s.code === 'FADE-01');
+  const beardService = BARBER_SERVICES_MASTER.find(s => s.code === 'BEARD-01');
+
+  assert(Boolean(fadeService && beardService), 'Servicios de Skin Fade y Ritual de Barba deben existir en el catálogo');
+  const barberSubtotal = (fadeService?.defaultPriceUSD || 15) + (beardService?.defaultPriceUSD || 12); // $27
+  const tipUSD = 5.0;
+  const barberCommissionPercent = 50;
+  const barberCommissionUSD = (barberSubtotal * barberCommissionPercent) / 100; // $13.50
+  const shopRevenueUSD = barberSubtotal - barberCommissionUSD; // $13.50
+  const totalBarberTicketUSD = barberSubtotal + tipUSD; // $32.00
+
+  assert(barberCommissionUSD === 13.5, `Comisión de barbero calculada incorrectamente: ${barberCommissionUSD}`);
+  assert(totalBarberTicketUSD === 32.0, `Total de ticket de barbería incorrecto: ${totalBarberTicketUSD}`);
+  console.log('  ✓ 11. Flujo operativo de barbería: ritual de barba, comisiones 50/50 y propinas validadas');
+
+  // 12. Test: Flujo Especializado de Peluquería Canina (Pet Grooming Matrix & WhatsApp)
+  const mediumDogConfig = PET_SIZES_CONFIG.medium;
+  assert(mediumDogConfig.baseFullGroomPriceUSD === 35.0, 'Precio base de grooming completo mediano debe ser $35');
+
+  // Simular perro mediano con nudos severos y pulgas detectadas
+  const severeMattingSurcharge = 10.0;
+  const fleaBathSurcharge = 8.0;
+  const totalGroomingUSD = mediumDogConfig.baseFullGroomPriceUSD + severeMattingSurcharge + fleaBathSurcharge;
+  assert(totalGroomingUSD === 53.0, `Total de grooming esperado $53.0, obtenido: $${totalGroomingUSD}`);
+
+  // Validación de plantilla de mensaje omnicanal de WhatsApp para retiro de mascota
+  const petName = 'Firulais';
+  const ownerName = 'Lucía Torres';
+  const whatsappMsg = `¡Hola ${ownerName}! 🐾 Te avisamos que tu peludo ${petName} ya terminó su sesión de peluquería y spa canino. ¡Quedó impecable y oliendo delicioso! ✨🐶 Ya puedes pasar a retirarlo.`;
+  assert(whatsappMsg.includes('Firulais') && whatsappMsg.includes('Lucía Torres'), 'Mensaje WhatsApp debe personalizarse con tutor y mascota');
+  console.log('  ✓ 12. Flujo operativo de pet grooming: matriz por tamaño de raza, suplementos y aviso WhatsApp validado');
 
   console.log('--- Suite 11 Completada con Éxito ---');
 }

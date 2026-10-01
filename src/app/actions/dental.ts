@@ -6,6 +6,7 @@ import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { ActionActor } from './entities';
 import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
+import { OrthodonticCase, OrthodonticVisit, EndodonticRecord, PeriodonticRecord } from '@/types/dentalSpecialties';
 
 export interface ToothCondition {
   code: string;    // 'caries' | 'obturacion' | 'endodoncia' | 'corona' | 'implante' | 'ausente' | 'fractura' | 'custom'
@@ -669,4 +670,238 @@ export async function sendDentalOrderToCashierAction(
     return { success: false, error: (err as Error).message };
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// ESPECIALIDADES CLÍNICAS: ORTODONCIA, ENDODONCIA Y PERIODONCIA
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Guarda o actualiza el caso y seguimiento de ortodoncia de un paciente
+ */
+export async function saveOrthodonticCaseAction(
+  patientId: string,
+  orthoCase: OrthodonticCase,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; recordId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'odontologia');
+    if (!moduleCheck.authorized) return { success: false, error: moduleCheck.error };
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) {
+      return { success: false, error: 'Paciente no válido en base de datos.' };
+    }
+
+    const { data: existing } = await supabaseAdmin
+      .from('entity_records')
+      .select('id')
+      .eq('entity_id', patientId)
+      .eq('tenant_id', tenantId)
+      .eq('record_type', 'dental_orthodontics')
+      .limit(1)
+      .maybeSingle();
+
+    if (existing?.id) {
+      const { error } = await supabaseAdmin
+        .from('entity_records')
+        .update({ metadata: orthoCase as any })
+        .eq('id', existing.id)
+        .eq('tenant_id', tenantId);
+
+      if (error) return { success: false, error: error.message };
+      return { success: true, recordId: existing.id };
+    } else {
+      const { data, error } = await supabaseAdmin
+        .from('entity_records')
+        .insert({
+          entity_id: patientId,
+          tenant_id: tenantId,
+          record_type: 'dental_orthodontics',
+          title: 'Expediente de Ortodoncia & Brackets',
+          content: `Caso de ortodoncia: Técnica ${orthoCase.technique}.`,
+          metadata: orthoCase as any,
+        })
+        .select('id')
+        .single();
+
+      if (error || !data) return { success: false, error: error?.message || 'Error al crear expediente de ortodoncia.' };
+      return { success: true, recordId: data.id };
+    }
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Obtiene el caso de ortodoncia activo de un paciente
+ */
+export async function getOrthodonticCaseAction(
+  patientId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; orthoCase?: OrthodonticCase; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) return { success: true, orthoCase: undefined };
+
+    const { data, error } = await supabaseAdmin
+      .from('entity_records')
+      .select('metadata')
+      .eq('entity_id', patientId)
+      .eq('tenant_id', tenantId)
+      .eq('record_type', 'dental_orthodontics')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return { success: false, error: error.message };
+    return { success: true, orthoCase: data?.metadata as unknown as OrthodonticCase };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Guarda un registro de conductometría / endodoncia
+ */
+export async function saveEndodonticRecordAction(
+  patientId: string,
+  record: EndodonticRecord,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; recordId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'odontologia');
+    if (!moduleCheck.authorized) return { success: false, error: moduleCheck.error };
+
+    const { data, error } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        entity_id: patientId,
+        tenant_id: tenantId,
+        record_type: 'dental_endodontics',
+        title: `Endodoncia Pieza ${record.toothNumber}`,
+        content: `Conductometría y biomecánica en pieza ${record.toothNumber}`,
+        metadata: record as any,
+      })
+      .select('id')
+      .single();
+
+    if (error || !data) return { success: false, error: error?.message || 'Error al guardar endodoncia.' };
+    return { success: true, recordId: data.id };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Obtiene los registros de endodoncia de un paciente
+ */
+export async function getEndodonticRecordsAction(
+  patientId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; records?: EndodonticRecord[]; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) return { success: true, records: [] };
+
+    const { data, error } = await supabaseAdmin
+      .from('entity_records')
+      .select('metadata')
+      .eq('entity_id', patientId)
+      .eq('tenant_id', tenantId)
+      .eq('record_type', 'dental_endodontics')
+      .order('created_at', { ascending: false });
+
+    if (error) return { success: false, error: error.message };
+    const list = (data || []).map(d => d.metadata as unknown as EndodonticRecord);
+    return { success: true, records: list };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Guarda un registro periodontal (Periodontograma simplificado)
+ */
+export async function savePeriodonticRecordAction(
+  patientId: string,
+  record: PeriodonticRecord,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; recordId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    const moduleCheck = await assertModuleEnabled(tenantId, 'odontologia');
+    if (!moduleCheck.authorized) return { success: false, error: moduleCheck.error };
+
+    const { data, error } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        entity_id: patientId,
+        tenant_id: tenantId,
+        record_type: 'dental_periodontics',
+        title: `Control Periodontal ${new Date(record.date).toLocaleDateString()}`,
+        content: `BOP: ${record.bleedingOnProbingPercent}%, Bolsas >=4mm: ${record.deepPocketsCount}`,
+        metadata: record as any,
+      })
+      .select('id')
+      .single();
+
+    if (error || !data) return { success: false, error: error?.message || 'Error al guardar periodoncia.' };
+    return { success: true, recordId: data.id };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Obtiene los controles periodontales de un paciente
+ */
+export async function getPeriodonticRecordsAction(
+  patientId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; records?: PeriodonticRecord[]; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) return { success: true, records: [] };
+
+    const { data, error } = await supabaseAdmin
+      .from('entity_records')
+      .select('metadata')
+      .eq('entity_id', patientId)
+      .eq('tenant_id', tenantId)
+      .eq('record_type', 'dental_periodontics')
+      .order('created_at', { ascending: false });
+
+    if (error) return { success: false, error: error.message };
+    const list = (data || []).map(d => d.metadata as unknown as PeriodonticRecord);
+    return { success: true, records: list };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 
