@@ -19,6 +19,8 @@ import { Entity } from '@/lib/api/entities';
 import { ConversationList } from '@/components/whatsapp/ConversationList';
 import { ChatInbox } from '@/components/whatsapp/ChatInbox';
 import { WhatsAppModal } from '@/components/whatsapp/WhatsAppModal';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { useActionActor } from '@/hooks/useActionActor';
 import { Button } from '@/components/ui/Button';
 import { useSearchParams } from 'next/navigation';
@@ -28,6 +30,7 @@ function WhatsAppPageContent() {
   const currentTenant = useERPStore((s) => s.currentTenant);
   const actor = useActionActor();
   const { toast } = useToast();
+  const globalViewMode = useViewModeStore((s) => s.viewMode);
   const searchParams = useSearchParams();
   const initialClientParam = searchParams.get('client');
 
@@ -453,13 +456,16 @@ function WhatsAppPageContent() {
             Bandeja omnicanal soberana y comunicación directa con clientes y contactos
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 btn-haptic shadow-sm"
-        >
-          <Send size={16} />
-          Nuevo Mensaje
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <ViewModeToggle variant="inline" />
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 btn-haptic shadow-sm"
+          >
+            <Send size={16} />
+            Nuevo Mensaje
+          </button>
+        </div>
       </div>
 
       {/* KPI Cards Summary */}
@@ -497,28 +503,33 @@ function WhatsAppPageContent() {
 
       {/* Main Omnichannel CRM Chat View */}
       <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col md:flex-row h-[650px]">
-        <ConversationList
-          conversations={conversations}
-          activeConversationId={activeConvId}
-          onSelectConversation={setActiveConvId}
-          filter={filter}
-          onFilterChange={setFilter}
-          isLoading={isLoadingConvs}
-          onNewChatClick={() => setIsModalOpen(true)}
-        />
-        <ChatInbox
-          conversation={activeConversation}
-          messages={messages}
-          isLoadingMessages={isLoadingMsgs}
-          onSendMessage={handleSendMessage}
-          onAddTag={handleAddTag}
-          onRemoveTag={handleRemoveTag}
-          onUpdateStatus={handleUpdateStatus}
-          onOpenNewModal={() => setIsModalOpen(true)}
-          onConvertToClient={openConvertModal}
-          tenantSlug={currentTenant?.slug}
-          tenantName={currentTenant?.name}
-        />
+        <div className={`w-full md:w-1/3 border-r border-border flex flex-col h-full shrink-0 ${globalViewMode === 'express' && activeConvId ? 'max-md:hidden' : ''}`}>
+          <ConversationList
+            conversations={conversations}
+            activeConversationId={activeConvId}
+            onSelectConversation={setActiveConvId}
+            filter={filter}
+            onFilterChange={setFilter}
+            isLoading={isLoadingConvs}
+            onNewChatClick={() => setIsModalOpen(true)}
+          />
+        </div>
+        <div className={`flex-1 flex flex-col h-full min-w-0 ${globalViewMode === 'express' && !activeConvId ? 'max-md:hidden' : ''}`}>
+          <ChatInbox
+            conversation={activeConversation}
+            messages={messages}
+            isLoadingMessages={isLoadingMsgs}
+            onSendMessage={handleSendMessage}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onUpdateStatus={handleUpdateStatus}
+            onOpenNewModal={() => setIsModalOpen(true)}
+            onConvertToClient={openConvertModal}
+            onBack={() => setActiveConvId(null)}
+            tenantSlug={currentTenant?.slug}
+            tenantName={currentTenant?.name}
+          />
+        </div>
       </div>
 
       {/* Start New Conversation Modal */}

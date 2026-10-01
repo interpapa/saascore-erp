@@ -9,6 +9,9 @@ import { AppointmentModal } from '@/components/calendario/AppointmentModal';
 import { AppointmentDetailsModal } from '@/components/calendario/AppointmentDetailsModal';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { DailyTimelineExpress } from '@/components/calendario/DailyTimelineExpress';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
 import {
@@ -37,6 +40,7 @@ export default function CalendarioPage() {
   const searchParams = useSearchParams();
   const session = useERPStore(s => s.session);
   const { toast } = useToast();
+  const globalViewMode = useViewModeStore((s) => s.viewMode);
   const [isPending, startTransition] = useTransition();
 
   const clientParam = searchParams.get('client') || searchParams.get('client_id');
@@ -366,65 +370,89 @@ export default function CalendarioPage() {
         </div>
         
         {/* Botón de Link Público y Configuración */}
-        {currentTenant && (
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setIsConfigModalOpen(true)}
-              className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
-              title="Configurar Horarios de Reserva"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            </button>
-            <button 
-              onClick={() => {
-                const url = `${window.location.origin}/reservas/${currentTenant.id}`;
-                navigator.clipboard.writeText(url);
-                toast({ variant: 'success', title: '¡Enlace copiado!', description: 'El enlace público de reservas ha sido copiado al portapapeles.' });
-              }}
-              className="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-              Copiar Enlace
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Conmutador Modo Timeline Diario Express vs Vista Grilla Pro */}
+          <ViewModeToggle variant="inline" />
+
+          {currentTenant && (
+            <>
+              <button 
+                onClick={() => setIsConfigModalOpen(true)}
+                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
+                title="Configurar Horarios de Reserva"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+              </button>
+              <button 
+                onClick={() => {
+                  const url = `${window.location.origin}/reservas/${currentTenant.id}`;
+                  navigator.clipboard.writeText(url);
+                  toast({ variant: 'success', title: '¡Enlace copiado!', description: 'El enlace público de reservas ha sido copiado al portapapeles.' });
+                }}
+                className="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                Copiar Enlace
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Real-time KPI Cards */}
-      <CalendarKPIs appointments={appointments} />
+      {globalViewMode === 'express' ? (
+        <div className="animate-in fade-in duration-200">
+          <DailyTimelineExpress
+            appointments={appointments}
+            onSelectAppointment={handleSelectAppointment}
+            onUpdateStatus={handleUpdateStatus}
+            onOpenCreateModal={() => {
+              setSelectedDateForCreate(currentDate);
+              setCreateModalType('appointment');
+              setIsCreateModalOpen(true);
+            }}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+          />
+        </div>
+      ) : (
+        <>
+          {/* Real-time KPI Cards */}
+          <CalendarKPIs appointments={appointments} />
 
-      {/* Filters & View Switcher */}
-      <CalendarFilters
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        currentDate={currentDate}
-        onDateChange={setCurrentDate}
-        filterState={filterState}
-        onFilterChange={setFilterState}
-        employees={bookableEmployees}
-        services={services}
-        onOpenCreateModal={(type = 'appointment') => {
-          setSelectedDateForCreate(null);
-          setCreateModalType(type);
-          setIsCreateModalOpen(true);
-        }}
-      />
+          {/* Filters & View Switcher */}
+          <CalendarFilters
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            filterState={filterState}
+            onFilterChange={setFilterState}
+            employees={bookableEmployees}
+            services={services}
+            onOpenCreateModal={(type = 'appointment') => {
+              setSelectedDateForCreate(null);
+              setCreateModalType(type);
+              setIsCreateModalOpen(true);
+            }}
+          />
 
-      {/* Interactive Monthly / Weekly / Daily Event Grid */}
-      <CalendarGrid
-        viewMode={viewMode}
-        currentDate={currentDate}
-        appointments={appointments}
-        employees={filterState.employee_id !== 'all' ? bookableEmployees.filter(e => e.id === filterState.employee_id) : bookableEmployees}
-        isLoading={isLoading}
-        onSelectAppointment={handleSelectAppointment}
-        onSelectDateSlot={handleSelectDateSlot}
-        onOpenCreateModal={(type = 'appointment') => {
-          setSelectedDateForCreate(null);
-          setCreateModalType(type);
-          setIsCreateModalOpen(true);
-        }}
-      />
+          {/* Interactive Monthly / Weekly / Daily Event Grid */}
+          <CalendarGrid
+            viewMode={viewMode}
+            currentDate={currentDate}
+            appointments={appointments}
+            employees={filterState.employee_id !== 'all' ? bookableEmployees.filter(e => e.id === filterState.employee_id) : bookableEmployees}
+            isLoading={isLoading}
+            onSelectAppointment={handleSelectAppointment}
+            onSelectDateSlot={handleSelectDateSlot}
+            onOpenCreateModal={(type = 'appointment') => {
+              setSelectedDateForCreate(null);
+              setCreateModalType(type);
+              setIsCreateModalOpen(true);
+            }}
+          />
+        </>
+      )}
 
       {/* Create Appointment Modal */}
       <AppointmentModal

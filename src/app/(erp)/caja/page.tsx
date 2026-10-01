@@ -18,6 +18,9 @@ import { HeldTicketsModal } from '@/components/caja/HeldTicketsModal';
 import { PendingDentalOrdersModal } from '@/components/caja/PendingDentalOrdersModal';
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { PhoneInput } from '@/components/ui/PhoneInput';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { FastTenderBottomSheet } from '@/components/caja/FastTenderBottomSheet';
 import { 
   Search, 
   ShoppingCart, 
@@ -78,6 +81,8 @@ function CajaPageContent() {
   const session = useERPStore((s) => s.session);
   const { toast } = useToast();
   const actor = useActionActor();
+  const globalViewMode = useViewModeStore((s) => s.viewMode);
+  const [isFastTenderOpen, setIsFastTenderOpen] = useState(false);
 
   const clientParam = searchParams.get('client') || searchParams.get('client_id');
   const appointmentIdParam = searchParams.get('appointment_id');
@@ -981,6 +986,9 @@ function CajaPageContent() {
 
         {/* Botones de Cabecera */}
         <div className="flex items-center flex-wrap gap-2">
+          {/* Conmutador Modo Express Mostrador vs Modo Pro */}
+          <ViewModeToggle variant="inline" />
+
           {/* Tasa Oficial BCV con Sincronización Automática */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold shadow-xs">
             <div className="flex items-center gap-1.5">
@@ -1106,7 +1114,7 @@ function CajaPageContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         
         {/* PANEL IZQUIERDO: Catálogo de Productos o Terminal de Cobro Libre (7 columnas) */}
-        <div className="lg:col-span-7 bg-card border border-border rounded-3xl p-5 shadow-xs space-y-4 flex flex-col min-h-[580px]">
+        <div className={`${globalViewMode === 'express' ? 'lg:col-span-7 col-span-1' : 'lg:col-span-7'} bg-card border border-border rounded-3xl p-5 shadow-xs space-y-4 flex flex-col min-h-[580px]`}>
           {isInventoryEnabled ? (
             <>
               {/* Buscador de Productos & Escáner */}
@@ -1485,7 +1493,7 @@ function CajaPageContent() {
         </div>
 
         {/* PANEL DERECHO: Ticket de Venta & Checkout (5 columnas) */}
-        <div className="lg:col-span-5 bg-card border border-border rounded-3xl p-5 shadow-lg space-y-4 flex flex-col relative overflow-hidden">
+        <div className={`lg:col-span-5 bg-card border border-border rounded-3xl p-5 shadow-lg space-y-4 flex flex-col relative overflow-hidden ${globalViewMode === 'express' ? 'max-lg:hidden' : ''}`}>
           
           {/* Overlay de Éxito */}
           {success && (
@@ -2195,6 +2203,62 @@ function CajaPageContent() {
           </div>
         </div>
       </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          2.1 BARRA FLOTANTE DE CHECKOUT EXPRÉS (MÓVIL / MOSTRADOR)
+         ───────────────────────────────────────────────────────────── */}
+      {globalViewMode === 'express' && ticketLines.length > 0 && (
+        <div className="fixed bottom-16 md:bottom-4 left-0 right-0 z-30 px-4 max-w-lg mx-auto pointer-events-none">
+          <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
+            <div>
+              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                {ticketLines.reduce((acc, l) => acc + l.quantity, 0)} ítem(s) en Ticket
+              </div>
+              <div className="text-lg font-black text-emerald-400 font-mono">
+                ${total.toFixed(2)}
+                <span className="text-xs text-slate-400 ml-1 font-normal font-sans">
+                  (Bs. {totalVES.toFixed(0)})
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsFastTenderOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md btn-haptic"
+              >
+                <CreditCard size={14} />
+                <span>COBRAR ➔</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL BOTTOM SHEET DE COBRO RÁPIDO */}
+      <FastTenderBottomSheet
+        isOpen={isFastTenderOpen}
+        onClose={() => setIsFastTenderOpen(false)}
+        totalUSD={total}
+        totalVES={totalVES}
+        currentRate={currentRate}
+        ticketCount={ticketLines.reduce((acc, l) => acc + l.quantity, 0)}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        cashTenderedUSD={cashTenderedUSD}
+        setCashTenderedUSD={setCashTenderedUSD}
+        cashTenderedVES={cashTenderedVES}
+        setCashTenderedVES={setCashTenderedVES}
+        changeDueUSD={changeDueUSD}
+        changeDueVES={changeDueVES}
+        onConfirmCheckout={async () => {
+          await handleCharge('invoiced');
+          setIsFastTenderOpen(false);
+        }}
+        isSaving={isSaving}
+        customerName={selectedCustomerObj?.name}
+      />
 
       {/* ─────────────────────────────────────────────────────────────
           3. MODAL DE CUENTAS BANCARIAS & PAGO MÓVIL

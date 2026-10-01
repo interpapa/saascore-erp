@@ -24,11 +24,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
   const { currentTenant, session } = useERPStore();
   const router = useRouter();
+  const globalViewMode = useViewModeStore((s) => s.viewMode);
 
   const apps = [
     { 
@@ -168,13 +171,83 @@ export default function LauncherPage() {
           </p>
         </div>
         
-        <button 
-          onClick={signOut} 
-          className="btn-base btn-secondary btn-sm flex items-center gap-2"
-        >
-          Cerrar Sesión
-        </button>
+        <div className="flex items-center gap-3">
+          <ViewModeToggle variant="pill" />
+          <button 
+            onClick={signOut} 
+            className="btn-base btn-secondary btn-sm flex items-center gap-2"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
       </div>
+
+      {/* Acceso Rápido Frontline en Modo Express */}
+      {globalViewMode === 'express' && (
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-5 text-white shadow-lg space-y-3 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase font-black tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
+                Modo Operativo Rápido
+              </span>
+              <span className="text-xs text-white/80 font-medium">· Acciones de 1-toque</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <Link
+              href="/caja"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
+            >
+              <div className="w-10 h-10 rounded-xl bg-emerald-400 text-emerald-950 flex items-center justify-center font-black shrink-0">
+                <Coins size={20} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white/80 block truncate">Caja POS</span>
+                <span className="text-sm font-black text-white">Cobrar ➔</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/odontologia"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
+            >
+              <div className="w-10 h-10 rounded-xl bg-teal-400 text-teal-950 flex items-center justify-center font-black shrink-0">
+                <Stethoscope size={20} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white/80 block truncate">Odontología</span>
+                <span className="text-sm font-black text-white">Sillón ➔</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/calendario"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
+            >
+              <div className="w-10 h-10 rounded-xl bg-cyan-400 text-cyan-950 flex items-center justify-center font-black shrink-0">
+                <Calendar size={20} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white/80 block truncate">Agenda</span>
+                <span className="text-sm font-black text-white">Turnos Hoy ➔</span>
+              </div>
+            </Link>
+
+            <Link
+              href="/inventario"
+              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
+            >
+              <div className="w-10 h-10 rounded-xl bg-purple-400 text-purple-950 flex items-center justify-center font-black shrink-0">
+                <Package size={20} />
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs font-bold text-white/80 block truncate">Almacén</span>
+                <span className="text-sm font-black text-white">Conteo ➔</span>
+              </div>
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Grid de Aplicaciones */}
       <div className="space-y-6">

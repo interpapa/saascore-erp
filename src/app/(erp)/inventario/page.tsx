@@ -41,6 +41,9 @@ import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { exportToCSV } from '@/lib/core/exportToCSV';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { InventarioExpress } from '@/components/inventario/InventarioExpress';
 
 type TabType = 'items' | 'services' | 'reorder' | 'audit';
 
@@ -68,6 +71,59 @@ export default function InventarioPage() {
   const { toast } = useToast();
   const router = useRouter();
   const actor = useActionActor();
+  const globalViewMode = useViewModeStore(s => s.viewMode);
+
+  const handleExpressStockChange = async (item: Item, newStock: number) => {
+    if (!activeTenant?.id || !actor) return;
+    const clampedStock = Math.max(0, newStock);
+    const oldStock = item.stock_quantity ?? (item as any).stock ?? 0;
+
+    // Actualización optimista inmediata
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === item.id
+          ? { ...i, stock_quantity: clampedStock }
+          : i
+      )
+    );
+
+    try {
+      const res = await updateItemAction(
+        item.id,
+        { stock_quantity: clampedStock },
+        activeTenant.id,
+        actor
+      );
+      if (!res.success) {
+        // Rollback
+        setItems((prev) =>
+          prev.map((i) =>
+            i.id === item.id
+              ? { ...i, stock_quantity: oldStock }
+              : i
+          )
+        );
+        toast({
+          variant: 'warning',
+          title: 'Aviso de stock',
+          description: res.error || 'No se pudo actualizar el stock en la base de datos.',
+        });
+      }
+    } catch (err: any) {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === item.id
+            ? { ...i, stock_quantity: oldStock }
+            : i
+        )
+      );
+      toast({
+        variant: 'error',
+        title: 'Error de red',
+        description: err?.message || 'No se pudo conectar con el servidor.',
+      });
+    }
+  };
 
   const isDentalActive = isModuleActive(
     activeTenant?.active_modules || (activeTenant?.metadata as any)?.active_modules,
@@ -490,6 +546,8 @@ export default function InventarioPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full md:w-auto justify-end">
+          <ViewModeToggle variant="pill" />
+
           <button
             onClick={() => {
               setStockModalItemId('');
@@ -543,7 +601,24 @@ export default function InventarioPage() {
         </div>
       </div>
 
-      {/* Tarjetas de Métricas Odoo / SAP */}
+      {globalViewMode === 'express' ? (
+        <InventarioExpress
+          items={items}
+          tenantId={activeTenant?.id || ''}
+          onStockChange={handleExpressStockChange}
+          onOpenAdjustmentModal={(id) => {
+            setStockModalItemId(id);
+            setIsStockModalOpen(true);
+          }}
+          onNewItem={() => {
+            setEditingItem(null);
+            setIsModalOpen(true);
+          }}
+          isLoading={isLoading}
+        />
+      ) : (
+        <>
+          {/* Tarjetas de Métricas Odoo / SAP */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* KPI 1: Valuación al Costo (Activo Realizable) */}
         <div className="bg-card border border-border rounded-2xl p-4.5 space-y-1 shadow-xs">
@@ -957,6 +1032,8 @@ export default function InventarioPage() {
           </div>
           <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
         </div>
+      )}
+      </>
       )}
 
       {/* Modal de Creación / Edición Odoo */}

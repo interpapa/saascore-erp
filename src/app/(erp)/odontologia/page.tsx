@@ -62,6 +62,9 @@ import { getAppointmentsAction, updateAppointmentStatusAction } from '@/app/acti
 import { getItemsAction } from '@/app/actions/items';
 import { Entity } from '@/lib/api/entities';
 import { useERPStore } from '@/store/useERPStore';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { DentalSillonExpress } from '@/components/dental/DentalSillonExpress';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
@@ -81,6 +84,7 @@ export default function OdontologiaPage() {
   const session = useERPStore((s) => s.session);
   const actor = useActionActor();
   const { toast } = useToast();
+  const viewMode = useViewModeStore((s) => s.viewMode);
 
   const tenantId = currentTenant?.id || session?.tenantId || '';
 
@@ -468,6 +472,66 @@ export default function OdontologiaPage() {
     }
   };
 
+  // DESPACHO RÁPIDO DESDE MODO SILLÓN EXPRESS A CAJA
+  const handleExpressSendToCashier = async (
+    items: Array<{ toothNum: string; procedureName: string; cost: number; category?: string; notes?: string }>,
+    notes?: string
+  ) => {
+    if (!tenantId || !actor || !selectedPatient) return;
+    const totalCost = items.reduce((acc, curr) => acc + curr.cost, 0);
+    try {
+      const res = await sendDentalOrderToCashierAction(
+        selectedPatient.id,
+        selectedPatient.name,
+        items,
+        totalCost,
+        tenantId,
+        actor
+      );
+
+      if (res.success) {
+        if (notes && notes.trim()) {
+          await saveDentalEvolutionAction(
+            selectedPatient.id,
+            {
+              patientId: selectedPatient.id,
+              note: notes.trim(),
+              teethInvolved: items.map((i) => i.toothNum).filter(Boolean),
+              doctorName: session?.userEmail || actor.email,
+            },
+            tenantId,
+            actor
+          );
+        }
+
+        toast({
+          variant: 'success',
+          title: 'Orden Despachada a Caja',
+          description: `Se despachó la orden a recepción (#${res.documentNumber}). El sillón ha quedado liberado.`,
+        });
+
+        // Marcar cita como completada si aplica
+        const currentAppt = todayAppointments.find(
+          (a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id
+        );
+        if (currentAppt) {
+          await updateAppointmentStatusAction(currentAppt.id, 'completed', tenantId, actor);
+        }
+
+        setSelectedPatient(null);
+        loadClinicalData();
+      } else {
+        toast({
+          variant: 'error',
+          title: 'Error al enviar orden',
+          description: res.error || 'No se pudo despachar a la caja.',
+        });
+      }
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error', description: (err as Error).message });
+    }
+  };
+
   // GUARDAR EVOLUCIÓN CLÍNICA DE HOY
   const handleSaveEvolution = async () => {
     if (!tenantId || !actor || !selectedPatient) return;
@@ -738,6 +802,9 @@ export default function OdontologiaPage() {
 
         {/* Acciones Rápidas del Módulo & Estado del Sillón */}
         <div className="flex items-center gap-2.5 flex-wrap">
+          {/* Conmutador Modo Sillón Express vs Modo Pro */}
+          <ViewModeToggle variant="inline" />
+
           {selectedPatient ? (
             <div className="flex items-center gap-1.5 p-1 bg-teal-500/10 border border-teal-500/30 rounded-2xl">
               <span className="text-xs font-black text-teal-600 dark:text-teal-400 px-2 py-1">
@@ -1075,9 +1142,22 @@ export default function OdontologiaPage() {
         </div>
       )}
 
-      {/* 4. WORKSPACE CLÍNICO DIVIDIDO (SOLO VISIBLE CUANDO HAY PACIENTE) */}
+      {/* 4. WORKSPACE CLÍNICO (MODO SILLÓN EXPRESS VS MODO INTEGRAL PRO) */}
       {selectedPatient && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        viewMode === 'express' ? (
+          <div className="animate-in fade-in duration-200">
+            <DentalSillonExpress
+              patient={selectedPatient}
+              chart={currentChart}
+              onSaveChart={handleSaveChart}
+              dentalCatalog={unifiedDentalCatalog}
+              onSendToCashier={handleExpressSendToCashier}
+              onOpenCheckout={() => setIsCheckoutModalOpen(true)}
+              isSaving={isSavingChart}
+            />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* COLUMNA IZQUIERDA: MOTOR DE ODONTOGRAMA (7 COLUMNAS EN LG) */}
           <div className="lg:col-span-7 bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
@@ -1586,10 +1666,10 @@ export default function OdontologiaPage() {
             )}
           </div>
         </div>
-      )}
+      ))}
 
-      {/* 5. DOCK INFERIOR FIJO: ACCIONES DE COBRO Y CIERRE DE CONSULTA */}
-      {selectedPatient && (
+      {/* 5. DOCK INFERIOR FIJO: ACCIONES DE COBRO Y CIERRE DE CONSULTA (SOLO EN MODO PRO) */}
+      {selectedPatient && viewMode === 'pro' && (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl py-3 px-4 sm:px-8 animate-in slide-in-from-bottom duration-300">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Resumen Clínico */}

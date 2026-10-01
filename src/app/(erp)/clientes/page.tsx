@@ -19,6 +19,8 @@ import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
 import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -34,6 +36,7 @@ export default function ClientesPage() {
   const { toast } = useToast();
   const router = useRouter();
   const actor = useActionActor();
+  const globalViewMode = useViewModeStore((s) => s.viewMode);
 
   // Estados Principales
   const [clients, setClients] = useState<Entity[]>([]);
@@ -337,6 +340,8 @@ export default function ClientesPage() {
 
         {activeTab === 'clients' && (
           <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            {/* Conmutador Modo Ficha Rápida vs Vista Integral Pro */}
+            <ViewModeToggle variant="inline" />
             <ViewToggle storageKey="clientes-view-mode" currentView={viewMode} onViewChange={setViewMode} />
             <button
               onClick={handleExportCSV}
@@ -637,31 +642,69 @@ export default function ClientesPage() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDrawerInitialTab('registros');
-                            setSelectedClient(client);
-                          }}
-                          className="px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
-                          title="Abrir historia médica / servicios en 1 clic"
-                        >
-                          <Stethoscope size={13} />
-                          <span>Historia</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setDrawerInitialTab('perfil');
-                            setSelectedClient(client);
-                          }}
-                          className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground text-xs font-bold transition-all flex items-center gap-1 btn-haptic"
-                        >
-                          <span>Ficha</span>
-                          <ArrowRight size={13} />
-                        </button>
+                      <div className="flex items-center gap-1.5 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
+                        {globalViewMode === 'express' ? (
+                          <>
+                            {client.phone && (
+                              <a
+                                href={`https://wa.me/${client.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                  `Hola ${client.name}, te escribimos para ponernos en contacto.`
+                                )}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all flex items-center gap-1 border border-emerald-500/20 btn-haptic"
+                                title="WhatsApp directo"
+                              >
+                                <MessageSquare size={13} />
+                                <span className="hidden sm:inline">WhatsApp</span>
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/odontologia?client_id=${client.id}`)}
+                              className="px-2 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 text-xs font-bold transition-all flex items-center gap-1 border border-teal-500/20 btn-haptic"
+                              title="Iniciar Odontograma en Sillón"
+                            >
+                              <Stethoscope size={13} />
+                              <span>Sillón</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/caja?client_id=${client.id}`)}
+                              className="px-2 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-all flex items-center gap-1 border border-indigo-500/20 btn-haptic"
+                              title="Cobrar en Caja"
+                            >
+                              <DollarSign size={13} />
+                              <span>Cobrar</span>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDrawerInitialTab('registros');
+                                setSelectedClient(client);
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
+                              title="Abrir historia médica / servicios en 1 clic"
+                            >
+                              <Stethoscope size={13} />
+                              <span>Historia</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDrawerInitialTab('perfil');
+                                setSelectedClient(client);
+                              }}
+                              className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground text-xs font-bold transition-all flex items-center gap-1 btn-haptic"
+                            >
+                              <span>Ficha</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>

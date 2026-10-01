@@ -15,6 +15,9 @@ import { SkeletonCardGrid, SkeletonCard } from '@/components/ui/SkeletonCard';
 import { SkeletonTable } from '@/components/ui/SkeletonTable';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
+import { useViewModeStore } from '@/store/useViewModeStore';
+import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
+import { EquipoKioskExpress } from '@/components/equipo/EquipoKioskExpress';
 
 type TabType = 'directorio' | 'asistencia' | 'nomina' | 'audit';
 
@@ -22,6 +25,7 @@ export default function EquipoPage() {
   const currentTenant = useTenantResolver();
   const actor = useActionActor();
   const { toast } = useToast();
+  const globalViewMode = useViewModeStore((s) => s.viewMode);
   const [employees, setEmployees] = useState<Entity[]>([]);
   const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,61 +116,74 @@ export default function EquipoPage() {
           </p>
         </div>
 
-        <button
-          onClick={fetchEmployees}
-          disabled={isLoading}
-          className="btn-base btn-secondary btn-sm flex items-center gap-2"
-        >
-          <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
-          Actualizar Personal
-        </button>
+        <div className="flex items-center gap-2.5">
+          <ViewModeToggle variant="pill" />
+          <button
+            onClick={fetchEmployees}
+            disabled={isLoading}
+            className="btn-base btn-secondary btn-sm flex items-center gap-2"
+          >
+            <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
+            Actualizar Personal
+          </button>
+        </div>
       </div>
 
-      {/* Tabs de Navegación Stripe-Style */}
-      <UnderlineTabs
-        tabs={tabs}
-        activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as TabType)}
-      />
-
-      {/* Contenido Modular */}
-      {isLoading ? (
-        <div className="bg-card border border-border rounded-2xl p-6">
-          {activeTab === 'directorio' ? (
-            <SkeletonCardGrid count={4} columns={2} showAvatar />
-          ) : (
-            <SkeletonTable rows={5} columns={4} />
-          )}
-        </div>
+      {globalViewMode === 'express' ? (
+        <EquipoKioskExpress
+          employees={employees}
+          tenantId={currentTenant?.id || ''}
+          onRefresh={fetchEmployees}
+        />
       ) : (
         <>
-          {activeTab === 'directorio' && (
-            <EmployeeDirectoryTab
-              employees={employees}
-              tenantId={currentTenant?.id || ''}
-              onRefresh={fetchEmployees}
-            />
-          )}
+          {/* Tabs de Navegación Stripe-Style */}
+          <UnderlineTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={(id) => setActiveTab(id as TabType)}
+          />
 
-          {activeTab === 'asistencia' && (
-            <AttendanceTab employees={employees} tenantId={currentTenant?.id || ''} />
-          )}
-
-          {activeTab === 'nomina' && (
-            <PayrollTab
-              employees={employees}
-              tenantId={currentTenant?.id || ''}
-            />
-          )}
-
-          {activeTab === 'audit' && (
+          {/* Contenido Modular */}
+          {isLoading ? (
             <div className="bg-card border border-border rounded-2xl p-6">
-              <div className="mb-4">
-                <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora de Recursos Humanos</h3>
-                <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de registros de empleados, asistencia y procesamiento de nóminas.</p>
-              </div>
-              <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
+              {activeTab === 'directorio' ? (
+                <SkeletonCardGrid count={4} columns={2} showAvatar />
+              ) : (
+                <SkeletonTable rows={5} columns={4} />
+              )}
             </div>
+          ) : (
+            <>
+              {activeTab === 'directorio' && (
+                <EmployeeDirectoryTab
+                  employees={employees}
+                  tenantId={currentTenant?.id || ''}
+                  onRefresh={fetchEmployees}
+                />
+              )}
+
+              {activeTab === 'asistencia' && (
+                <AttendanceTab employees={employees} tenantId={currentTenant?.id || ''} />
+              )}
+
+              {activeTab === 'nomina' && (
+                <PayrollTab
+                  employees={employees}
+                  tenantId={currentTenant?.id || ''}
+                />
+              )}
+
+              {activeTab === 'audit' && (
+                <div className="bg-card border border-border rounded-2xl p-6">
+                  <div className="mb-4">
+                    <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora de Recursos Humanos</h3>
+                    <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de registros de empleados, asistencia y procesamiento de nóminas.</p>
+                  </div>
+                  <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
+                </div>
+              )}
+            </>
           )}
         </>
       )}

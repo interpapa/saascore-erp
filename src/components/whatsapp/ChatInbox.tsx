@@ -23,6 +23,7 @@ import {
   CreditCard,
   Clock,
   ShoppingBag,
+  ChevronLeft,
 } from 'lucide-react';
 import { Conversation, Message } from '@/types/whatsapp';
 import { MessageHistory } from './MessageHistory';
@@ -40,6 +41,7 @@ interface ChatInboxProps {
   onUpdateStatus?: (status: 'active' | 'archived') => Promise<void>;
   onOpenNewModal: () => void;
   onConvertToClient?: (conversation: Conversation) => void;
+  onBack?: () => void;
   tenantSlug?: string;
   tenantName?: string;
   bankDetails?: string;
@@ -57,6 +59,7 @@ export function ChatInbox({
   onUpdateStatus,
   onOpenNewModal,
   onConvertToClient,
+  onBack,
   tenantSlug,
   tenantName,
   bankDetails,
@@ -203,7 +206,17 @@ export function ChatInbox({
       <div className="flex-1 flex flex-col bg-slate-50/30 dark:bg-slate-950/50 h-full min-w-0">
         {/* Header & Profile Summary */}
         <div className="px-4 sm:px-5 py-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border flex flex-wrap items-center justify-between gap-3 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {onBack && (
+              <button
+                type="button"
+                onClick={onBack}
+                className="md:hidden p-1.5 -ml-1 rounded-xl text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors btn-haptic shrink-0"
+                title="Volver a lista de conversaciones"
+              >
+                <ChevronLeft size={20} />
+              </button>
+            )}
             <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 font-bold flex items-center justify-center shrink-0">
               {conversation.client_name ? conversation.client_name.substring(0, 2).toUpperCase() : 'WA'}
             </div>
