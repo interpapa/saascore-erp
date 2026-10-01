@@ -16,7 +16,6 @@ import { SkeletonTable } from '@/components/ui/SkeletonTable';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { EquipoKioskExpress } from '@/components/equipo/EquipoKioskExpress';
 
 type TabType = 'directorio' | 'asistencia' | 'nomina' | 'audit';
@@ -117,7 +116,6 @@ export default function EquipoPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <ViewModeToggle variant="pill" />
           <button
             onClick={fetchEmployees}
             disabled={isLoading}

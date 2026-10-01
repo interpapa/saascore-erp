@@ -63,7 +63,6 @@ import { getItemsAction } from '@/app/actions/items';
 import { Entity } from '@/lib/api/entities';
 import { useERPStore } from '@/store/useERPStore';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { DentalSillonExpress } from '@/components/dental/DentalSillonExpress';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -802,9 +801,6 @@ export default function OdontologiaPage() {
 
         {/* Acciones Rápidas del Módulo & Estado del Sillón */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Conmutador Modo Sillón Express vs Modo Pro */}
-          <ViewModeToggle variant="inline" />
-
           {selectedPatient ? (
             <div className="flex items-center gap-1.5 p-1 bg-teal-500/10 border border-teal-500/30 rounded-2xl">
               <span className="text-xs font-black text-teal-600 dark:text-teal-400 px-2 py-1">

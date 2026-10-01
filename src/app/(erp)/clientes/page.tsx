@@ -12,7 +12,7 @@ import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import { 
   Plus, Download, Users, DollarSign, Activity, Calendar, MessageSquare, 
   ShoppingBag, ArrowRight, Search, Filter, Sparkles, UserCheck, ShieldAlert,
-  Phone, Mail, Tag, Copy, Check, Stethoscope
+  Phone, Mail, Tag, Copy, Check, Stethoscope, FileText
 } from 'lucide-react';
 import { exportToCSV } from '@/lib/core/exportToCSV';
 import { useERPStore } from '@/store/useERPStore';
@@ -20,13 +20,13 @@ import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useToast } from '@/components/core/ToastProvider';
 import { ViewToggle, useViewPreference } from '@/components/ui/ViewToggle';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useRouter } from 'next/navigation';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
+import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 
 type TabType = 'clients' | 'audit';
 
@@ -37,6 +37,10 @@ export default function ClientesPage() {
   const router = useRouter();
   const actor = useActionActor();
   const globalViewMode = useViewModeStore((s) => s.viewMode);
+  const isDentalActive = isModuleActive(
+    currentTenant?.active_modules || (currentTenant?.metadata as any)?.active_modules,
+    'odontologia'
+  );
 
   // Estados Principales
   const [clients, setClients] = useState<Entity[]>([]);
@@ -340,8 +344,6 @@ export default function ClientesPage() {
 
         {activeTab === 'clients' && (
           <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-            {/* Conmutador Modo Ficha Rápida vs Vista Integral Pro */}
-            <ViewModeToggle variant="inline" />
             <ViewToggle storageKey="clientes-view-mode" currentView={viewMode} onViewChange={setViewMode} />
             <button
               onClick={handleExportCSV}
@@ -659,15 +661,30 @@ export default function ClientesPage() {
                                 <span className="hidden sm:inline">WhatsApp</span>
                               </a>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/odontologia?client_id=${client.id}`)}
-                              className="px-2 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 text-xs font-bold transition-all flex items-center gap-1 border border-teal-500/20 btn-haptic"
-                              title="Iniciar Odontograma en Sillón"
-                            >
-                              <Stethoscope size={13} />
-                              <span>Sillón</span>
-                            </button>
+                            {isDentalActive ? (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/odontologia?client_id=${client.id}`)}
+                                className="px-2 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 text-xs font-bold transition-all flex items-center gap-1 border border-teal-500/20 btn-haptic"
+                                title="Iniciar Odontograma en Sillón"
+                              >
+                                <Stethoscope size={13} />
+                                <span>Sillón</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDrawerInitialTab('registros');
+                                  setSelectedClient(client);
+                                }}
+                                className="px-2 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
+                                title="Ver Ficha y Servicios"
+                              >
+                                <FileText size={13} />
+                                <span>Ficha</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => router.push(`/caja?client_id=${client.id}`)}
@@ -687,10 +704,10 @@ export default function ClientesPage() {
                                 setSelectedClient(client);
                               }}
                               className="px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
-                              title="Abrir historia médica / servicios en 1 clic"
+                              title={isDentalActive ? "Abrir historia clínica odontológica" : "Abrir ficha de contacto y servicios"}
                             >
-                              <Stethoscope size={13} />
-                              <span>Historia</span>
+                              {isDentalActive ? <Stethoscope size={13} /> : <FileText size={13} />}
+                              <span>{isDentalActive ? 'Historia' : 'Ficha'}</span>
                             </button>
                             <button
                               type="button"

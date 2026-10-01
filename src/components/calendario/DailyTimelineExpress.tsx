@@ -14,7 +14,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   Plus,
-  Play
+  Play,
+  UserCheck
 } from 'lucide-react';
 import { Appointment, AppointmentStatus } from '@/types/calendario';
 
@@ -25,6 +26,7 @@ interface DailyTimelineExpressProps {
   onOpenCreateModal: () => void;
   currentDate: Date;
   onDateChange: (date: Date) => void;
+  isDentalActive?: boolean;
 }
 
 export function DailyTimelineExpress({
@@ -34,6 +36,7 @@ export function DailyTimelineExpress({
   onOpenCreateModal,
   currentDate,
   onDateChange,
+  isDentalActive = false,
 }: DailyTimelineExpressProps) {
   const router = useRouter();
 
@@ -207,21 +210,34 @@ export function DailyTimelineExpress({
                     </button>
                   )}
 
-                  {/* Botón Iniciar Consulta / Sillón */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (appt.client_id) {
-                        router.push(`/odontologia?client_id=${appt.client_id}`);
-                      } else {
-                        onSelectAppointment(appt);
-                      }
-                    }}
-                    className="py-2 px-2 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 text-teal-600 dark:text-teal-400 text-[11px] font-bold text-center flex items-center justify-center gap-1.5 transition-all btn-haptic"
-                  >
-                    <Stethoscope size={13} />
-                    <span className="truncate">Sillón</span>
-                  </button>
+                  {/* Botón Iniciar Consulta / Sillón o Ver Ficha */}
+                  {isDentalActive ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (appt.client_id) {
+                          router.push(`/odontologia?client_id=${appt.client_id}`);
+                        } else {
+                          onSelectAppointment(appt);
+                        }
+                      }}
+                      className="py-2 px-2 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 text-teal-600 dark:text-teal-400 text-[11px] font-bold text-center flex items-center justify-center gap-1.5 transition-all btn-haptic"
+                      title="Atender en Sillón Odontológico"
+                    >
+                      <Stethoscope size={13} />
+                      <span className="truncate">Sillón</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onSelectAppointment(appt)}
+                      className="py-2 px-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-[11px] font-bold text-center flex items-center justify-center gap-1.5 transition-all btn-haptic"
+                      title="Ver Ficha de Consulta"
+                    >
+                      <UserCheck size={13} />
+                      <span className="truncate">Ficha</span>
+                    </button>
+                  )}
 
                   {/* Botón Cobrar en Caja */}
                   <button

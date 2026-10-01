@@ -42,7 +42,6 @@ import { exportToCSV } from '@/lib/core/exportToCSV';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { InventarioExpress } from '@/components/inventario/InventarioExpress';
 
 type TabType = 'items' | 'services' | 'reorder' | 'audit';
@@ -546,8 +545,6 @@ export default function InventarioPage() {
         </div>
 
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full md:w-auto justify-end">
-          <ViewModeToggle variant="pill" />
-
           <button
             onClick={() => {
               setStockModalItemId('');

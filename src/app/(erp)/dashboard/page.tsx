@@ -25,7 +25,6 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
@@ -172,7 +171,6 @@ export default function LauncherPage() {
         </div>
         
         <div className="flex items-center gap-3">
-          <ViewModeToggle variant="pill" />
           <button 
             onClick={signOut} 
             className="btn-base btn-secondary btn-sm flex items-center gap-2"
@@ -182,69 +180,100 @@ export default function LauncherPage() {
         </div>
       </div>
 
-      {/* Acceso Rápido Frontline en Modo Express */}
+      {/* Acceso Rápido Frontline en Modo Express / Móvil (estrictamente filtrado por módulos del negocio) */}
       {globalViewMode === 'express' && (
         <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-700 rounded-3xl p-5 text-white shadow-lg space-y-3 animate-in fade-in duration-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-[11px] uppercase font-black tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">
-                Modo Operativo Rápido
+                Acceso Operativo Rápido
               </span>
               <span className="text-xs text-white/80 font-medium">· Acciones de 1-toque</span>
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            <Link
-              href="/caja"
-              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
-            >
-              <div className="w-10 h-10 rounded-xl bg-emerald-400 text-emerald-950 flex items-center justify-center font-black shrink-0">
-                <Coins size={20} />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-white/80 block truncate">Caja POS</span>
-                <span className="text-sm font-black text-white">Cobrar ➔</span>
-              </div>
-            </Link>
-
-            <Link
-              href="/odontologia"
-              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
-            >
-              <div className="w-10 h-10 rounded-xl bg-teal-400 text-teal-950 flex items-center justify-center font-black shrink-0">
-                <Stethoscope size={20} />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-white/80 block truncate">Odontología</span>
-                <span className="text-sm font-black text-white">Sillón ➔</span>
-              </div>
-            </Link>
-
-            <Link
-              href="/calendario"
-              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
-            >
-              <div className="w-10 h-10 rounded-xl bg-cyan-400 text-cyan-950 flex items-center justify-center font-black shrink-0">
-                <Calendar size={20} />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-white/80 block truncate">Agenda</span>
-                <span className="text-sm font-black text-white">Turnos Hoy ➔</span>
-              </div>
-            </Link>
-
-            <Link
-              href="/inventario"
-              className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
-            >
-              <div className="w-10 h-10 rounded-xl bg-purple-400 text-purple-950 flex items-center justify-center font-black shrink-0">
-                <Package size={20} />
-              </div>
-              <div className="min-w-0">
-                <span className="text-xs font-bold text-white/80 block truncate">Almacén</span>
-                <span className="text-sm font-black text-white">Conteo ➔</span>
-              </div>
-            </Link>
+            {[
+              {
+                id: 'caja',
+                name: 'Caja POS',
+                action: 'Cobrar ➔',
+                href: '/caja',
+                bgIcon: 'bg-emerald-400 text-emerald-950',
+                icon: <Coins size={20} />,
+                enabled: enabledModules.includes('caja'),
+              },
+              {
+                id: 'odontologia',
+                name: 'Odontología',
+                action: 'Sillón ➔',
+                href: '/odontologia',
+                bgIcon: 'bg-teal-400 text-teal-950',
+                icon: <Stethoscope size={20} />,
+                enabled: enabledModules.includes('odontologia'),
+              },
+              {
+                id: 'calendario',
+                name: 'Agenda',
+                action: 'Turnos Hoy ➔',
+                href: '/calendario',
+                bgIcon: 'bg-cyan-400 text-cyan-950',
+                icon: <Calendar size={20} />,
+                enabled: enabledModules.includes('calendario'),
+              },
+              {
+                id: 'catalogo',
+                name: 'Almacén',
+                action: 'Conteo ➔',
+                href: '/inventario',
+                bgIcon: 'bg-purple-400 text-purple-950',
+                icon: <Package size={20} />,
+                enabled: enabledModules.includes('catalogo') || enabledModules.includes('inventario'),
+              },
+              {
+                id: 'clientes',
+                name: 'Clientes',
+                action: 'Directorio ➔',
+                href: '/clientes',
+                bgIcon: 'bg-blue-400 text-blue-950',
+                icon: <Users size={20} />,
+                enabled: enabledModules.includes('clientes'),
+              },
+              {
+                id: 'whatsapp',
+                name: 'WhatsApp',
+                action: 'Bandeja ➔',
+                href: '/whatsapp',
+                bgIcon: 'bg-green-400 text-green-950',
+                icon: <MessageSquare size={20} />,
+                enabled: enabledModules.includes('whatsapp'),
+              },
+              {
+                id: 'equipo',
+                name: 'Asistencia',
+                action: 'Marcaje ➔',
+                href: '/equipo',
+                bgIcon: 'bg-indigo-400 text-indigo-950',
+                icon: <Contact size={20} />,
+                enabled: enabledModules.includes('equipo'),
+              },
+            ]
+              .filter((c) => c.enabled)
+              .slice(0, 4)
+              .map((item) => (
+                <Link
+                  key={item.id}
+                  href={item.href}
+                  className="bg-white/15 hover:bg-white/25 active:scale-95 transition-all rounded-2xl p-3.5 flex items-center gap-3 border border-white/20 backdrop-blur-xs"
+                >
+                  <div className={`w-10 h-10 rounded-xl ${item.bgIcon} flex items-center justify-center font-black shrink-0`}>
+                    {item.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-white/80 block truncate">{item.name}</span>
+                    <span className="text-sm font-black text-white">{item.action}</span>
+                  </div>
+                </Link>
+              ))}
           </div>
         </div>
       )}

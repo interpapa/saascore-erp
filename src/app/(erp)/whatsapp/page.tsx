@@ -20,7 +20,6 @@ import { ConversationList } from '@/components/whatsapp/ConversationList';
 import { ChatInbox } from '@/components/whatsapp/ChatInbox';
 import { WhatsAppModal } from '@/components/whatsapp/WhatsAppModal';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { useActionActor } from '@/hooks/useActionActor';
 import { Button } from '@/components/ui/Button';
 import { useSearchParams } from 'next/navigation';
@@ -457,7 +456,6 @@ function WhatsAppPageContent() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <ViewModeToggle variant="inline" />
           <button
             onClick={() => setIsModalOpen(true)}
             className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 btn-haptic shadow-sm"

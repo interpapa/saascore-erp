@@ -10,7 +10,6 @@ import { AppointmentDetailsModal } from '@/components/calendario/AppointmentDeta
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { DailyTimelineExpress } from '@/components/calendario/DailyTimelineExpress';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -91,6 +90,7 @@ export default function CalendarioPage() {
   const isInventoryEnabled = isModuleActive(tenantModules, 'inventario');
   const isCRMEnabled = isModuleActive(tenantModules, 'clientes');
   const isTeamEnabled = isModuleActive(tenantModules, 'equipo');
+  const isDentalActive = isModuleActive(tenantModules, 'odontologia');
 
   // Fetch Data Function (Adaptativo a Módulos Habilitados)
   const fetchData = useCallback(async () => {
@@ -371,9 +371,6 @@ export default function CalendarioPage() {
         
         {/* Botón de Link Público y Configuración */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Conmutador Modo Timeline Diario Express vs Vista Grilla Pro */}
-          <ViewModeToggle variant="inline" />
-
           {currentTenant && (
             <>
               <button 
@@ -412,6 +409,7 @@ export default function CalendarioPage() {
             }}
             currentDate={currentDate}
             onDateChange={setCurrentDate}
+            isDentalActive={isDentalActive}
           />
         </div>
       ) : (

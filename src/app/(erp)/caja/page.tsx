@@ -19,7 +19,6 @@ import { PendingDentalOrdersModal } from '@/components/caja/PendingDentalOrdersM
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { useViewModeStore } from '@/store/useViewModeStore';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { FastTenderBottomSheet } from '@/components/caja/FastTenderBottomSheet';
 import { 
   Search, 
@@ -986,9 +985,6 @@ function CajaPageContent() {
 
         {/* Botones de Cabecera */}
         <div className="flex items-center flex-wrap gap-2">
-          {/* Conmutador Modo Express Mostrador vs Modo Pro */}
-          <ViewModeToggle variant="inline" />
-
           {/* Tasa Oficial BCV con Sincronización Automática */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold shadow-xs">
             <div className="flex items-center gap-1.5">

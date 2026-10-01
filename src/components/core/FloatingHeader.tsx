@@ -3,7 +3,6 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { Search, Bell, CheckCircle2, AlertTriangle, MessageCircle, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
-import { ViewModeToggle } from '@/components/ui/ViewModeToggle';
 import { Breadcrumbs } from '@/components/core/Breadcrumbs';
 import { CommandPalette } from '@/components/core/CommandPalette';
 
@@ -175,13 +174,6 @@ export function FloatingHeader() {
               </div>
             )}
           </div>
-
-          {/* Selector de Modo Dual (Rápido vs Pro) */}
-          <div className="flex items-center justify-center">
-            <ViewModeToggle variant="header" />
-          </div>
-
-          <div className="w-px h-6 bg-border mx-0.5" />
 
           {/* Modo Oscuro */}
           <div className="w-10 h-10 flex items-center justify-center">

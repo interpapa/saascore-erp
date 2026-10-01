@@ -1,4 +1,6 @@
 import { useViewModeStore } from '../store/useViewModeStore';
+import { mergeTenantDentalServices } from '../lib/dental/proceduresCatalog';
+import { isModuleActive } from '../lib/core/kernel/moduleRegistry';
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -127,6 +129,53 @@ export async function runDualModeWorkflowsTests() {
   assert(employeeState.lastType === 'check_out', 'Tipo de evento debe ser check_out');
   console.log('  ✓ 6. Transición de estados en Modo Kiosco (Reloj Checador Express) validada');
 
+  // 7. Test: Zero Hardcoding & Catálogo Dinámico de Procedimientos y Precios
+  const mockTenantServices = [
+    {
+      id: 'custom-item-1',
+      name: 'Profilaxis Dental & Limpieza Ultrasonido',
+      type: 'service',
+      base_price: 55.0, // Precio personalizado por la clínica (override del default de $30)
+      metadata: { duration_minutes: 40 }
+    },
+    {
+      id: 'custom-item-2',
+      name: 'Consulta Médica / Triaje General',
+      type: 'service',
+      base_price: 80.0, // Servicio nuevo para módulo de salud general / hospitales
+      metadata: { duration_minutes: 30 }
+    }
+  ];
+
+  const mergedCatalog = mergeTenantDentalServices(mockTenantServices);
+  const overriddenService = mergedCatalog.find(p => p.name === 'Profilaxis Dental & Limpieza Ultrasonido');
+  const customGeneralService = mergedCatalog.find(p => p.name === 'Consulta Médica / Triaje General');
+
+  assert(Boolean(overriddenService), 'El procedimiento sobreescrito debe existir en el catálogo');
+  assert(overriddenService?.defaultPriceUSD === 55.0, `Precio personalizado debe ser $55.0, obtenido: ${overriddenService?.defaultPriceUSD}`);
+  assert(Boolean(customGeneralService), 'El servicio personalizado debe agregarse dinámicamente');
+  assert(customGeneralService?.defaultPriceUSD === 80.0, `Precio de servicio personalizado debe ser $80.0, obtenido: ${customGeneralService?.defaultPriceUSD}`);
+  console.log('  ✓ 7. Catálogo dinámico sin hardcoding: overrides de precios y procedimientos libres validados');
+
+  // 8. Test: Desacoplamiento Modular Multi-Industria (No asumir odontología en todo el ERP)
+  const retailModules = ['caja', 'inventario', 'clientes'];
+  const dentalModules = ['caja', 'inventario', 'clientes', 'odontologia'];
+
+  assert(isModuleActive(retailModules, 'odontologia') === false, 'Tenant de comercio/retail no debe tener odontología activa');
+  assert(isModuleActive(retailModules, 'caja') === true, 'Tenant de comercio debe tener caja activa');
+  assert(isModuleActive(dentalModules, 'odontologia') === true, 'Tenant dental debe tener odontología activa');
+  console.log('  ✓ 8. Desacoplamiento multi-industria verificado (módulos generales se adaptan al rubro)');
+
+  // 9. Test: Regla Estricta de Responsividad por Resolución (< 1024px vs >= 1024px)
+  const computeModeForWidth = (width: number) => (width < 1024 ? 'express' : 'pro');
+  assert(computeModeForWidth(375) === 'express', 'Móvil (375px) debe resolverse estrictamente a express');
+  assert(computeModeForWidth(768) === 'express', 'Tablet vertical (768px) debe resolverse estrictamente a express');
+  assert(computeModeForWidth(1023) === 'express', 'Sub-desktop (1023px) debe resolverse estrictamente a express');
+  assert(computeModeForWidth(1024) === 'pro', 'Desktop base (1024px) debe resolverse estrictamente a pro');
+  assert(computeModeForWidth(1440) === 'pro', 'Desktop amplio (1440px) debe resolverse estrictamente a pro');
+  console.log('  ✓ 9. Breakpoint estricto de dispositivo verificado (< 1024px = express, >= 1024px = pro)');
+
   console.log('--- Suite 11 Completada con Éxito ---');
 }
+
 

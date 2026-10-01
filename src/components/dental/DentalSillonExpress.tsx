@@ -15,7 +15,10 @@ import {
   Info,
   Layers,
   Smile,
-  ShieldCheck
+  ShieldCheck,
+  Search,
+  Tag,
+  X
 } from 'lucide-react';
 import { Entity } from '@/lib/api/entities';
 import { DentalChart, ToothCondition, ToothData } from '@/app/actions/dental';
@@ -51,17 +54,6 @@ const TOOTH_SHORT_NAMES: Record<string, string> = {
   '31': 'Inc. Cent', '32': 'Inc. Lat', '33': 'Canino', '34': '1er Pre', '35': '2do Pre', '36': '1er Molar', '37': '2do Molar', '38': '3er Molar',
 };
 
-const FAST_PROCEDURES = [
-  { name: 'Limpieza con Ultrasonido', cost: 30, category: 'Prevención' },
-  { name: 'Resina Nanohíbrida 1 Cara', cost: 45, category: 'Operatoria' },
-  { name: 'Resina Nanohíbrida 2+ Caras', cost: 60, category: 'Operatoria' },
-  { name: 'Exodoncia Simple', cost: 50, category: 'Cirugía' },
-  { name: 'Consulta & Diagnóstico', cost: 20, category: 'Diagnóstico' },
-  { name: 'Tratamiento de Conducto (Endo)', cost: 90, category: 'Endodoncia' },
-  { name: 'Blanqueamiento Dental', cost: 120, category: 'Estética' },
-  { name: 'Corona de Porcelana', cost: 160, category: 'Prótesis' },
-];
-
 const QUICK_EVOLUTION_CHIPS = [
   'Aislamiento absoluto y restauración con resina fotocurada. Pulido oclusal favorable.',
   'Tartrectomía ultrasónica en ambas arcadas y aplicación de flúor tópico.',
@@ -85,6 +77,16 @@ export function DentalSillonExpress({
   // Diente seleccionado para edición modal
   const [selectedToothNum, setSelectedToothNum] = useState<string | null>(null);
 
+  // Filtros dinámicos de catálogo
+  const [procSearch, setProcSearch] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+
+  // Modal para agregar procedimiento libre/personalizado
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+  const [customProcName, setCustomProcName] = useState('');
+  const [customProcPrice, setCustomProcPrice] = useState('');
+  const [customProcTooth, setCustomProcTooth] = useState('General');
+
   // Orden de procedimientos a cobrar hoy (Carrito de Sillón)
   const [sessionItems, setSessionItems] = useState<Array<{
     id: string;
@@ -98,6 +100,41 @@ export function DentalSillonExpress({
   // Nota de evolución clínica rápida
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [isSendingToCashier, setIsSendingToCashier] = useState(false);
+
+  // PROCEDIMIENTOS 100% DINÁMICOS BASADOS EN EL CATÁLOGO DE LA EMPRESA (0 Hardcoding)
+  const dynamicProcedures = useMemo(() => {
+    const sourceList = (dentalCatalog && dentalCatalog.length > 0)
+      ? dentalCatalog
+      : DENTAL_PROCEDURES_MASTER;
+
+    return sourceList.map((p) => ({
+      id: p.id,
+      name: p.name,
+      cost: Number(p.defaultPriceUSD || (p as any).base_price || 0),
+      category: p.categoryLabel || p.category || 'General',
+    }));
+  }, [dentalCatalog]);
+
+  // Categorías presentes en los procedimientos configurados
+  const categories = useMemo(() => {
+    const catSet = new Set<string>();
+    dynamicProcedures.forEach((p) => {
+      if (p.category) catSet.add(p.category);
+    });
+    return Array.from(catSet);
+  }, [dynamicProcedures]);
+
+  // Procedimientos filtrados en vivo
+  const filteredProcedures = useMemo(() => {
+    return dynamicProcedures.filter((p) => {
+      if (selectedCategory !== 'all' && p.category !== selectedCategory) return false;
+      if (procSearch.trim()) {
+        const query = procSearch.toLowerCase();
+        return p.name.toLowerCase().includes(query) || p.category.toLowerCase().includes(query);
+      }
+      return true;
+    });
+  }, [dynamicProcedures, selectedCategory, procSearch]);
 
   // Obtener condición activa del diente
   const getToothData = (num: string): ToothData | undefined => {
@@ -142,7 +179,7 @@ export function DentalSillonExpress({
     setSelectedToothNum(null);
   };
 
-  // Agregar procedimiento rápido a la orden de cobro
+  // Agregar procedimiento a la orden de cobro
   const handleAddProcedure = (proc: { name: string; cost: number; category?: string }, toothNum: string = 'General') => {
     const newItem = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -152,6 +189,22 @@ export function DentalSillonExpress({
       category: proc.category,
     };
     setSessionItems((prev) => [...prev, newItem]);
+  };
+
+  const handleAddCustomProcedure = (e: React.FormEvent) => {
+    e.preventDefault();
+    const name = customProcName.trim();
+    const price = parseFloat(customProcPrice);
+    if (!name || isNaN(price) || price < 0) return;
+
+    handleAddProcedure(
+      { name, cost: price, category: 'Personalizado' },
+      customProcTooth.trim() || 'General'
+    );
+    setCustomProcName('');
+    setCustomProcPrice('');
+    setCustomProcTooth('General');
+    setIsCustomModalOpen(false);
   };
 
   const handleRemoveItem = (id: string) => {
@@ -178,6 +231,10 @@ export function DentalSillonExpress({
 
   const currentQuadTeeth = QUADRANTS.find((q) => q.id === activeQuadrant)?.range || [];
 
+  // Búsqueda de precios reales de la empresa para tratamientos de acción rápida por diente
+  const resinaMatch = dynamicProcedures.find(p => p.name.toLowerCase().includes('resina')) || { name: 'Resina', cost: 40 };
+  const exodonciaMatch = dynamicProcedures.find(p => p.name.toLowerCase().includes('extrac') || p.name.toLowerCase().includes('exodon')) || { name: 'Extracción Simple', cost: 40 };
+
   return (
     <div className="space-y-5 pb-24">
       {/* 1. SELECCIÓN DE CUADRANTE TÁCTIL */}
@@ -200,71 +257,70 @@ export function DentalSillonExpress({
                 key={quad.id}
                 type="button"
                 onClick={() => setActiveQuadrant(quad.id as any)}
-                className={`py-3 px-2 rounded-xl text-center border font-bold text-xs transition-all btn-haptic ${
+                className={`py-3 px-3 rounded-xl font-bold text-xs transition-all flex flex-col items-center justify-center gap-1 border btn-haptic ${
                   isActive
-                    ? 'bg-teal-500 text-white border-teal-600 shadow-md scale-[1.02]'
-                    : 'bg-slate-50 dark:bg-slate-800/60 text-foreground border-border hover:bg-slate-100'
+                    ? 'bg-teal-500 text-white border-teal-600 shadow-sm scale-102'
+                    : 'bg-slate-100/80 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border-border hover:bg-slate-200'
                 }`}
               >
-                <div className="text-sm font-black tracking-tight">{quad.id}</div>
-                <div className="text-[10px] opacity-85 mt-0.5 truncate">{quad.label}</div>
+                <span className="text-sm font-black">{quad.id}</span>
+                <span className="text-[10px] opacity-80">{quad.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 2. REJILLA TÁCTIL DE DIENTES (4 x 2) */}
-      <div className="bg-card border border-border rounded-2xl p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
-          <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
-            Piezas del Cuadrante {activeQuadrant} (Toca para diagnosticar)
-          </h4>
-          <span className="text-[11px] text-slate-400">
-            Toque grande apto para guantes
+      {/* 2. MATRIZ DE DIENTES TÁCTILES DEL CUADRANTE SELECCIONADO */}
+      <div className="bg-card border border-border rounded-2xl p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-2">
+            <span>Piezas del Cuadrante {activeQuadrant}</span>
+            <span className="text-[10px] font-medium text-slate-400 font-mono">(Toca un diente para registrar)</span>
+          </h3>
+          <span className="text-xs text-teal-600 font-bold">
+            {QUADRANTS.find((q) => q.id === activeQuadrant)?.label}
           </span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {currentQuadTeeth.map((toothNum) => {
             const condition = getToothPrimaryCondition(toothNum);
-            const isSick = condition !== 'sano';
-
-            const conditionBadge = {
-              sano: { label: 'Sano', color: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300' },
-              caries: { label: 'Caries', color: 'bg-red-500/15 text-red-600 border-red-500/30' },
-              obturacion: { label: 'Obturado', color: 'bg-blue-500/15 text-blue-600 border-blue-500/30' },
-              endodoncia: { label: 'Endodoncia', color: 'bg-purple-500/15 text-purple-600 border-purple-500/30' },
-              corona: { label: 'Corona', color: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
-              ausente: { label: 'Ausente', color: 'bg-slate-400/20 text-slate-400 line-through border-slate-300' },
-              implante: { label: 'Implante', color: 'bg-cyan-500/15 text-cyan-600 border-cyan-500/30' },
-              fractura: { label: 'Fractura', color: 'bg-rose-500/15 text-rose-600 border-rose-500/30' },
-            }[condition] || { label: condition, color: 'bg-slate-100 text-slate-600' };
+            const isToothTreated = condition !== 'sano';
+            const shortName = TOOTH_SHORT_NAMES[toothNum] || '';
 
             return (
               <button
                 key={toothNum}
                 type="button"
                 onClick={() => setSelectedToothNum(toothNum)}
-                className={`flex flex-col items-center justify-between p-2.5 rounded-2xl border transition-all text-center min-h-[76px] btn-haptic active:scale-95 ${
-                  isSick
-                    ? 'border-red-500/40 bg-red-500/5 shadow-xs'
-                    : 'border-border bg-slate-50/50 dark:bg-slate-900/50 hover:border-teal-500/40 hover:bg-teal-500/5'
+                className={`p-3.5 rounded-2xl border flex flex-col justify-between text-left transition-all btn-haptic min-h-[92px] ${
+                  condition === 'caries'
+                    ? 'bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-300'
+                    : condition === 'obturacion'
+                    ? 'bg-blue-500/10 border-blue-500/40 text-blue-700 dark:text-blue-300'
+                    : condition === 'endodoncia'
+                    ? 'bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300'
+                    : condition === 'corona'
+                    ? 'bg-purple-500/10 border-purple-500/40 text-purple-700 dark:text-purple-300'
+                    : condition === 'ausente'
+                    ? 'bg-slate-200/50 dark:bg-slate-800/40 border-slate-300 dark:border-slate-700 text-slate-400 opacity-60'
+                    : 'bg-card border-border hover:border-teal-500/50 hover:bg-teal-500/5'
                 }`}
               >
                 <div className="flex items-center justify-between w-full">
-                  <span className="text-base font-black text-foreground font-mono">
-                    {toothNum}
+                  <span className="text-xl font-black font-mono tracking-tight">{toothNum}</span>
+                  {isToothTreated ? (
+                    <span className="w-2.5 h-2.5 rounded-full bg-current" />
+                  ) : (
+                    <span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                  )}
+                </div>
+                <div>
+                  <span className="text-[11px] font-bold block truncate">{shortName}</span>
+                  <span className="text-[10px] capitalize opacity-80">
+                    {condition === 'sano' ? 'Sano' : condition}
                   </span>
-                  {isSick && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />}
-                </div>
-
-                <div className="text-[10px] text-slate-400 font-medium truncate w-full">
-                  {TOOTH_SHORT_NAMES[toothNum] || 'Diente'}
-                </div>
-
-                <div className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border w-full truncate mt-1 ${conditionBadge.color}`}>
-                  {conditionBadge.label}
                 </div>
               </button>
             );
@@ -272,38 +328,101 @@ export function DentalSillonExpress({
         </div>
       </div>
 
-      {/* 3. PROCEDIMIENTOS RÁPIDOS 1-TOQUE */}
+      {/* 3. PROCEDIMIENTOS DINÁMICOS BASADOS EN CATÁLOGO REAL (0 Hardcoding) */}
       <div className="bg-card border border-border rounded-2xl p-4 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Sparkles size={15} className="text-amber-500" />
+            <Sparkles size={15} className="text-teal-500" />
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">
-              Agregar Tratamientos a Cobrar Hoy
+              Catálogo de Tratamientos
             </h4>
+            <span className="text-[10px] font-bold bg-teal-500/10 text-teal-600 px-2 py-0.5 rounded-full">
+              Precios Editables de la Empresa
+            </span>
           </div>
-          <span className="text-[11px] text-slate-400">1-Toque para añadir</span>
+
+          <button
+            type="button"
+            onClick={() => setIsCustomModalOpen(true)}
+            className="self-start sm:self-auto text-xs font-black text-teal-600 hover:text-teal-700 bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1.5 rounded-xl border border-teal-500/20 flex items-center gap-1 transition-colors btn-haptic"
+          >
+            <Plus size={13} />
+            <span>+ Concepto Libre / Precio Editable</span>
+          </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {FAST_PROCEDURES.map((proc, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => handleAddProcedure(proc)}
-              className="flex flex-col justify-between p-2.5 rounded-xl border border-border bg-slate-50/80 dark:bg-slate-800/50 hover:border-teal-500/40 hover:bg-teal-500/10 text-left transition-all btn-haptic"
-            >
-              <span className="text-xs font-bold text-foreground leading-tight line-clamp-2">
-                {proc.name}
-              </span>
-              <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/40">
-                <span className="text-[10px] text-slate-400">{proc.category}</span>
-                <span className="text-xs font-black text-teal-600 dark:text-teal-400 font-mono">
-                  ${proc.cost}
-                </span>
-              </div>
-            </button>
-          ))}
+        {/* Buscador & Categorías Dinámicas */}
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar procedimiento o especialidad..."
+              value={procSearch}
+              onChange={(e) => setProcSearch(e.target.value)}
+              className="w-full bg-background border border-border rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-foreground placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-teal-500/30"
+            />
+          </div>
+
+          {/* Categorías */}
+          {categories.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory('all')}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                  selectedCategory === 'all'
+                    ? 'bg-teal-600 text-white shadow-2xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                }`}
+              >
+                Todos ({dynamicProcedures.length})
+              </button>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold shrink-0 transition-colors ${
+                    selectedCategory === cat
+                      ? 'bg-teal-600 text-white shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Grilla de Tratamientos Dinámicos */}
+        {filteredProcedures.length === 0 ? (
+          <div className="text-center py-6 text-slate-400 text-xs border border-dashed border-border rounded-xl">
+            No se encontraron procedimientos en el catálogo. Usa el botón &quot;+ Concepto Libre&quot; para registrar uno nuevo.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {filteredProcedures.slice(0, 12).map((proc) => (
+              <button
+                key={proc.id}
+                type="button"
+                onClick={() => handleAddProcedure(proc)}
+                className="flex flex-col justify-between p-2.5 rounded-xl border border-border bg-slate-50/80 dark:bg-slate-800/50 hover:border-teal-500/40 hover:bg-teal-500/10 text-left transition-all btn-haptic"
+              >
+                <span className="text-xs font-bold text-foreground leading-tight line-clamp-2">
+                  {proc.name}
+                </span>
+                <div className="flex items-center justify-between mt-2 pt-1 border-t border-border/40">
+                  <span className="text-[10px] text-slate-400 truncate max-w-[80px]">{proc.category}</span>
+                  <span className="text-xs font-black text-teal-600 dark:text-teal-400 font-mono">
+                    ${proc.cost.toFixed(2)}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Lista de Procedimientos en la Orden de Hoy */}
         {sessionItems.length > 0 && (
@@ -324,7 +443,7 @@ export function DentalSillonExpress({
                     <span className="font-bold text-foreground">{item.procedureName}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-black text-foreground font-mono">${item.cost}</span>
+                    <span className="font-black text-foreground font-mono">${item.cost.toFixed(2)}</span>
                     <button
                       type="button"
                       onClick={() => handleRemoveItem(item.id)}
@@ -341,13 +460,13 @@ export function DentalSillonExpress({
         )}
       </div>
 
-      {/* 4. EVOLUCIÓN CLÍNICA RÁPIDA (CHIPS 1-TOQUE) */}
+      {/* 4. EVOLUCIÓN CLÍNICA RÁPIDA (CHIPS 1-TOQUE + TEXTO LIBRE) */}
       <div className="bg-card border border-border rounded-2xl p-4 shadow-xs space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileText size={15} className="text-blue-500" />
             <h4 className="text-xs font-black uppercase tracking-wider text-slate-500">
-              Evolución Clínica Rápida
+              Evolución Clínica de la Consulta
             </h4>
           </div>
           <span className="text-[11px] text-slate-400">Toca un chip para autocompletar</span>
@@ -360,41 +479,40 @@ export function DentalSillonExpress({
               key={idx}
               type="button"
               onClick={() => {
-                setClinicalNotes((prev) => (prev ? `${prev}\n\n${chip}` : chip));
+                setClinicalNotes((prev) => (prev ? `${prev} ${chip}` : chip));
               }}
-              className="text-[11px] px-2.5 py-1.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-left transition-all text-slate-600 dark:text-slate-300 font-medium btn-haptic"
+              className="text-[11px] py-1 px-2.5 rounded-lg border border-border bg-slate-100 dark:bg-slate-800 hover:border-blue-500/40 text-slate-700 dark:text-slate-300 font-medium transition-all text-left btn-haptic"
             >
-              + {chip.slice(0, 48)}...
+              + {chip.slice(0, 36)}...
             </button>
           ))}
         </div>
 
-        {/* Campo de Texto para Ajuste */}
+        {/* Input de texto libre */}
         <textarea
           value={clinicalNotes}
           onChange={(e) => setClinicalNotes(e.target.value)}
-          placeholder="Evolución clínica de la consulta de hoy..."
+          placeholder="Escribe detalles de la evolución médica, materiales o indicaciones..."
           rows={3}
-          className="w-full bg-background border border-input rounded-xl p-3 text-xs text-foreground focus:ring-2 focus:ring-teal-500/30"
+          className="w-full p-3 rounded-xl border border-border bg-background text-xs font-medium text-foreground focus:outline-hidden focus:ring-2 focus:ring-teal-500/20 resize-none"
         />
       </div>
 
-      {/* 5. MODAL BOTTOM SHEET: DIAGNÓSTICO DEL DIENTE SELECCIONADO */}
+      {/* 5. MODAL DE AJUSTE DENTAL DE 1-TOQUE (BOTTOM SHEET) */}
       <MobileBottomSheet
         isOpen={!!selectedToothNum}
         onClose={() => setSelectedToothNum(null)}
-        title={selectedToothNum ? `Pieza Dental FDI: ${selectedToothNum}` : ''}
-        subtitle={selectedToothNum ? `${TOOTH_SHORT_NAMES[selectedToothNum] || 'Diente'} · Cuadrante ${activeQuadrant}` : ''}
+        title={selectedToothNum ? `Pieza Dental FDI #${selectedToothNum} (${TOOTH_SHORT_NAMES[selectedToothNum] || ''})` : ''}
       >
         {selectedToothNum && (
           <div className="space-y-4">
-            <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Seleccionar Estado de la Pieza:
-            </div>
+            <span className="text-xs text-slate-400 block">
+              Selecciona el estado clínico diagnosticado para esta pieza:
+            </span>
 
             <div className="grid grid-cols-2 gap-2">
               <QuickActionChip
-                label="Pieza Sana"
+                label="Sano"
                 sublabel="Sin patología"
                 variant="emerald"
                 size="md"
@@ -445,33 +563,104 @@ export function DentalSillonExpress({
 
             <div className="pt-3 border-t border-border space-y-2">
               <span className="text-xs font-bold text-slate-500 block">
-                Tratar directamente esta pieza:
+                Tratar directamente esta pieza (Precios configurados de la clínica):
               </span>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    handleAddProcedure({ name: `Resina en Pieza ${selectedToothNum}`, cost: 45, category: 'Operatoria' }, selectedToothNum);
+                    handleAddProcedure({ name: `${resinaMatch.name} en Pieza ${selectedToothNum}`, cost: resinaMatch.cost, category: 'Operatoria' }, selectedToothNum);
                     setSelectedToothNum(null);
                   }}
                   className="flex-1 py-2.5 px-3 bg-teal-500 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-teal-600 transition-all text-center"
                 >
-                  + Resina ($45)
+                  + {resinaMatch.name} (${resinaMatch.cost.toFixed(0)})
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    handleAddProcedure({ name: `Exodoncia Pieza ${selectedToothNum}`, cost: 50, category: 'Cirugía' }, selectedToothNum);
+                    handleAddProcedure({ name: `${exodonciaMatch.name} en Pieza ${selectedToothNum}`, cost: exodonciaMatch.cost, category: 'Cirugía' }, selectedToothNum);
                     setSelectedToothNum(null);
                   }}
                   className="flex-1 py-2.5 px-3 bg-rose-500 text-white rounded-xl text-xs font-bold shadow-xs hover:bg-rose-600 transition-all text-center"
                 >
-                  + Extracción ($50)
+                  + {exodonciaMatch.name} (${exodonciaMatch.cost.toFixed(0)})
                 </button>
               </div>
             </div>
           </div>
         )}
+      </MobileBottomSheet>
+
+      {/* MODAL PARA AGREGAR TRATAMIENTO CON PRECIO PERSONALIZADO */}
+      <MobileBottomSheet
+        isOpen={isCustomModalOpen}
+        onClose={() => setIsCustomModalOpen(false)}
+        title="Agregar Tratamiento con Precio Personalizado"
+      >
+        <form onSubmit={handleAddCustomProcedure} className="space-y-3">
+          <div>
+            <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
+              Nombre del Tratamiento o Procedimiento
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="Ej. Retenedor Nocturno, Blanqueamiento Especial, Injerto Óseo..."
+              value={customProcName}
+              onChange={(e) => setCustomProcName(e.target.value)}
+              className="w-full p-2.5 rounded-xl border border-border bg-background text-xs font-medium text-foreground focus:ring-2 focus:ring-teal-500/20"
+              autoFocus
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                Precio Sugerido ($ USD)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                placeholder="0.00"
+                value={customProcPrice}
+                onChange={(e) => setCustomProcPrice(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-border bg-background text-xs font-black font-mono text-foreground focus:ring-2 focus:ring-teal-500/20"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                Pieza Dental (Opcional)
+              </label>
+              <input
+                type="text"
+                placeholder="Ej. 16, 21 o General"
+                value={customProcTooth}
+                onChange={(e) => setCustomProcTooth(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-border bg-background text-xs font-medium text-foreground focus:ring-2 focus:ring-teal-500/20"
+              />
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCustomModalOpen(false)}
+              className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-slate-600 dark:text-slate-300"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black shadow-md btn-haptic"
+            >
+              + Agregar a la Orden
+            </button>
+          </div>
+        </form>
       </MobileBottomSheet>
 
       {/* 6. BARRA INFERIOR FIJA: ACCIÓN INMEDIATA A CAJA POS */}
