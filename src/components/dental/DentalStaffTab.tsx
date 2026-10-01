@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Plus, 
@@ -18,7 +18,8 @@ import {
   FileText
 } from 'lucide-react';
 import { ModuleStaffMember, saveModuleStaffAction, toggleModuleStaffStatusAction } from '@/app/actions/moduleStaff';
-import { ActionActor } from '@/app/actions/entities';
+import { ActionActor, getEntitiesAction } from '@/app/actions/entities';
+import { Entity } from '@/lib/api/entities';
 import { useToast } from '@/components/core/ToastProvider';
 
 interface DentalStaffTabProps {
@@ -37,6 +38,10 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [editingCommission, setEditingCommission] = useState<number>(45);
 
+  // Colaboradores existentes del tenant
+  const [availableEmployees, setAvailableEmployees] = useState<Entity[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+
   // Formulario nuevo especialista
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -46,7 +51,18 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
   const [commissionPercent, setCommissionPercent] = useState<number>(45);
   const [selectedAvatar, setSelectedAvatar] = useState('🦷');
 
+  useEffect(() => {
+    if (tenantId && actor) {
+      getEntitiesAction(tenantId, 'employee', 100, actor).then((res) => {
+        if (res.success && res.entities) {
+          setAvailableEmployees(res.entities as Entity[]);
+        }
+      });
+    }
+  }, [tenantId, actor]);
+
   const handleOpenNewModal = () => {
+    setSelectedEmployeeId('');
     setName('');
     setPhone('');
     setRole('Ortodoncista');
@@ -69,6 +85,7 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
       const res = await saveModuleStaffAction(
         tenantId,
         {
+          id: selectedEmployeeId || undefined,
           name: name.trim(),
           phone: phone.trim() || null,
           role,
@@ -219,9 +236,29 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
         </div>
       </div>
 
-      {/* Grid de Doctores */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {staff.map((member) => {
+      {/* Grid de Doctores o Estado Vacío */}
+      {staff.length === 0 ? (
+        <div className="text-center py-14 bg-card border border-dashed border-border rounded-3xl space-y-4 p-6">
+          <div className="w-16 h-16 rounded-3xl bg-teal-500/10 text-teal-600 flex items-center justify-center text-3xl mx-auto border border-teal-500/20">
+            🦷
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-foreground">No hay odontólogos asignados al cuerpo médico</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+              Los odontólogos provienen de tu equipo de colaboradores. Puedes habilitarlos desde el <strong>Directorio de Personal</strong> o vincular uno directamente a continuación.
+            </p>
+          </div>
+          <button
+            onClick={handleOpenNewModal}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs shadow-md shadow-teal-600/20 transition-all btn-haptic"
+          >
+            <Plus size={16} />
+            + Asignar o Agregar Odontólogo
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {staff.map((member) => {
           const isEditing = editingStaffId === member.id;
 
           return (
@@ -349,7 +386,8 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Modal para Agregar Odontólogo */}
       {isModalOpen && (
@@ -373,6 +411,45 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
             </div>
 
             <form onSubmit={handleSaveDoctor} className="space-y-4">
+              {availableEmployees.length > 0 && (
+                <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-2xl space-y-1.5">
+                  <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+                    Vincular a Empleado de tu Nómina
+                  </label>
+                  <select
+                    value={selectedEmployeeId}
+                    onChange={(e) => {
+                      const empId = e.target.value;
+                      setSelectedEmployeeId(empId);
+                      if (empId) {
+                        const emp = availableEmployees.find(x => x.id === empId);
+                        if (emp) {
+                          setName(emp.name.startsWith('Dr') ? emp.name : `Dr(a). ${emp.name}`);
+                          setPhone(emp.phone || '');
+                          const meta = (emp.metadata || {}) as any;
+                          if (meta.dentist_config?.role || meta.role_title) setRole(meta.dentist_config?.role || meta.role_title);
+                          if (meta.dentist_config?.specialty) setSpecialty(meta.dentist_config?.specialty);
+                          if (meta.dentist_config?.license_number) setLicenseNumber(meta.dentist_config?.license_number);
+                          if (meta.dentist_config?.commission_percent) setCommissionPercent(meta.dentist_config?.commission_percent);
+                          if (meta.dentist_config?.avatar) setSelectedAvatar(meta.dentist_config?.avatar);
+                        }
+                      }
+                    }}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-teal-500/30"
+                  >
+                    <option value="">+ Registrar un nuevo odontólogo desde cero</option>
+                    {availableEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        👤 {emp.name} {emp.metadata?.role_title ? `(${emp.metadata.role_title})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500">
+                    Selecciona un miembro de tu equipo para asignarlo al cuerpo médico conservando su ficha unificada.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
                   Nombre Completo con Título *

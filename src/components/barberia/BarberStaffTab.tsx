@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Plus, 
@@ -18,7 +18,8 @@ import {
   Award
 } from 'lucide-react';
 import { ModuleStaffMember, saveModuleStaffAction, toggleModuleStaffStatusAction } from '@/app/actions/moduleStaff';
-import { ActionActor } from '@/app/actions/entities';
+import { ActionActor, getEntitiesAction } from '@/app/actions/entities';
+import { Entity } from '@/lib/api/entities';
 import { useToast } from '@/components/core/ToastProvider';
 
 interface BarberStaffTabProps {
@@ -37,6 +38,10 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [editingCommission, setEditingCommission] = useState<number>(50);
 
+  // Colaboradores existentes del tenant
+  const [availableEmployees, setAvailableEmployees] = useState<Entity[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
+
   // Formulario nuevo barbero
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -45,7 +50,18 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
   const [commissionPercent, setCommissionPercent] = useState<number>(50);
   const [selectedAvatar, setSelectedAvatar] = useState('✂️');
 
+  useEffect(() => {
+    if (tenantId && actor) {
+      getEntitiesAction(tenantId, 'employee', 100, actor).then((res) => {
+        if (res.success && res.entities) {
+          setAvailableEmployees(res.entities as Entity[]);
+        }
+      });
+    }
+  }, [tenantId, actor]);
+
   const handleOpenNewModal = () => {
+    setSelectedEmployeeId('');
     setName('');
     setPhone('');
     setRole('Master Barber');
@@ -67,6 +83,7 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
       const res = await saveModuleStaffAction(
         tenantId,
         {
+          id: selectedEmployeeId || undefined,
           name: name.trim(),
           phone: phone.trim() || null,
           role,
@@ -210,9 +227,29 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
         </div>
       </div>
 
-      {/* Grid de Barberos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {staff.map((member) => {
+      {/* Grid de Barberos o Estado Vacío */}
+      {staff.length === 0 ? (
+        <div className="text-center py-14 bg-card border border-dashed border-border rounded-3xl space-y-4 p-6">
+          <div className="w-16 h-16 rounded-3xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-3xl mx-auto border border-amber-500/20">
+            💈
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-foreground">No hay barberos asignados todavía</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 leading-relaxed">
+              Los barberos provienen de tu equipo de colaboradores. Puedes habilitarlos desde el <strong>Directorio de Personal</strong> o vincular uno directamente a continuación.
+            </p>
+          </div>
+          <button
+            onClick={handleOpenNewModal}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-bold text-xs shadow-md shadow-amber-600/20 transition-all btn-haptic"
+          >
+            <Plus size={16} />
+            + Asignar o Agregar Barbero
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {staff.map((member) => {
           const isEditing = editingStaffId === member.id;
 
           return (
@@ -333,7 +370,8 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Modal para Agregar Barbero */}
       {isModalOpen && (
@@ -357,6 +395,44 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
             </div>
 
             <form onSubmit={handleSaveBarber} className="space-y-4">
+              {availableEmployees.length > 0 && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1.5">
+                  <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
+                    Vincular a Empleado de tu Nómina
+                  </label>
+                  <select
+                    value={selectedEmployeeId}
+                    onChange={(e) => {
+                      const empId = e.target.value;
+                      setSelectedEmployeeId(empId);
+                      if (empId) {
+                        const emp = availableEmployees.find(x => x.id === empId);
+                        if (emp) {
+                          setName(emp.name);
+                          setPhone(emp.phone || '');
+                          const meta = (emp.metadata || {}) as any;
+                          if (meta.barber_config?.role || meta.role_title) setRole(meta.barber_config?.role || meta.role_title);
+                          if (meta.barber_config?.specialty) setSpecialty(meta.barber_config?.specialty);
+                          if (meta.barber_config?.commission_percent) setCommissionPercent(meta.barber_config?.commission_percent);
+                          if (meta.barber_config?.avatar) setSelectedAvatar(meta.barber_config?.avatar);
+                        }
+                      }
+                    }}
+                    className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-border bg-background text-foreground focus:ring-2 focus:ring-amber-500/30"
+                  >
+                    <option value="">+ Registrar un nuevo barbero desde cero</option>
+                    {availableEmployees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        👤 {emp.name} {emp.metadata?.role_title ? `(${emp.metadata.role_title})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500">
+                    Selecciona un miembro de tu equipo para asignarlo a esta barbería conservando su ficha unificada.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
                   Nombre Completo / Apodo de Trabajo *
