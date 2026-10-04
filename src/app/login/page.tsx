@@ -1,14 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Mail, Lock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
+import { getUserTenant } from '@/app/actions/tenant';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
+import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 import { useERPStore } from '@/store/useERPStore';
 
-export default function LoginPage() {
+const PRIMARY_DEFAULT_TENANT_ID = '31ec279c-4216-48e1-905c-fbf4ea398e04';
 
+export default function LoginPage() {
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +58,49 @@ export default function LoginPage() {
 
       if (signInError) throw signInError;
 
-      setStatusMessage('Acceso concedido. Redirigiendo al sistema...');
-      
-      // Limpiar cualquier estado residual previo
-      useERPStore.getState().setCurrentTenant(null);
+      setStatusMessage('Acceso concedido. Entrando al sistema...');
 
-      // Redirigir de inmediato al dashboard. AuthProvider completará la sincronización en segundo plano.
-      window.location.href = '/dashboard';
+      const cleanEmail = email.trim().toLowerCase();
+      const isSuper = isSuperAdminEmail(cleanEmail);
+
+      let tenantId = PRIMARY_DEFAULT_TENANT_ID;
+      let tenantName = 'rendo CORP';
+      let tenantModules = DEFAULT_ENABLED_MODULES;
+      let tenantMetadata: any = {};
+      let userRole: any = isSuper ? 'superadmin' : 'owner';
+
+      try {
+        const result = await getUserTenant(cleanEmail, signInData.user?.id);
+        if (result?.success && result.tenant) {
+          tenantId = result.tenant.id;
+          tenantName = result.tenant.name;
+          tenantModules = result.tenant.active_modules || DEFAULT_ENABLED_MODULES;
+          tenantMetadata = result.tenant.metadata || {};
+          if (result.role) userRole = result.role;
+        }
+      } catch (tErr) {
+        console.warn('[LoginPage] Usando tenant activo principal por defecto:', tErr);
+      }
+
+      // 1. Guardar de inmediato en el store de Zustand (persiste en localStorage sincronizadamente)
+      useERPStore.getState().setCurrentTenant({
+        id: tenantId,
+        name: tenantName,
+        blocked: false,
+        active_modules: tenantModules,
+        metadata: tenantMetadata,
+      });
+
+      useERPStore.getState().setSession({
+        userEmail: cleanEmail,
+        role: userRole,
+        tenantId: tenantId,
+        token: signInData.session?.access_token,
+      });
+
+      // 2. Redirigir de inmediato al panel
+      const targetUrl = userRole === 'superadmin' ? '/admin' : '/dashboard';
+      router.replace(targetUrl);
     } catch (err: unknown) {
       setIsLoading(false);
       setStatusMessage(null);
@@ -119,52 +161,42 @@ export default function LoginPage() {
 
             <Input
               name="email"
-              label="Correo Electrónico"
               type="email"
-              placeholder="tu@empresa.com"
+              label="Correo Electrónico"
+              placeholder="tu@negocio.com"
               icon={<Mail size={18} />}
               required
               autoFocus
+              disabled={isLoading || countdown !== null}
             />
 
-            <div className="space-y-1">
-              <Input
-                name="password"
-                label="Contraseña"
-                type="password"
-                placeholder="••••••••"
-                icon={<Lock size={18} />}
-                required
-              />
-            </div>
+            <Input
+              name="password"
+              type="password"
+              label="Contraseña"
+              placeholder="••••••••"
+              icon={<Lock size={18} />}
+              required
+              disabled={isLoading || countdown !== null}
+            />
 
             <Button
               type="submit"
-              className="w-full mt-2"
+              className="w-full mt-2 font-bold py-2.5 rounded-xl shadow-md transition-all active:scale-[0.98]"
               size="lg"
               isLoading={isLoading}
-              disabled={countdown !== null && countdown > 0}
+              disabled={isLoading || countdown !== null}
             >
-              {countdown !== null && countdown > 0
-                ? `Espera ${countdown}s...`
-                : isLoading
-                ? (statusMessage || 'Ingresando...')
-                : 'Ingresar al Sistema'}
+              Ingresar al Sistema
             </Button>
           </form>
-
-          {/* Nota de Acceso Privado - Sin botón de Registro */}
-          <div className="mt-8 pt-6 border-t border-border text-center">
-            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-medium">
-              🔒 <strong>Acceso Restringido:</strong> Las cuentas son creadas y gestionadas exclusivamente por la administración de la empresa.
-            </p>
-          </div>
         </div>
-      </div>
 
-      {/* Marca de agua / Versión */}
-      <div className="fixed bottom-6 text-center w-full pointer-events-none">
-        <p className="text-xs font-medium text-slate-400">Rendo · Secure Enterprise Authentication</p>
+        {/* Footer Informativo */}
+        <div className="py-4 bg-muted/40 border-t border-border/50 text-center text-xs text-muted-foreground">
+          Gestión de accesos centralizada vía Supabase
+        </div>
+
       </div>
     </div>
   );
