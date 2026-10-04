@@ -19,6 +19,8 @@ export default function LoginPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     if (countdown === null) return;
@@ -39,11 +41,11 @@ export default function LoginPage() {
     setError(null);
     setStatusMessage(null);
 
-    const formData = new FormData(e.currentTarget);
-    const email = (formData.get('email') as string || '').trim().toLowerCase();
-    const password = formData.get('password') as string;
+    const cleanEmail = email.trim().toLowerCase();
+    const rawPassword = password;
+    const trimmedPassword = password.trim();
 
-    if (!email || !password) {
+    if (!cleanEmail || !rawPassword) {
       setError('Por favor, ingresa tu correo y contraseña.');
       setIsLoading(false);
       return;
@@ -51,16 +53,27 @@ export default function LoginPage() {
 
     try {
       setStatusMessage('Verificando credenciales...');
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: rawPassword,
       });
+
+      // Si falla y la contraseña tenía espacios adicionales al copiar/pegar, reintentar con trimmedPassword
+      if (signInError && rawPassword !== trimmedPassword) {
+        const retry = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: trimmedPassword,
+        });
+        if (!retry.error) {
+          signInData = retry.data;
+          signInError = null;
+        }
+      }
 
       if (signInError) throw signInError;
 
       setStatusMessage('Acceso concedido. Entrando al sistema...');
 
-      const cleanEmail = email.trim().toLowerCase();
       const isSuper = isSuperAdminEmail(cleanEmail);
 
       let tenantId: string | null = null;
@@ -146,7 +159,7 @@ export default function LoginPage() {
       }
 
       if (rawMessage.includes('Invalid login credentials')) {
-        setError('El correo o la contraseña son incorrectos. Por favor, verifica tus datos de acceso.');
+        setError('El correo o la contraseña no coinciden con los registrados en Supabase. Verifica que el correo esté dado de alta y la contraseña sea exacta.');
       } else if (rawMessage.toLowerCase().includes('email not confirmed')) {
         setError('Debes confirmar tu correo electrónico antes de ingresar. Revisa tu bandeja de entrada en Supabase.');
       } else {
@@ -174,7 +187,7 @@ export default function LoginPage() {
 
         {/* Formulario */}
         <div className="px-8 pb-10">
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             {error && (
               <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm p-3.5 rounded-xl font-medium leading-relaxed animate-in slide-in-from-top-2">
                 {countdown !== null && countdown > 0
@@ -192,10 +205,16 @@ export default function LoginPage() {
 
             <Input
               name="email"
-              type="email"
+              type="text"
+              inputMode="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               label="Correo Electrónico"
               placeholder="tu@negocio.com"
               icon={<Mail size={18} />}
+              value={email}
+              onChange={(e) => setEmail(e.target.value.replace(/\s+/g, '').toLowerCase())}
               required
               autoFocus
               disabled={isLoading || countdown !== null}
@@ -207,6 +226,8 @@ export default function LoginPage() {
               label="Contraseña"
               placeholder="••••••••"
               icon={<Lock size={18} />}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
               disabled={isLoading || countdown !== null}
             />
