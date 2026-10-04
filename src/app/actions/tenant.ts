@@ -448,6 +448,37 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       if (isSuperAdmin) {
         return { success: true, tenant: null, role: 'superadmin' };
       }
+
+      // Auto-asociación inteligente: si es un usuario creado manualmente en Supabase Auth
+      // pero aún no tiene fila en user_tenants, asignarlo a la empresa activa principal
+      try {
+        const { data: activeTenants } = await db
+          .from('tenants')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (activeTenants && activeTenants.length > 0) {
+          const mainTenant = activeTenants[0];
+          await db.from('user_tenants').insert([
+            {
+              tenant_id: mainTenant.id,
+              user_email: cleanEmail,
+              user_id: userId || null,
+              role: 'owner',
+            }
+          ]);
+          return {
+            success: true,
+            tenant: mainTenant,
+            role: 'owner' as UserRole,
+          };
+        }
+      } catch (autoErr) {
+        console.warn('[getUserTenant] Auto-link a empresa activa error:', autoErr);
+      }
+
       return { success: false, tenant: null, role: null };
     }
 
@@ -629,45 +660,6 @@ export async function createTenantUserAction(
     return { success: true, email: cleanEmail };
   } catch (err: any) {
     return { success: false, error: (err as Error).message };
-  }
-}
-
-/**
- * Registra un usuario nuevo en Supabase Auth con confirmación de correo automática
- * para permitir acceso inmediato y flujo fluido de Onboarding de nueva empresa.
- */
-export async function registerUserAction(email: string, password: string): Promise<{ success: boolean; error?: string }> {
-  try {
-    const cleanEmail = (email || '').trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return { success: false, error: 'Introduce una dirección de correo electrónico válida.' };
-    }
-    if (!password || password.length < 6) {
-      return { success: false, error: 'La contraseña debe contener al menos 6 caracteres.' };
-    }
-
-    // 1. Verificar si el usuario ya existe en Supabase Auth
-    const { data: usersList } = await supabaseAdmin.auth.admin.listUsers();
-    const existing = usersList?.users.find(u => u.email?.toLowerCase() === cleanEmail);
-    if (existing) {
-      return { success: false, error: 'Este correo electrónico ya está registrado. Por favor, inicia sesión con tu contraseña.' };
-    }
-
-    // 2. Crear el usuario en Supabase Auth con confirmación automática
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: cleanEmail,
-      password,
-      email_confirm: true,
-      user_metadata: { role: 'owner' }
-    });
-
-    if (createError) {
-      return { success: false, error: 'Error al crear la cuenta: ' + createError.message };
-    }
-
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message || 'Error inesperado al registrar la cuenta.' };
   }
 }
 
