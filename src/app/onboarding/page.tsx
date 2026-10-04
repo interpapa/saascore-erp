@@ -57,58 +57,89 @@ export default function OnboardingPage() {
     setIsLoading(true);
     setError(null);
 
-    let activeUserId = userId;
-    let activeEmail = userEmail;
+    try {
+      let activeUserId = userId;
+      let activeEmail = userEmail;
 
-    // Respaldo de seguridad: si userId aún no estaba listo en el state, buscarlo en vivo
-    if (!activeUserId) {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (sessionData?.session?.user) {
-        activeUserId = sessionData.session.user.id;
-        activeEmail = sessionData.session.user.email || activeEmail;
-      } else {
-        const { data: userData } = await supabase.auth.getUser();
-        if (userData?.user) {
-          activeUserId = userData.user.id;
-          activeEmail = userData.user.email || activeEmail;
+      // Respaldo de seguridad: si userId aún no estaba listo en el state, buscarlo en vivo
+      if (!activeUserId) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.user) {
+          activeUserId = sessionData.session.user.id;
+          activeEmail = sessionData.session.user.email || activeEmail;
+        } else {
+          const { data: userData } = await supabase.auth.getUser();
+          if (userData?.user) {
+            activeUserId = userData.user.id;
+            activeEmail = userData.user.email || activeEmail;
+          }
         }
       }
-    }
 
-    if (!activeUserId) {
-      setError('No se pudo identificar tu sesión. Por favor, vuelve a iniciar sesión.');
-      setIsLoading(false);
-      return;
-    }
-    
-    const formData = new FormData(e.currentTarget);
-    const businessName = (formData.get('businessName') as string || '').trim();
-    if (!businessName) {
-      setError('El nombre de la empresa es obligatorio.');
-      setIsLoading(false);
-      return;
-    }
-
-    const result = await createTenant(activeUserId, activeEmail || 'admin@Rendo.com', businessName);
-
-    if (result.success && result.tenant) {
-      setCurrentTenant({
-        id: result.tenant.id,
-        name: result.tenant.name,
-        blocked: !result.tenant.is_active,
-        active_modules: result.tenant.active_modules || (result.tenant.metadata as any)?.active_modules || [],
-        metadata: result.tenant.metadata
-      });
+      if (!activeUserId) {
+        setError('No se pudo identificar tu sesión. Por favor, vuelve a iniciar sesión.');
+        setIsLoading(false);
+        return;
+      }
       
-      setSession({
-        userEmail: activeEmail || 'user@Rendo.com',
-        role: 'owner',
-        tenantId: result.tenant.id
-      });
-      
-      window.location.href = '/dashboard';
-    } else {
-      setError(result.error || 'Error al crear la empresa');
+      const formData = new FormData(e.currentTarget);
+      const businessName = (formData.get('businessName') as string || '').trim();
+      if (!businessName) {
+        setError('El nombre de la empresa es obligatorio.');
+        setIsLoading(false);
+        return;
+      }
+
+      let result: any = null;
+
+      try {
+        result = await createTenant(activeUserId, activeEmail || 'admin@Rendo.com', businessName);
+      } catch (actionErr) {
+        console.warn('[Onboarding] createTenant Server Action falló, ejecutando fallback API REST:', actionErr);
+      }
+
+      // Si falló la acción de servidor o no devolvió éxito, intentar vía API REST directa
+      if (!result?.success || !result?.tenant) {
+        try {
+          const apiRes = await fetch('/api/tenant/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: activeUserId,
+              userEmail: activeEmail,
+              businessName,
+            }),
+          });
+          result = await apiRes.json();
+        } catch (apiErr: any) {
+          console.error('[Onboarding] API REST fallback error:', apiErr);
+          throw new Error(result?.error || apiErr?.message || 'Error al conectar con el servidor.');
+        }
+      }
+
+      if (result?.success && result.tenant) {
+        setCurrentTenant({
+          id: result.tenant.id,
+          name: result.tenant.name,
+          blocked: !result.tenant.is_active,
+          active_modules: result.tenant.active_modules || (result.tenant.metadata as any)?.active_modules || [],
+          metadata: result.tenant.metadata
+        });
+        
+        setSession({
+          userEmail: activeEmail || 'user@Rendo.com',
+          role: 'owner',
+          tenantId: result.tenant.id
+        });
+        
+        router.replace('/dashboard');
+      } else {
+        setError(result?.error || 'Error al crear la empresa');
+        setIsLoading(false);
+      }
+    } catch (err: any) {
+      console.error('[Onboarding Exception]:', err);
+      setError(err?.message || 'Ocurrió un error inesperado al registrar la empresa. Por favor intenta de nuevo.');
       setIsLoading(false);
     }
   };

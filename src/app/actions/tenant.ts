@@ -247,8 +247,6 @@ export async function createTenant(userId: string, userEmail: string, businessNa
       metadata: { name: cleanName }
     });
 
-    revalidatePath('/dashboard');
-    revalidatePath('/onboarding');
     return { success: true, tenant };
   } catch (error: any) {
     console.error('[createTenant Error]:', error);
