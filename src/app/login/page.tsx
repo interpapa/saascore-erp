@@ -63,8 +63,8 @@ export default function LoginPage() {
       const cleanEmail = email.trim().toLowerCase();
       const isSuper = isSuperAdminEmail(cleanEmail);
 
-      let tenantId = PRIMARY_DEFAULT_TENANT_ID;
-      let tenantName = 'rendo CORP';
+      let tenantId: string | null = null;
+      let tenantName: string | null = null;
       let tenantModules = DEFAULT_ENABLED_MODULES;
       let tenantMetadata: any = {};
       let userRole: any = isSuper ? 'superadmin' : 'owner';
@@ -79,28 +79,59 @@ export default function LoginPage() {
           if (result.role) userRole = result.role;
         }
       } catch (tErr) {
-        console.warn('[LoginPage] Usando tenant activo principal por defecto:', tErr);
+        console.warn('[LoginPage] Error consultando empresa del usuario:', tErr);
       }
 
-      // 1. Guardar de inmediato en el store de Zustand (persiste en localStorage sincronizadamente)
-      useERPStore.getState().setCurrentTenant({
-        id: tenantId,
-        name: tenantName,
-        blocked: false,
-        active_modules: tenantModules,
-        metadata: tenantMetadata,
-      });
+      if (isSuper || userRole === 'superadmin') {
+        useERPStore.getState().setSession({
+          userEmail: cleanEmail,
+          role: 'superadmin',
+          tenantId: tenantId || 'global-admin',
+          token: signInData.session?.access_token,
+        });
+        if (tenantId && tenantName) {
+          useERPStore.getState().setCurrentTenant({
+            id: tenantId,
+            name: tenantName,
+            blocked: false,
+            active_modules: tenantModules,
+            metadata: tenantMetadata,
+          });
+        }
+        router.replace('/admin');
+        return;
+      }
 
-      useERPStore.getState().setSession({
-        userEmail: cleanEmail,
-        role: userRole,
-        tenantId: tenantId,
-        token: signInData.session?.access_token,
-      });
+      if (tenantId && tenantName) {
+        // Usuario con empresa existente vinculada -> Directo al panel principal
+        useERPStore.getState().setCurrentTenant({
+          id: tenantId,
+          name: tenantName,
+          blocked: false,
+          active_modules: tenantModules,
+          metadata: tenantMetadata,
+        });
 
-      // 2. Redirigir de inmediato al panel
-      const targetUrl = userRole === 'superadmin' ? '/admin' : '/dashboard';
-      router.replace(targetUrl);
+        useERPStore.getState().setSession({
+          userEmail: cleanEmail,
+          role: userRole,
+          tenantId: tenantId,
+          token: signInData.session?.access_token,
+        });
+
+        router.replace('/dashboard');
+      } else {
+        // Usuario nuevo creado en Supabase sin empresa asociada -> Configurar su empresa (Onboarding)
+        useERPStore.getState().setCurrentTenant(null);
+        useERPStore.getState().setSession({
+          userEmail: cleanEmail,
+          role: 'owner',
+          tenantId: null as any,
+          token: signInData.session?.access_token,
+        });
+
+        router.replace('/onboarding');
+      }
     } catch (err: unknown) {
       setIsLoading(false);
       setStatusMessage(null);

@@ -74,36 +74,8 @@ export async function writeAuditLog(entry: AuditEntry): Promise<void> {
       }]);
 
     if (error) {
-      console.warn('⚠️  AUDIT LOG TABLE MISSING (using tenant metadata fallback):', error.message);
-      try {
-        const { data: tenant } = await supabaseAdmin
-          .from('tenants')
-          .select('metadata')
-          .eq('id', entry.tenant_id)
-          .maybeSingle();
-
-        if (tenant) {
-          const currentLogs = Array.isArray(tenant.metadata?.audit_logs) ? tenant.metadata.audit_logs : [];
-          const newEntry = {
-            id: `audit-${Date.now()}-${Math.random().toString(36).slice(-4)}`,
-            ...entry,
-            created_at: new Date().toISOString(),
-            ip_address: 'server-action',
-          };
-          const updatedLogs = [newEntry, ...currentLogs].slice(0, 100);
-          await supabaseAdmin
-            .from('tenants')
-            .update({
-              metadata: {
-                ...tenant.metadata,
-                audit_logs: updatedLogs,
-              },
-            })
-            .eq('id', entry.tenant_id);
-        }
-      } catch (fallbackErr) {
-        // Silencioso para no quebrar el hilo principal
-      }
+      // Si la tabla audit_logs no existe en la base de datos, registramos limpiamente en la consola del servidor
+      console.log(`[AUDIT EVENT]: ${entry.actor_email} (${entry.actor_role}) -> ${entry.action} on ${entry.target_type} (${entry.target_id || 'N/A'})`);
     }
   } catch (err) {
     console.error('⚠️  AUDIT LOG EXCEPTION (non-critical):', err);

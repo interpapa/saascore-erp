@@ -471,37 +471,8 @@ export async function getUserTenant(userEmail: string, userId?: string) {
         return { success: true, tenant: null, role: 'superadmin' };
       }
 
-      // Auto-asociación inteligente: si es un usuario creado manualmente en Supabase Auth
-      // pero aún no tiene fila en user_tenants, asignarlo a la empresa activa principal
-      try {
-        const { data: activeTenants } = await db
-          .from('tenants')
-          .select('*')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(1);
-
-        if (activeTenants && activeTenants.length > 0) {
-          const mainTenant = activeTenants[0];
-          await db.from('user_tenants').insert([
-            {
-              tenant_id: mainTenant.id,
-              user_email: cleanEmail,
-              user_id: userId || null,
-              role: 'owner',
-            }
-          ]);
-          return {
-            success: true,
-            tenant: sanitizeTenantPayload(mainTenant),
-            role: 'owner' as UserRole,
-          };
-        }
-      } catch (autoErr) {
-        console.warn('[getUserTenant] Auto-link a empresa activa error:', autoErr);
-      }
-
-      return { success: false, tenant: null, role: null };
+      // El usuario está autenticado pero no tiene empresa asociada -> Debe configurar su empresa en Onboarding
+      return { success: true, tenant: null, role: 'owner' as UserRole };
     }
 
     const membership = userTenants[0];

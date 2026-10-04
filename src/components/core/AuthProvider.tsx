@@ -91,36 +91,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Fallback seguro: vincular a la empresa activa principal para NUNCA expulsar al usuario
-      setCurrentTenant({
-        id: PRIMARY_DEFAULT_TENANT_ID,
-        name: 'rendo CORP',
-        blocked: false,
-        active_modules: DEFAULT_ENABLED_MODULES,
-      });
+      // Si no tiene empresa asignada, es un usuario nuevo pendiente de Onboarding
+      setCurrentTenant(null);
       setSession({
         userEmail: cleanEmail,
-        role: isSuper ? 'superadmin' : 'owner',
-        tenantId: PRIMARY_DEFAULT_TENANT_ID,
+        role: 'owner',
+        tenantId: null as any,
         token: accessToken
       });
     } catch (err) {
       console.error('Error sincronizando sesión:', err);
-      const existingSession = useERPStore.getState().session;
-      if (!existingSession?.tenantId) {
-        setCurrentTenant({
-          id: PRIMARY_DEFAULT_TENANT_ID,
-          name: 'rendo CORP',
-          blocked: false,
-          active_modules: DEFAULT_ENABLED_MODULES,
-        });
-        setSession({
-          userEmail: cleanEmail,
-          role: isSuper ? 'superadmin' : 'owner',
-          tenantId: PRIMARY_DEFAULT_TENANT_ID,
-          token: accessToken
-        });
-      }
     }
   }, [setCurrentTenant, setSession]);
 
@@ -202,6 +182,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Usuario normal con tenant no debe estar en /login ni en /onboarding
     else if (session && session.tenantId && (pathname === '/login' || pathname === '/onboarding')) {
       router.push('/dashboard');
+    }
+    // Usuario autenticado SIN empresa asignada intentando acceder a rutas privadas -> Configurar empresa
+    else if (session && !session.tenantId && session.role !== 'superadmin' && pathname !== '/onboarding' && !isPublic) {
+      router.push('/onboarding');
     }
   }, [session, isLoading, hasHydrated, pathname, router]);
 

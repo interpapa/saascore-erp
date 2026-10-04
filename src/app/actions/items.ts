@@ -111,10 +111,6 @@ export async function createItemAction(
       metadata: { action: 'created', name: input.name, price: input.base_price },
     });
 
-    safeRevalidate('/inventario');
-    safeRevalidate('/catalogo');
-    safeRevalidate('/caja');
-
     return { success: true, item: newItem };
   } catch (err: any) {
     const errorMsg = err?.message || 'Error de red al conectar con el servidor (Failed to fetch).';
@@ -198,10 +194,6 @@ export async function updateItemAction(
       metadata: { action: 'updated', updates },
     });
 
-    safeRevalidate('/inventario');
-    safeRevalidate('/catalogo');
-    safeRevalidate('/caja');
-
     return { success: true, item: updatedItem };
   } catch (err: any) {
     console.error('[updateItemAction Error]:', (err as Error).message);
@@ -261,10 +253,6 @@ export async function deleteItemAction(
       target_id: id,
       metadata: { action: 'soft_deleted' },
     });
-
-    safeRevalidate('/inventario');
-    safeRevalidate('/catalogo');
-    safeRevalidate('/caja');
 
     return { success: true };
   } catch (err: any) {

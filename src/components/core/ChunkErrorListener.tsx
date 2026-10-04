@@ -20,7 +20,10 @@ export function ChunkErrorListener() {
       reasonStr.includes('ChunkLoadError') ||
       reasonStr.includes('Failed to fetch dynamically imported module') ||
       reasonStr.includes('Failed to fetch') ||
-      reasonStr.includes('Script error');
+      reasonStr.includes('Script error') ||
+      reasonStr.includes('Server action not found') ||
+      reasonStr.includes('x-nextjs-action-not-found') ||
+      reasonStr.includes('Server Components render');
 
     if (isChunkError) {
       // Try to extract chunk identifier from the error message

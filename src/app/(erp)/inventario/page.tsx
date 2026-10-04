@@ -240,30 +240,49 @@ export default function InventarioPage() {
         });
         return;
       }
-      try {
-        const res = await updateItemAction(
-          editingItem.id,
-          {
-            type: data.type,
-            name: data.name,
-            sku: data.sku,
-            category: data.category,
-            description: data.description,
-            base_price: Number(data.base_price || 0),
-            cost: Number(data.cost || 0),
-            stock_quantity: Number(data.stock_quantity || 0),
-            metadata: data.metadata,
-          },
-          targetTenantId,
-          actor
-        );
+      const itemPayload = {
+        type: data.type,
+        name: data.name,
+        sku: data.sku,
+        category: data.category,
+        description: data.description,
+        base_price: Number(data.base_price || 0),
+        cost: Number(data.cost || 0),
+        stock_quantity: Number(data.stock_quantity || 0),
+        metadata: data.metadata,
+      };
 
-        if (res.success) {
+      try {
+        let res: any;
+        try {
+          res = await updateItemAction(
+            editingItem.id,
+            itemPayload,
+            targetTenantId,
+            actor
+          );
+        } catch (actionErr) {
+          console.warn('[inventario] updateItemAction falló, ejecutando fallback API REST:', actionErr);
+          const apiRes = await fetch('/api/inventory/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'update',
+              id: editingItem.id,
+              input: itemPayload,
+              tenantId: targetTenantId,
+              actor,
+            }),
+          });
+          res = await apiRes.json();
+        }
+
+        if (res?.success) {
           toast({ variant: 'success', title: 'Artículo Actualizado', description: `"${data.name}" se actualizó correctamente en inventario.` });
           setEditingItem(null);
           fetchItems();
         } else {
-          toast({ variant: 'warning', title: 'Error al actualizar', description: res.error || 'No se pudieron guardar los cambios.' });
+          toast({ variant: 'warning', title: 'Error al actualizar', description: res?.error || 'No se pudieron guardar los cambios.' });
         }
       } catch (err: unknown) {
         toast({ variant: 'error', title: 'Error de red', description: (err as Error).message });
@@ -285,27 +304,45 @@ export default function InventarioPage() {
 
       setItems((prev) => [newItem, ...prev]);
 
-      try {
-        const res = await createItemAction(
-          {
-            type: data.type,
-            name: data.name,
-            sku: data.sku,
-            category: data.category,
-            description: data.description,
-            base_price: Number(data.base_price || 0),
-            cost: Number(data.cost || 0),
-            stock_quantity: Number(data.stock_quantity || 0),
-            metadata: data.metadata,
-          },
-          targetTenantId,
-          actor
-        );
+      const itemPayload = {
+        type: data.type,
+        name: data.name,
+        sku: data.sku,
+        category: data.category,
+        description: data.description,
+        base_price: Number(data.base_price || 0),
+        cost: Number(data.cost || 0),
+        stock_quantity: Number(data.stock_quantity || 0),
+        metadata: data.metadata,
+      };
 
-        if (!res.success) {
+      try {
+        let res: any;
+        try {
+          res = await createItemAction(
+            itemPayload,
+            targetTenantId,
+            actor
+          );
+        } catch (actionErr) {
+          console.warn('[inventario] createItemAction falló, ejecutando fallback API REST:', actionErr);
+          const apiRes = await fetch('/api/inventory/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              action: 'create',
+              input: itemPayload,
+              tenantId: targetTenantId,
+              actor,
+            }),
+          });
+          res = await apiRes.json();
+        }
+
+        if (!res?.success) {
           // Rollback reactivo: remover el temporal si falla
           setItems((prev) => prev.filter((i) => i.id !== tempId));
-          toast({ variant: 'warning', title: 'Aviso', description: res.error || 'No se pudo sincronizar con la nube.' });
+          toast({ variant: 'warning', title: 'Aviso', description: res?.error || 'No se pudo sincronizar con la nube.' });
         } else {
           // Sustitución atómica reactiva en memoria
           if (res.item) {
@@ -344,14 +381,31 @@ export default function InventarioPage() {
     }
 
     try {
-      const res = await deleteItemAction(id, activeTenant.id, actor);
-      if (res.success) {
+      let res: any;
+      try {
+        res = await deleteItemAction(id, activeTenant.id, actor);
+      } catch (actionErr) {
+        console.warn('[inventario] deleteItemAction falló, ejecutando fallback API REST:', actionErr);
+        const apiRes = await fetch('/api/inventory/items', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'delete',
+            id,
+            tenantId: activeTenant.id,
+            actor,
+          }),
+        });
+        res = await apiRes.json();
+      }
+
+      if (res?.success) {
         setItems((prev) => prev.filter((i) => i.id !== id));
         toast({ variant: 'success', title: 'Artículo Eliminado', description: 'El artículo ha sido retirado del inventario.' });
         setSelectedItem(null);
         fetchItems();
       } else {
-        toast({ variant: 'warning', title: 'Error al eliminar', description: res.error || 'No se pudo eliminar el artículo.' });
+        toast({ variant: 'warning', title: 'Error al eliminar', description: res?.error || 'No se pudo eliminar el artículo.' });
       }
     } catch (err: unknown) {
       toast({ variant: 'error', title: 'Error', description: (err as Error).message });
