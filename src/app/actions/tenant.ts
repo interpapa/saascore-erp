@@ -8,6 +8,7 @@ import { ActionActor } from './entities';
 import { UserRole } from '@/lib/rbac';
 import { validateUserTenantAccess, isSuperAdminEmail, isSuperAdminAuthUser, SUPERADMIN_EMAILS } from '@/lib/core/tenantSecurity';
 import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
+import { getResolvedSupabaseUrl, getResolvedAnonKey } from '@/lib/supabaseConfig';
 
 async function verifySuperAdminActor(
   callerOrActor: ActionActor | string,
@@ -408,6 +409,27 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
   }
 }
 
+function sanitizeTenantPayload(tenant: any) {
+  if (!tenant) return null;
+  const rawMeta = (tenant.metadata || {}) as Record<string, any>;
+  const cleanMetadata = {
+    plan: rawMeta.plan || 'pro',
+    currency: rawMeta.currency || tenant.currency || 'USD',
+    symbol: rawMeta.symbol || tenant.symbol || '$',
+    exchange_rate: rawMeta.exchange_rate || 850.0,
+    active_modules: tenant.active_modules || rawMeta.active_modules || DEFAULT_ENABLED_MODULES,
+    booking_settings: rawMeta.booking_settings,
+    public_theme: rawMeta.public_theme,
+    integraciones: rawMeta.integraciones,
+  };
+
+  return {
+    ...tenant,
+    active_modules: tenant.active_modules || cleanMetadata.active_modules,
+    metadata: cleanMetadata,
+  };
+}
+
 export async function getUserTenant(userEmail: string, userId?: string) {
   try {
     const db = supabaseAdmin;
@@ -471,7 +493,7 @@ export async function getUserTenant(userEmail: string, userId?: string) {
           ]);
           return {
             success: true,
-            tenant: mainTenant,
+            tenant: sanitizeTenantPayload(mainTenant),
             role: 'owner' as UserRole,
           };
         }
@@ -495,28 +517,9 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       return { success: false, tenant: null, role: null, error: 'Tenant not found' };
     }
 
-    // Sanitizar metadata para aligerar payload y proteger cuotas de memoria en Server Actions y localStorage
-    const rawMeta = (tenant.metadata || {}) as Record<string, any>;
-    const cleanMetadata = {
-      plan: rawMeta.plan || 'pro',
-      currency: rawMeta.currency || tenant.currency || 'USD',
-      symbol: rawMeta.symbol || tenant.symbol || '$',
-      exchange_rate: rawMeta.exchange_rate || 850.0,
-      active_modules: tenant.active_modules || rawMeta.active_modules || DEFAULT_ENABLED_MODULES,
-      booking_settings: rawMeta.booking_settings,
-      public_theme: rawMeta.public_theme,
-      integraciones: rawMeta.integraciones,
-    };
-
-    const sanitizedTenant = {
-      ...tenant,
-      active_modules: tenant.active_modules || cleanMetadata.active_modules,
-      metadata: cleanMetadata,
-    };
-
     return {
       success: true,
-      tenant: sanitizedTenant,
+      tenant: sanitizeTenantPayload(tenant),
       role: isSuperAdmin ? 'superadmin' : (membership.role as UserRole),
     };
   } catch (error: any) {
@@ -734,8 +737,8 @@ export async function updateCurrentUserPasswordAction(
     }
 
     const userSupabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://pfgfsnoblxasiixeveue.supabase.co',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZ2Zzbm9ibHhhc2lpeGV2ZXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MjUzNzQsImV4cCI6MjEwNDIwMTM3NH0.aCJ_3GWs6kta4LRqGDd6QKNvKqAKjwdc-Daef8Bgwv8',
+      getResolvedSupabaseUrl(),
+      getResolvedAnonKey(),
       { global: { headers: { Authorization: `Bearer ${actor.token}` } } }
     );
 

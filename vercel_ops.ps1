@@ -26,9 +26,9 @@ Write-Host "=== CONFIGURANDO VARIABLES EN saascore-erp ==="
 $projectId = "prj_9Z1OE5GuADYVd4s5x9iVvizCdKjR"
 
 $envVars = @(
-    @{ key = "NEXT_PUBLIC_SUPABASE_URL"; value = "https://acyvimrmtkbnsmdxxfwi.supabase.co"; type = "plain"; target = @("production","preview","development") },
-    @{ key = "NEXT_PUBLIC_SUPABASE_ANON_KEY"; value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjeXZpbXJtdGtibnNtZHh4ZndpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMzMwMjQsImV4cCI6MjEwMDkwOTAyNH0.ZpTSAIY9Ew_xqmTGGTYkC3at9C9VrZlmpP8Ezae8vgw"; type = "plain"; target = @("production","preview","development") },
-    @{ key = "SUPABASE_SERVICE_ROLE_KEY"; value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFjeXZpbXJtdGtibnNtZHh4ZndpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTMzMzAyNCwiZXhwIjoyMTAwOTA5MDI0fQ.QDjmDls3Zug1BTJbF14W1qihTKwk7cfTU-lNYf6h5eE"; type = "sensitive"; target = @("production","preview","development") }
+    @{ key = "NEXT_PUBLIC_SUPABASE_URL"; value = "https://pfgfsnoblxasiixeveue.supabase.co"; type = "plain"; target = @("production","preview","development") },
+    @{ key = "NEXT_PUBLIC_SUPABASE_ANON_KEY"; value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZ2Zzbm9ibHhhc2lpeGV2ZXVlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg2MjUzNzQsImV4cCI6MjEwNDIwMTM3NH0.aCJ_3GWs6kta4LRqGDd6QKNvKqAKjwdc-Daef8Bgwv8"; type = "plain"; target = @("production","preview","development") },
+    @{ key = "SUPABASE_SERVICE_ROLE_KEY"; value = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBmZ2Zzbm9ibHhhc2lpeGV2ZXVlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4ODYyNTM3NCwiZXhwIjoyMTA0MjAxMzc0fQ.hmoocNnKBQyabarzdEFpsfmHWLjAjN2kmx1_ccbuhv0"; type = "sensitive"; target = @("production","preview","development") }
 )
 
 foreach ($env in $envVars) {
