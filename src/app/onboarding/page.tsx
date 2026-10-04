@@ -18,37 +18,90 @@ export default function OnboardingPage() {
   const { setSession, setCurrentTenant } = useERPStore();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data.user) {
-        setUserId(data.user.id);
-        setUserEmail(data.user.email || '');
-      } else {
-        router.push('/login');
+    let isMounted = true;
+    const storeSession = useERPStore.getState().session;
+    if (storeSession?.userEmail) {
+      setUserEmail(storeSession.userEmail);
+    }
+
+    async function resolveUser() {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData?.session?.user && isMounted) {
+          setUserId(sessionData.session.user.id);
+          setUserEmail(sessionData.session.user.email || storeSession?.userEmail || '');
+          return;
+        }
+
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user && isMounted) {
+          setUserId(userData.user.id);
+          setUserEmail(userData.user.email || storeSession?.userEmail || '');
+          return;
+        }
+
+        if (!storeSession?.userEmail && isMounted) {
+          router.push('/login');
+        }
+      } catch (err) {
+        console.warn('[Onboarding] Error resolviendo usuario:', err);
       }
-    });
+    }
+
+    resolveUser();
+    return () => { isMounted = false; };
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!userId) return;
-
     setIsLoading(true);
     setError(null);
+
+    let activeUserId = userId;
+    let activeEmail = userEmail;
+
+    // Respaldo de seguridad: si userId aún no estaba listo en el state, buscarlo en vivo
+    if (!activeUserId) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData?.session?.user) {
+        activeUserId = sessionData.session.user.id;
+        activeEmail = sessionData.session.user.email || activeEmail;
+      } else {
+        const { data: userData } = await supabase.auth.getUser();
+        if (userData?.user) {
+          activeUserId = userData.user.id;
+          activeEmail = userData.user.email || activeEmail;
+        }
+      }
+    }
+
+    if (!activeUserId) {
+      setError('No se pudo identificar tu sesión. Por favor, vuelve a iniciar sesión.');
+      setIsLoading(false);
+      return;
+    }
     
     const formData = new FormData(e.currentTarget);
-    const businessName = formData.get('businessName') as string;
+    const businessName = (formData.get('businessName') as string || '').trim();
+    if (!businessName) {
+      setError('El nombre de la empresa es obligatorio.');
+      setIsLoading(false);
+      return;
+    }
 
-    const result = await createTenant(userId, userEmail || 'admin@Rendo.com', businessName);
+    const result = await createTenant(activeUserId, activeEmail || 'admin@Rendo.com', businessName);
 
     if (result.success && result.tenant) {
       setCurrentTenant({
         id: result.tenant.id,
         name: result.tenant.name,
-        blocked: !result.tenant.is_active
+        blocked: !result.tenant.is_active,
+        active_modules: result.tenant.active_modules || (result.tenant.metadata as any)?.active_modules || [],
+        metadata: result.tenant.metadata
       });
       
       setSession({
-        userEmail: userEmail || 'user@Rendo.com',
+        userEmail: activeEmail || 'user@Rendo.com',
         role: 'owner',
         tenantId: result.tenant.id
       });

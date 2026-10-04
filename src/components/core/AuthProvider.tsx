@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const existingSession = useERPStore.getState().session;
       const existingTenant = useERPStore.getState().currentTenant;
 
-      if (existingSession?.tenantId && existingTenant?.id) {
+      if (existingSession?.tenantId && existingTenant?.id && existingSession.userEmail === cleanEmail) {
         // Preservar el tenant existente y solo actualizar el token
         console.warn('[AuthProvider] Preservando tenant activo existente frente a desincronización de getUserTenant');
         setSession({
