@@ -35,6 +35,7 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [editingCommission, setEditingCommission] = useState<number>(45);
 
@@ -70,12 +71,16 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
     setLicenseNumber('');
     setCommissionPercent(45);
     setSelectedAvatar('🦷');
+    setSaveError(null);
     setIsModalOpen(true);
   };
 
   const handleSaveDoctor = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
+
     if (!name.trim()) {
+      setSaveError('Ingresa el nombre del odontólogo o especialista.');
       toast({ variant: 'error', title: 'Campo requerido', description: 'Ingresa el nombre del odontólogo o especialista.' });
       return;
     }
@@ -101,13 +106,18 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
 
       if (res.success) {
         toast({ variant: 'success', title: 'Especialista registrado', description: `${name} forma parte del cuerpo médico.` });
+        setSaveError(null);
         setIsModalOpen(false);
         onRefresh();
       } else {
-        toast({ variant: 'error', title: 'Error al guardar', description: res.error || 'No se pudo guardar el odontólogo.' });
+        const errorMsg = res.error || 'No se pudo guardar el odontólogo.';
+        setSaveError(errorMsg);
+        toast({ variant: 'error', title: 'Error al guardar', description: errorMsg });
       }
     } catch (err: any) {
-      toast({ variant: 'error', title: 'Error inesperado', description: err.message });
+      const errorMsg = err.message || 'Error inesperado.';
+      setSaveError(errorMsg);
+      toast({ variant: 'error', title: 'Error inesperado', description: errorMsg });
     } finally {
       setIsSaving(false);
     }
@@ -411,6 +421,22 @@ export function DentalStaffTab({ staff, onRefresh, tenantId, actor }: DentalStaf
             </div>
 
             <form onSubmit={handleSaveDoctor} className="space-y-4">
+              {saveError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-between text-rose-700 dark:text-rose-300 text-xs font-semibold animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚠️</span>
+                    <span>{saveError}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setSaveError(null)} 
+                    className="text-rose-400 hover:text-rose-600 p-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               {availableEmployees.length > 0 && (
                 <div className="p-3 bg-teal-500/10 border border-teal-500/20 rounded-2xl space-y-1.5">
                   <label className="block text-xs font-bold text-foreground uppercase tracking-wider">

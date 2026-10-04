@@ -115,9 +115,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (supabaseSession) {
           await handleSessionSync(supabaseSession.user, supabaseSession.access_token);
         } else {
-          // Si supabase.auth.getSession() no retornó sesión, verificar si hay sesión activa persistida
+          // Si supabase.auth.getSession() no retornó sesión, intentar refrescar usando refresh_token
+          try {
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            if (refreshData?.session) {
+              await handleSessionSync(refreshData.session.user, refreshData.session.access_token);
+              return;
+            }
+          } catch (rErr) {
+            console.warn('[AuthProvider] No se pudo refrescar sesión:', rErr);
+          }
+
+          // Si supabase no retornó sesión, verificar si hay sesión activa persistida
           const existingSession = useERPStore.getState().session;
-          if (!existingSession) {
+          if (!existingSession?.userEmail) {
             setSession(null);
             setCurrentTenant(null);
           }
@@ -137,7 +148,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setCurrentTenant(null);
           router.push('/login');
-        } else if (event === 'TOKEN_REFRESHED' && supabaseSession) {
+        } else if ((event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') && supabaseSession) {
           // Token renovado: actualizar token en el store en tiempo real sin destruir la empresa
           const currentSession = useERPStore.getState().session;
           if (currentSession) {

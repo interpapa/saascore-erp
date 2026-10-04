@@ -60,6 +60,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<ModalTab>('datos');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -104,12 +105,14 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     setEditingId(null);
     setForm(defaultForm);
     setModalTab('datos');
+    setSaveError(null);
     setIsModalOpen(true);
   };
 
   const openEditModal = (emp: Entity) => {
     setEditingId(emp.id);
     setModalTab('datos');
+    setSaveError(null);
     const meta = (emp.metadata || {}) as any;
     const isBarber = Boolean(meta.is_barber || meta.barber_config?.is_active || meta.module === 'barberia' || (Array.isArray(meta.modules) && meta.modules.includes('barberia')));
     const isDentist = Boolean(meta.is_dentist || meta.is_doctor || meta.dentist_config?.is_active || meta.module === 'odontologia' || (Array.isArray(meta.modules) && meta.modules.includes('odontologia')));
@@ -156,8 +159,20 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
 
   const handleSaveEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!effectiveActor) {
-      toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
+    setSaveError(null);
+
+    if (!form.name || !form.name.trim()) {
+      setModalTab('datos');
+      const msg = form.isResource ? 'El nombre del espacio o cancha es requerido.' : 'El nombre del colaborador es requerido.';
+      setSaveError(msg);
+      toast({ variant: 'error', title: 'Campo Requerido', description: msg });
+      return;
+    }
+
+    if (!effectiveActor?.email) {
+      const msg = 'Tu sesión ha expirado o no está disponible. Por favor, recarga la página.';
+      setSaveError(msg);
+      toast({ variant: 'error', title: 'Sesión no disponible', description: msg });
       return;
     }
     
@@ -272,23 +287,32 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
 
       if (res && res.success) {
         toast({ variant: 'success', title: 'Éxito', description: `Colaborador guardado correctamente.` });
+        setSaveError(null);
         setIsModalOpen(false);
         onRefresh();
       } else {
-        toast({ variant: 'error', title: 'Error', description: res?.error || 'No se pudo guardar.' });
+        const errorMsg = res?.error || 'No se pudo guardar.';
+        setSaveError(errorMsg);
+        toast({ variant: 'error', title: 'Error al guardar', description: errorMsg });
       }
     } catch (err: unknown) {
-      toast({ variant: 'error', title: 'Error de servidor', description: (err as Error).message });
+      const errorMsg = (err as Error).message || 'Error de servidor.';
+      setSaveError(errorMsg);
+      toast({ variant: 'error', title: 'Error de servidor', description: errorMsg });
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleDeleteEmployee = async () => {
-    if (!editingId || !actor) return;
+    if (!editingId) return;
+    if (!effectiveActor?.email) {
+      toast({ variant: 'error', title: 'Sesión no disponible', description: 'Por favor recarga la página o inicia sesión.' });
+      return;
+    }
     setIsDeleting(true);
     try {
-      const res = await deleteEntityAction(editingId, tenantId, actor);
+      const res = await deleteEntityAction(editingId, tenantId, effectiveActor);
       if (res.success) {
         toast({
           variant: 'success',
@@ -579,6 +603,23 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             {/* Modal Body Scrollable */}
             <form onSubmit={handleSaveEmployee} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 overflow-y-auto space-y-5 flex-1">
+                {/* Banner de Error Visible si la Acción Falla */}
+                {saveError && (
+                  <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-between text-rose-700 dark:text-rose-300 text-xs font-semibold animate-in fade-in">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle size={16} className="text-rose-500 shrink-0" />
+                      <span>{saveError}</span>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setSaveError(null)} 
+                      className="text-rose-400 hover:text-rose-600 p-1"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+
                 {/* TAB 1: DATOS & CONTRATO */}
                 {modalTab === 'datos' && (
                   <div className="space-y-4 animate-in fade-in duration-150">

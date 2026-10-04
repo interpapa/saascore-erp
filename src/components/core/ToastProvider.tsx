@@ -150,7 +150,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
       {/* Toast container — bottom-left to avoid AI Copilot orb (bottom-right) */}
       <div
-        className="fixed bottom-6 left-6 z-80 flex flex-col-reverse gap-3 pointer-events-none"
+        className="fixed bottom-6 left-6 z-[99999] flex flex-col-reverse gap-3 pointer-events-none"
         aria-label="Notificaciones"
       >
         {toasts.map((t) => (

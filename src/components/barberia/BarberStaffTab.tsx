@@ -35,6 +35,7 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [editingCommission, setEditingCommission] = useState<number>(50);
 
@@ -68,12 +69,16 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
     setSpecialty('Degradados & Barba');
     setCommissionPercent(50);
     setSelectedAvatar('✂️');
+    setSaveError(null);
     setIsModalOpen(true);
   };
 
   const handleSaveBarber = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSaveError(null);
+
     if (!name.trim()) {
+      setSaveError('Ingresa el nombre del barbero.');
       toast({ variant: 'error', title: 'Campo requerido', description: 'Ingresa el nombre del barbero.' });
       return;
     }
@@ -98,13 +103,18 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
 
       if (res.success) {
         toast({ variant: 'success', title: 'Barbero registrado', description: `${name} ya forma parte de tu equipo.` });
+        setSaveError(null);
         setIsModalOpen(false);
         onRefresh();
       } else {
-        toast({ variant: 'error', title: 'Error al guardar', description: res.error || 'No se pudo guardar el barbero.' });
+        const errorMsg = res.error || 'No se pudo guardar el barbero.';
+        setSaveError(errorMsg);
+        toast({ variant: 'error', title: 'Error al guardar', description: errorMsg });
       }
     } catch (err: any) {
-      toast({ variant: 'error', title: 'Error inesperado', description: err.message });
+      const errorMsg = err.message || 'Error inesperado.';
+      setSaveError(errorMsg);
+      toast({ variant: 'error', title: 'Error inesperado', description: errorMsg });
     } finally {
       setIsSaving(false);
     }
@@ -395,6 +405,22 @@ export function BarberStaffTab({ staff, onRefresh, tenantId, actor }: BarberStaf
             </div>
 
             <form onSubmit={handleSaveBarber} className="space-y-4">
+              {saveError && (
+                <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-between text-rose-700 dark:text-rose-300 text-xs font-semibold animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚠️</span>
+                    <span>{saveError}</span>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setSaveError(null)} 
+                    className="text-rose-400 hover:text-rose-600 p-1"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               {availableEmployees.length > 0 && (
                 <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-1.5">
                   <label className="block text-xs font-bold text-foreground uppercase tracking-wider">
