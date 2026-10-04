@@ -32,7 +32,7 @@ export function useActionActor(): ActionActor | null {
     return () => {
       isMounted = false;
     };
-  }, [session?.token]);
+  }, []);
 
   return useMemo(() => {
     if (!session?.userEmail) return null;
