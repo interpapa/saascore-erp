@@ -1,22 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { Mail, Lock, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { supabase } from '@/lib/supabase';
-import { getUserTenant } from '@/app/actions/tenant';
-import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 import { useERPStore } from '@/store/useERPStore';
 
 export default function LoginPage() {
-  const router = useRouter();
+
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const { setSession, setCurrentTenant } = useERPStore();
 
   useEffect(() => {
     if (countdown === null) return;
@@ -56,51 +52,13 @@ export default function LoginPage() {
 
       if (signInError) throw signInError;
 
-      setStatusMessage('Acceso concedido. Preparando entorno...');
+      setStatusMessage('Acceso concedido. Redirigiendo al sistema...');
+      
+      // Limpiar cualquier estado residual previo
+      useERPStore.getState().setCurrentTenant(null);
 
-      const cleanEmail = email.trim().toLowerCase();
-      const user = signInData?.user;
-      const result = await getUserTenant(cleanEmail, user?.id);
-
-      if (result.success && result.tenant) {
-        setCurrentTenant({
-          id: result.tenant.id,
-          name: result.tenant.name,
-          blocked: !result.tenant.is_active,
-          active_modules: result.tenant.active_modules || (result.tenant.metadata as any)?.active_modules || [],
-          metadata: result.tenant.metadata,
-        });
-        setSession({
-          userEmail: cleanEmail,
-          role: isSuperAdminEmail(cleanEmail) ? 'superadmin' : ((result.role as any) || 'owner'),
-          tenantId: result.tenant.id,
-          token: signInData?.session?.access_token,
-        });
-        router.push('/dashboard');
-      } else if (isSuperAdminEmail(cleanEmail) || result.role === 'superadmin') {
-        setSession({
-          userEmail: cleanEmail,
-          role: 'superadmin',
-          tenantId: 'global-admin',
-          token: signInData?.session?.access_token,
-        });
-        setCurrentTenant({
-          id: 'global-admin',
-          name: 'Superadmin Console',
-          blocked: false,
-          active_modules: ['admin', 'config', 'estadisticas']
-        });
-        router.push('/admin');
-      } else {
-        // En caso de que no tenga tenant y falle auto-link
-        setSession({
-          userEmail: cleanEmail,
-          role: 'owner',
-          tenantId: '',
-          token: signInData?.session?.access_token,
-        });
-        router.push('/dashboard');
-      }
+      // Redirigir de inmediato al dashboard. AuthProvider completará la sincronización en segundo plano.
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       setIsLoading(false);
       setStatusMessage(null);

@@ -495,9 +495,28 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       return { success: false, tenant: null, role: null, error: 'Tenant not found' };
     }
 
+    // Sanitizar metadata para aligerar payload y proteger cuotas de memoria en Server Actions y localStorage
+    const rawMeta = (tenant.metadata || {}) as Record<string, any>;
+    const cleanMetadata = {
+      plan: rawMeta.plan || 'pro',
+      currency: rawMeta.currency || tenant.currency || 'USD',
+      symbol: rawMeta.symbol || tenant.symbol || '$',
+      exchange_rate: rawMeta.exchange_rate || 850.0,
+      active_modules: tenant.active_modules || rawMeta.active_modules || DEFAULT_ENABLED_MODULES,
+      booking_settings: rawMeta.booking_settings,
+      public_theme: rawMeta.public_theme,
+      integraciones: rawMeta.integraciones,
+    };
+
+    const sanitizedTenant = {
+      ...tenant,
+      active_modules: tenant.active_modules || cleanMetadata.active_modules,
+      metadata: cleanMetadata,
+    };
+
     return {
       success: true,
-      tenant,
+      tenant: sanitizedTenant,
       role: isSuperAdmin ? 'superadmin' : (membership.role as UserRole),
     };
   } catch (error: any) {
