@@ -27,6 +27,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useViewModeStore } from '@/store/useViewModeStore';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
@@ -162,7 +163,7 @@ export default function LauncherPage() {
     ? currentTenant.active_modules 
     : fallbackModules;
   const filteredApps = apps.filter((app) => {
-    if (app.id === 'admin') return session?.role === 'superadmin';
+    if (app.id === 'admin') return session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
     return enabledModules.includes(app.id) || (app.id === 'inventario' && enabledModules.includes('catalogo'));
   });
 

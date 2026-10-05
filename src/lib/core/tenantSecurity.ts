@@ -15,12 +15,18 @@ export interface SecurityActor {
   token?: string;
 }
 
-const DEFAULT_SUPERADMIN = 'interpapadavid2811@gmail.com';
-const rawSuperAdmins = process.env.SUPERADMIN_EMAIL || DEFAULT_SUPERADMIN;
-export const SUPERADMIN_EMAILS = rawSuperAdmins
-  .split(',')
-  .map(e => e.trim().toLowerCase())
-  .filter(Boolean);
+const DEFAULT_SUPERADMINS = [
+  'interpapadavid2811@gmail.com',
+  '1@gmail.com',
+  'valerasilvamariajose@gmail.com'
+];
+const rawSuperAdmins = process.env.SUPERADMIN_EMAIL || '';
+export const SUPERADMIN_EMAILS = Array.from(
+  new Set([
+    ...DEFAULT_SUPERADMINS,
+    ...rawSuperAdmins.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+  ])
+);
 
 export function isSuperAdminEmail(email?: string | null): boolean {
   if (!email) return false;

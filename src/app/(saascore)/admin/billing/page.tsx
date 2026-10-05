@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 export default function BillingAdminPage() {
   const { toast } = useToast();
@@ -17,9 +18,10 @@ export default function BillingAdminPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchTenants = async () => {
-    if (!actor && !session?.userEmail) return;
+    const email = session?.userEmail;
+    if (!email && !actor) return;
     setIsLoading(true);
-    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const activeActor = actor || { email: email!, role: 'superadmin' as const };
     const result = await getAllTenants(activeActor);
     if (result.success && result.tenants) {
       setTenants(result.tenants);
@@ -28,10 +30,10 @@ export default function BillingAdminPage() {
   };
 
   useEffect(() => {
-    if (session?.userEmail) {
+    if (session?.userEmail || actor?.email) {
       fetchTenants();
     }
-  }, [session?.userEmail]);
+  }, [session?.userEmail, actor?.token]);
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
     if (!session?.userEmail) return;
@@ -46,10 +48,12 @@ export default function BillingAdminPage() {
     }
   };
 
-  if (session?.role !== 'superadmin') {
+  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+
+  if (!isSuper) {
     return (
       <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-16 flex items-center justify-center">
-        <div className="bg-red-50 text-red-600 p-8 rounded-2xl border border-red-100 flex flex-col items-center gap-4 shadow-sm">
+        <div className="bg-destructive/10 text-destructive p-8 rounded-2xl border border-destructive/20 flex flex-col items-center gap-4 shadow-sm">
           <ShieldAlert size={48} />
           <h2 className="text-xl font-bold">Acceso Denegado</h2>
           <p className="text-sm">Esta área es exclusiva para Super Administradores.</p>

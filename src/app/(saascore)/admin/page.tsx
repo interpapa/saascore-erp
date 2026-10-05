@@ -30,22 +30,28 @@ export default function AdminTenantsPage() {
   const [newTenantPlan, setNewTenantPlan] = useState('pro');
   const [isCreating, setIsCreating] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const fetchTenants = async () => {
-    if (!actor && !session?.userEmail) return;
+    const email = session?.userEmail;
+    if (!email && !actor) return;
     setIsLoading(true);
-    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    setLoadError(null);
+    const activeActor = actor || { email: email!, role: 'superadmin' as const };
     const result = await getAllTenants(activeActor);
     if (result.success && result.tenants) {
       setTenants(result.tenants);
+    } else {
+      setLoadError(result.error || 'Error al cargar inquilinos');
     }
     setIsLoading(false);
   };
 
   useEffect(() => {
-    if (session?.userEmail) {
+    if (session?.userEmail || actor?.email) {
       fetchTenants();
     }
-  }, [session?.userEmail]);
+  }, [session?.userEmail, actor?.token]);
 
   const handleCreateTenant = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +118,25 @@ export default function AdminTenantsPage() {
       description: `Ingresando al ERP como "${tenant.name}".`,
     });
     router.push('/dashboard');
+  };
+
+  const handleAccessTenantModule = (tenant: any, moduleId?: string) => {
+    impersonateTenant({
+      id: tenant.id,
+      name: tenant.name,
+      blocked: tenant.status === 'suspended',
+      active_modules: tenant.active_modules,
+      metadata: tenant.metadata,
+    });
+    const target = moduleId 
+      ? (moduleId === 'catalogo' ? '/inventario' : moduleId === 'config' ? '/configuracion' : `/${moduleId}`) 
+      : '/dashboard';
+    toast({
+      variant: 'success',
+      title: 'Accediendo al Módulo',
+      description: `Entrando a "${tenant.name}" en modo soporte (${moduleId ? moduleId.toUpperCase() : 'Dashboard'}).`,
+    });
+    router.push(target);
   };
 
   const totalCount = tenants.length;
@@ -211,13 +236,28 @@ export default function AdminTenantsPage() {
         </div>
       </div>
 
+      {loadError && (
+        <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm animate-in fade-in">
+          <div className="flex items-center gap-2 font-medium">
+            <Ban size={18} className="shrink-0" />
+            <span>{loadError}</span>
+          </div>
+          <button
+            onClick={fetchTenants}
+            className="px-3.5 py-1.5 bg-destructive text-destructive-foreground font-bold text-xs rounded-xl shadow-xs hover:bg-destructive/90 transition-all shrink-0"
+          >
+            Reintentar Conexión
+          </button>
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
         <table className="w-full text-left">
           <thead className="bg-muted/50 border-b border-border text-xs uppercase tracking-wider font-bold text-muted-foreground">
             <tr>
               <th className="p-4 pl-6">Empresa (Tenant)</th>
               <th className="p-4">Estado</th>
-              <th className="p-4">Plan & Módulos</th>
+              <th className="p-4">Plan & Módulos Activos</th>
               <th className="p-4">Creado</th>
               <th className="p-4 text-right pr-6">Acciones</th>
             </tr>
@@ -227,7 +267,7 @@ export default function AdminTenantsPage() {
               <tr>
                 <td colSpan={5} className="p-8 text-center text-slate-400">
                   <div className="flex justify-center mb-2">
-                    <div className="w-6 h-6 border-2 border-rose-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                   </div>
                   Cargando inquilinos...
                 </td>
@@ -267,11 +307,17 @@ export default function AdminTenantsPage() {
                   <div className="text-sm text-foreground mb-1">
                     <span className="uppercase font-bold text-primary text-xs">{tenant.subscription_plan || 'basic'}</span>
                   </div>
-                  <div className="flex gap-1 flex-wrap max-w-[200px]">
+                  <div className="flex gap-1.5 flex-wrap max-w-[260px]">
                     {(tenant.active_modules || []).map((mod: string) => (
-                      <span key={mod} className="bg-muted text-muted-foreground text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border">
-                        {mod}
-                      </span>
+                      <button
+                        key={mod}
+                        onClick={() => handleAccessTenantModule(tenant, mod)}
+                        className="bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border hover:border-primary/40 transition-colors btn-haptic cursor-pointer inline-flex items-center gap-1"
+                        title={`Acceder directamente al módulo ${mod.toUpperCase()} en ${tenant.name}`}
+                      >
+                        <span>{mod}</span>
+                        <span className="opacity-40 text-[8px]">↗</span>
+                      </button>
                     ))}
                   </div>
                 </td>
@@ -301,7 +347,7 @@ export default function AdminTenantsPage() {
                       {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
                     </button>
                     <Link href={`/admin/tenant/${tenant.id}`} className="px-3.5 py-1.5 text-foreground hover:bg-accent border border-border rounded-lg text-xs font-bold transition-colors">
-                      Gestionar
+                      Gestionar Módulos
                     </Link>
                     <button 
                       onClick={() => handleDelete(tenant.id)}

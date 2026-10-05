@@ -98,15 +98,16 @@ export default function TenantAdminPage() {
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
 
   useEffect(() => {
-    if (session?.userEmail && id) {
+    if ((session?.userEmail || actor?.email) && id) {
       fetchTenant();
       fetchUsers();
     }
-  }, [session, id]);
+  }, [session?.userEmail, actor?.token, id]);
 
   const fetchTenant = async () => {
     setIsLoading(true);
-    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const email = session?.userEmail;
+    const activeActor = actor || { email: email!, role: 'superadmin' as const };
     const result = await getTenantByIdAdmin(id as string, activeActor);
     if (result.success && result.tenant) {
       setTenant(result.tenant);
@@ -123,6 +124,8 @@ export default function TenantAdminPage() {
         use_pos_discounts: true,
         use_calendar_whatsapp: true
       });
+    } else if (result.error) {
+      toast({ variant: 'error', title: 'Error de lectura', description: result.error });
     }
     setIsLoading(false);
   };
@@ -130,7 +133,8 @@ export default function TenantAdminPage() {
   const fetchUsers = async () => {
     if (!id) return;
     setIsLoadingUsers(true);
-    const activeActor = actor || { email: session!.userEmail!, role: 'superadmin' as const };
+    const email = session?.userEmail;
+    const activeActor = actor || { email: email!, role: 'superadmin' as const };
     const res = await getTenantUsersAdminAction(id as string, activeActor);
     if (res.success && res.users) {
       setUsers(res.users);
@@ -144,8 +148,8 @@ export default function TenantAdminPage() {
       id: tenant.id,
       name: tenant.name,
       blocked: tenant.status === 'suspended',
-      active_modules: tenant.active_modules,
-      metadata: tenant.metadata,
+      active_modules: activeModules,
+      metadata: { ...(tenant.metadata || {}), features: featureFlags },
     });
     toast({
       variant: 'success',
@@ -153,6 +157,24 @@ export default function TenantAdminPage() {
       description: `Has ingresado al ERP como "${tenant.name}".`,
     });
     router.push('/dashboard');
+  };
+
+  const handleOpenModuleInERP = (modId: string) => {
+    if (!tenant) return;
+    impersonateTenant({
+      id: tenant.id,
+      name: tenant.name,
+      blocked: tenant.status === 'suspended',
+      active_modules: activeModules,
+      metadata: { ...(tenant.metadata || {}), features: featureFlags },
+    });
+    const target = modId === 'catalogo' ? '/inventario' : modId === 'config' ? '/configuracion' : `/${modId}`;
+    toast({
+      variant: 'success',
+      title: 'Acceso Directo al Módulo',
+      description: `Abriendo "${modId.toUpperCase()}" para "${tenant.name}".`,
+    });
+    router.push(target);
   };
 
   const handleResetPassword = async (email: string) => {
@@ -225,7 +247,18 @@ export default function TenantAdminPage() {
 
     const result = await updateTenantAdminAction(tenant.id, updates, activeActor);
     if (result.success) {
-      toast({ variant: 'success', title: 'Guardado', description: 'Configuración actualizada exitosamente.' });
+      toast({ variant: 'success', title: 'Guardado', description: 'Configuración de módulos actualizada exitosamente.' });
+      setTenant((prev: any) => ({ ...prev, name, active_modules: activeModules, metadata: newMetadata }));
+      const currentStoreTenant = useERPStore.getState().currentTenant;
+      if (currentStoreTenant && currentStoreTenant.id === tenant.id) {
+        useERPStore.getState().setCurrentTenant({
+          ...currentStoreTenant,
+          id: currentStoreTenant.id,
+          name,
+          active_modules: activeModules,
+          metadata: newMetadata,
+        });
+      }
     } else {
       toast({ variant: 'error', title: 'Error', description: result.error });
     }
@@ -269,22 +302,22 @@ export default function TenantAdminPage() {
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-24 space-y-6 animate-in fade-in">
       {/* Header Sticky para Móviles */}
-      <div className="sticky top-0 z-10 bg-slate-950/80 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:bg-transparent sm:backdrop-blur-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-white/5 sm:border-none mb-6">
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:bg-transparent sm:backdrop-blur-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/60 sm:border-none mb-6">
         <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Link href="/admin" className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors shrink-0">
+          <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1 truncate">
-            <h1 className="text-xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2 truncate">
+            <h1 className="text-xl sm:text-3xl font-black text-foreground tracking-tight flex items-center gap-2 truncate">
               {tenant.name}
             </h1>
-            <p className="text-slate-400 font-mono text-[10px] sm:text-xs mt-1 truncate">ID: {tenant.id}</p>
+            <p className="text-muted-foreground font-mono text-[10px] sm:text-xs mt-1 truncate">ID: {tenant.id}</p>
           </div>
         </div>
         <div className="flex w-full sm:w-auto gap-2">
           <button
             onClick={handleImpersonate}
-            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm shrink-0"
+            className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs shrink-0 btn-haptic"
             title="Ingresar a la sesión de este negocio en modo soporte (Modo Dios)"
           >
             <LogIn size={16} /> Entrar al ERP
@@ -292,7 +325,7 @@ export default function TenantAdminPage() {
           <button 
             onClick={handleDelete}
             disabled={isSaving}
-            className="w-10 sm:w-auto flex justify-center items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all shrink-0"
+            className="w-10 sm:w-auto flex justify-center items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all shrink-0 btn-haptic"
             title="Eliminar Empresa"
           >
             <Trash2 size={18} />
@@ -300,7 +333,7 @@ export default function TenantAdminPage() {
           <button 
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 sm:flex-none justify-center bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+            className="flex-1 sm:flex-none justify-center bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
           >
             {isSaving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
           </button>
@@ -308,33 +341,33 @@ export default function TenantAdminPage() {
       </div>
 
       {/* Datos Generales */}
-      <div className="bg-slate-900 border border-white/10 rounded-2xl p-5 sm:p-6 shadow-xl">
-        <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-          <Briefcase size={18} className="text-slate-400"/> Información General
+      <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-xs">
+        <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+          <Briefcase size={18} className="text-muted-foreground"/> Información General
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nombre del Negocio</label>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Nombre del Negocio</label>
             <input 
               type="text" 
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none transition-all"
+              className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
             />
           </div>
           <div className="flex gap-4">
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Plan Actual</label>
-              <div className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-indigo-400 font-bold text-sm uppercase">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Plan Actual</label>
+              <div className="w-full bg-background border border-border rounded-xl px-4 py-3 text-primary font-bold text-sm uppercase">
                 {tenant.subscription_plan || 'BASIC'}
               </div>
             </div>
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Estado</label>
-              <div className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Estado</label>
+              <div className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm flex items-center gap-2">
                 {tenant.status === 'active' 
-                  ? <><ShieldCheck size={16} className="text-emerald-400"/> <span className="text-emerald-400 font-bold">Activo</span></>
-                  : <><span className="text-rose-400 font-bold">Suspendido</span></>
+                  ? <><ShieldCheck size={16} className="text-emerald-500"/> <span className="text-emerald-500 font-bold">Activo</span></>
+                  : <><span className="text-rose-500 font-bold">Suspendido</span></>
                 }
               </div>
             </div>
@@ -343,34 +376,34 @@ export default function TenantAdminPage() {
       </div>
 
       {/* Usuarios y Accesos del Tenant */}
-      <div className="bg-slate-900 border border-white/10 rounded-2xl p-5 sm:p-6 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-white/5 pb-4">
+      <div className="bg-card border border-border rounded-2xl p-5 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-border/60 pb-4">
           <div>
-            <h3 className="font-bold text-white flex items-center gap-2 text-lg">
-              <Users size={20} className="text-indigo-400" /> Miembros & Accesos del Tenant
+            <h3 className="font-bold text-foreground flex items-center gap-2 text-lg">
+              <Users size={20} className="text-primary" /> Miembros & Accesos del Tenant
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               Cuentas de usuario registradas para este negocio. Puedes resetear contraseñas o crear nuevos colaboradores.
             </p>
           </div>
           <button
             onClick={() => setIsUserModalOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 btn-haptic shadow-xs"
           >
             <UserPlus size={15} /> Crear Usuario
           </button>
         </div>
 
         {isLoadingUsers ? (
-          <div className="text-center py-6 text-xs text-slate-400">Cargando colaboradores...</div>
+          <div className="text-center py-6 text-xs text-muted-foreground">Cargando colaboradores...</div>
         ) : users.length === 0 ? (
-          <div className="text-center py-6 text-xs text-slate-500">
+          <div className="text-center py-6 text-xs text-muted-foreground">
             No hay miembros explícitos en user_tenants para esta empresa.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="text-[10px] text-slate-400 uppercase tracking-wider font-bold border-b border-white/5">
+              <thead className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold border-b border-border/60">
                 <tr>
                   <th className="pb-2">Usuario (Email / ID)</th>
                   <th className="pb-2">Rol Asignado</th>
@@ -378,25 +411,25 @@ export default function TenantAdminPage() {
                   <th className="pb-2 text-right">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/5">
+              <tbody className="divide-y divide-border/60">
                 {users.map(u => (
-                  <tr key={u.id || u.user_email} className="hover:bg-white/[0.01]">
-                    <td className="py-2.5 font-medium text-white">
+                  <tr key={u.id || u.user_email} className="hover:bg-muted/40 transition-colors">
+                    <td className="py-2.5 font-medium text-foreground">
                       {u.user_email || u.user_id}
                     </td>
                     <td className="py-2.5">
-                      <span className="bg-white/10 text-indigo-300 px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold">
+                      <span className="bg-muted text-primary px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold border border-border">
                         {u.role}
                       </span>
                     </td>
-                    <td className="py-2.5 text-slate-400">
+                    <td className="py-2.5 text-muted-foreground">
                       {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}
                     </td>
                     <td className="py-2.5 text-right">
                       {u.user_email && (
                         <button
                           onClick={() => handleResetPassword(u.user_email)}
-                          className="px-2.5 py-1 rounded bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[11px] font-semibold transition-all inline-flex items-center gap-1"
+                          className="px-2.5 py-1 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border text-[11px] font-semibold transition-all inline-flex items-center gap-1 btn-haptic"
                           title="Resetear Contraseña"
                         >
                           <KeyRound size={12} /> Reset Clave
@@ -412,24 +445,24 @@ export default function TenantAdminPage() {
       </div>
 
       {/* Arquitectura Modular */}
-      <div className="bg-slate-900 border border-white/10 rounded-2xl shadow-xl overflow-hidden">
-        <div className="p-5 sm:p-6 border-b border-white/5 bg-slate-800/20">
-          <h3 className="font-bold text-white flex items-center gap-2 text-lg">
-            <LayoutTemplate size={20} className="text-rose-400"/> Configuración de Módulos
+      <div className="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
+        <div className="p-5 sm:p-6 border-b border-border/60 bg-muted/20">
+          <h3 className="font-bold text-foreground flex items-center gap-2 text-lg">
+            <LayoutTemplate size={20} className="text-primary"/> Configuración de Módulos
           </h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-muted-foreground mt-1">
             Enciende o apaga aplicaciones completas. Expande un módulo encendido para ajustar sus opciones finas.
           </p>
         </div>
         
-        <div className="divide-y divide-white/5">
+        <div className="divide-y divide-border/60">
           {ALL_MODULES.map(mod => {
             const isActive = activeModules.includes(mod.id);
             const isExpanded = expandedModule === mod.id;
             const hasFeatures = mod.features.length > 0;
 
             return (
-              <div key={mod.id} className={`transition-colors ${isExpanded ? 'bg-white/[0.02]' : 'hover:bg-white/[0.01]'}`}>
+              <div key={mod.id} className={`transition-colors ${isExpanded ? 'bg-muted/30' : 'hover:bg-muted/10'}`}>
                 {/* Cabecera del Módulo */}
                 <div 
                   className={`flex items-center justify-between p-4 sm:p-5 cursor-pointer ${!isActive ? 'opacity-60' : ''}`}
@@ -441,53 +474,71 @@ export default function TenantAdminPage() {
                 >
                   <div className="flex items-center gap-3">
                     {hasFeatures && isActive ? (
-                      <div className="text-slate-500">
+                      <div className="text-muted-foreground">
                         {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
                       </div>
                     ) : (
                       <div className="w-[18px]" /> // Spacer
                     )}
-                    <span className={`font-bold sm:text-lg ${isActive ? 'text-white' : 'text-slate-400'}`}>
+                    <span className={`font-bold sm:text-lg ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {mod.name}
                     </span>
                     {hasFeatures && (
-                      <span className="hidden sm:inline-block bg-white/5 text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-white/10">
+                      <span className="hidden sm:inline-block bg-muted text-muted-foreground text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-border">
                         {mod.features.length} Ajustes
                       </span>
                     )}
                   </div>
-                  <button 
-                    onClick={(e) => toggleModule(mod.id, e)}
-                    className="p-1 -m-1"
-                  >
-                    {isActive 
-                      ? <ToggleRight size={32} className="text-emerald-500" />
-                      : <ToggleLeft size={32} className="text-slate-600" />
-                    }
-                  </button>
+                  <div className="flex items-center gap-2.5">
+                    {isActive && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenModuleInERP(mod.id);
+                        }}
+                        className="text-[11px] font-bold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 border border-primary/20 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 btn-haptic cursor-pointer shadow-2xs"
+                        title={`Acceder directamente al módulo ${mod.name} en el ERP`}
+                      >
+                        <span>Acceder</span>
+                        <span className="text-[9px]">↗</span>
+                      </button>
+                    )}
+                    <button 
+                      type="button"
+                      onClick={(e) => toggleModule(mod.id, e)}
+                      className="p-1 -m-1 btn-haptic"
+                      title={isActive ? 'Desactivar módulo' : 'Activar módulo'}
+                    >
+                      {isActive 
+                        ? <ToggleRight size={32} className="text-emerald-500" />
+                        : <ToggleLeft size={32} className="text-muted-foreground/40" />
+                      }
+                    </button>
+                  </div>
                 </div>
 
                 {/* Configuraciones Internas (Feature Flags) */}
                 {isExpanded && isActive && hasFeatures && (
-                  <div className="px-4 sm:px-12 pb-5 pt-1 bg-black/20 border-t border-white/5">
-                    <div className="flex items-center gap-2 text-xs font-bold text-rose-400 mb-4 uppercase tracking-widest">
+                  <div className="px-4 sm:px-12 pb-5 pt-1 bg-muted/20 border-t border-border/60">
+                    <div className="flex items-center gap-2 text-xs font-bold text-primary mb-4 uppercase tracking-widest">
                       <Settings2 size={14} /> Opciones Internas
                     </div>
                     <div className="space-y-1">
                       {mod.features.map(feat => {
                         const isEnabled = featureFlags[feat.key] !== false; // true by default si es undefined
                         return (
-                          <div key={feat.key} className="flex items-center justify-between p-3 sm:p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-colors">
-                            <span className="text-xs sm:text-sm font-medium text-slate-200 leading-tight pr-4">
+                          <div key={feat.key} className="flex items-center justify-between p-3 sm:p-4 bg-card rounded-xl border border-border hover:border-primary/20 transition-colors">
+                            <span className="text-xs sm:text-sm font-medium text-foreground leading-tight pr-4">
                               {feat.label}
                             </span>
                             <button 
                               onClick={() => toggleFeature(feat.key)} 
-                              className="shrink-0 p-1 -m-1"
+                              className="shrink-0 p-1 -m-1 btn-haptic"
                             >
                               {isEnabled 
-                                ? <ToggleRight size={28} className="text-indigo-400" />
-                                : <ToggleLeft size={28} className="text-slate-600" />
+                                ? <ToggleRight size={28} className="text-primary" />
+                                : <ToggleLeft size={28} className="text-muted-foreground/40" />
                               }
                             </button>
                           </div>
@@ -504,27 +555,27 @@ export default function TenantAdminPage() {
 
       {/* Modal Crear Usuario */}
       {isUserModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
             <button
               onClick={() => setIsUserModalOpen(false)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+              className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
             >
               <X size={20} />
             </button>
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
                 <UserPlus size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-white">Nuevo Miembro / Acceso</h3>
-                <p className="text-xs text-slate-400">Crear cuenta con acceso inmediato a este negocio</p>
+                <h3 className="text-lg font-bold text-foreground">Nuevo Miembro / Acceso</h3>
+                <p className="text-xs text-muted-foreground">Crear cuenta con acceso inmediato a este negocio</p>
               </div>
             </div>
 
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider block mb-1.5">
                   Correo Electrónico *
                 </label>
                 <input
@@ -533,12 +584,12 @@ export default function TenantAdminPage() {
                   placeholder="empleado@empresa.com"
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider block mb-1.5">
                   Contraseña Temporal * (mínimo 6 caracteres)
                 </label>
                 <input
@@ -547,18 +598,18 @@ export default function TenantAdminPage() {
                   placeholder="••••••••"
                   value={newUserPassword}
                   onChange={(e) => setNewUserPassword(e.target.value)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-muted-foreground"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                <label className="text-xs font-bold text-foreground uppercase tracking-wider block mb-1.5">
                   Rol en el Sistema
                 </label>
                 <select
                   value={newUserRole}
                   onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
                 >
                   <option value="seller">Ventas / Cajero</option>
                   <option value="technician">Técnico / Operativo</option>
@@ -567,18 +618,18 @@ export default function TenantAdminPage() {
                 </select>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-white/10 justify-end">
+              <div className="flex gap-3 pt-4 border-t border-border justify-end">
                 <button
                   type="button"
                   onClick={() => setIsUserModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingUser}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 btn-haptic"
                 >
                   {isSubmittingUser ? 'Creando...' : 'Crear Acceso'}
                 </button>
