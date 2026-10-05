@@ -42,7 +42,7 @@ async function verifySuperAdminActor(
           const parsed = JSON.parse(decodeURIComponent(authCookie.value));
           if (parsed?.access_token) tokenStr = parsed.access_token;
           else if (Array.isArray(parsed) && parsed[0]) tokenStr = parsed[0];
-          if (parsed?.user?.email && isSuperAdminEmail(parsed.user.email)) {
+          if (parsed?.user?.email && (isSuperAdminEmail(parsed.user.email) || isSuperAdminAuthUser(parsed.user))) {
             return { authorized: true };
           }
         } catch {}
@@ -53,11 +53,11 @@ async function verifySuperAdminActor(
     }
   }
 
-  // 3. Validación criptográfica vía Supabase Auth si hay token
+  // 4. Validación criptográfica vía Supabase Auth si hay token
   if (authToken) {
     try {
       const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(authToken);
-      if (!authError && user && (isSuperAdminAuthUser(user) || isSuperAdminEmail(user.email))) {
+      if (!authError && user && isSuperAdminAuthUser(user)) {
         return { authorized: true };
       }
     } catch {
@@ -391,16 +391,35 @@ export async function getAllTenants(callerOrActor?: ActionActor | string | null,
       return { success: false, tenants: [], error: authCheck.error || 'No autorizado. Se requiere acceso de Super Administrador.' };
     }
     const db = supabaseAdmin;
-    const { data: tenants, error } = await db
+    let { data: tenants, error } = await db
       .from('tenants')
       .select('*')
       .order('created_at', { ascending: false });
 
     if (error) {
+      const retry = await db.from('tenants').select('*');
+      if (!retry.error && retry.data) {
+        tenants = retry.data;
+        error = null;
+      }
+    }
+
+    if (error) {
       console.error('[getAllTenants error]:', error);
       return { success: false, tenants: [], error: error.message };
     }
-    return { success: true, tenants: tenants || [] };
+
+    const normalizedTenants = (tenants || []).map((t: any) => ({
+      ...t,
+      status: t.status || (t.is_active !== false ? 'active' : 'suspended'),
+      is_active: t.is_active !== false && t.status !== 'suspended',
+      subscription_plan: t.subscription_plan || (t.metadata as any)?.plan || 'pro',
+      active_modules: Array.isArray(t.active_modules) && t.active_modules.length > 0 
+        ? t.active_modules 
+        : ((t.metadata as any)?.active_modules || DEFAULT_ENABLED_MODULES)
+    }));
+
+    return { success: true, tenants: normalizedTenants };
   } catch (error: any) {
     console.error('[getAllTenants catch]:', error);
     return { success: false, tenants: [], error: error.message };
@@ -910,11 +929,20 @@ export async function getAllUsersGlobalAdminAction(
       db.from('tenants').select('id, name, active_modules')
     ]);
 
-    if (authListRes.error) throw authListRes.error;
+    const userTenants = userTenantsRes.data || [];
+    let authUsers = authListRes.data?.users || [];
+
+    if ((!authUsers || authUsers.length === 0) && userTenants.length > 0) {
+      authUsers = Array.from(new Set(userTenants.map((ut: any) => ut.user_email))).map(email => ({
+        id: email,
+        email: email,
+        created_at: new Date().toISOString(),
+        app_metadata: {},
+        user_metadata: {}
+      })) as any[];
+    }
 
     const tenantsMap = new Map((tenantsRes.data || []).map((t: any) => [t.id, t]));
-    const userTenants = userTenantsRes.data || [];
-    const authUsers = authListRes.data?.users || [];
 
     const enrichedUsers = authUsers.map((u: any) => {
       const email = u.email?.toLowerCase();

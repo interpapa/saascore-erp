@@ -33,6 +33,7 @@ import { useActionActor } from '@/hooks/useActionActor';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { getActiveEnvironmentInfo } from '@/lib/supabaseConfig';
 
 const ALL_SYSTEM_MODULES = [
   { id: 'caja', name: 'Caja POS' },
@@ -78,6 +79,11 @@ export default function AdminTenantsPage() {
   const [isSavingModules, setIsSavingModules] = useState(false);
 
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [envInfo, setEnvInfo] = useState<ReturnType<typeof getActiveEnvironmentInfo> | null>(null);
+
+  useEffect(() => {
+    setEnvInfo(getActiveEnvironmentInfo());
+  }, []);
 
   const fetchTenants = async () => {
     setIsLoading(true);
@@ -370,6 +376,14 @@ export default function AdminTenantsPage() {
           </select>
         </div>
       </div>
+
+      {envInfo && (
+        <div className={`px-4 py-2.5 rounded-2xl border text-xs font-mono flex flex-wrap items-center gap-x-4 gap-y-1 ${envInfo.isProd ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400'}`}>
+          <span><b>Base de datos:</b> {envInfo.environmentName} · {envInfo.projectRef}</span>
+          <span><b>Usuario:</b> {session?.userEmail || 'sin sesión'}</span>
+          <span><b>Empresas cargadas:</b> {tenants.length}</span>
+        </div>
+      )}
 
       {loadError && (
         <div className="p-4 bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-sm animate-in fade-in">
