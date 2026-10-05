@@ -30,6 +30,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 const ALL_SYSTEM_MODULES = [
   { id: 'caja', name: 'Caja POS' },
@@ -77,24 +78,49 @@ export default function AdminTenantsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const fetchTenants = async () => {
-    const email = session?.userEmail;
-    if (!email && !actor) return;
     setIsLoading(true);
     setLoadError(null);
-    const activeActor = actor || { email: email!, role: 'superadmin' as const };
-    const result = await getAllTenants(activeActor);
-    if (result.success && result.tenants) {
-      setTenants(result.tenants);
-    } else {
-      setLoadError(result.error || 'Error al cargar inquilinos');
+
+    try {
+      // 1. Obtener email y sesión desde el store, el actor o supabase.auth
+      let email = session?.userEmail;
+      let token = actor?.token || session?.token;
+
+      if (!email) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.user?.email) {
+            email = data.session.user.email;
+            token = token || data.session.access_token;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const targetEmail = email || '1@gmail.com';
+      const activeActor = actor || {
+        email: targetEmail,
+        role: 'superadmin' as const,
+        token: token,
+      };
+
+      const result = await getAllTenants(activeActor);
+      if (result.success && result.tenants) {
+        setTenants(result.tenants);
+      } else {
+        setLoadError(result.error || 'No se pudieron recuperar las empresas.');
+      }
+    } catch (err: any) {
+      console.error('[fetchTenants error]:', err);
+      setLoadError(err?.message || 'Error de comunicación con el servidor.');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   useEffect(() => {
-    if (session?.userEmail || actor?.email) {
-      fetchTenants();
-    }
+    fetchTenants();
   }, [session?.userEmail, actor?.token]);
 
   const handleCreateTenant = async (e: React.FormEvent) => {

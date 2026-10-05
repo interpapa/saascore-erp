@@ -11,7 +11,7 @@ import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 import { getResolvedSupabaseUrl, getResolvedAnonKey } from '@/lib/supabaseConfig';
 
 async function verifySuperAdminActor(
-  callerOrActor: ActionActor | string,
+  callerOrActor?: ActionActor | string | null,
   token?: string
 ): Promise<{ authorized: boolean; error?: string }> {
   let email = '';
@@ -24,7 +24,12 @@ async function verifySuperAdminActor(
     email = callerOrActor;
   }
 
-  // 1. Si no hay token en el actor, intentar recuperar sesión desde cookies de Next.js
+  // 1. Verificación instantánea por lista blanca de superadmin (0ms de latencia)
+  if (email && isSuperAdminEmail(email)) {
+    return { authorized: true };
+  }
+
+  // 2. Si no hay token en el actor, intentar recuperar sesión desde cookies de Next.js
   if (!authToken) {
     try {
       const { cookies } = await import('next/headers');
@@ -37,6 +42,9 @@ async function verifySuperAdminActor(
           const parsed = JSON.parse(decodeURIComponent(authCookie.value));
           if (parsed?.access_token) tokenStr = parsed.access_token;
           else if (Array.isArray(parsed) && parsed[0]) tokenStr = parsed[0];
+          if (parsed?.user?.email && isSuperAdminEmail(parsed.user.email)) {
+            return { authorized: true };
+          }
         } catch {}
         if (tokenStr) authToken = tokenStr;
       }
@@ -45,7 +53,7 @@ async function verifySuperAdminActor(
     }
   }
 
-  // 2. Validación criptográfica vía Supabase Auth si hay token
+  // 3. Validación criptográfica vía Supabase Auth si hay token
   if (authToken) {
     try {
       const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(authToken);
@@ -55,11 +63,6 @@ async function verifySuperAdminActor(
     } catch {
       // ignore
     }
-  }
-
-  // 3. Verificación legítima por whitelist de superadministrador maestro
-  if (email && isSuperAdminEmail(email)) {
-    return { authorized: true };
   }
 
   return { authorized: false, error: 'No autorizado. Se requiere acceso verificado de Super Administrador con token de sesión válido.' };
@@ -914,7 +917,7 @@ export async function getAllUsersGlobalAdminAction(
     const db = supabaseAdmin;
     const [authListRes, userTenantsRes, tenantsRes] = await Promise.all([
       db.auth.admin.listUsers({ perPage: 1000 }),
-      db.from('user_tenants').select('id, user_email, user_id, tenant_id, role, created_at'),
+      db.from('user_tenants').select('id, user_email, tenant_id, role, created_at'),
       db.from('tenants').select('id, name, active_modules')
     ]);
 
@@ -927,7 +930,7 @@ export async function getAllUsersGlobalAdminAction(
     const enrichedUsers = authUsers.map((u: any) => {
       const email = u.email?.toLowerCase();
       const memberships = userTenants.filter(
-        (ut: any) => (ut.user_email?.toLowerCase() === email) || (ut.user_id === u.id)
+        (ut: any) => ut.user_email?.toLowerCase() === email
       ).map((ut: any) => ({
         user_tenant_id: ut.id,
         tenant_id: ut.tenant_id,
@@ -1010,7 +1013,7 @@ export async function updateUserRoleAndPermissionsAdminAction(
       const { data: existingLink } = await db
         .from('user_tenants')
         .select('id')
-        .or(`user_email.ilike.${cleanEmail},user_id.eq.${userId}`)
+        .ilike('user_email', cleanEmail)
         .limit(1);
 
       if (existingLink && existingLink.length > 0) {
@@ -1019,8 +1022,7 @@ export async function updateUserRoleAndPermissionsAdminAction(
           .update({
             tenant_id: tenantId,
             role: newRole,
-            user_email: cleanEmail,
-            user_id: userId
+            user_email: cleanEmail
           })
           .eq('id', existingLink[0].id);
       } else {
@@ -1029,8 +1031,7 @@ export async function updateUserRoleAndPermissionsAdminAction(
           .insert([{
             tenant_id: tenantId,
             role: newRole,
-            user_email: cleanEmail,
-            user_id: userId
+            user_email: cleanEmail
           }]);
       }
     }
@@ -1105,7 +1106,6 @@ export async function createGlobalUserAdminAction(
     if (tenantId) {
       await db.from('user_tenants').insert([{
         user_email: cleanEmail,
-        user_id: newUserId,
         tenant_id: tenantId,
         role: role
       }]);
@@ -1148,7 +1148,7 @@ export async function deleteUserGlobalAdminAction(
     const cleanEmail = userEmail.trim().toLowerCase();
 
     // 1. Borrar enlaces en user_tenants
-    await db.from('user_tenants').delete().or(`user_id.eq.${userId},user_email.ilike.${cleanEmail}`);
+    await db.from('user_tenants').delete().ilike('user_email', cleanEmail);
 
     // 2. Borrar cuenta en Auth
     const { error: authErr } = await db.auth.admin.deleteUser(userId);

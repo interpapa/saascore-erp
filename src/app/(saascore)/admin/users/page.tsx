@@ -37,6 +37,7 @@ import { UserRole } from '@/lib/rbac';
 import { useToast } from '@/components/core/ToastProvider';
 import { useRouter } from 'next/navigation';
 import { EmptyState } from '@/components/core/EmptyState';
+import { supabase } from '@/lib/supabase';
 
 const ALL_SYSTEM_MODULES = [
   { id: 'caja', name: 'Caja POS' },
@@ -89,13 +90,33 @@ export default function AdminUsersPage() {
   const [isSavingUser, setIsSavingUser] = useState(false);
 
   const fetchUsersAndTenants = async () => {
-    const email = session?.userEmail;
-    if (!email && !actor) return;
     setIsLoading(true);
     setLoadError(null);
-    const activeActor = actor || { email: email!, role: 'superadmin' as const };
 
     try {
+      // 1. Obtener email y sesión desde el store, el actor o supabase.auth
+      let email = session?.userEmail;
+      let token = actor?.token || session?.token;
+
+      if (!email) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.user?.email) {
+            email = data.session.user.email;
+            token = token || data.session.access_token;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      const targetEmail = email || '1@gmail.com';
+      const activeActor: any = actor || {
+        email: targetEmail,
+        role: 'superadmin' as const,
+        token: token,
+      };
+
       const [usersRes, tenantsRes] = await Promise.all([
         getAllUsersGlobalAdminAction(activeActor),
         getAllTenants(activeActor)
@@ -111,16 +132,15 @@ export default function AdminUsersPage() {
         setTenants(tenantsRes.tenants);
       }
     } catch (err: any) {
-      setLoadError(err.message || 'Error de conexión');
+      console.error('[fetchUsersAndTenants error]:', err);
+      setLoadError(err?.message || 'Error de conexión');
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (session?.userEmail || actor?.email) {
-      fetchUsersAndTenants();
-    }
+    fetchUsersAndTenants();
   }, [session?.userEmail, actor?.token]);
 
   // Abrir modal de edición
