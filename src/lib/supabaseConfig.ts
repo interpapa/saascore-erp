@@ -21,6 +21,22 @@ export const ACTIVE_SUPABASE_URL = PROD_SUPABASE_URL;
 export const ACTIVE_SUPABASE_ANON_KEY = PROD_SUPABASE_ANON_KEY;
 export const ACTIVE_SUPABASE_SERVICE_ROLE_KEY = PROD_SUPABASE_SERVICE_ROLE_KEY;
 
+function getJwtRef(token?: string): string | null {
+  if (!token || !token.includes('.')) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = typeof Buffer !== 'undefined' 
+      ? Buffer.from(base64, 'base64').toString('utf8')
+      : atob(base64);
+    const parsed = JSON.parse(json);
+    return parsed.ref || null;
+  } catch {
+    return null;
+  }
+}
+
 export function getResolvedSupabaseUrl(): string {
   const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!envUrl || envUrl.includes('acyvim') || envUrl.includes('your-project') || !envUrl.startsWith('https://')) {
@@ -31,28 +47,36 @@ export function getResolvedSupabaseUrl(): string {
 
 export function getResolvedAnonKey(): string {
   const url = getResolvedSupabaseUrl();
-  if (url.includes('pfgfsnoblxasiixeveue')) {
-    return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.includes('your-anon-key')
-      ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-      : DEV_SUPABASE_ANON_KEY;
-  }
   const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!envKey || envKey.includes('acyvim') || envKey.includes('your-anon-key') || envKey.includes('pfgfsnoblxasiixeveue')) {
-    return PROD_SUPABASE_ANON_KEY;
+
+  if (url.includes('pfgfsnoblxasiixeveue')) {
+    if (envKey && getJwtRef(envKey) === 'pfgfsnoblxasiixeveue') {
+      return envKey;
+    }
+    return DEV_SUPABASE_ANON_KEY;
   }
-  return envKey;
+
+  // Producción (nurbajgedeltcvgljsmg)
+  if (envKey && getJwtRef(envKey) === 'nurbajgedeltcvgljsmg') {
+    return envKey;
+  }
+  return PROD_SUPABASE_ANON_KEY;
 }
 
 export function getResolvedServiceRoleKey(): string {
   const url = getResolvedSupabaseUrl();
-  if (url.includes('pfgfsnoblxasiixeveue')) {
-    return process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY.includes('your-service-key')
-      ? process.env.SUPABASE_SERVICE_ROLE_KEY
-      : DEV_SUPABASE_SERVICE_ROLE_KEY;
-  }
   const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!envKey || envKey.includes('acyvim') || envKey.includes('your-service-key') || envKey.includes('pfgfsnoblxasiixeveue')) {
-    return PROD_SUPABASE_SERVICE_ROLE_KEY;
+
+  if (url.includes('pfgfsnoblxasiixeveue')) {
+    if (envKey && getJwtRef(envKey) === 'pfgfsnoblxasiixeveue') {
+      return envKey;
+    }
+    return DEV_SUPABASE_SERVICE_ROLE_KEY;
   }
-  return envKey;
+
+  // Producción (nurbajgedeltcvgljsmg)
+  if (envKey && getJwtRef(envKey) === 'nurbajgedeltcvgljsmg') {
+    return envKey;
+  }
+  return PROD_SUPABASE_SERVICE_ROLE_KEY;
 }

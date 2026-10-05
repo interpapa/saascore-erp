@@ -9,6 +9,7 @@ import { UserRole } from '@/lib/rbac';
 import { validateUserTenantAccess, isSuperAdminEmail, isSuperAdminAuthUser, SUPERADMIN_EMAILS } from '@/lib/core/tenantSecurity';
 import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 import { getResolvedSupabaseUrl, getResolvedAnonKey } from '@/lib/supabaseConfig';
+import { cookies } from 'next/headers';
 
 async function verifySuperAdminActor(
   callerOrActor?: ActionActor | string | null,
@@ -32,7 +33,6 @@ async function verifySuperAdminActor(
   // 2. Si no hay token en el actor, intentar recuperar sesión desde cookies de Next.js
   if (!authToken) {
     try {
-      const { cookies } = await import('next/headers');
       const cookieStore = await cookies();
       const allCookies = cookieStore.getAll();
       const authCookie = allCookies.find(c => c.name.includes('-auth-token'));
@@ -384,7 +384,7 @@ export async function updateTenantMetadataAction(
   }
 }
 
-export async function getAllTenants(callerOrActor: ActionActor | string, token?: string) {
+export async function getAllTenants(callerOrActor?: ActionActor | string | null, token?: string) {
   try {
     const authCheck = await verifySuperAdminActor(callerOrActor, token);
     if (!authCheck.authorized) {
@@ -396,10 +396,14 @@ export async function getAllTenants(callerOrActor: ActionActor | string, token?:
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (error) throw new Error('Error fetching tenants: ' + error.message);
-    return { success: true, tenants };
+    if (error) {
+      console.error('[getAllTenants error]:', error);
+      return { success: false, tenants: [], error: error.message };
+    }
+    return { success: true, tenants: tenants || [] };
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error('[getAllTenants catch]:', error);
+    return { success: false, tenants: [], error: error.message };
   }
 }
 
@@ -478,20 +482,6 @@ export async function getUserTenant(userEmail: string, userId?: string) {
 
     let userTenants = userTenantsRes.data;
     let utError = userTenantsRes.error;
-
-    // Si no se encontró por email o hubo error en columna, intentar por user_id
-    if ((!userTenants || userTenants.length === 0 || utError) && userId) {
-      const retry = await db
-        .from('user_tenants')
-        .select('tenant_id, role, created_at')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      if (retry.data && retry.data.length > 0) {
-        userTenants = retry.data;
-        utError = retry.error;
-      }
-    }
 
     if (utError || !userTenants || userTenants.length === 0) {
       if (isSuperAdmin) {
@@ -679,7 +669,6 @@ export async function createTenantUserAction(
     const { error: linkError } = await supabaseAdmin.from('user_tenants').upsert([
       {
         tenant_id: tenantId,
-        user_id: userId,
         user_email: cleanEmail,
         role
       }
@@ -708,7 +697,7 @@ export async function getTenantUsersAction(tenantId: string, actor: ActionActor)
 
     const { data, error } = await supabaseAdmin
       .from('user_tenants')
-      .select('id, user_id, user_email, role, created_at')
+      .select('id, user_email, role, created_at')
       .eq('tenant_id', tenantId);
 
     if (error) throw error;
@@ -785,7 +774,7 @@ export async function getTenantUsersAdminAction(
     const db = supabaseAdmin;
     const { data: users, error } = await db
       .from('user_tenants')
-      .select('id, user_email, user_id, role, created_at')
+      .select('id, user_email, role, created_at')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true });
 

@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import { ReactNode, useEffect, useState } from 'react';
 import { Crown, Database, CreditCard, Blocks, ArrowLeft, Zap, Users, Activity } from 'lucide-react';
 import Link from 'next/link';
@@ -47,11 +49,15 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
     const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
     if (isSuper && session?.userEmail) {
       const activeActor = actor || { email: session.userEmail || '', role: 'superadmin' as const };
-      getSystemHealthAdminAction(activeActor).then(res => {
-        if (res.success && res.data) {
-          setHealthData(res.data);
-        }
-      });
+      getSystemHealthAdminAction(activeActor)
+        .then(res => {
+          if (res.success && res.data) {
+            setHealthData(res.data);
+          }
+        })
+        .catch(err => {
+          console.warn('[RendoLayout healthData error]:', err);
+        });
     }
   }, [session?.role, session?.userEmail, actor]);
 
