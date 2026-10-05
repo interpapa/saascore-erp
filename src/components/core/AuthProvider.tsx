@@ -175,16 +175,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session && !isPublic) {
       router.push('/login');
     } 
-    // Superadmin sin tenant va directo a /admin
-    else if (session && session.role === 'superadmin' && (pathname === '/login' || pathname === '/onboarding')) {
-      router.push('/admin');
-    }
-    // Usuario normal con tenant no debe estar en /login ni en /onboarding
-    else if (session && session.tenantId && (pathname === '/login' || pathname === '/onboarding')) {
+    // Usuario autenticado con empresa activa que quedó en /onboarding -> Directo a su Dashboard
+    else if (session && session.tenantId && session.tenantId !== 'global-admin' && pathname === '/onboarding') {
       router.push('/dashboard');
     }
+    // Superadmin global sin empresa que visita /onboarding -> Directo a consola /admin
+    else if (session && session.role === 'superadmin' && (!session.tenantId || session.tenantId === 'global-admin') && pathname === '/onboarding') {
+      router.push('/admin');
+    }
     // Usuario autenticado SIN empresa asignada intentando acceder a rutas privadas -> Configurar empresa
-    else if (session && !session.tenantId && session.role !== 'superadmin' && pathname !== '/onboarding' && !isPublic) {
+    else if (session && (!session.tenantId || session.tenantId === 'global-admin') && session.role !== 'superadmin' && pathname !== '/onboarding' && !isPublic) {
       router.push('/onboarding');
     }
   }, [session, isLoading, hasHydrated, pathname, router]);

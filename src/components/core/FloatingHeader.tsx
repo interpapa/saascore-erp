@@ -1,7 +1,9 @@
 'use client';
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { Search, Bell, CheckCircle2, AlertTriangle, MessageCircle, X } from 'lucide-react';
+import { Search, Bell, CheckCircle2, AlertTriangle, MessageCircle, X, Crown } from 'lucide-react';
+import Link from 'next/link';
+import { useERPStore } from '@/store/useERPStore';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Breadcrumbs } from '@/components/core/Breadcrumbs';
 import { CommandPalette } from '@/components/core/CommandPalette';
@@ -16,6 +18,7 @@ interface NotificationItem {
 }
 
 export function FloatingHeader() {
+  const session = useERPStore((s) => s.session);
   const [scrolled, setScrolled] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -179,6 +182,20 @@ export function FloatingHeader() {
           <div className="w-10 h-10 flex items-center justify-center">
             <ThemeToggle />
           </div>
+
+          {/* Acceso directo SuperAdmin */}
+          {session?.role === 'superadmin' && (
+            <>
+              <div className="w-px h-6 bg-border mx-1" />
+              <Link
+                href="/admin"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors btn-haptic group"
+                title="Consola SuperAdmin (Rendo Hub)"
+              >
+                <Crown size={18} className="group-hover:scale-110 transition-transform" />
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
