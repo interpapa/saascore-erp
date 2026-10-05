@@ -10,6 +10,7 @@ import { getSystemHealthAdminAction } from '@/app/actions/tenant';
 import { FloatingHeader } from '@/components/core/FloatingHeader';
 import { AmbientBackground } from '@/components/core/AmbientBackground';
 import { MobileDock } from '@/components/core/MobileDock';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 export default function RendoLayout({ children }: { children: ReactNode }) {
   const { session } = useERPStore();
@@ -27,8 +28,15 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Evitar parpadeos o redirecciones en el lado del servidor
-    if (session?.role === 'superadmin') {
+    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    if (isSuper) {
       setIsAuthorized(true);
+      if (session && session.role !== 'superadmin') {
+        useERPStore.getState().setSession({
+          ...session,
+          role: 'superadmin'
+        });
+      }
     } else {
       setIsAuthorized(false);
       router.replace('/dashboard');
@@ -36,7 +44,8 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   }, [session, router]);
 
   useEffect(() => {
-    if (session?.role === 'superadmin') {
+    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    if (isSuper && session?.userEmail) {
       const activeActor = actor || { email: session.userEmail || '', role: 'superadmin' as const };
       getSystemHealthAdminAction(activeActor).then(res => {
         if (res.success && res.data) {
@@ -44,13 +53,14 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
         }
       });
     }
-  }, [session?.role, actor]);
+  }, [session?.role, session?.userEmail, actor]);
 
   if (isAuthorized === null) return null; // Cargando
   if (!isAuthorized) return null; // Redirigiendo
 
   const navItems = [
     { href: '/admin', label: 'Tenants & Clientes', icon: Database, exact: true },
+    { href: '/admin/users', label: 'Usuarios & Accesos', icon: Users, exact: false },
     { href: '/admin/billing', label: 'Facturación SaaS', icon: CreditCard, exact: false },
     { href: '/admin/studio', label: 'Lego Studio', icon: Blocks, exact: false },
   ];

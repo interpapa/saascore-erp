@@ -898,3 +898,267 @@ export async function getSystemHealthAdminAction(
     return { success: false, error: err.message };
   }
 }
+
+/**
+ * Consulta TODOS los usuarios del sistema global, cruzando Auth con user_tenants y tenants.
+ */
+export async function getAllUsersGlobalAdminAction(
+  actor: ActionActor
+): Promise<{ success: boolean; users?: any[]; error?: string }> {
+  try {
+    const authCheck = await verifySuperAdminActor(actor);
+    if (!authCheck.authorized) {
+      return { success: false, users: [], error: authCheck.error };
+    }
+
+    const db = supabaseAdmin;
+    const [authListRes, userTenantsRes, tenantsRes] = await Promise.all([
+      db.auth.admin.listUsers({ perPage: 1000 }),
+      db.from('user_tenants').select('id, user_email, user_id, tenant_id, role, created_at'),
+      db.from('tenants').select('id, name, active_modules')
+    ]);
+
+    if (authListRes.error) throw authListRes.error;
+
+    const tenantsMap = new Map((tenantsRes.data || []).map((t: any) => [t.id, t]));
+    const userTenants = userTenantsRes.data || [];
+    const authUsers = authListRes.data?.users || [];
+
+    const enrichedUsers = authUsers.map((u: any) => {
+      const email = u.email?.toLowerCase();
+      const memberships = userTenants.filter(
+        (ut: any) => (ut.user_email?.toLowerCase() === email) || (ut.user_id === u.id)
+      ).map((ut: any) => ({
+        user_tenant_id: ut.id,
+        tenant_id: ut.tenant_id,
+        tenant_name: tenantsMap.get(ut.tenant_id)?.name || 'Empresa Desconocida',
+        role: ut.role,
+        tenant_modules: tenantsMap.get(ut.tenant_id)?.active_modules || []
+      }));
+
+      const primaryTenant = memberships[0] || null;
+      const isSuper = isSuperAdminEmail(email) || u.app_metadata?.role === 'superadmin' || u.app_metadata?.is_superadmin === true;
+      const primaryRole = isSuper ? 'superadmin' : (primaryTenant?.role || u.app_metadata?.role || 'seller');
+
+      return {
+        id: u.id,
+        email: u.email,
+        created_at: u.created_at,
+        last_sign_in_at: u.last_sign_in_at,
+        is_banned: !!u.banned_until && new Date(u.banned_until) > new Date(),
+        app_metadata: u.app_metadata || {},
+        user_metadata: u.user_metadata || {},
+        primary_role: primaryRole,
+        primary_tenant_id: primaryTenant?.tenant_id || null,
+        primary_tenant_name: primaryTenant?.tenant_name || null,
+        allowed_modules: u.app_metadata?.allowed_modules || primaryTenant?.tenant_modules || null,
+        memberships
+      };
+    });
+
+    return { success: true, users: enrichedUsers };
+  } catch (err: any) {
+    return { success: false, users: [], error: err.message };
+  }
+}
+
+/**
+ * Modifica rol, empresa y módulos permitidos de un usuario en Supabase Auth y user_tenants.
+ */
+export async function updateUserRoleAndPermissionsAdminAction(
+  payload: {
+    userId: string;
+    userEmail: string;
+    newRole: UserRole;
+    tenantId?: string;
+    allowedModules?: string[];
+    isBanned?: boolean;
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const authCheck = await verifySuperAdminActor(actor);
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
+    }
+
+    const { userId, userEmail, newRole, tenantId, allowedModules, isBanned } = payload;
+    const cleanEmail = userEmail.trim().toLowerCase();
+    const db = supabaseAdmin;
+
+    // 1. Actualizar metadata y estado de baneo en Supabase Auth
+    const authUpdates: any = {
+      app_metadata: {
+        role: newRole,
+        is_superadmin: newRole === 'superadmin',
+        allowed_modules: allowedModules || undefined
+      },
+      user_metadata: {
+        role: newRole,
+      }
+    };
+
+    if (isBanned !== undefined) {
+      authUpdates.ban_duration = isBanned ? '876000h' : 'none';
+    }
+
+    const { error: authError } = await db.auth.admin.updateUserById(userId, authUpdates);
+    if (authError) throw authError;
+
+    // 2. Si se especificó tenantId, actualizar o insertar en user_tenants
+    if (tenantId) {
+      const { data: existingLink } = await db
+        .from('user_tenants')
+        .select('id')
+        .or(`user_email.ilike.${cleanEmail},user_id.eq.${userId}`)
+        .limit(1);
+
+      if (existingLink && existingLink.length > 0) {
+        await db
+          .from('user_tenants')
+          .update({
+            tenant_id: tenantId,
+            role: newRole,
+            user_email: cleanEmail,
+            user_id: userId
+          })
+          .eq('id', existingLink[0].id);
+      } else {
+        await db
+          .from('user_tenants')
+          .insert([{
+            tenant_id: tenantId,
+            role: newRole,
+            user_email: cleanEmail,
+            user_id: userId
+          }]);
+      }
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId || 'SYSTEM',
+      actor_email: actor.email,
+      actor_role: 'superadmin',
+      action: 'user.permissions_updated',
+      target_type: 'user',
+      target_id: userId,
+      metadata: { newRole, tenantId, allowedModules, isBanned }
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/users');
+    revalidatePath('/dashboard');
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Crea un nuevo usuario en Supabase Auth y lo vincula a un tenant con rol y módulos.
+ */
+export async function createGlobalUserAdminAction(
+  payload: {
+    email: string;
+    password: string;
+    role: UserRole;
+    tenantId: string;
+    allowedModules?: string[];
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const authCheck = await verifySuperAdminActor(actor);
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
+    }
+
+    const { email, password, role, tenantId, allowedModules } = payload;
+    if (!email || !password || password.length < 6) {
+      return { success: false, error: 'Correo y contraseña de al menos 6 caracteres requeridos.' };
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const db = supabaseAdmin;
+
+    // 1. Crear en Supabase Auth
+    const { data: createdAuth, error: createError } = await db.auth.admin.createUser({
+      email: cleanEmail,
+      password: password,
+      email_confirm: true,
+      app_metadata: {
+        role,
+        is_superadmin: role === 'superadmin',
+        allowed_modules: allowedModules || undefined
+      },
+      user_metadata: {
+        role,
+        email_verified: true
+      }
+    });
+
+    if (createError) throw createError;
+    const newUserId = createdAuth.user.id;
+
+    // 2. Vincular a user_tenants si hay tenantId
+    if (tenantId) {
+      await db.from('user_tenants').insert([{
+        user_email: cleanEmail,
+        user_id: newUserId,
+        tenant_id: tenantId,
+        role: role
+      }]);
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId || 'SYSTEM',
+      actor_email: actor.email,
+      actor_role: 'superadmin',
+      action: 'user.created_by_admin',
+      target_type: 'user',
+      target_id: newUserId,
+      metadata: { cleanEmail, role, tenantId }
+    });
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/users');
+
+    return { success: true, user: createdAuth.user };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Elimina permanentemente a un usuario de Supabase Auth y desvincula sus tenants.
+ */
+export async function deleteUserGlobalAdminAction(
+  userId: string,
+  userEmail: string,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const authCheck = await verifySuperAdminActor(actor);
+    if (!authCheck.authorized) {
+      return { success: false, error: authCheck.error };
+    }
+
+    const db = supabaseAdmin;
+    const cleanEmail = userEmail.trim().toLowerCase();
+
+    // 1. Borrar enlaces en user_tenants
+    await db.from('user_tenants').delete().or(`user_id.eq.${userId},user_email.ilike.${cleanEmail}`);
+
+    // 2. Borrar cuenta en Auth
+    const { error: authErr } = await db.auth.admin.deleteUser(userId);
+    if (authErr) throw authErr;
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/users');
+
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
