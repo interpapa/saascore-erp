@@ -132,6 +132,8 @@ function CajaPageContent() {
 
   // Ticket & Checkout
   const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
+  const [editingPriceItemId, setEditingPriceItemId] = useState<string | null>(null);
+  const [tempPriceValue, setTempPriceValue] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>(clientParam || 'generic_counter_customer');
   const [docType, setDocType] = useState<'delivery_order' | 'fiscal_invoice'>('delivery_order');
   const [paymentMethod, setPaymentMethod] = useState<'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'mixed' | 'credit'>('cash_usd');
@@ -577,6 +579,54 @@ function CajaPageContent() {
     );
   };
 
+  const setExactQuantity = (itemId: string, exactQty: number) => {
+    if (exactQty <= 0) {
+      removeLine(itemId);
+      return;
+    }
+    setTicketLines((prev) =>
+      prev.map((l) => {
+        if (l.item.id === itemId) {
+          if (l.item.type === 'product') {
+            const stockVal = l.item.stock ?? l.item.stock_quantity ?? 0;
+            if (stockVal > 0 && exactQty > stockVal) {
+              toast({ variant: 'warning', title: 'Stock Limitado', description: `Solo hay ${stockVal} unidades disponibles.` });
+              return { ...l, quantity: stockVal };
+            }
+          }
+          return { ...l, quantity: exactQty };
+        }
+        return l;
+      })
+    );
+  };
+
+  const handleSaveLinePrice = (itemId: string) => {
+    const numPrice = parseFloat(tempPriceValue);
+    if (isNaN(numPrice) || numPrice < 0) {
+      toast({ variant: 'warning', title: 'Precio Inválido', description: 'Ingresa un precio mayor o igual a 0.' });
+      return;
+    }
+    setTicketLines((prev) =>
+      prev.map((l) => {
+        if (l.item.id === itemId) {
+          const originalPrice = l.item._originalPrice ?? l.item.base_price ?? 0;
+          return {
+            ...l,
+            item: {
+              ...l.item,
+              _originalPrice: originalPrice,
+              base_price: numPrice,
+            },
+          };
+        }
+        return l;
+      })
+    );
+    setEditingPriceItemId(null);
+    toast({ variant: 'success', title: 'Precio Actualizado', description: `Precio unitario fijado en $${numPrice.toFixed(2)} USD` });
+  };
+
   const clearCart = () => {
     setTicketLines([]);
     setCashTenderedUSD('');
@@ -944,7 +994,7 @@ function CajaPageContent() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-36 md:pb-6">
       {/* ─────────────────────────────────────────────────────────────
           1. BARRA SUPERIOR DINÁMICA DE CAJA (TURNO, TASA BCV, ACCIONES)
          ───────────────────────────────────────────────────────────── */}
@@ -1489,7 +1539,7 @@ function CajaPageContent() {
         </div>
 
         {/* PANEL DERECHO: Ticket de Venta & Checkout (5 columnas) */}
-        <div className={`lg:col-span-5 bg-card border border-border rounded-3xl p-5 shadow-lg space-y-4 flex flex-col relative overflow-hidden ${globalViewMode === 'express' ? 'max-lg:hidden' : ''}`}>
+        <div id="pos-ticket-panel" className={`lg:col-span-5 bg-card border border-border rounded-3xl p-5 shadow-lg space-y-4 flex flex-col relative overflow-hidden ${globalViewMode === 'express' ? 'max-lg:hidden' : ''}`}>
           
           {/* Overlay de Éxito */}
           {success && (
@@ -1636,7 +1686,7 @@ function CajaPageContent() {
           </div>
 
           {/* Líneas de Productos en el Ticket */}
-          <div className="space-y-2 max-h-48 overflow-y-auto pr-1 flex-1">
+          <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 flex-1">
             {ticketLines.length === 0 ? (
               <div className="text-center py-10 text-slate-400 space-y-2">
                 <ShoppingBag size={32} className="mx-auto opacity-30" />
@@ -1647,65 +1697,187 @@ function CajaPageContent() {
               ticketLines.map((line) => {
                 const lineTotalUSD = (line.item.base_price || 0) * line.quantity;
                 const lineTotalVES = lineTotalUSD * currentRate;
+                const isEditingPrice = editingPriceItemId === line.item.id;
+                const originalPrice = line.item._originalPrice;
+                const hasDiscount = originalPrice !== undefined && originalPrice !== line.item.base_price;
+
                 return (
                   <div
                     key={line.item.id}
-                    className="p-2.5 rounded-xl border border-border bg-background flex items-center justify-between gap-2 text-xs"
+                    className="p-3 rounded-2xl border border-border bg-background shadow-2xs space-y-2 text-xs transition-all hover:border-border/80"
                   >
-                    <div className="flex-1 min-w-0">
-                      <span className="font-bold text-foreground block truncate">{line.item.name}</span>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          ${Number(line.item.base_price || 0).toFixed(2)} c/u
+                    <div className="flex items-start justify-between gap-2">
+                      {/* Información del Ítem */}
+                      <div className="flex-1 min-w-0">
+                        <span className="font-bold text-foreground block truncate" title={line.item.name}>
+                          {line.item.name}
                         </span>
-                        {line.item.type === 'service' && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                            Servicio
-                          </span>
-                        )}
-                        {(String(line.item.id).startsWith('appt-') || line.item.category === 'Citas') && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                            Cita
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          {/* Precio unitario interactivo con opción a modificar */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPriceItemId(line.item.id);
+                              setTempPriceValue(String(line.item.base_price || 0));
+                            }}
+                            className="text-[11px] text-slate-500 hover:text-primary font-mono flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group/p"
+                            title="Haz clic para modificar el precio o aplicar un descuento a esta línea"
+                          >
+                            <span className="font-bold text-foreground">
+                              ${Number(line.item.base_price || 0).toFixed(2)}
+                            </span>
+                            <span className="text-[10px] text-slate-400">c/u</span>
+                            <Edit3 size={11} className="text-slate-400 group-hover/p:text-primary transition-colors ml-0.5" />
+                          </button>
+
+                          {hasDiscount && (
+                            <span className="text-[10px] line-through text-slate-400 font-mono" title="Precio de catálogo original">
+                              ${Number(originalPrice).toFixed(2)}
+                            </span>
+                          )}
+
+                          {line.item.type === 'service' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                              Servicio
+                            </span>
+                          )}
+                          {(String(line.item.id).startsWith('appt-') || line.item.category === 'Citas') && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                              Cita
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Importe Total de la Línea */}
+                      <div className="text-right shrink-0">
+                        <span className="font-mono font-black text-foreground block text-sm">
+                          ${lineTotalUSD.toFixed(2)}
+                        </span>
+                        <span className="font-mono text-[10px] text-blue-600 dark:text-blue-400 block font-semibold">
+                          Bs. {lineTotalVES.toFixed(2)}
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      {/* Control de Cantidad */}
-                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-border">
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(line.item.id, -1)}
-                          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-card text-foreground transition-colors"
-                        >
-                          <Minus size={11} />
-                        </button>
-                        <span className="w-6 text-center text-xs font-bold text-foreground">{line.quantity}</span>
-                        <button
-                          type="button"
-                          onClick={() => updateQuantity(line.item.id, 1)}
-                          className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-card text-foreground transition-colors"
-                        >
-                          <Plus size={11} />
-                        </button>
+                    {/* Editor Rápido de Precio Unitario / Descuentos */}
+                    {isEditingPrice && (
+                      <div className="p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-primary/30 rounded-xl space-y-2 animate-in fade-in duration-150">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                          <span>Modificar Precio Unitario:</span>
+                          <span className="text-primary font-mono text-[10px]">
+                            Original: ${Number(line.item._originalPrice ?? line.item.base_price ?? 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">$</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              autoFocus
+                              value={tempPriceValue}
+                              onChange={(e) => setTempPriceValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleSaveLinePrice(line.item.id);
+                                else if (e.key === 'Escape') setEditingPriceItemId(null);
+                              }}
+                              className="w-full bg-background border border-border rounded-lg pl-6 pr-2 py-1 text-xs font-black text-foreground font-mono focus:ring-2 focus:ring-primary/20"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleSaveLinePrice(line.item.id)}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold btn-haptic"
+                            title="Confirmar precio"
+                          >
+                            Guardar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingPriceItemId(null)}
+                            className="px-2.5 py-1 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold"
+                            title="Cancelar"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        {/* Atajos de Descuento Rápido */}
+                        <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                          <span className="text-[10px] text-slate-400 font-bold">Descuentos:</span>
+                          {[5, 10, 15, 20].map((pct) => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => {
+                                const orig = Number(line.item._originalPrice ?? line.item.base_price ?? 0);
+                                const discounted = Math.max(0, orig * (1 - pct / 100));
+                                setTempPriceValue(discounted.toFixed(2));
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-card border border-border text-[10px] font-bold text-foreground hover:border-primary transition-colors"
+                            >
+                              -{pct}%
+                            </button>
+                          ))}
+                          {originalPrice !== undefined && (
+                            <button
+                              type="button"
+                              onClick={() => setTempPriceValue(Number(originalPrice).toFixed(2))}
+                              className="px-2 py-0.5 rounded-md bg-card border border-border text-[10px] font-bold text-slate-400 hover:text-foreground"
+                            >
+                              Restablecer
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    )}
 
-                      <div className="text-right w-16">
-                        <span className="font-mono font-bold text-foreground block text-xs">
-                          ${lineTotalUSD.toFixed(2)}
-                        </span>
-                        <span className="font-mono text-[9px] text-blue-600 dark:text-blue-400 block">
-                          Bs. {lineTotalVES.toFixed(2)}
-                        </span>
+                    {/* Controles de Cantidad y Botón de Eliminar */}
+                    <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] text-slate-400 font-semibold">Cantidad:</span>
+                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-border">
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(line.item.id, -1)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-card text-foreground transition-all active:scale-90"
+                            title="Restar 1 unidad"
+                          >
+                            <Minus size={13} />
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            max={line.item.type === 'product' ? (line.item.stock ?? line.item.stock_quantity ?? 9999) : 9999}
+                            value={line.quantity}
+                            onChange={(e) => {
+                              const val = parseInt(e.target.value);
+                              if (!isNaN(val)) setExactQuantity(line.item.id, val);
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            className="w-10 text-center text-xs font-black text-foreground bg-transparent border-0 focus:outline-hidden focus:bg-background rounded-lg py-0.5"
+                            title="Escribe la cantidad exacta"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => updateQuantity(line.item.id, 1)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-card text-foreground transition-all active:scale-90"
+                            title="Sumar 1 unidad"
+                          >
+                            <Plus size={13} />
+                          </button>
+                        </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => removeLine(line.item.id)}
-                        className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors btn-haptic font-bold text-[11px]"
+                        title="Quitar este producto del ticket"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} />
+                        <span>Quitar</span>
                       </button>
                     </div>
                   </div>
@@ -2201,35 +2373,88 @@ function CajaPageContent() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          2.1 BARRA FLOTANTE DE CHECKOUT EXPRÉS (MÓVIL / MOSTRADOR)
+          2.1 BARRA FLOTANTE DE CHECKOUT (MÓVIL & MODO EXPRÉS)
+          Posicionada sobre el MobileDock (bottom-22) para que nunca lo tape
          ───────────────────────────────────────────────────────────── */}
-      {globalViewMode === 'express' && ticketLines.length > 0 && (
-        <div className="fixed bottom-16 md:bottom-4 left-0 right-0 z-30 px-4 max-w-lg mx-auto pointer-events-none">
-          <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
-            <div>
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                {ticketLines.reduce((acc, l) => acc + l.quantity, 0)} ítem(s) en Ticket
-              </div>
-              <div className="text-lg font-black text-emerald-400 font-mono">
-                ${total.toFixed(2)}
-                <span className="text-xs text-slate-400 ml-1 font-normal font-sans">
-                  (Bs. {totalVES.toFixed(0)})
-                </span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsFastTenderOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md btn-haptic"
+      {ticketLines.length > 0 && (
+        <>
+          {/* Versión Móvil: Flota siempre sobre el MobileDock para acceso inmediato */}
+          <div className="fixed bottom-22 left-3 right-3 sm:left-6 sm:right-6 z-40 max-w-lg mx-auto md:hidden pointer-events-none">
+            <div className="pointer-events-auto bg-slate-900/95 dark:bg-slate-950/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
+              <div
+                onClick={() => {
+                  document.getElementById('pos-ticket-panel')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="cursor-pointer"
+                title="Toca para ir al detalle del ticket"
               >
-                <CreditCard size={14} />
-                <span>COBRAR ➔</span>
-              </button>
+                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-black">
+                    {ticketLines.reduce((acc, l) => acc + l.quantity, 0)}
+                  </span>
+                  <span>en Ticket ➔</span>
+                </div>
+                <div className="text-base font-black text-emerald-400 font-mono leading-tight">
+                  ${total.toFixed(2)} USD
+                  <span className="text-[10px] text-slate-400 ml-1 font-sans">
+                    (Bs. {totalVES.toLocaleString('es-VE', { maximumFractionDigits: 0 })})
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('pos-ticket-panel');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all"
+                >
+                  Ver Ticket
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsFastTenderOpen(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md btn-haptic"
+                >
+                  <CreditCard size={13} />
+                  <span>COBRAR</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+
+          {/* Versión Escritorio en Modo Exprés */}
+          {globalViewMode === 'express' && (
+            <div className="hidden md:block fixed bottom-4 left-0 right-0 z-30 px-4 max-w-lg mx-auto pointer-events-none">
+              <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
+                <div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    {ticketLines.reduce((acc, l) => acc + l.quantity, 0)} ítem(s) en Ticket
+                  </div>
+                  <div className="text-lg font-black text-emerald-400 font-mono">
+                    ${total.toFixed(2)}
+                    <span className="text-xs text-slate-400 ml-1 font-normal font-sans">
+                      (Bs. {totalVES.toFixed(0)})
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsFastTenderOpen(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md btn-haptic"
+                  >
+                    <CreditCard size={14} />
+                    <span>COBRAR ➔</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* MODAL BOTTOM SHEET DE COBRO RÁPIDO */}
@@ -2668,10 +2893,27 @@ function CajaPageContent() {
           onClose={() => setIsStockModalOpen(false)}
           tenantId={currentTenant.id}
           items={items}
-          onSuccess={() => {
+          onSuccess={(updatedItem) => {
+            if (updatedItem?.id) {
+              setItems((prev) =>
+                prev.map((i) =>
+                  i.id === updatedItem.id
+                    ? {
+                        ...i,
+                        ...updatedItem,
+                        stock: updatedItem.stock !== undefined ? updatedItem.stock : updatedItem.stock_quantity,
+                        stock_quantity: updatedItem.stock_quantity !== undefined ? updatedItem.stock_quantity : (updatedItem.stock ?? 0),
+                      }
+                    : i
+                )
+              );
+            }
             if (actor) {
               getItemsAction(currentTenant.id, undefined, 100, actor).then((res) => {
                 if (res.success) setItems(res.items || []);
+              });
+              getCashSessionStatusAction(currentTenant.id, actor).then((res) => {
+                if (res.success) setCashSessionStatus(res.session || null);
               });
             }
           }}

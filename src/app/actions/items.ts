@@ -358,16 +358,25 @@ export async function getItemsAction(tenantId: string, type: ItemType | undefine
   }
 }
 
+export interface AdjustItemExpenseInput {
+  recordExpense?: boolean;
+  unitCost?: number;
+  totalCost?: number;
+  paymentSource?: 'cash' | 'payable' | 'other';
+  supplierName?: string;
+}
+
 /**
- * Ajuste rápido de inventario (sumar/restar stock) sin pasar por POs.
- * Ideal para compras rápidas de mostrador sin proveedor formal o mermas.
+ * Ajuste rápido de inventario (sumar/restar stock) con opción de asentar gasto de compra.
+ * Ideal para compras rápidas de mostrador, reposición con costo o mermas.
  */
 export async function adjustItemStockAction(
   id: string,
   quantityDelta: number,
   tenantId: string,
   actor: ActionActor,
-  reason?: string
+  reason?: string,
+  expenseData?: AdjustItemExpenseInput
 ) {
   try {
     if (!isValidUUID(id) || isTemporaryId(id)) {
@@ -429,6 +438,113 @@ export async function adjustItemStockAction(
 
     if (error) throw new Error('Error al actualizar inventario: ' + error.message);
 
+    // 3. Si es una entrada (+) y se solicitó registrar el gasto de compra
+    let purchaseDocId: string | undefined = undefined;
+    if (quantityDelta > 0 && expenseData?.recordExpense) {
+      const safeTotalCost = Number(expenseData.totalCost) || (Number(expenseData.unitCost || 0) * quantityDelta);
+      const safeUnitCost = Number(expenseData.unitCost) || (quantityDelta > 0 ? safeTotalCost / quantityDelta : 0);
+
+      if (safeTotalCost > 0) {
+        // Actualizar el costo del ítem si se suministró un costo unitario válido
+        if (safeUnitCost > 0) {
+          try {
+            await supabaseAdmin
+              .from('items')
+              .update({ cost: safeUnitCost })
+              .eq('id', id)
+              .eq('tenant_id', targetTenantId);
+          } catch (costErr) {
+            console.warn('[adjustItemStockAction] Advertencia actualizando costo del ítem:', costErr);
+          }
+        }
+
+        // Crear documento contable de compra / egreso
+        const docNumber = `COM-${Date.now().toString().slice(-6)}`;
+        try {
+          const { data: purchaseDoc } = await supabaseAdmin
+            .from('documents')
+            .insert([{
+              tenant_id: targetTenantId,
+              entity_id: null,
+              type: 'purchase_order',
+              status: expenseData.paymentSource === 'payable' ? 'approved' : 'paid',
+              document_number: docNumber,
+              subtotal_amount: safeTotalCost,
+              tax_amount: 0,
+              total_amount: safeTotalCost,
+              notes: `Reposición de mercancía: +${quantityDelta} uds de ${item.name}${reason ? ' (' + reason + ')' : ''}`,
+              metadata: {
+                category: 'reposicion_inventario',
+                item_id: item.id,
+                item_name: item.name,
+                quantity: quantityDelta,
+                unit_cost: safeUnitCost,
+                total_cost: safeTotalCost,
+                payment_source: expenseData.paymentSource || 'cash',
+                supplier_name: expenseData.supplierName || 'Proveedor General',
+                registered_by: actor.email,
+                created_at: new Date().toISOString()
+              }
+            }])
+            .select('id')
+            .maybeSingle();
+
+          if (purchaseDoc?.id) {
+            purchaseDocId = purchaseDoc.id;
+          }
+        } catch (docErr) {
+          console.warn('[adjustItemStockAction] Advertencia creando documento de compra:', docErr);
+        }
+
+        // Si se pagó desde caja chica / gaveta POS en efectivo, registrar la salida en la sesión abierta
+        if (expenseData.paymentSource === 'cash' || !expenseData.paymentSource) {
+          try {
+            const { data: tenantData } = await supabaseAdmin
+              .from('tenants')
+              .select('metadata')
+              .eq('id', targetTenantId)
+              .maybeSingle();
+
+            if (tenantData) {
+              const sessions = tenantData.metadata?.cash_sessions || [];
+              const openIndex = sessions.findIndex((s: any) => s.status === 'open');
+              if (openIndex !== -1) {
+                const openSession = sessions[openIndex];
+                const rate = Number(openSession.exchangeRate) || Number(tenantData.metadata?.exchange_rate?.rate) || 849.56;
+                const movAmountVES = safeTotalCost * rate;
+                const movement: any = {
+                  id: `MOV-${Date.now()}`,
+                  type: 'out',
+                  amount_usd: safeTotalCost,
+                  amount_ves: movAmountVES,
+                  reason: `Compra/Reposición: ${item.name} (+${quantityDelta} uds)`,
+                  document_id: purchaseDocId,
+                  created_at: new Date().toISOString(),
+                  actor_email: actor.email,
+                };
+                const movements = openSession.cash_movements || [];
+                movements.push(movement);
+                openSession.cash_movements = movements;
+                sessions[openIndex] = openSession;
+
+                await supabaseAdmin
+                  .from('tenants')
+                  .update({
+                    metadata: {
+                      ...tenantData.metadata,
+                      cash_sessions: sessions,
+                    }
+                  })
+                  .eq('id', targetTenantId);
+              }
+            }
+          } catch (cashErr) {
+            console.warn('[adjustItemStockAction] Advertencia al asentar movimiento en caja chica:', cashErr);
+          }
+        }
+      }
+    }
+
     await writeAuditLog({
       tenant_id: targetTenantId,
       actor_email: actor.email,
@@ -441,21 +557,24 @@ export async function adjustItemStockAction(
         delta: quantityDelta, 
         newStock, 
         previousStock: currentStock,
-        reason: reason || 'Ajuste manual de inventario' 
+        reason: reason || 'Ajuste manual de inventario',
+        purchase_doc_id: purchaseDocId
       },
     });
 
     safeRevalidate('/inventario');
     safeRevalidate('/catalogo');
     safeRevalidate('/caja');
+    safeRevalidate('/compras');
 
     const mappedItem = {
       ...item,
+      cost: (expenseData?.recordExpense && expenseData.unitCost) ? expenseData.unitCost : item.cost,
       stock: newStock,
       stock_quantity: newStock,
     };
 
-    return { success: true, newStock, item: mappedItem };
+    return { success: true, newStock, item: mappedItem, purchaseDocId };
   } catch (err: any) {
     console.error('[adjustItemStockAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };

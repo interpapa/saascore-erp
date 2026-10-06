@@ -125,6 +125,24 @@ export default function InventarioPage() {
     }
   };
 
+  const handleStockAdjustSuccess = (updatedItem?: any) => {
+    if (updatedItem?.id) {
+      setItems((prev) =>
+        prev.map((i) =>
+          i.id === updatedItem.id
+            ? {
+                ...i,
+                ...updatedItem,
+                stock: updatedItem.stock !== undefined ? updatedItem.stock : updatedItem.stock_quantity,
+                stock_quantity: updatedItem.stock_quantity !== undefined ? updatedItem.stock_quantity : (updatedItem.stock ?? 0),
+              }
+            : i
+        )
+      );
+    }
+    fetchItems();
+  };
+
   const isDentalActive = isModuleActive(
     activeTenant?.active_modules || (activeTenant?.metadata as any)?.active_modules,
     'odontologia'
@@ -1125,7 +1143,7 @@ export default function InventarioPage() {
           setIsStockModalOpen(false);
           setStockModalItemId('');
         }}
-        onSuccess={fetchItems}
+        onSuccess={handleStockAdjustSuccess}
         items={items}
         initialItemId={stockModalItemId}
         tenantId={activeTenant?.id || ''}

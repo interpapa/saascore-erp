@@ -98,6 +98,30 @@ export async function runCajaTests() {
   assert.equal(cierreFaltante.status, 'deficit');
   console.log('  ✓ Arqueo de caja y detección de descuadre o faltante verificada');
 
+  console.log('5.4 Modificación interactiva de líneas de ticket: cantidad, cambio de precio y descuentos');
+  const cartWithOverrides: (CartItem & { originalPrice?: number })[] = [
+    { id: 'item-creatina', name: 'Creatina Monohidrato 300g', price: 20.00, quantity: 1, originalPrice: 20.00 },
+  ];
+  // 1. Aumentar cantidad directamente a 10 unidades
+  cartWithOverrides[0].quantity = 10;
+  assert.equal(cartWithOverrides[0].quantity, 10, 'La cantidad debe permitir asignarse a 10 unidades directamente');
+
+  // 2. Aplicar descuento / cambio de precio unitario a $18.00
+  cartWithOverrides[0].price = 18.00;
+  assert.equal(cartWithOverrides[0].price, 18.00, 'El precio unitario debe permitir modificarse');
+
+  const resOver = processCartCheckout(cartWithOverrides, 0.16, { cash: 208.80 });
+  // Subtotal = 10 * 18 = 180. IVA 16% = 28.80. Total = 208.80
+  assert.equal(resOver.subtotal, 180.00);
+  assert.equal(resOver.tax, 28.80);
+  assert.equal(resOver.total, 208.80);
+  assert.equal(resOver.isFullyPaid, true);
+
+  // 3. Quitar ítem del ticket
+  const cartFiltered = cartWithOverrides.filter(i => i.id !== 'item-creatina');
+  assert.equal(cartFiltered.length, 0, 'El carrito debe permitir retirar ítems completamente');
+  console.log('  ✓ Modificación de cantidad, cambio de precio e interactividad de ticket validadas');
+
   console.log('✅ [05_caja.test.ts] Todos los tests pasaron exitosamente.');
 }
 

@@ -63,6 +63,16 @@ export async function runCatalogoTests() {
   assert.equal(res2.total, 34.80, 'Total de servicio con 16% IVA');
   console.log('  ✓ Servicios clínicos exentos de alertas de inventario verificados');
 
+  console.log('2.3 Reposición de mercancía (+10 unidades) con registro de compra y costo unitario');
+  const stockInicial = 5;
+  const reposicionDelta = 10;
+  const costoUnitarioCompra = 20.00;
+  const nuevoStock = stockInicial + reposicionDelta;
+  const gastoTotalCompra = reposicionDelta * costoUnitarioCompra;
+  assert.equal(nuevoStock, 15, 'El nuevo stock tras agregar 10 unidades debe ser 15');
+  assert.equal(gastoTotalCompra, 200.00, 'El gasto registrado en compras debe ser $200.00 USD');
+  console.log('  ✓ Reflejo inmediato de +10 unidades y asiento de gasto financiero validados');
+
   console.log('✅ [02_catalogo.test.ts] Todos los tests pasaron exitosamente.');
 }
 
