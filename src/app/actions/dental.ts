@@ -513,18 +513,27 @@ export async function saveDentalEvolutionAction(
         if (isValidUUID(item.itemId)) {
           const { data: currentItem } = await supabaseAdmin
             .from('items')
-            .select('stock_quantity')
+            .select('*')
             .eq('id', item.itemId)
             .eq('tenant_id', tenantId)
-            .single();
+            .maybeSingle();
 
-          if (currentItem && typeof currentItem.stock_quantity === 'number') {
-            const newQty = Math.max(0, currentItem.stock_quantity - item.quantity);
-            await supabaseAdmin
+          if (currentItem) {
+            const currentQty = Number(currentItem.stock ?? currentItem.stock_quantity ?? currentItem.quantity ?? 0);
+            const newQty = Math.max(0, currentQty - item.quantity);
+            let updateResult = await supabaseAdmin
               .from('items')
-              .update({ stock_quantity: newQty })
+              .update({ stock: newQty })
               .eq('id', item.itemId)
               .eq('tenant_id', tenantId);
+
+            if (updateResult.error && (updateResult.error.message.includes('stock') || updateResult.error.message.includes('column'))) {
+              await supabaseAdmin
+                .from('items')
+                .update({ stock_quantity: newQty })
+                .eq('id', item.itemId)
+                .eq('tenant_id', tenantId);
+            }
           }
         }
       }

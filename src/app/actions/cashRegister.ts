@@ -798,20 +798,28 @@ export async function voidSaleAction(
           try {
             const { data: item } = await supabaseAdmin
               .from('items')
-              .select('id, type, stock, stock_quantity')
+              .select('*')
               .eq('id', line.item_id)
               .eq('tenant_id', tenantId)
               .maybeSingle();
 
             if (item && item.type !== 'service') {
-              const currentStock = item.stock !== undefined && item.stock !== null ? Number(item.stock) : Number(item.stock_quantity || 0);
+              const currentStock = Number(item.stock ?? item.stock_quantity ?? item.quantity ?? 0);
               const restoredStock = currentStock + qty;
-              const updatePayload = item.stock !== undefined ? { stock: restoredStock } : { stock_quantity: restoredStock };
-              await supabaseAdmin
+
+              let updateResult = await supabaseAdmin
                 .from('items')
-                .update(updatePayload)
+                .update({ stock: restoredStock })
                 .eq('id', item.id)
                 .eq('tenant_id', tenantId);
+
+              if (updateResult.error && (updateResult.error.message.includes('stock') || updateResult.error.message.includes('column'))) {
+                await supabaseAdmin
+                  .from('items')
+                  .update({ stock_quantity: restoredStock })
+                  .eq('id', item.id)
+                  .eq('tenant_id', tenantId);
+              }
             }
           } catch (stockErr) {
             console.warn('[voidSaleAction] Error restaurando stock del ítem:', line.item_id, stockErr);

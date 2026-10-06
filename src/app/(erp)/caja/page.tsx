@@ -283,8 +283,8 @@ function CajaPageContent() {
     try {
       setLoadingData(true);
       const [itemsRes, customersRes, cashRes, bankRes, rateRes] = await Promise.all([
-        isInventoryEnabled ? getItemsAction(currentTenant.id, undefined, 100, actor) : Promise.resolve({ success: true, items: [] }),
-        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 50, actor) : Promise.resolve({ success: true, entities: [] }),
+        isInventoryEnabled ? getItemsAction(currentTenant.id, undefined, 250, actor) : Promise.resolve({ success: true, items: [] }),
+        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 250, actor) : Promise.resolve({ success: true, entities: [] }),
         getCashSessionStatusAction(currentTenant.id, actor),
         getBankAccountsAction(currentTenant.id, actor),
         getExchangeRateAction(currentTenant.id),

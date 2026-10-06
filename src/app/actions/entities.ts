@@ -101,30 +101,39 @@ export async function updateEntityAction(
   actor: ActionActor
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor, tenantId);
-    if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
-    }
-
-    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+    if (!id) throw new Error('ID requerido.');
 
     // Blindaje defensivo contra IDs temporales
     if (!isValidUUID(id) || isTemporaryId(id)) {
       return { success: true, localOnly: true, entity: { id, ...updates } as any };
     }
 
+    const { data: existingEntity } = await supabaseAdmin
+      .from('entities')
+      .select('id, tenant_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    const targetTenantId = existingEntity?.tenant_id || tenantId;
+    if (!targetTenantId) throw new Error('Empresa requerida.');
+
+    const securityCheck = await validateUserTenantAccess(actor, targetTenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
     const { data: updatedEntity, error } = await supabaseAdmin
       .from('entities')
       .update(updates)
       .eq('id', id)
-      .eq('tenant_id', tenantId)
+      .eq('tenant_id', targetTenantId)
       .select()
       .single();
 
     if (error) throw new Error('Error al actualizar entidad: ' + error.message);
 
     await writeAuditLog({
-      tenant_id: tenantId,
+      tenant_id: targetTenantId,
       actor_email: actor.email,
       actor_role: actor.role,
       action: 'entity.updated',
@@ -151,16 +160,25 @@ export async function deleteEntityAction(
   actor: ActionActor
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor, tenantId);
-    if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
-    }
-
-    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+    if (!id) throw new Error('ID requerido.');
 
     // Blindaje defensivo contra IDs temporales: descarte seguro local
     if (!isValidUUID(id) || isTemporaryId(id)) {
       return { success: true, localOnly: true };
+    }
+
+    const { data: existingEntity } = await supabaseAdmin
+      .from('entities')
+      .select('id, tenant_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    const targetTenantId = existingEntity?.tenant_id || tenantId;
+    if (!targetTenantId) throw new Error('Empresa requerida.');
+
+    const securityCheck = await validateUserTenantAccess(actor, targetTenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
     // Soft delete: marcar deleted_at en lugar de destruir la fila
@@ -168,21 +186,21 @@ export async function deleteEntityAction(
       .from('entities')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', targetTenantId);
 
     if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
       const retry = await supabaseAdmin
         .from('entities')
         .update({ status: 'inactive' })
         .eq('id', id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', targetTenantId);
       error = retry.error;
     }
 
     if (error) throw new Error('Error al eliminar entidad: ' + error.message);
 
     await writeAuditLog({
-      tenant_id: tenantId,
+      tenant_id: targetTenantId,
       actor_email: actor.email,
       actor_role: actor.role,
       action: 'entity.updated',
@@ -545,6 +563,48 @@ export async function recordClientPaymentAction(
         entryId = docEntry?.id;
       } catch (docErr) {
         console.warn('[recordClientPaymentAction] Advertencia fallback document entry:', docErr);
+      }
+    }
+
+    // Si el abono fue en efectivo, ingresar automáticamente el movimiento a la caja abierta activa
+    if (fundCode === '1.1.01.01') {
+      try {
+        const { data: tenantData } = await supabaseAdmin
+          .from('tenants')
+          .select('metadata')
+          .eq('id', tenantId)
+          .single();
+
+        const sessions: any[] = tenantData?.metadata?.cash_sessions || [];
+        const openIdx = sessions.findIndex((s: any) => s.status === 'open');
+        if (openIdx !== -1) {
+          const openSession = sessions[openIdx];
+          const rate = Number(openSession.exchangeRate) || 849.56;
+          const movements = openSession.cash_movements || [];
+          movements.push({
+            id: `MOV-${Date.now()}`,
+            type: 'in',
+            amount_usd: cleanAmount,
+            amount_ves: cleanAmount * rate,
+            reason: `Abono de cliente (${entity.name}): ${concept}`,
+            created_at: new Date().toISOString(),
+            actor_email: actor.email,
+          });
+          openSession.cash_movements = movements;
+          sessions[openIdx] = openSession;
+          await supabaseAdmin
+            .from('tenants')
+            .update({
+              metadata: {
+                ...tenantData.metadata,
+                cash_sessions: sessions,
+              },
+            })
+            .eq('id', tenantId);
+          safeRevalidate('/caja');
+        }
+      } catch (cashErr) {
+        console.warn('[recordClientPaymentAction] Advertencia sincronizando caja:', cashErr);
       }
     }
 
