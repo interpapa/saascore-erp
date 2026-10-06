@@ -391,10 +391,16 @@ export async function getAllTenants(callerOrActor?: ActionActor | string | null,
       return { success: false, tenants: [], error: authCheck.error || 'No autorizado. Se requiere acceso de Super Administrador.' };
     }
     const db = supabaseAdmin;
-    let { data: tenants, error } = await db
-      .from('tenants')
-      .select('*')
-      .order('created_at', { ascending: false });
+
+    // 1. Obtener usuarios y membresías para sincronización y telemetría automática
+    const [tenantsRes, userTenantsRes, authListRes] = await Promise.all([
+      db.from('tenants').select('*').order('created_at', { ascending: false }),
+      db.from('user_tenants').select('id, user_email, tenant_id, role, created_at'),
+      db.auth.admin.listUsers({ perPage: 1000 }).catch(() => ({ data: { users: [] }, error: null }))
+    ]);
+
+    let tenants = tenantsRes.data || [];
+    let error = tenantsRes.error;
 
     if (error) {
       const retry = await db.from('tenants').select('*');
@@ -409,15 +415,80 @@ export async function getAllTenants(callerOrActor?: ActionActor | string | null,
       return { success: false, tenants: [], error: error.message };
     }
 
-    const normalizedTenants = (tenants || []).map((t: any) => ({
-      ...t,
-      status: t.status || (t.is_active !== false ? 'active' : 'suspended'),
-      is_active: t.is_active !== false && t.status !== 'suspended',
-      subscription_plan: t.subscription_plan || (t.metadata as any)?.plan || 'pro',
-      active_modules: Array.isArray(t.active_modules) && t.active_modules.length > 0 
-        ? t.active_modules 
-        : ((t.metadata as any)?.active_modules || DEFAULT_ENABLED_MODULES)
-    }));
+    const userTenants = userTenantsRes.data || [];
+    const authUsers = authListRes.data?.users || [];
+
+    // 2. Detección automática: Si algún usuario de Auth no tiene ningún tenant asignado, auto-provisionar
+    for (const authUser of authUsers) {
+      if (!authUser.email) continue;
+      const cleanEmail = authUser.email.toLowerCase();
+      const hasTenant = userTenants.some(ut => ut.user_email?.toLowerCase() === cleanEmail);
+
+      if (!hasTenant) {
+        try {
+          const autoName = authUser.user_metadata?.full_name || cleanEmail.split('@')[0];
+          const displayName = autoName.charAt(0).toUpperCase() + autoName.slice(1);
+          
+          const initialModules = [
+            'caja', 'clientes', 'inventario', 'catalogo', 'calendario',
+            'equipo', 'contabilidad', 'compras', 'whatsapp', 'kanban',
+            'estadisticas', 'config'
+          ];
+
+          const { data: newTenant } = await db.from('tenants').insert([{
+            name: displayName,
+            is_active: true,
+            status: 'active',
+            currency: 'USD',
+            symbol: '$',
+            country_code: 'VE',
+            active_modules: initialModules,
+            metadata: {
+              plan: 'pro',
+              owner_email: cleanEmail,
+              auto_provisioned: true,
+            }
+          }]).select().single();
+
+          if (newTenant) {
+            const { data: newLink } = await db.from('user_tenants').insert([{
+              user_email: cleanEmail,
+              tenant_id: newTenant.id,
+              role: 'owner'
+            }]).select().single();
+
+            tenants.unshift(newTenant);
+            if (newLink) userTenants.push(newLink);
+          }
+        } catch (provErr) {
+          console.error('[auto-provision error for', cleanEmail, ']:', provErr);
+        }
+      }
+    }
+
+    // 3. Normalizar tenants vinculando lista de miembros y conteos
+    const normalizedTenants = (tenants || []).map((t: any) => {
+      const members = userTenants.filter(ut => ut.tenant_id === t.id);
+      const ownerMember = members.find(m => m.role === 'owner');
+
+      return {
+        ...t,
+        status: t.status || (t.is_active !== false ? 'active' : 'suspended'),
+        is_active: t.is_active !== false && t.status !== 'suspended',
+        subscription_plan: t.subscription_plan || (t.metadata as any)?.plan || 'pro',
+        active_modules: Array.isArray(t.active_modules) && t.active_modules.length > 0 
+          ? t.active_modules 
+          : ((t.metadata as any)?.active_modules || DEFAULT_ENABLED_MODULES),
+        owner_email: ownerMember?.user_email || (t.metadata as any)?.owner_email || null,
+        user_count: members.length,
+        members: members.map(m => ({
+          id: m.id,
+          email: m.user_email,
+          role: m.role,
+          created_at: m.created_at
+        }))
+      };
+    });
 
     return { success: true, tenants: normalizedTenants };
   } catch (error: any) {

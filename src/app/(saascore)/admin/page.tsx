@@ -17,7 +17,14 @@ import {
   SlidersHorizontal, 
   ToggleLeft, 
   ToggleRight, 
-  Save 
+  Save,
+  ChevronDown,
+  ChevronRight,
+  RefreshCw,
+  Sparkles,
+  Building2,
+  UserPlus,
+  KeyRound
 } from 'lucide-react';
 import { 
   getAllTenants, 
@@ -60,6 +67,9 @@ export default function AdminTenantsPage() {
   const { toast } = useToast();
   const [tenants, setTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Fila expandida con profundidad operativa inline
+  const [expandedTenantId, setExpandedTenantId] = useState<string | null>(null);
 
   // Filtros y Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -294,6 +304,15 @@ export default function AdminTenantsPage() {
           <p className="text-muted-foreground font-medium">Control maestro de acceso, telemetría y empresas de tu plataforma SaaS.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={fetchTenants}
+            disabled={isLoading}
+            className="bg-card hover:bg-muted text-foreground border border-border px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50"
+            title="Sincronizar y detectar automáticamente nuevos usuarios de Supabase"
+          >
+            <RefreshCw size={16} className={`text-primary ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Sincronizar</span>
+          </button>
           <Link
             href="/admin/users"
             className="bg-card hover:bg-muted text-foreground border border-border px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs"
@@ -435,87 +454,211 @@ export default function AdminTenantsPage() {
                   />
                 </td>
               </tr>
-            ) : filteredTenants.map(tenant => (
-              <tr key={tenant.id} className="hover:bg-muted/40 transition-colors">
-                <td className="p-4 pl-6">
-                  <div className="font-bold text-foreground text-base">{tenant.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono mt-0.5">ID: {tenant.id}</div>
-                </td>
-                <td className="p-4">
-                  {tenant.status === 'active' ? (
-                    <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                      <CheckCircle2 size={14} /> Activo
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                      <Ban size={14} /> Suspendido
-                    </span>
+            ) : filteredTenants.map(tenant => {
+              const isExpanded = expandedTenantId === tenant.id;
+              const members = tenant.members || [];
+              const ownerEmail = tenant.owner_email || members.find((m: any) => m.role === 'owner')?.email || 'Sin dueño asignado';
+
+              return (
+                <React.Fragment key={tenant.id}>
+                  <tr className={`hover:bg-muted/40 transition-colors ${isExpanded ? 'bg-muted/30' : ''}`}>
+                    <td className="p-4 pl-6">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setExpandedTenantId(isExpanded ? null : tenant.id)}
+                          className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all shrink-0"
+                          title={isExpanded ? 'Ocultar detalles' : 'Ver usuarios y configuración operativa'}
+                        >
+                          {isExpanded ? <ChevronDown size={18} className="text-primary" /> : <ChevronRight size={18} />}
+                        </button>
+                        <div>
+                          <div className="font-bold text-foreground text-base flex items-center gap-2">
+                            <span>{tenant.name}</span>
+                            {tenant.user_count !== undefined && (
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                {tenant.user_count} {tenant.user_count === 1 ? 'usuario' : 'usuarios'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
+                            <span>ID: {tenant.id.slice(0, 8)}...</span>
+                            <span>•</span>
+                            <span className="truncate max-w-[200px]" title={ownerEmail}>👤 {ownerEmail}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      {tenant.status === 'active' ? (
+                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <CheckCircle2 size={14} /> Activo
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <Ban size={14} /> Suspendido
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <div className="text-sm text-foreground mb-1">
+                        <span className="uppercase font-bold text-primary text-xs">{tenant.subscription_plan || 'basic'}</span>
+                        <span className="text-xs text-muted-foreground ml-2">({(tenant.active_modules || []).length} módulos)</span>
+                      </div>
+                      <div className="flex gap-1.5 flex-wrap max-w-[260px]">
+                        {(tenant.active_modules || []).slice(0, 6).map((mod: string) => (
+                          <button
+                            key={mod}
+                            onClick={() => handleAccessTenantModule(tenant, mod)}
+                            className="bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border hover:border-primary/40 transition-colors btn-haptic cursor-pointer inline-flex items-center gap-1"
+                            title={`Acceder directamente al módulo ${mod.toUpperCase()} en ${tenant.name}`}
+                          >
+                            <span>{mod}</span>
+                            <span className="opacity-40 text-[8px]">↗</span>
+                          </button>
+                        ))}
+                        {(tenant.active_modules || []).length > 6 && (
+                          <button
+                            onClick={() => setExpandedTenantId(isExpanded ? null : tenant.id)}
+                            className="text-[10px] text-muted-foreground font-bold hover:text-foreground self-center px-1"
+                          >
+                            +{(tenant.active_modules || []).length - 6} más
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CreditCard size={14} className={tenant.status === 'suspended' ? 'text-rose-500' : 'text-muted-foreground'} />
+                        {new Date(tenant.created_at).toLocaleDateString()}
+                      </div>
+                    </td>
+                    <td className="p-4 pr-6 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleImpersonate(tenant)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center gap-1.5 btn-haptic"
+                          title="Entrar al ERP como esta empresa (Modo Soporte)"
+                        >
+                          <LogIn size={13} /> Entrar
+                        </button>
+                        <button 
+                          onClick={() => handleToggleStatus(tenant.id, tenant.status)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors btn-haptic ${
+                            tenant.status === 'active' 
+                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20' 
+                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                          }`}
+                        >
+                          {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
+                        </button>
+                        <button
+                          onClick={() => handleOpenModulesModal(tenant)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-muted hover:bg-accent text-foreground border border-border flex items-center gap-1.5 btn-haptic"
+                          title="Activar o desactivar módulos para esta empresa"
+                        >
+                          <SlidersHorizontal size={13} className="text-primary" /> Módulos
+                        </button>
+                        <Link href={`/admin/tenant/${tenant.id}`} className="px-3 py-1.5 text-foreground hover:bg-accent border border-border rounded-lg text-xs font-bold transition-colors">
+                          Detalles
+                        </Link>
+                        <button 
+                          onClick={() => handleDelete(tenant.id)}
+                          className="p-1.5 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
+                          title="Eliminar empresa"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* Fila expandida: Profundidad Operativa & Gestión de Usuarios Inline */}
+                  {isExpanded && (
+                    <tr className="bg-muted/20 border-b border-border">
+                      <td colSpan={5} className="p-5 pl-14">
+                        <div className="bg-card border border-border rounded-xl p-4 space-y-4 shadow-xs animate-in fade-in">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                            <div>
+                              <h4 className="font-bold text-sm text-foreground flex items-center gap-2">
+                                <Users size={16} className="text-primary" />
+                                Usuarios vinculados a {tenant.name} ({members.length})
+                              </h4>
+                              <p className="text-xs text-muted-foreground">
+                                Cuentas con credenciales en Supabase Auth asociadas a esta organización.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleImpersonate(tenant)}
+                                className="px-3 py-1.5 bg-primary text-primary-foreground text-xs font-bold rounded-lg flex items-center gap-1.5 hover:bg-primary/90 transition-all shadow-xs btn-haptic"
+                              >
+                                <LogIn size={13} /> Acceso Soporte Inmediato
+                              </button>
+                              <Link
+                                href={`/admin/tenant/${tenant.id}`}
+                                className="px-3 py-1.5 bg-muted hover:bg-accent text-foreground text-xs font-bold rounded-lg border border-border transition-colors"
+                              >
+                                Configuración Avanzada ↗
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Lista de Miembros */}
+                          {members.length === 0 ? (
+                            <div className="text-xs text-muted-foreground py-2 italic">
+                              No hay usuarios explícitamente registrados en user_tenants para esta empresa.
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {members.map((member: any) => (
+                                <div key={member.id} className="p-3 bg-muted/40 border border-border rounded-lg flex items-center justify-between">
+                                  <div className="truncate mr-2">
+                                    <div className="font-bold text-xs text-foreground truncate">{member.email}</div>
+                                    <div className="text-[10px] text-muted-foreground uppercase font-mono">
+                                      Rol: <span className="text-primary font-bold">{member.role}</span>
+                                    </div>
+                                  </div>
+                                  <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full ${
+                                    member.role === 'owner' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' : 'bg-primary/10 text-primary border border-primary/20'
+                                  }`}>
+                                    {member.role}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Acceso Rápido a Todos los Módulos Habilitados */}
+                          <div className="pt-2 border-t border-border">
+                            <div className="text-xs font-bold text-foreground mb-2 flex items-center justify-between">
+                              <span>Módulos Operativos Activos ({tenant.active_modules?.length || 0}):</span>
+                              <button
+                                onClick={() => handleOpenModulesModal(tenant)}
+                                className="text-primary hover:underline font-bold text-xs"
+                              >
+                                Administrar Módulos
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {(tenant.active_modules || []).map((mod: string) => (
+                                <button
+                                  key={mod}
+                                  onClick={() => handleAccessTenantModule(tenant, mod)}
+                                  className="px-2.5 py-1 bg-background hover:bg-primary hover:text-primary-foreground border border-border rounded-lg text-xs font-medium text-foreground transition-all flex items-center gap-1.5 shadow-2xs btn-haptic"
+                                >
+                                  <span>{mod.toUpperCase()}</span>
+                                  <span className="opacity-40 text-[9px]">↗</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
                   )}
-                </td>
-                <td className="p-4">
-                  <div className="text-sm text-foreground mb-1">
-                    <span className="uppercase font-bold text-primary text-xs">{tenant.subscription_plan || 'basic'}</span>
-                  </div>
-                  <div className="flex gap-1.5 flex-wrap max-w-[260px]">
-                    {(tenant.active_modules || []).map((mod: string) => (
-                      <button
-                        key={mod}
-                        onClick={() => handleAccessTenantModule(tenant, mod)}
-                        className="bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border hover:border-primary/40 transition-colors btn-haptic cursor-pointer inline-flex items-center gap-1"
-                        title={`Acceder directamente al módulo ${mod.toUpperCase()} en ${tenant.name}`}
-                      >
-                        <span>{mod}</span>
-                        <span className="opacity-40 text-[8px]">↗</span>
-                      </button>
-                    ))}
-                  </div>
-                </td>
-                <td className="p-4">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <CreditCard size={14} className={tenant.status === 'suspended' ? 'text-rose-500' : 'text-muted-foreground'} />
-                    {new Date(tenant.created_at).toLocaleDateString()}
-                  </div>
-                </td>
-                <td className="p-4 pr-6 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => handleImpersonate(tenant)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center gap-1.5 btn-haptic"
-                      title="Entrar al ERP como esta empresa (Modo Soporte)"
-                    >
-                      <LogIn size={13} /> Entrar
-                    </button>
-                    <button 
-                      onClick={() => handleToggleStatus(tenant.id, tenant.status)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors btn-haptic ${
-                        tenant.status === 'active' 
-                          ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20' 
-                          : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
-                      }`}
-                    >
-                      {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
-                    </button>
-                    <button
-                      onClick={() => handleOpenModulesModal(tenant)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-muted hover:bg-accent text-foreground border border-border flex items-center gap-1.5 btn-haptic"
-                      title="Activar o desactivar módulos para esta empresa"
-                    >
-                      <SlidersHorizontal size={13} className="text-primary" /> Módulos
-                    </button>
-                    <Link href={`/admin/tenant/${tenant.id}`} className="px-3 py-1.5 text-foreground hover:bg-accent border border-border rounded-lg text-xs font-bold transition-colors">
-                      Detalles
-                    </Link>
-                    <button 
-                      onClick={() => handleDelete(tenant.id)}
-                      className="p-1.5 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title="Eliminar empresa"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                </React.Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
