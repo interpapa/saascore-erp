@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 import { DentalProcedureDefinition, DENTAL_PROCEDURES_MASTER } from '@/lib/dental/proceduresCatalog';
 import { 
-  DentalPricingConfig, 
   quickUpdateItemPriceAction, 
   quickCreateModuleServiceAction, 
   saveModulePricingConfigAction 
 } from '@/app/actions/modulePricing';
+import type { DentalPricingConfig } from '@/lib/modulePricingDefaults';
 import { ActionActor } from '@/app/actions/entities';
 import { useToast } from '@/components/core/ToastProvider';
 

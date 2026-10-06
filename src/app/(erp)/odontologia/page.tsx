@@ -51,7 +51,8 @@ import { PeriodonticsMiniChart } from '@/components/dental/PeriodonticsMiniChart
 import { DentalStaffTab } from '@/components/dental/DentalStaffTab';
 import { DentalPricingTab } from '@/components/dental/DentalPricingTab';
 import { getModuleStaffAction, ModuleStaffMember } from '@/app/actions/moduleStaff';
-import { getModulePricingConfigAction, DentalPricingConfig, DEFAULT_DENTAL_PRICING } from '@/app/actions/modulePricing';
+import { getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import { DentalPricingConfig, DEFAULT_DENTAL_PRICING } from '@/lib/modulePricingDefaults';
 import { mergeTenantDentalServices, DentalProcedureDefinition, DENTAL_PROCEDURES_MASTER } from '@/lib/dental/proceduresCatalog';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 import { 

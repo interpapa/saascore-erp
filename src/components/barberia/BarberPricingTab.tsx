@@ -18,11 +18,11 @@ import {
 } from 'lucide-react';
 import { BarberServiceDefinition } from '@/lib/barberia/barberCatalog';
 import { 
-  BarberPricingConfig, 
   quickUpdateItemPriceAction, 
   quickCreateModuleServiceAction, 
   saveModulePricingConfigAction 
 } from '@/app/actions/modulePricing';
+import type { BarberPricingConfig } from '@/lib/modulePricingDefaults';
 import { ActionActor } from '@/app/actions/entities';
 import { useToast } from '@/components/core/ToastProvider';
 

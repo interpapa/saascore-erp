@@ -19,11 +19,11 @@ import {
 } from 'lucide-react';
 import { GroomingServiceDefinition } from '@/lib/grooming/groomingCatalog';
 import { 
-  GroomingPricingConfig, 
   quickUpdateItemPriceAction, 
   quickCreateModuleServiceAction, 
   saveModulePricingConfigAction 
 } from '@/app/actions/modulePricing';
+import type { GroomingPricingConfig } from '@/lib/modulePricingDefaults';
 import { ActionActor } from '@/app/actions/entities';
 import { useToast } from '@/components/core/ToastProvider';
 

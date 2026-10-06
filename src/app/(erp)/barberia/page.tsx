@@ -37,7 +37,8 @@ import {
 import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, ActionActor } from '@/app/actions/entities';
 import { ModuleStaffMember, getModuleStaffAction } from '@/app/actions/moduleStaff';
-import { BarberPricingConfig, getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import { getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import type { BarberPricingConfig } from '@/lib/modulePricingDefaults';
 import { BarberStaffTab } from '@/components/barberia/BarberStaffTab';
 import { BarberPricingTab } from '@/components/barberia/BarberPricingTab';
 import { useERPStore } from '@/store/useERPStore';

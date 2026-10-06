@@ -6,79 +6,8 @@ import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { ActionActor } from './entities';
 import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
-export interface BarberPricingConfig {
-  defaultCommissionPercent: number;
-  defaultDurationMin: number;
-  tipSplitWithShop: boolean;
-}
-
-export interface GroomingPricingConfig {
-  sizeBasePrices: {
-    toy: number;
-    small: number;
-    medium: number;
-    large: number;
-    giant: number;
-  };
-  supplementPrices: {
-    matting: number;
-    tickFlea: number;
-    nails: number;
-    ears: number;
-    teeth: number;
-    reactiveFee: number;
-  };
-  defaultCommissionPercent: number;
-}
-
-export interface DentalPricingConfig {
-  orthoMonthlyFeeUSD: number;
-  bracketReplacementFeeUSD: number;
-  endoCanalBaseUSD: number;
-  perioCleaningBaseUSD: number;
-  defaultDoctorCommissionPercent: number;
-}
-
-const DEFAULT_CONFIGS: {
-  barberia: BarberPricingConfig;
-  grooming: GroomingPricingConfig;
-  odontologia: DentalPricingConfig;
-} = {
-  barberia: {
-    defaultCommissionPercent: 50,
-    defaultDurationMin: 30,
-    tipSplitWithShop: false,
-  },
-  grooming: {
-    sizeBasePrices: {
-      toy: 18,
-      small: 22,
-      medium: 28,
-      large: 38,
-      giant: 50,
-    },
-    supplementPrices: {
-      matting: 10,
-      tickFlea: 10,
-      nails: 5,
-      ears: 5,
-      teeth: 6,
-      reactiveFee: 8,
-    },
-    defaultCommissionPercent: 45,
-  },
-  odontologia: {
-    orthoMonthlyFeeUSD: 35,
-    bracketReplacementFeeUSD: 10,
-    endoCanalBaseUSD: 40,
-    perioCleaningBaseUSD: 30,
-    defaultDoctorCommissionPercent: 50,
-  },
-};
-
-export const DEFAULT_BARBER_PRICING: BarberPricingConfig = DEFAULT_CONFIGS.barberia;
-export const DEFAULT_GROOMING_PRICING: GroomingPricingConfig = DEFAULT_CONFIGS.grooming;
-export const DEFAULT_DENTAL_PRICING: DentalPricingConfig = DEFAULT_CONFIGS.odontologia;
+import { DEFAULT_CONFIGS } from '@/lib/modulePricingDefaults';
+import type { BarberPricingConfig, GroomingPricingConfig, DentalPricingConfig } from '@/lib/modulePricingDefaults';
 
 /**
  * Obtiene la configuración de precios y tarifas paramétricas del módulo

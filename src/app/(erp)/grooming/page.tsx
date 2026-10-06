@@ -44,7 +44,8 @@ import {
 import { getItemsAction } from '@/app/actions/items';
 import { ActionActor } from '@/app/actions/entities';
 import { ModuleStaffMember, getModuleStaffAction } from '@/app/actions/moduleStaff';
-import { GroomingPricingConfig, getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import { getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import type { GroomingPricingConfig } from '@/lib/modulePricingDefaults';
 import { GroomerStaffTab } from '@/components/grooming/GroomerStaffTab';
 import { GroomingPricingTab } from '@/components/grooming/GroomingPricingTab';
 import { useERPStore } from '@/store/useERPStore';

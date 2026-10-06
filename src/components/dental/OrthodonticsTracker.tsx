@@ -30,7 +30,8 @@ import {
 } from '@/types/dentalSpecialties';
 import { saveOrthodonticCaseAction, getOrthodonticCaseAction, sendDentalOrderToCashierAction } from '@/app/actions/dental';
 import { ModuleStaffMember, getModuleStaffAction } from '@/app/actions/moduleStaff';
-import { DentalPricingConfig, getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import { getModulePricingConfigAction } from '@/app/actions/modulePricing';
+import type { DentalPricingConfig } from '@/lib/modulePricingDefaults';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
