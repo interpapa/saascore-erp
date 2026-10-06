@@ -73,7 +73,8 @@ export default function InventarioPage() {
   const globalViewMode = useViewModeStore(s => s.viewMode);
 
   const handleExpressStockChange = async (item: Item, newStock: number) => {
-    if (!activeTenant?.id || !actor) return;
+    const targetTenantId = item.tenant_id || activeTenant?.id || session?.tenantId;
+    if (!targetTenantId || !actor) return;
     const clampedStock = Math.max(0, newStock);
     const oldStock = item.stock_quantity ?? (item as any).stock ?? 0;
 
@@ -81,7 +82,7 @@ export default function InventarioPage() {
     setItems((prev) =>
       prev.map((i) =>
         i.id === item.id
-          ? { ...i, stock_quantity: clampedStock }
+          ? { ...i, stock_quantity: clampedStock, stock: clampedStock }
           : i
       )
     );
@@ -90,7 +91,7 @@ export default function InventarioPage() {
       const res = await updateItemAction(
         item.id,
         { stock_quantity: clampedStock },
-        activeTenant.id,
+        targetTenantId,
         actor
       );
       if (!res.success) {
@@ -98,7 +99,7 @@ export default function InventarioPage() {
         setItems((prev) =>
           prev.map((i) =>
             i.id === item.id
-              ? { ...i, stock_quantity: oldStock }
+              ? { ...i, stock_quantity: oldStock, stock: oldStock }
               : i
           )
         );
@@ -112,7 +113,7 @@ export default function InventarioPage() {
       setItems((prev) =>
         prev.map((i) =>
           i.id === item.id
-            ? { ...i, stock_quantity: oldStock }
+            ? { ...i, stock_quantity: oldStock, stock: oldStock }
             : i
         )
       );
@@ -197,7 +198,7 @@ export default function InventarioPage() {
   }, [activeTab, loadAuditLogs]);
 
   const handleSaveItem = async (data: any) => {
-    const targetTenantId = activeTenant?.id || session?.tenantId;
+    const targetTenantId = (editingItem ? editingItem.tenant_id : null) || activeTenant?.id || session?.tenantId;
     if (!targetTenantId) {
       toast({
         variant: 'warning',
@@ -370,7 +371,9 @@ export default function InventarioPage() {
   };
 
   const handleDeleteItem = async (id: string) => {
-    if (!activeTenant || !actor) return;
+    const itemToDelete = items.find((i) => i.id === id);
+    const targetTenantId = itemToDelete?.tenant_id || activeTenant?.id || session?.tenantId;
+    if (!targetTenantId || !actor) return;
 
     // Descarte defensivo directo si es un ID temporal o no es un UUID válido
     if (isTemporaryId(id) || !isValidUUID(id)) {
@@ -383,7 +386,7 @@ export default function InventarioPage() {
     try {
       let res: any;
       try {
-        res = await deleteItemAction(id, activeTenant.id, actor);
+        res = await deleteItemAction(id, targetTenantId, actor);
       } catch (actionErr) {
         console.warn('[inventario] deleteItemAction falló, ejecutando fallback API REST:', actionErr);
         const apiRes = await fetch('/api/inventory/items', {
@@ -392,7 +395,7 @@ export default function InventarioPage() {
           body: JSON.stringify({
             action: 'delete',
             id,
-            tenantId: activeTenant.id,
+            tenantId: targetTenantId,
             actor,
           }),
         });

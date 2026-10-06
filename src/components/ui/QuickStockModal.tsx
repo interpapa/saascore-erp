@@ -33,6 +33,18 @@ export function QuickStockModal({
   const [reason, setReason] = useState<string>('Reposición de mercancía');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Sincronizar selección cuando se abre el modal o cambia el ID inicial
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialItemId) {
+        setSelectedItemId(initialItemId);
+      } else if (!selectedItemId && (items as any[])?.length > 0) {
+        const firstProd = (items as any[]).find((i) => i.type === 'product' || !i.type);
+        if (firstProd) setSelectedItemId(firstProd.id);
+      }
+    }
+  }, [isOpen, initialItemId, items]);
+
   if (!isOpen) return null;
 
   const actor = {
@@ -42,14 +54,21 @@ export function QuickStockModal({
   };
 
   const selectedItem = (items as any[]).find((i) => i.id === selectedItemId);
-  const currentStock = selectedItem ? (selectedItem.stock ?? selectedItem.stock_quantity ?? 0) : 0;
+  const currentStock = selectedItem ? Number(selectedItem.stock ?? selectedItem.stock_quantity ?? 0) : 0;
   const quantityDelta = operationType === 'add' ? quantity : -quantity;
   const resultingStock = Math.max(0, currentStock + quantityDelta);
 
   const handleAdjustStock = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentTenant?.id || !selectedItemId) {
+    const effectiveTenantId = tenantId || selectedItem?.tenant_id || currentTenant?.id || session?.tenantId;
+
+    if (!selectedItemId) {
       toast({ variant: 'warning', title: 'Selección requerida', description: 'Selecciona un producto para ajustar.' });
+      return;
+    }
+
+    if (!effectiveTenantId) {
+      toast({ variant: 'warning', title: 'Empresa requerida', description: 'No se detectó la empresa activa para realizar el ajuste.' });
       return;
     }
 
@@ -63,7 +82,7 @@ export function QuickStockModal({
       const res = await adjustItemStockAction(
         selectedItemId,
         quantityDelta,
-        currentTenant.id,
+        effectiveTenantId,
         actor,
         reason
       );
@@ -77,7 +96,7 @@ export function QuickStockModal({
         onSuccess();
         onClose();
       } else {
-        toast({ variant: 'error', title: 'Error al actualizar', description: res.error });
+        toast({ variant: 'error', title: 'Error al actualizar', description: res.error || 'No se pudo actualizar el stock.' });
       }
     } catch (err: unknown) {
       toast({ variant: 'error', title: 'Error de conexión', description: (err as Error).message });
@@ -136,7 +155,7 @@ export function QuickStockModal({
               className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
             >
               <option value="">-- Seleccionar de inventario --</option>
-              {items.filter((i: any) => i.type === 'product').map((i: any) => (
+              {items.filter((i: any) => i.type !== 'service').map((i: any) => (
                 <option key={i.id} value={i.id}>
                   {i.name} — Stock actual: {i.stock ?? i.stock_quantity ?? 0} uds
                 </option>

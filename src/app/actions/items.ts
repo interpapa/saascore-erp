@@ -111,7 +111,13 @@ export async function createItemAction(
       metadata: { action: 'created', name: input.name, price: input.base_price },
     });
 
-    return { success: true, item: newItem };
+    const mappedItem = newItem ? {
+      ...newItem,
+      stock: newItem.stock !== undefined ? newItem.stock : newItem.stock_quantity,
+      stock_quantity: newItem.stock_quantity !== undefined ? newItem.stock_quantity : (newItem.stock ?? 0),
+    } : null;
+
+    return { success: true, item: mappedItem };
   } catch (err: any) {
     const errorMsg = err?.message || 'Error de red al conectar con el servidor (Failed to fetch).';
     console.error('[createItemAction Error]:', errorMsg);
@@ -127,21 +133,35 @@ export async function updateItemAction(
   actor: ActionActor
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor, tenantId);
-    if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
-    }
-
-    const moduleCheck = await assertModuleEnabled(tenantId, 'catalogo');
-    if (!moduleCheck.authorized) {
-      return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
-    }
-
-    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+    if (!id) throw new Error('ID requerido.');
 
     // Blindaje defensivo contra IDs temporales en memoria
     if (!isValidUUID(id) || isTemporaryId(id)) {
       return { success: true, localOnly: true, item: { id, ...updates } };
+    }
+
+    // Buscar ítem para identificar su tenant_id real si hay discrepancia de contexto
+    const { data: existingItem } = await supabaseAdmin
+      .from('items')
+      .select('id, tenant_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    const targetTenantId = existingItem?.tenant_id || tenantId;
+    if (!targetTenantId) throw new Error('Empresa requerida.');
+
+    const securityCheck = await validateUserTenantAccess(actor, targetTenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(targetTenantId, 'catalogo');
+    if (!moduleCheck.authorized) {
+      const invCheck = await assertModuleEnabled(targetTenantId, 'inventario');
+      const dentalCheck = await assertModuleEnabled(targetTenantId, 'odontologia');
+      if (!invCheck.authorized && !dentalCheck.authorized) {
+        return { success: false, error: moduleCheck.error || 'El módulo de Catálogo/Inventario está desactivado.' };
+      }
     }
 
     if (
@@ -161,7 +181,7 @@ export async function updateItemAction(
       .from('items')
       .update(updatePayload)
       .eq('id', id)
-      .eq('tenant_id', tenantId)
+      .eq('tenant_id', targetTenantId)
       .select()
       .single();
 
@@ -175,7 +195,7 @@ export async function updateItemAction(
         .from('items')
         .update(updatePayload)
         .eq('id', id)
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', targetTenantId)
         .select()
         .single();
       updatedItem = retry.data;
@@ -185,7 +205,7 @@ export async function updateItemAction(
     if (error) throw new Error('Error al actualizar ítem: ' + error.message);
 
     await writeAuditLog({
-      tenant_id: tenantId,
+      tenant_id: targetTenantId,
       actor_email: actor.email,
       actor_role: actor.role,
       action: 'item.updated',
@@ -194,7 +214,13 @@ export async function updateItemAction(
       metadata: { action: 'updated', updates },
     });
 
-    return { success: true, item: updatedItem };
+    const mappedItem = updatedItem ? {
+      ...updatedItem,
+      stock: updatedItem.stock !== undefined ? updatedItem.stock : updatedItem.stock_quantity,
+      stock_quantity: updatedItem.stock_quantity !== undefined ? updatedItem.stock_quantity : (updatedItem.stock ?? 0),
+    } : null;
+
+    return { success: true, item: mappedItem };
   } catch (err: any) {
     console.error('[updateItemAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
@@ -207,21 +233,34 @@ export async function deleteItemAction(
   actor: ActionActor
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor, tenantId);
-    if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
-    }
-
-    const moduleCheck = await assertModuleEnabled(tenantId, 'catalogo');
-    if (!moduleCheck.authorized) {
-      return { success: false, error: moduleCheck.error || 'El módulo de Catálogo está desactivado.' };
-    }
-
-    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+    if (!id) throw new Error('ID requerido.');
 
     // Blindaje defensivo contra IDs temporales: descartar localmente sin error 22P02
     if (!isValidUUID(id) || isTemporaryId(id)) {
       return { success: true, localOnly: true };
+    }
+
+    const { data: existingItem } = await supabaseAdmin
+      .from('items')
+      .select('id, tenant_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    const targetTenantId = existingItem?.tenant_id || tenantId;
+    if (!targetTenantId) throw new Error('Empresa requerida.');
+
+    const securityCheck = await validateUserTenantAccess(actor, targetTenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertModuleEnabled(targetTenantId, 'catalogo');
+    if (!moduleCheck.authorized) {
+      const invCheck = await assertModuleEnabled(targetTenantId, 'inventario');
+      const dentalCheck = await assertModuleEnabled(targetTenantId, 'odontologia');
+      if (!invCheck.authorized && !dentalCheck.authorized) {
+        return { success: false, error: moduleCheck.error || 'El módulo de Catálogo/Inventario está desactivado.' };
+      }
     }
 
     // Soft delete: preservar historial e integridad contable/fiscal
@@ -229,23 +268,22 @@ export async function deleteItemAction(
       .from('items')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', id)
-      .eq('tenant_id', tenantId);
+      .eq('tenant_id', targetTenantId);
 
     if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
       // Fallback: Si no existe la columna deleted_at, lo marcamos como inactivo (is_active: false)
-      // NUNCA hacer un DELETE físico si ya tiene ventas, para evitar el error de foreign key.
       const retry = await supabaseAdmin
         .from('items')
         .update({ is_active: false })
         .eq('id', id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', targetTenantId);
       error = retry.error;
     }
 
     if (error) throw new Error('Error al eliminar ítem: ' + error.message);
 
     await writeAuditLog({
-      tenant_id: tenantId,
+      tenant_id: targetTenantId,
       actor_email: actor.email,
       actor_role: actor.role,
       action: 'item.deleted',
@@ -270,7 +308,7 @@ export async function getItemsAction(tenantId: string, type: ItemType | undefine
 
     if (!tenantId) return { success: true, items: [] };
 
-    let selectFields = 'id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at';
+    let selectFields = 'id, tenant_id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at';
     let baseQuery = supabaseAdmin
       .from('items')
       .select(selectFields)
@@ -287,7 +325,7 @@ export async function getItemsAction(tenantId: string, type: ItemType | undefine
 
     if (error && (error.message.includes('stock') || error.message.includes('deleted_at') || error.message.includes('column'))) {
       // Fallback: Query using stock_quantity and ignoring deleted_at column if missing (migration_run schema)
-      selectFields = 'id, type, sku, name, description, category, base_price, cost, stock_quantity, is_active, metadata, created_at';
+      selectFields = 'id, tenant_id, type, sku, name, description, category, base_price, cost, stock_quantity, is_active, metadata, created_at';
       let retryQuery = supabaseAdmin
         .from('items')
         .select(selectFields)
@@ -332,64 +370,67 @@ export async function adjustItemStockAction(
   reason?: string
 ) {
   try {
-    const securityCheck = await validateUserTenantAccess(actor, tenantId);
-    if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
-    }
-
     if (!isValidUUID(id) || isTemporaryId(id)) {
       return { success: false, error: 'No se puede ajustar el stock de un ítem temporal o no sincronizado.' };
     }
 
-    // 1. Obtener item actual
-    const { data: item, error: findError } = await supabaseAdmin
+    // 1. Obtener item actual por id sin asumir columnas específicas para evitar error 42703
+    let { data: item, error: findError } = await supabaseAdmin
       .from('items')
-      .select('stock, stock_quantity')
+      .select('*')
       .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .single();
+      .maybeSingle();
 
-    if (findError || !item) throw new Error('Ítem no encontrado para ajustar.');
+    if (findError) {
+      console.error('[adjustItemStockAction] Error buscando item:', findError);
+      return { success: false, error: 'Error al buscar el ítem: ' + findError.message };
+    }
 
-    const currentStock = item.stock !== undefined ? (item.stock || 0) : (item.stock_quantity || 0);
+    if (!item) {
+      return { success: false, error: 'Ítem no encontrado para ajustar.' };
+    }
+
+    const targetTenantId = item.tenant_id || tenantId;
+
+    const securityCheck = await validateUserTenantAccess(actor, targetTenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado a la empresa del ítem.' };
+    }
+
+    const currentStock = Number(item.stock ?? item.stock_quantity ?? item.quantity ?? 0);
     const newStock = Math.max(0, currentStock + quantityDelta);
 
-    // 2. Actualizar stock con fallback y registrar cuál columna se usó
-    let _stockFieldUsed = 'stock';
-    let error: any = null;
-    const result = await supabaseAdmin
+    // 2. Actualizar stock con fallback resiliente entre columnas
+    let updateResult = await supabaseAdmin
       .from('items')
       .update({ stock: newStock })
       .eq('id', id)
-      .eq('tenant_id', tenantId);
-    error = result.error;
+      .eq('tenant_id', targetTenantId);
+
+    let error = updateResult.error;
 
     if (error && (error.message.includes('stock') || error.message.includes('column'))) {
-      // Intentar con stock_quantity
       const retryQty = await supabaseAdmin
         .from('items')
         .update({ stock_quantity: newStock })
         .eq('id', id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', targetTenantId);
       error = retryQty.error;
-      if (!error) _stockFieldUsed = 'stock_quantity';
     }
 
     if (error && (error.message.includes('quantity') || error.message.includes('column'))) {
-      // Intentar con columna genérica quantity
       const retryQuantity = await supabaseAdmin
         .from('items')
         .update({ quantity: newStock })
         .eq('id', id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', targetTenantId);
       error = retryQuantity.error;
-      if (!error) _stockFieldUsed = 'quantity';
     }
 
     if (error) throw new Error('Error al actualizar inventario: ' + error.message);
 
     await writeAuditLog({
-      tenant_id: tenantId,
+      tenant_id: targetTenantId,
       actor_email: actor.email,
       actor_role: actor.role,
       action: 'item.updated',
@@ -408,7 +449,13 @@ export async function adjustItemStockAction(
     safeRevalidate('/catalogo');
     safeRevalidate('/caja');
 
-    return { success: true, newStock };
+    const mappedItem = {
+      ...item,
+      stock: newStock,
+      stock_quantity: newStock,
+    };
+
+    return { success: true, newStock, item: mappedItem };
   } catch (err: any) {
     console.error('[adjustItemStockAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };

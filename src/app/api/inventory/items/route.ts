@@ -109,6 +109,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: 'ID de ítem requerido.' }, { status: 400 });
       }
 
+      const { data: existingItem } = await supabaseAdmin
+        .from('items')
+        .select('id, tenant_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      const targetTenantId = existingItem?.tenant_id || tenantId;
+
       const updatePayload: any = { ...(input || {}) };
       if (updatePayload.stock_quantity !== undefined) {
         updatePayload.stock = updatePayload.stock_quantity;
@@ -119,7 +127,7 @@ export async function POST(req: Request) {
         .from('items')
         .update(updatePayload)
         .eq('id', id)
-        .eq('tenant_id', tenantId)
+        .eq('tenant_id', targetTenantId)
         .select()
         .single();
 
@@ -132,7 +140,7 @@ export async function POST(req: Request) {
           .from('items')
           .update(updatePayload)
           .eq('id', id)
-          .eq('tenant_id', tenantId)
+          .eq('tenant_id', targetTenantId)
           .select()
           .single();
         updatedItem = retry.data;
@@ -143,7 +151,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
 
-      return NextResponse.json({ success: true, item: updatedItem });
+      const mappedItem = updatedItem ? {
+        ...updatedItem,
+        stock: updatedItem.stock !== undefined ? updatedItem.stock : updatedItem.stock_quantity,
+        stock_quantity: updatedItem.stock_quantity !== undefined ? updatedItem.stock_quantity : (updatedItem.stock ?? 0),
+      } : null;
+
+      return NextResponse.json({ success: true, item: mappedItem });
     }
 
     if (action === 'delete') {
@@ -151,18 +165,26 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: 'ID de ítem requerido.' }, { status: 400 });
       }
 
+      const { data: existingItem } = await supabaseAdmin
+        .from('items')
+        .select('id, tenant_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      const targetTenantId = existingItem?.tenant_id || tenantId;
+
       let { error } = await supabaseAdmin
         .from('items')
         .update({ deleted_at: new Date().toISOString() })
         .eq('id', id)
-        .eq('tenant_id', tenantId);
+        .eq('tenant_id', targetTenantId);
 
       if (error && (error.message.includes('deleted_at') || error.message.includes('column'))) {
         const retry = await supabaseAdmin
           .from('items')
           .update({ is_active: false })
           .eq('id', id)
-          .eq('tenant_id', tenantId);
+          .eq('tenant_id', targetTenantId);
         error = retry.error;
       }
 
