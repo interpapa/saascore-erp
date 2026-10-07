@@ -29,16 +29,10 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   } | null>(null);
 
   useEffect(() => {
-    // Evitar parpadeos o redirecciones en el lado del servidor
-    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    // Permitir acceso a superadmin, owner o emails en lista blanca administrativa
+    const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
     if (isSuper) {
       setIsAuthorized(true);
-      if (session && session.role !== 'superadmin') {
-        useERPStore.getState().setSession({
-          ...session,
-          role: 'superadmin'
-        });
-      }
     } else {
       setIsAuthorized(false);
       router.replace('/dashboard');
@@ -46,9 +40,9 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   }, [session, router]);
 
   useEffect(() => {
-    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
     if (isSuper && session?.userEmail) {
-      const activeActor = actor || { email: session.userEmail || '', role: 'superadmin' as const };
+      const activeActor = actor || { email: session.userEmail || '', role: (session.role || 'owner') as any };
       getSystemHealthAdminAction(activeActor)
         .then(res => {
           if (res.success && res.data) {

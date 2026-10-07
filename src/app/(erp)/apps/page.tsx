@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { 
   Users, 
   Box, 
@@ -217,7 +218,15 @@ export default function AppsManagerPage() {
                     <IconComp size={26} strokeWidth={1.5} />
                   </div>
                   
-                  {mod.isCore ? (
+                  {mod.id === 'admin' ? (
+                    <Link
+                      href="/admin"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white btn-haptic"
+                      title="Abrir Rendo Hub"
+                    >
+                      <Crown size={14} /> Abrir Consola ➔
+                    </Link>
+                  ) : mod.isCore ? (
                     <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
                       Núcleo Base
                     </span>

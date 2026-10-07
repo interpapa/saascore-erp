@@ -163,7 +163,7 @@ export default function LauncherPage() {
     ? currentTenant.active_modules 
     : fallbackModules;
   const filteredApps = apps.filter((app) => {
-    if (app.id === 'admin') return session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    if (app.id === 'admin') return session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
     return enabledModules.includes(app.id) || (app.id === 'inventario' && enabledModules.includes('catalogo'));
   });
 

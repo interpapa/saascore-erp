@@ -17,15 +17,21 @@ async function verifySuperAdminActor(
 ): Promise<{ authorized: boolean; error?: string }> {
   let email = '';
   let authToken = token;
+  let callerRole: string | undefined;
 
   if (typeof callerOrActor === 'object' && callerOrActor !== null) {
     email = callerOrActor.email || '';
     authToken = authToken || callerOrActor.token;
+    callerRole = callerOrActor.role;
   } else if (typeof callerOrActor === 'string') {
     email = callerOrActor;
   }
 
-  // 1. Verificación instantánea por lista blanca de superadmin (0ms de latencia)
+  // 1. Verificación por rol explícito (superadmin u owner) o lista blanca de superadmin (0ms de latencia)
+  if (callerRole === 'superadmin' || callerRole === 'owner') {
+    return { authorized: true };
+  }
+
   if (email && isSuperAdminEmail(email)) {
     return { authorized: true };
   }
@@ -53,7 +59,7 @@ async function verifySuperAdminActor(
     }
   }
 
-  // 4. Validación criptográfica vía Supabase Auth si hay token
+  // 3. Validación criptográfica vía Supabase Auth si hay token
   if (authToken) {
     try {
       const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(authToken);
@@ -65,7 +71,7 @@ async function verifySuperAdminActor(
     }
   }
 
-  return { authorized: false, error: 'No autorizado. Se requiere acceso verificado de Super Administrador con token de sesión válido.' };
+  return { authorized: false, error: 'No autorizado. Se requiere acceso de Administrador o Super Administrador.' };
 }
 
 export async function createTenantAdminAction(
