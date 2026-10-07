@@ -14,6 +14,7 @@ import { runOdontologiaKanbanTests } from './08_odontologia_kanban.test';
 import { runQASchemaResilienceTests } from './09_qa_schema_resilience.test';
 import { runEnterpriseEnhancementsTests } from './10_enterprise_enhancements.test';
 import { runDualModeWorkflowsTests } from './11_dual_mode_workflows.test';
+import { runSyntheticQAFullSuite } from './synthetic_full_qa';
 
 async function main() {
   console.log('====================================================');
@@ -33,6 +34,7 @@ async function main() {
     { name: '09. QA de Esquema & Resiliencia de Columnas', fn: runQASchemaResilienceTests },
     { name: '10. Mejoras de Grado Enterprise (ESC/POS & Worker Queue)', fn: runEnterpriseEnhancementsTests },
     { name: '11. Paradigma Dual & Flujos Operativos UX', fn: runDualModeWorkflowsTests },
+    { name: '12. QA Sintético Extenso de Interconexión Total', fn: runSyntheticQAFullSuite },
   ];
 
   let passed = 0;
