@@ -207,7 +207,10 @@ export default function InventarioPage() {
 
   useEffect(() => {
     fetchItems();
-  }, [fetchItems]);
+    if (globalViewMode === 'express') {
+      loadAuditLogs();
+    }
+  }, [fetchItems, globalViewMode, loadAuditLogs]);
 
   useEffect(() => {
     if (activeTab === 'audit') {
@@ -686,6 +689,12 @@ export default function InventarioPage() {
             setEditingItem(null);
             setIsModalOpen(true);
           }}
+          onSelectItem={(item) => setSelectedItem(item)}
+          onEditItem={(item) => {
+            setEditingItem(item);
+            setIsModalOpen(true);
+          }}
+          auditLogs={auditLogs}
           isLoading={isLoading}
         />
       ) : (
