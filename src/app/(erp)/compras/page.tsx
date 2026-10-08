@@ -18,7 +18,7 @@ import { useActionActor } from '@/hooks/useActionActor';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Suspense } from 'react';
 
 type TabType = 'suppliers' | 'pos' | 'match' | 'audit';
@@ -26,6 +26,7 @@ type TabType = 'suppliers' | 'pos' | 'match' | 'audit';
 function ComprasPageContent() {
   const currentTenant = useTenantResolver();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('pos');
   const initialItemParam = searchParams.get('item');
 
@@ -172,6 +173,9 @@ function ComprasPageContent() {
               tenantId={currentTenant?.id || ''}
               onRefresh={loadData}
               initialItem={initialItemParam}
+              onClearInitialItem={() => {
+                router.replace('/compras');
+              }}
               isInventoryEnabled={isInventoryEnabled}
               isCRMEnabled={isCRMEnabled}
             />

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { MODULE_CATALOG, ModuleId, ModuleDefinition } from '@/lib/core/kernel/moduleRegistry';
 import { useToast } from '@/components/core/ToastProvider';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 export default function StudioAdminPage() {
   const { session } = useERPStore();

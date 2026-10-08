@@ -203,7 +203,8 @@ export async function openCashSessionAction(
   tenantId: string, 
   actor: ActionActor,
   initialAmountVES?: number,
-  sessionRate?: number
+  sessionRate?: number,
+  forceCloseStale: boolean = false
 ) {
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
@@ -227,9 +228,41 @@ export async function openCashSessionAction(
     }
 
     const sessions: CashSession[] = tenant.metadata?.cash_sessions || [];
-    const hasOpen = sessions.some(s => s.status === 'open');
-    if (hasOpen) {
-      throw new Error('Ya existe una caja abierta. Debe cerrarla primero.');
+    const openSession = sessions.find(s => s.status === 'open');
+    if (openSession) {
+      const openTime = new Date(openSession.openedAt).getTime();
+      const now = Date.now();
+      const ageHours = (now - openTime) / (1000 * 60 * 60);
+      const isOlderThanWeek = ageHours >= 24 * 7; // Más de 7 días inactiva
+
+      if (forceCloseStale || isOlderThanWeek) {
+        // Cerrar automáticamente la sesión obsoleta para que nunca bloquee al cajero
+        const openIdx = sessions.findIndex(s => s.id === openSession.id);
+        if (openIdx !== -1) {
+          sessions[openIdx] = {
+            ...openSession,
+            status: 'closed',
+            closedAt: new Date().toISOString(),
+            closedBy: actor.email,
+            notes: (openSession.notes ? openSession.notes + ' | ' : '') + 
+              (isOlderThanWeek ? 'Cierre preventivo automático por inactividad prolongada (> 7 días).' : 'Cierre de turno anterior forzado para nueva apertura.'),
+          };
+        }
+      } else {
+        const daysAgo = Math.floor(ageHours / 24);
+        const timeAgoDesc = daysAgo > 0 ? `hace ${daysAgo} día(s)` : `hace ${Math.floor(ageHours)} hora(s)`;
+        return { 
+          success: false, 
+          error: `Ya existe una sesión de caja activa abierta ${timeAgoDesc} (${new Date(openSession.openedAt).toLocaleDateString()}). Puedes cerrar el turno anterior o iniciar nuevo turno.`,
+          hasStaleSession: true,
+          staleSession: {
+            id: openSession.id,
+            openedAt: openSession.openedAt,
+            openedBy: openSession.openedBy,
+            ageHours
+          }
+        };
+      }
     }
 
     const safeUSD = isNaN(Number(initialAmount)) || Number(initialAmount) < 0 ? 0 : Number(initialAmount);

@@ -1017,6 +1017,11 @@ function CajaPageContent() {
               }`}>
                 {cashSessionStatus ? '🟢 Turno Activo' : '🔴 Caja Cerrada'}
               </span>
+              {cashSessionStatus?.openedAt && (Date.now() - new Date(cashSessionStatus.openedAt).getTime() > 24 * 60 * 60 * 1000) && (
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full">
+                  Abierto {new Date(cashSessionStatus.openedAt).toLocaleDateString()}
+                </span>
+              )}
             </div>
             
             {cashSessionStatus ? (

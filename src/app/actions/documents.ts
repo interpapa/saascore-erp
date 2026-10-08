@@ -17,7 +17,7 @@ export type DocumentType =
   | 'journal_entry'
   | 'payroll_slip';
 
-export type DocumentStatus = 'draft' | 'in_progress' | 'invoiced' | 'annulled' | 'paid' | 'partial';
+export type DocumentStatus = 'draft' | 'in_progress' | 'invoiced' | 'annulled' | 'paid' | 'partial' | 'received' | 'completed';
 
 export interface DocumentLineInput {
   item_id?: string | null;
@@ -346,9 +346,51 @@ export async function updateDocumentStatusAction(
       return { success: false, error: securityCheck.error || 'Acceso denegado.' };
     }
 
+    // Obtener estado actual del documento para gestionar transiciones coherentes
+    const { data: currentDoc, error: fetchErr } = await supabaseAdmin
+      .from('documents')
+      .select('id, status, metadata, type')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (fetchErr || !currentDoc) {
+      throw new Error('Documento no encontrado.');
+    }
+
+    let targetStatus = status;
+    let targetMetadata = { ...(currentDoc.metadata || {}) };
+
+    if (status === 'paid') {
+      const isAlreadyPaid = currentDoc.status === 'paid' || currentDoc.status === 'completed' || targetMetadata.payment_status === 'paid';
+      if (isAlreadyPaid) {
+        return { success: false, error: 'Esta orden ya fue marcada como pagada.' };
+      }
+      targetMetadata.payment_status = 'paid';
+      targetMetadata.paid_at = new Date().toISOString();
+      targetMetadata.paid_by = actor.email;
+
+      // Si ya fue recibida en almacén, el estado global pasa a 'completed' (Completada: Recibida y Pagada)
+      if (currentDoc.status === 'received' || targetMetadata.delivery_status === 'received') {
+        targetStatus = 'completed';
+      }
+    } else if (status === 'annulled') {
+      if (currentDoc.status === 'received' || currentDoc.status === 'completed' || targetMetadata.delivery_status === 'received') {
+        return { success: false, error: 'No se puede anular una orden cuya mercancía ya fue ingresada a inventario.' };
+      }
+      if (currentDoc.status === 'paid' || targetMetadata.payment_status === 'paid') {
+        return { success: false, error: 'No se puede anular una orden que ya fue marcada como pagada.' };
+      }
+      targetMetadata.annulled_at = new Date().toISOString();
+      targetMetadata.annulled_by = actor.email;
+    }
+
     const { data: updatedDoc, error } = await supabaseAdmin
       .from('documents')
-      .update({ status })
+      .update({ 
+        status: targetStatus,
+        metadata: targetMetadata,
+      })
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .select()
@@ -398,8 +440,12 @@ export async function receivePurchaseOrderAction(
       return { success: false, error: 'Orden de compra no encontrada.' };
     }
 
-    if (po.status === 'received' || po.status === 'completed') {
+    if (po.status === 'received' || po.status === 'completed' || po.metadata?.delivery_status === 'received') {
       return { success: false, error: 'Esta orden ya fue marcada como recibida.' };
+    }
+
+    if (po.status === 'annulled') {
+      return { success: false, error: 'No se puede recibir mercancía de una orden anulada.' };
     }
 
     // Extraer líneas desde metadata.lines o cart_lines
@@ -451,16 +497,20 @@ export async function receivePurchaseOrderAction(
       }
     }
 
+    const isAlreadyPaid = po.status === 'paid' || po.metadata?.payment_status === 'paid';
+    const nextStatus = isAlreadyPaid ? 'completed' : 'received';
+
     const updatedMetadata = {
       ...(po.metadata || {}),
       received_at: new Date().toISOString(),
       received_by: actor.email,
+      delivery_status: 'received',
     };
 
     const { data: updatedDoc, error: updateErr } = await supabaseAdmin
       .from('documents')
       .update({
-        status: 'received',
+        status: nextStatus,
         metadata: updatedMetadata,
       })
       .eq('id', poId)

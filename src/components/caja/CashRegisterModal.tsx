@@ -36,6 +36,9 @@ export function CashRegisterModal({
   const [countedVES, setCountedVES] = useState<string>('0');
   const [notes, setNotes] = useState<string>('');
 
+  // Advertencia de sesión anterior activa
+  const [staleWarning, setStaleWarning] = useState<any>(null);
+
   useEffect(() => {
     if (isOpen) {
       setInitialUSD('0');
@@ -43,6 +46,7 @@ export function CashRegisterModal({
       setCountedUSD('0');
       setCountedVES('0');
       setNotes('');
+      setStaleWarning(null);
     }
   }, [isOpen]);
 
@@ -76,7 +80,7 @@ export function CashRegisterModal({
 
     try {
       if (isOpening) {
-        const res = await openCashSessionAction(numInitUSD, tenantId, actor, numInitVES, rate);
+        const res = await openCashSessionAction(numInitUSD, tenantId, actor, numInitVES, rate, false);
         if (res.success) {
           toast({ 
             variant: 'success', 
@@ -85,6 +89,13 @@ export function CashRegisterModal({
           });
           onSuccess();
           onClose();
+        } else if ((res as any).hasStaleSession) {
+          setStaleWarning((res as any).staleSession);
+          toast({
+            variant: 'warning',
+            title: 'Sesión Activa Anterior',
+            description: res.error || 'Existe una sesión anterior que no fue cerrada.',
+          });
         } else {
           throw new Error(res.error);
         }
@@ -228,12 +239,66 @@ export function CashRegisterModal({
                   </span>
                 </div>
               </div>
+
+              {/* Alerta y Recuperación de Sesión Anterior Huérfana / Olvidada */}
+              {staleWarning && (
+                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs space-y-2.5 animate-in fade-in duration-200">
+                  <div className="flex items-center gap-2 font-bold text-amber-700 dark:text-amber-400">
+                    <AlertTriangle size={16} />
+                    <span>Turno anterior activo detectado</span>
+                  </div>
+                  <p className="text-slate-600 dark:text-slate-300 text-xs">
+                    Hay una caja abierta desde el <strong>{new Date(staleWarning.openedAt).toLocaleDateString()}</strong> por <em>{staleWarning.openedBy}</em> ({Math.floor(staleWarning.ageHours / 24) > 0 ? `hace ${Math.floor(staleWarning.ageHours / 24)} día(s)` : `hace ${Math.floor(staleWarning.ageHours)} hora(s)`}).
+                  </p>
+                  <p className="text-[11px] text-slate-500">
+                    Puedes archivar esa sesión anterior y abrir tu nuevo turno de hoy inmediatamente:
+                  </p>
+                  <button
+                    type="button"
+                    disabled={isLoading}
+                    onClick={async () => {
+                      setIsLoading(true);
+                      try {
+                        const forceRes = await openCashSessionAction(numInitUSD, tenantId, actor, numInitVES, rate, true);
+                        if (forceRes.success) {
+                          toast({
+                            variant: 'success',
+                            title: 'Nuevo Turno Iniciado',
+                            description: 'La sesión anterior fue archivada y se inició el nuevo turno con éxito.',
+                          });
+                          onSuccess();
+                          onClose();
+                        } else {
+                          toast({ variant: 'error', title: 'Error', description: forceRes.error });
+                        }
+                      } finally {
+                        setIsLoading(false);
+                      }
+                    }}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cerrar sesión anterior y abrir este nuevo turno
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             /* ─────────────────────────────────────────────────────────────
                CIERRE Z / ARQUEO UNIFICADO (DÓLARES + BOLÍVARES = 1 GAVETA)
                ───────────────────────────────────────────────────────────── */
             <div className="space-y-4">
+              {/* Aviso si la sesión tiene más de 24 horas abierta */}
+              {currentSession?.openedAt && (Date.now() - new Date(currentSession.openedAt).getTime() > 24 * 60 * 60 * 1000) && (
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs text-blue-700 dark:text-blue-300 flex items-center gap-2.5">
+                  <AlertTriangle size={16} className="shrink-0 text-blue-500" />
+                  <div>
+                    <p className="font-bold">Turno activo prolongado</p>
+                    <p className="text-[11px] opacity-90">
+                      Esta sesión fue abierta el {new Date(currentSession.openedAt).toLocaleDateString()}. Realiza el arqueo Z para cerrar este período y dejar la caja lista para un nuevo turno.
+                    </p>
+                  </div>
+                </div>
+              )}
               {/* Resumen Unificado del Sistema */}
               <div className="bg-slate-100 dark:bg-slate-800/60 p-4 rounded-2xl border border-border/50 space-y-2 text-xs">
                 <div className="flex justify-between items-center text-slate-500">

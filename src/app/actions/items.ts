@@ -66,6 +66,23 @@ export async function createItemAction(
       return { success: false, error: 'El precio base y el costo no pueden ser importes negativos.' };
     }
 
+    // Validación preventiva de productos duplicados con el mismo nombre exacto
+    const cleanName = input.name.trim();
+    const { data: existingDuplicate } = await supabaseAdmin
+      .from('items')
+      .select('id, name')
+      .eq('tenant_id', tenantId)
+      .ilike('name', cleanName)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (existingDuplicate) {
+      return { 
+        success: false, 
+        error: `Ya existe un producto o servicio registrado con el nombre "${cleanName}". Usa un nombre distintivo o edita el existente.` 
+      };
+    }
+
     const insertData: any = {
       tenant_id: tenantId,
       type: input.type,
@@ -169,6 +186,26 @@ export async function updateItemAction(
       (updates.cost !== undefined && updates.cost < 0)
     ) {
       return { success: false, error: 'El precio base y el costo no pueden ser importes negativos.' };
+    }
+
+    // Si se modifica el nombre, verificar que no colisione con otro ítem existente
+    if (updates.name && updates.name.trim()) {
+      const cleanName = updates.name.trim();
+      const { data: duplicate } = await supabaseAdmin
+        .from('items')
+        .select('id, name')
+        .eq('tenant_id', targetTenantId)
+        .ilike('name', cleanName)
+        .neq('id', id)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (duplicate) {
+        return { 
+          success: false, 
+          error: `Ya existe otro producto o servicio registrado con el nombre "${cleanName}".` 
+        };
+      }
     }
 
     const updatePayload: any = { ...updates };

@@ -35,6 +35,7 @@ interface PurchaseOrderTabProps {
   tenantId: string;
   onRefresh: () => void;
   initialItem?: string | null;
+  onClearInitialItem?: () => void;
   isInventoryEnabled?: boolean;
   isCRMEnabled?: boolean;
 }
@@ -46,6 +47,7 @@ export function PurchaseOrderTab({
   tenantId,
   onRefresh,
   initialItem,
+  onClearInitialItem,
   isInventoryEnabled = true,
   isCRMEnabled = true,
 }: PurchaseOrderTabProps) {
@@ -85,18 +87,51 @@ export function PurchaseOrderTab({
     unit_price: number;
   }>>([]);
 
+  // Automatizaciones inmediatas en emisión
+  const [autoReceiveStock, setAutoReceiveStock] = useState(false);
+  const [autoMarkPaid, setAutoMarkPaid] = useState(false);
+
+  // Helper para evaluar el estado dual de entrega y pago
+  const getPoStatusFlags = (po: any) => {
+    const isReceived = po?.status === 'received' || po?.status === 'completed' || po?.metadata?.delivery_status === 'received';
+    const isPaid = po?.status === 'paid' || po?.status === 'completed' || po?.metadata?.payment_status === 'paid';
+    const isAnnulled = po?.status === 'annulled';
+    return { isReceived, isPaid, isAnnulled };
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedItemId('');
+    setItemQty(1);
+    setItemCost(0);
+    setCustomConcept('');
+    setCustomQty(1);
+    setCustomCost(0);
+    setPoLines([]);
+    setPoNotes('');
+    setAutoReceiveStock(false);
+    setAutoMarkPaid(false);
+    if (onClearInitialItem) {
+      onClearInitialItem();
+    }
+  };
+
+  // Referencia para no re-abrir en bucle cuando el usuario cierra la ventana
+  const lastInitialItemRef = useState<string | null>(null);
+
   // Si se pasa un ítem inicial por URL (ej: /compras?item=123)
   useEffect(() => {
-    if (initialItem && catalogItems.length > 0 && !isModalOpen) {
+    if (initialItem && catalogItems.length > 0 && initialItem !== lastInitialItemRef[0]) {
       const item = catalogItems.find((i: any) => i.id === initialItem);
       if (item) {
+        lastInitialItemRef[1](initialItem);
         setIsModalOpen(true);
         setLineType('inventory');
         setSelectedItemId(initialItem);
         setItemCost(item.cost || item.base_price || 0);
       }
     }
-  }, [initialItem, catalogItems, isModalOpen]);
+  }, [initialItem, catalogItems, lastInitialItemRef]);
 
   // Si cambia la disponibilidad de inventario
   useEffect(() => {
@@ -224,19 +259,39 @@ export function PurchaseOrderTab({
         actor
       );
 
-      if (res.success) {
+      if (res.success && res.document?.id) {
+        let successDesc = `Orden ${res.document?.document_number || ''} registrada a nombre de ${supplierName}.`;
+
+        // Ingreso directo a stock si el usuario marcó la opción
+        if (autoReceiveStock) {
+          try {
+            const recRes = await receivePurchaseOrderAction(res.document.id, tenantId, actor);
+            if (recRes.success) {
+              successDesc += ' Existencias ingresadas a inventario.';
+            }
+          } catch (rErr) {
+            console.warn('Error al auto-recibir orden:', rErr);
+          }
+        }
+
+        // Marcado directo como pagada si fue compra al contado
+        if (autoMarkPaid) {
+          try {
+            const payRes = await updateDocumentStatusAction(res.document.id, 'paid', tenantId, actor);
+            if (payRes.success) {
+              successDesc += ' Marcada como pagada.';
+            }
+          } catch (pErr) {
+            console.warn('Error al auto-pagar orden:', pErr);
+          }
+        }
+
         toast({ 
           variant: 'success', 
-          title: 'Orden de Compra Emitida', 
-          description: `Orden ${res.document?.document_number || ''} registrada a nombre de ${supplierName}.` 
+          title: 'Orden de Compra Procesada', 
+          description: successDesc 
         });
-        setPoLines([]);
-        setPoNotes('');
-        setSelectedSupplierId('');
-        setManualSupplierName('');
-        setSelectedItemId('');
-        setCustomConcept('');
-        setIsModalOpen(false);
+        handleCloseModal();
         onRefresh();
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo crear la orden de compra.' });
@@ -260,7 +315,15 @@ export function PurchaseOrderTab({
           title: 'Mercancía Recibida',
           description: `Se confirmó la recepción de ${po.document_number}. Las existencias en inventario fueron actualizadas.`,
         });
-        setSelectedPoForView(null);
+        setSelectedPoForView((prev: any) => prev ? {
+          ...prev,
+          status: res.document?.status || (prev.status === 'paid' ? 'completed' : 'received'),
+          metadata: {
+            ...(prev.metadata || {}),
+            delivery_status: 'received',
+            received_at: new Date().toISOString(),
+          }
+        } : null);
         onRefresh();
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo recibir la mercancía.' });
@@ -284,7 +347,15 @@ export function PurchaseOrderTab({
           title: 'Orden Pagada',
           description: `La orden ${po.document_number} ha sido marcada como pagada.`,
         });
-        setSelectedPoForView(null);
+        setSelectedPoForView((prev: any) => prev ? {
+          ...prev,
+          status: res.document?.status || (prev.status === 'received' ? 'completed' : 'paid'),
+          metadata: {
+            ...(prev.metadata || {}),
+            payment_status: 'paid',
+            paid_at: new Date().toISOString(),
+          }
+        } : null);
         onRefresh();
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo actualizar el pago.' });
@@ -409,9 +480,7 @@ export function PurchaseOrderTab({
           {purchaseOrders.map((po) => {
             const supplierDisplayName = po.entity?.name || po.metadata?.supplier_name || 'Proveedor General';
             const linesCount = Array.isArray(po.lines) ? po.lines.length : 0;
-            const isReceived = po.status === 'received' || po.status === 'completed';
-            const isPaid = po.status === 'paid';
-            const isAnnulled = po.status === 'annulled';
+            const { isReceived, isPaid, isAnnulled } = getPoStatusFlags(po);
 
             return (
               <div
@@ -421,12 +490,14 @@ export function PurchaseOrderTab({
               >
                 <div className="flex items-center gap-4">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-transform group-hover:scale-105 ${
-                    isReceived 
+                    isAnnulled
+                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
+                      : isReceived && isPaid
                       ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                      : isReceived 
+                      ? 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20'
                       : isPaid
                       ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                      : isAnnulled
-                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
                       : 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/20'
                   }`}>
                     {isReceived ? <PackageCheck size={20} /> : <ShoppingCart size={20} />}
@@ -436,18 +507,33 @@ export function PurchaseOrderTab({
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono font-bold text-foreground text-sm tracking-tight">{po.document_number}</span>
                       
-                      {/* Estado */}
-                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
-                        isReceived
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                          : isPaid
-                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                          : isAnnulled
-                          ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                      }`}>
-                        {isReceived ? 'Mercancía Recibida' : isPaid ? 'Pagado' : isAnnulled ? 'Anulado' : po.status === 'in_progress' ? 'Emitida / En Tránsito' : po.status}
-                      </span>
+                      {/* Estado Dual Coherente */}
+                      {isAnnulled ? (
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+                          Anulada
+                        </span>
+                      ) : isReceived && isPaid ? (
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 flex items-center gap-1">
+                          <CheckCircle2 size={11} /> Completada (Recibida y Pagada)
+                        </span>
+                      ) : (
+                        <>
+                          <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                            isReceived
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                          }`}>
+                            {isReceived ? '✓ Recibida' : 'En Tránsito'}
+                          </span>
+                          <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                            isPaid
+                              ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                              : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
+                          }`}>
+                            {isPaid ? '✓ Pagada' : 'Por Pagar'}
+                          </span>
+                        </>
+                      )}
 
                       {/* Badge 3-Way Match */}
                       {po.metadata?.three_way_match && (
@@ -500,7 +586,7 @@ export function PurchaseOrderTab({
               </div>
               <button 
                 type="button" 
-                onClick={() => setIsModalOpen(false)}
+                onClick={handleCloseModal}
                 className="text-slate-400 hover:text-foreground p-1 rounded-lg"
               >
                 <X size={20} />
@@ -747,10 +833,37 @@ export function PurchaseOrderTab({
                 />
               </div>
 
+              {/* Opciones Inmediatas de Flujo */}
+              <div className="p-3.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border space-y-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Flujo Directo (Opcional)</span>
+                <label className="flex items-center gap-2.5 text-xs text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoReceiveStock}
+                    onChange={(e) => setAutoReceiveStock(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                  />
+                  <span>
+                    <strong>Ingreso directo a inventario:</strong> Recibir mercancía e incrementar existencias inmediatamente al emitir.
+                  </span>
+                </label>
+                <label className="flex items-center gap-2.5 text-xs text-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={autoMarkPaid}
+                    onChange={(e) => setAutoMarkPaid(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
+                  />
+                  <span>
+                    <strong>Compra al contado:</strong> Marcar como pagada de inmediato.
+                  </span>
+                </label>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={handleCloseModal}
                   className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-foreground cursor-pointer"
                 >
                   Cancelar
@@ -802,24 +915,33 @@ export function PurchaseOrderTab({
 
               <div>
                 <span className="text-slate-400 block text-[10px] font-bold uppercase tracking-wider">Estado</span>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
-                    selectedPoForView.status === 'received' || selectedPoForView.status === 'completed'
-                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                      : selectedPoForView.status === 'paid'
-                      ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
-                      : selectedPoForView.status === 'annulled'
-                      ? 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20'
-                      : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
-                  }`}>
-                    {selectedPoForView.status === 'received' || selectedPoForView.status === 'completed' 
-                      ? 'Recibida en Almacén' 
-                      : selectedPoForView.status === 'paid' 
-                      ? 'Pagada' 
-                      : selectedPoForView.status === 'annulled' 
-                      ? 'Anulada' 
-                      : 'Emitida / En Tránsito'}
-                  </span>
+                <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                  {getPoStatusFlags(selectedPoForView).isAnnulled ? (
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20">
+                      Anulada
+                    </span>
+                  ) : getPoStatusFlags(selectedPoForView).isReceived && getPoStatusFlags(selectedPoForView).isPaid ? (
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Completada (Recibida y Pagada)
+                    </span>
+                  ) : (
+                    <>
+                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                        getPoStatusFlags(selectedPoForView).isReceived
+                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                          : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20'
+                      }`}>
+                        {getPoStatusFlags(selectedPoForView).isReceived ? '✓ Recibida en Almacén' : 'En Tránsito'}
+                      </span>
+                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                        getPoStatusFlags(selectedPoForView).isPaid
+                          ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                          : 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
+                      }`}>
+                        {getPoStatusFlags(selectedPoForView).isPaid ? '✓ Pagada' : 'Por Pagar'}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -921,7 +1043,7 @@ export function PurchaseOrderTab({
                 </button>
 
                 {/* Botón Recibir Mercancía (si no fue recibida aún) */}
-                {selectedPoForView.status !== 'received' && selectedPoForView.status !== 'completed' && selectedPoForView.status !== 'annulled' && (
+                {!getPoStatusFlags(selectedPoForView).isReceived && !getPoStatusFlags(selectedPoForView).isAnnulled ? (
                   <button
                     type="button"
                     disabled={isProcessingAction}
@@ -931,10 +1053,14 @@ export function PurchaseOrderTab({
                     <PackageCheck size={15} />
                     {isProcessingAction ? 'Recibiendo...' : 'Recibir Mercancía'}
                   </button>
-                )}
+                ) : getPoStatusFlags(selectedPoForView).isReceived ? (
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 flex items-center gap-1.5">
+                    <CheckCircle2 size={14} /> Mercancía Recibida
+                  </span>
+                ) : null}
 
                 {/* Botón Marcar como Pagada */}
-                {selectedPoForView.status !== 'paid' && selectedPoForView.status !== 'annulled' && (
+                {!getPoStatusFlags(selectedPoForView).isPaid && !getPoStatusFlags(selectedPoForView).isAnnulled ? (
                   <button
                     type="button"
                     disabled={isProcessingAction}
@@ -944,10 +1070,14 @@ export function PurchaseOrderTab({
                     <CheckCircle2 size={14} className="text-blue-500" />
                     Marcar como Pagada
                   </button>
-                )}
+                ) : getPoStatusFlags(selectedPoForView).isPaid ? (
+                  <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-3 py-1.5 rounded-xl border border-blue-500/20 flex items-center gap-1.5">
+                    <CheckCircle2 size={14} /> Orden Pagada
+                  </span>
+                ) : null}
 
                 {/* Botón Anular */}
-                {selectedPoForView.status !== 'annulled' && selectedPoForView.status !== 'paid' && (
+                {!getPoStatusFlags(selectedPoForView).isAnnulled && !getPoStatusFlags(selectedPoForView).isReceived && !getPoStatusFlags(selectedPoForView).isPaid && (
                   <button
                     type="button"
                     disabled={isProcessingAction}
