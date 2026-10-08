@@ -48,7 +48,7 @@ export default function BillingAdminPage() {
     }
   };
 
-  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+  const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
 
   if (!isSuper) {
     return (

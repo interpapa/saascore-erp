@@ -591,17 +591,18 @@ export async function recordClientPaymentAction(
             actor_email: actor.email,
           });
           openSession.cash_movements = movements;
-          sessions[openIdx] = openSession;
-          await supabaseAdmin
-            .from('tenants')
-            .update({
-              metadata: {
-                ...tenantData.metadata,
-                cash_sessions: sessions,
-              },
-            })
-            .eq('id', tenantId);
-          safeRevalidate('/caja');
+          if (tenantData) {
+            await supabaseAdmin
+              .from('tenants')
+              .update({
+                metadata: {
+                  ...tenantData.metadata,
+                  cash_sessions: sessions,
+                },
+              })
+              .eq('id', tenantId);
+            safeRevalidate('/caja');
+          }
         }
       } catch (cashErr) {
         console.warn('[recordClientPaymentAction] Advertencia sincronizando caja:', cashErr);

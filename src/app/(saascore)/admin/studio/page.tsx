@@ -23,7 +23,9 @@ export default function StudioAdminPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isDeploying, setIsDeploying] = useState(false);
 
-  if (session?.role !== 'superadmin') {
+  const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
+
+  if (!isSuper) {
     return (
       <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-16 text-center text-red-500 font-bold">
         Acceso Denegado

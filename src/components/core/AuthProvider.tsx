@@ -183,8 +183,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else if (session && session.role === 'superadmin' && (!session.tenantId || session.tenantId === 'global-admin') && pathname === '/onboarding') {
       router.push('/admin');
     }
-    // Usuario autenticado SIN empresa asignada intentando acceder a rutas privadas -> Configurar empresa
-    else if (session && (!session.tenantId || session.tenantId === 'global-admin') && session.role !== 'superadmin' && pathname !== '/onboarding' && !isPublic) {
+    // Usuario autenticado SIN empresa asignada intentando acceder a rutas privadas -> Configurar empresa (excepto si va a /admin)
+    else if (session && (!session.tenantId || session.tenantId === 'global-admin') && session.role !== 'superadmin' && pathname !== '/onboarding' && !pathname.startsWith('/admin') && !isPublic) {
       router.push('/onboarding');
     }
   }, [session, isLoading, hasHydrated, pathname, router]);

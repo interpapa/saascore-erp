@@ -21,7 +21,8 @@ export function QuickStockModal({
   onClose,
   onSuccess,
   items,
-  initialItemId = ''
+  initialItemId = '',
+  tenantId
 }: QuickStockModalProps) {
   const currentTenant = useTenantResolver();
   const { session } = useERPStore();

@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, 
   Ban, 
@@ -529,7 +529,9 @@ export default function AdminTenantsPage() {
                     <td className="p-4">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <CreditCard size={14} className={tenant.status === 'suspended' ? 'text-rose-500' : 'text-muted-foreground'} />
-                        {new Date(tenant.created_at).toLocaleDateString()}
+                        {tenant.created_at && !isNaN(new Date(tenant.created_at).getTime()) 
+                          ? new Date(tenant.created_at).toLocaleDateString() 
+                          : 'N/A'}
                       </div>
                     </td>
                     <td className="p-4 pr-6 text-right">
