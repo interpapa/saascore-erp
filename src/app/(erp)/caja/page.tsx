@@ -982,10 +982,10 @@ function CajaPageContent() {
           totalVES: totalVES,
           rate: currentRate,
           paymentMethod: paymentMethod,
-          cashTenderedUSD: numericCashUSD > 0 ? numericCashUSD : undefined,
-          cashTenderedVES: numericCashVES > 0 ? numericCashVES : undefined,
-          changeDueUSD: changeDueUSD > 0 ? changeDueUSD : undefined,
-          changeDueVES: changeDueVES > 0 ? changeDueVES : undefined,
+          cashTenderedUSD: (paymentMethod === 'cash_usd' && numericCashUSD > 0) ? numericCashUSD : undefined,
+          cashTenderedVES: (paymentMethod === 'cash_ves' && numericCashVES > 0) ? numericCashVES : undefined,
+          changeDueUSD: (paymentMethod === 'cash_usd' && changeDueUSD > 0) ? changeDueUSD : undefined,
+          changeDueVES: (paymentMethod === 'cash_ves' && changeDueVES > 0) ? changeDueVES : undefined,
           cashier: actor?.email?.split('@')[0] || session?.userEmail?.split('@')[0] || 'Cajero',
         };
         setSaleReceiptData(saleReceipt);

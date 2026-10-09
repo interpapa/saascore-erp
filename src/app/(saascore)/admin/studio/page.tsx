@@ -126,7 +126,7 @@ export default function StudioAdminPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredModules.map(m => (
             <div key={m.id} className="flex items-start justify-between p-4 rounded-2xl border border-border bg-background hover:border-border/80 transition-all">
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${m.active ? 'bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400' : 'bg-slate-200 dark:bg-slate-800 text-slate-400'}`}>
                   <Database size={18} />
                 </div>

@@ -430,9 +430,10 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Tabla Principal de Usuarios */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-2xs">
-        <table className="w-full text-left">
+      {/* Tabla Principal de Usuarios (Escritorio) */}
+      <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden shadow-2xs">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-[850px]">
           <thead className="bg-muted/50 border-b border-border text-xs uppercase tracking-wider font-bold text-muted-foreground">
             <tr>
               <th className="p-4 pl-6">Usuario & Email</th>
@@ -569,6 +570,121 @@ export default function AdminUsersPage() {
             })}
           </tbody>
         </table>
+        </div>
+      </div>
+
+      {/* Vista Móvil: Tarjetas Adaptativas Touch-First */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="p-8 text-center text-muted-foreground bg-card rounded-2xl border border-border">
+            <div className="flex justify-center mb-2">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+            Cargando usuarios y permisos...
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="p-6 bg-card rounded-2xl border border-border">
+            <EmptyState
+              icon={<Users size={40} />}
+              title="No se encontraron usuarios"
+              description={
+                searchTerm || roleFilter !== 'all' || tenantFilter !== 'all'
+                  ? 'No hay usuarios que coincidan con los filtros aplicados.'
+                  : 'Crea un nuevo usuario para otorgarle acceso al sistema.'
+              }
+            />
+          </div>
+        ) : (
+          filteredUsers.map((u) => {
+            const activeCount = Array.isArray(u.allowed_modules) ? u.allowed_modules.length : ALL_SYSTEM_MODULES.length;
+            const isSuper = u.primary_role === 'superadmin';
+
+            return (
+              <div
+                key={u.id}
+                className="bg-card border border-border rounded-2xl p-4 space-y-3 shadow-2xs"
+              >
+                {/* Cabecera Usuario */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-black text-xs uppercase border border-primary/20 shrink-0">
+                      {u.email.charAt(0)}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-bold text-foreground text-sm truncate flex items-center gap-1.5">
+                        <span className="truncate">{u.email}</span>
+                        {isSuper && (
+                          <span className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 px-1.5 py-0.2 rounded font-bold uppercase shrink-0">
+                            Dios
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground font-mono truncate">
+                        ID: {u.id.substring(0, 8)}...
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Badge de Rol */}
+                  <span
+                    className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border shrink-0 ${
+                      u.primary_role === 'superadmin'
+                        ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
+                        : u.primary_role === 'owner'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                        : u.primary_role === 'manager'
+                        ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20'
+                        : 'bg-muted text-muted-foreground border-border'
+                    }`}
+                  >
+                    {u.primary_role}
+                  </span>
+                </div>
+
+                {/* Empresa y Módulos */}
+                <div className="flex items-center justify-between text-xs border-y border-border/50 py-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <Building2 size={13} className="text-muted-foreground shrink-0" />
+                    <span className="font-semibold text-foreground truncate max-w-[160px]">
+                      {u.primary_tenant_name || 'Sin Asignar'}
+                    </span>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="font-bold text-foreground">
+                      {activeCount} / {ALL_SYSTEM_MODULES.length} módulos
+                    </span>
+                  </div>
+                </div>
+
+                {/* Botones de Acción Móviles */}
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button
+                    onClick={() => handleOpenEdit(u)}
+                    className="flex-1 py-2 px-3 rounded-xl text-xs font-bold bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 flex items-center justify-center gap-1.5 btn-haptic"
+                  >
+                    <SlidersHorizontal size={13} /> Configurar
+                  </button>
+
+                  <button
+                    onClick={() => handleResetPassword(u.email)}
+                    className="py-2 px-3 rounded-xl text-xs font-bold bg-muted hover:bg-accent text-foreground border border-border flex items-center gap-1.5 btn-haptic"
+                    title="Resetear contraseña"
+                  >
+                    <KeyRound size={13} className="text-primary" /> Clave
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteUser(u.id, u.email)}
+                    className="p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors btn-haptic shrink-0"
+                    title="Borrar usuario"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       {/* MODAL EDITAR PERMISOS & MÓDULOS */}

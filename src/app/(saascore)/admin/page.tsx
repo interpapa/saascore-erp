@@ -419,8 +419,10 @@ export default function AdminTenantsPage() {
         </div>
       )}
 
-      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
-        <table className="w-full text-left">
+      {/* Vista de Tabla para Escritorio / Pantallas Medianas y Grandes */}
+      <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left min-w-[850px]">
           <thead className="bg-muted/50 border-b border-border text-xs uppercase tracking-wider font-bold text-muted-foreground">
             <tr>
               <th className="p-4 pl-6">Empresa (Tenant)</th>
@@ -663,6 +665,204 @@ export default function AdminTenantsPage() {
             })}
           </tbody>
         </table>
+        </div>
+      </div>
+
+      {/* Vista Móvil: Tarjetas Adaptativas Touch-First */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="p-8 text-center text-slate-400 bg-card rounded-2xl border border-border">
+            <div className="flex justify-center mb-2">
+              <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+            Cargando inquilinos...
+          </div>
+        ) : filteredTenants.length === 0 ? (
+          <div className="p-6 bg-card rounded-2xl border border-border">
+            <EmptyState
+              icon={<Search size={40} />}
+              title="No se encontraron inquilinos"
+              description={
+                searchTerm || statusFilter !== 'all' || planFilter !== 'all'
+                  ? 'No hay resultados que coincidan con los filtros de búsqueda aplicados.'
+                  : 'Crea un nuevo inquilino para comenzar a gestionar clientes SaaS'
+              }
+            />
+          </div>
+        ) : (
+          filteredTenants.map((tenant) => {
+            const isExpanded = expandedTenantId === tenant.id;
+            const members = tenant.members || [];
+            const ownerEmail = tenant.owner_email || members.find((m: any) => m.role === 'owner')?.email || 'Sin dueño asignado';
+
+            return (
+              <div
+                key={tenant.id}
+                className={`bg-card border border-border rounded-2xl p-4 space-y-3 shadow-xs transition-all ${
+                  isExpanded ? 'ring-1 ring-primary/30' : ''
+                }`}
+              >
+                {/* Cabecera de la Tarjeta */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-foreground text-base truncate">{tenant.name}</h3>
+                      {tenant.user_count !== undefined && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
+                          {tenant.user_count} {tenant.user_count === 1 ? 'usuario' : 'usuarios'}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
+                      ID: {tenant.id.slice(0, 8)}... · 👤 {ownerEmail}
+                    </div>
+                  </div>
+
+                  {/* Estado Activo / Suspendido */}
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider shrink-0 ${
+                      tenant.status === 'active'
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                    }`}
+                  >
+                    {tenant.status === 'active' ? (
+                      <>
+                        <CheckCircle2 size={12} /> Activo
+                      </>
+                    ) : (
+                      <>
+                        <Ban size={12} /> Suspendido
+                      </>
+                    )}
+                  </span>
+                </div>
+
+                {/* Info Plan & Módulos */}
+                <div className="flex items-center justify-between text-xs text-muted-foreground border-y border-border/50 py-2">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase block text-slate-400">Plan</span>
+                    <span className="font-bold text-primary uppercase text-xs">
+                      {tenant.subscription_plan || 'basic'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase block text-slate-400">Creado</span>
+                    <span className="text-xs">
+                      {tenant.created_at && !isNaN(new Date(tenant.created_at).getTime())
+                        ? new Date(tenant.created_at).toLocaleDateString()
+                        : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-bold uppercase block text-slate-400 text-right">Módulos</span>
+                    <span className="font-bold text-foreground text-xs block text-right">
+                      {(tenant.active_modules || []).length} activos
+                    </span>
+                  </div>
+                </div>
+
+                {/* Módulos de Acceso Rápido */}
+                <div className="flex gap-1.5 flex-wrap">
+                  {(tenant.active_modules || []).slice(0, 5).map((mod: string) => (
+                    <button
+                      key={mod}
+                      onClick={() => handleAccessTenantModule(tenant, mod)}
+                      className="bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border transition-colors flex items-center gap-1"
+                    >
+                      <span>{mod}</span>
+                      <span className="opacity-40 text-[8px]">↗</span>
+                    </button>
+                  ))}
+                  {(tenant.active_modules || []).length > 5 && (
+                    <button
+                      onClick={() => setExpandedTenantId(isExpanded ? null : tenant.id)}
+                      className="text-[10px] text-primary font-bold px-1.5 py-0.5"
+                    >
+                      +{(tenant.active_modules || []).length - 5} más
+                    </button>
+                  )}
+                </div>
+
+                {/* Botones de Acción Móviles con buen tamaño de toque */}
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => handleImpersonate(tenant)}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-primary text-primary-foreground flex items-center justify-center gap-1.5 shadow-xs btn-haptic"
+                  >
+                    <LogIn size={14} /> Entrar al ERP
+                  </button>
+                  <button
+                    onClick={() => handleOpenModulesModal(tenant)}
+                    className="py-2.5 px-3 rounded-xl text-xs font-bold bg-muted hover:bg-accent text-foreground border border-border flex items-center justify-center gap-1.5 btn-haptic"
+                  >
+                    <SlidersHorizontal size={14} className="text-primary" /> Módulos
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <button
+                    onClick={() => handleToggleStatus(tenant.id, tenant.status)}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-colors btn-haptic text-center ${
+                      tenant.status === 'active'
+                        ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20'
+                        : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                    }`}
+                  >
+                    {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
+                  </button>
+
+                  <Link
+                    href={`/admin/tenant/${tenant.id}`}
+                    className="py-2 px-3 text-foreground hover:bg-accent border border-border rounded-xl text-xs font-bold transition-colors text-center"
+                  >
+                    Detalles
+                  </Link>
+
+                  <button
+                    onClick={() => handleDelete(tenant.id)}
+                    className="p-2 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-xl transition-colors shrink-0"
+                    title="Eliminar empresa"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+
+                {/* Subpanel Expandido en Móvil */}
+                {isExpanded && (
+                  <div className="p-3 bg-muted/30 border border-border rounded-xl space-y-3 mt-2 text-xs">
+                    <div className="font-bold text-foreground flex items-center justify-between">
+                      <span>Usuarios vinculados ({members.length})</span>
+                      <Link
+                        href={`/admin/tenant/${tenant.id}`}
+                        className="text-primary hover:underline text-[11px]"
+                      >
+                        Gestionar
+                      </Link>
+                    </div>
+                    {members.length === 0 ? (
+                      <p className="text-muted-foreground text-[11px] italic">No hay miembros registrados.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {members.map((member: any) => (
+                          <div
+                            key={member.id}
+                            className="p-2 bg-card border border-border rounded-lg flex items-center justify-between"
+                          >
+                            <span className="truncate font-medium text-foreground">{member.email}</span>
+                            <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-primary/10 text-primary">
+                              {member.role}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
       </div>
       
       <div className="mt-8 bg-blue-500/10 border border-blue-500/20 rounded-2xl p-6 flex gap-4">

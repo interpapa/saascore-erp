@@ -303,10 +303,16 @@ export function ReceiptModal({ isOpen, onClose, saleData }: ReceiptModalProps) {
                 <span className="font-bold capitalize">{getPaymentMethodLabel(saleData.paymentMethod)}</span>
               </div>
 
-              {saleData.changeDueUSD !== undefined && saleData.changeDueUSD > 0 && (
+              {saleData.changeDueUSD !== undefined && saleData.changeDueUSD > 0 && (saleData.paymentMethod === 'cash_usd' || saleData.paymentMethod === 'cash') && (
                 <div className="flex justify-between font-black text-emerald-800">
                   <span>Vuelto Entregado:</span>
                   <span>${saleData.changeDueUSD.toFixed(2)} USD</span>
+                </div>
+              )}
+              {saleData.changeDueVES !== undefined && saleData.changeDueVES > 0 && saleData.paymentMethod === 'cash_ves' && (
+                <div className="flex justify-between font-black text-teal-800">
+                  <span>Vuelto Entregado (Bs):</span>
+                  <span>Bs. {saleData.changeDueVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
                 </div>
               )}
             </div>

@@ -72,12 +72,12 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
 
       <main className="relative z-10 pt-24 pb-24 md:pb-12 px-4 sm:px-6 max-w-7xl mx-auto w-full">
         {/* Barra superior de navegación unificada del Módulo SaaS Admin */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8 pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-4 sm:p-5 rounded-3xl border shadow-xs">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6 sm:mb-8 pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-4 sm:p-5 rounded-3xl border shadow-xs overflow-hidden">
           {/* Botón directo de regreso al Dashboard + Título de Módulo */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <Link
               href="/dashboard"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md shadow-primary/20 btn-haptic group shrink-0"
+              className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md shadow-primary/20 btn-haptic group shrink-0"
               title="Volver al panel principal del ERP"
             >
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
@@ -87,19 +87,19 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
             <div className="h-6 w-px bg-border hidden sm:block" />
 
             <div className="flex items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20 shadow-xs">
-                <Crown size={20} />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20 shadow-xs shrink-0">
+                <Crown size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div>
-                <h1 className="text-lg font-black text-foreground tracking-tight leading-none">Rendo Hub</h1>
-                <p className="text-xs text-slate-500 font-semibold mt-0.5">Módulo de Administración SaaS</p>
+                <h1 className="text-base sm:text-lg font-black text-foreground tracking-tight leading-none">Rendo Hub</h1>
+                <p className="text-[11px] sm:text-xs text-slate-500 font-semibold mt-0.5">Módulo de Administración SaaS</p>
               </div>
             </div>
           </div>
 
           {/* Pestañas horizontales de navegación del módulo */}
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-            <nav className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-2xl w-full sm:w-auto">
+          <div className="w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+            <nav className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-2xl w-max lg:w-auto">
               {navItems.map((item) => {
                 const isActive = item.exact 
                   ? pathname === item.href 
@@ -110,7 +110,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap btn-haptic ${
+                    className={`flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap btn-haptic ${
                       isActive
                         ? 'bg-card text-foreground shadow-xs border border-border'
                         : 'text-slate-500 hover:text-foreground hover:bg-card/50'
@@ -127,7 +127,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
 
         {/* Telemetría y estado de servidores */}
         {healthData && (
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 px-4 py-2.5 bg-card/60 border border-border/80 rounded-2xl text-xs text-slate-500 font-mono shadow-2xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 p-3 sm:px-4 sm:py-2.5 bg-card/60 border border-border/80 rounded-2xl text-xs text-slate-500 font-mono shadow-2xs overflow-hidden">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5">
                 <Database size={13} className="text-rose-500" />
