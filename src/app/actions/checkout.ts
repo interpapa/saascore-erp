@@ -78,7 +78,7 @@ export async function processSecureCheckout(
       return { success: false, error: 'Acceso denegado: No tienes permisos para procesar ventas.' };
     }
 
-    if (!cart.length || !entityId || !tenantId) {
+    if (!cart.length || !tenantId) {
       return { success: false, error: 'Datos insuficientes para procesar la transacción.' };
     }
 
@@ -117,16 +117,20 @@ export async function processSecureCheckout(
     let entityData: any = null;
     
     // Intentar buscar cliente real perteneciente a este tenant (Anti-IDOR)
-    const { data: realEntity } = await supabaseAdmin
-      .from('entities')
-      .select('*')
-      .eq('id', entityId)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
+    if (entityId && entityId !== 'generic_counter_customer' && entityId !== tenantId) {
+      const { data: realEntity } = await supabaseAdmin
+        .from('entities')
+        .select('*')
+        .eq('id', entityId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
 
-    if (realEntity) {
-      entityData = realEntity;
-    } else {
+      if (realEntity) {
+        entityData = realEntity;
+      }
+    }
+
+    if (!entityData) {
       // Fallback: Si no se encuentra (o es el ID del tenant), buscar o crear el "Cliente de Mostrador" genérico
       const { data: counterEntity } = await supabaseAdmin
         .from('entities')

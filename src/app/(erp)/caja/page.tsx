@@ -20,6 +20,7 @@ import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { PhoneInput } from '@/components/ui/PhoneInput';
 import { useViewModeStore } from '@/store/useViewModeStore';
 import { FastTenderBottomSheet } from '@/components/caja/FastTenderBottomSheet';
+import { MobileBottomSheet } from '@/components/ui/mobile/MobileBottomSheet';
 import { 
   Search, 
   ShoppingCart, 
@@ -82,6 +83,7 @@ function CajaPageContent() {
   const actor = useActionActor();
   const globalViewMode = useViewModeStore((s) => s.viewMode);
   const [isFastTenderOpen, setIsFastTenderOpen] = useState(false);
+  const [isMobileTicketOpen, setIsMobileTicketOpen] = useState(false);
 
   const clientParam = searchParams.get('client') || searchParams.get('client_id');
   const appointmentIdParam = searchParams.get('appointment_id');
@@ -665,6 +667,19 @@ function CajaPageContent() {
 
   // Validación de Pago Mixto
   const remainingToAssign = total - (mixedPayments.cash + mixedPayments.card + mixedPayments.transfer);
+
+  // Auto-prellenar monto de cobro con el total de venta si no ha sido editado
+  useEffect(() => {
+    if (total > 0 && (!cashTenderedUSD || Number(cashTenderedUSD) === 0)) {
+      setCashTenderedUSD(total.toFixed(2));
+    }
+  }, [total]);
+
+  useEffect(() => {
+    if (totalVES > 0 && (!cashTenderedVES || Number(cashTenderedVES) === 0)) {
+      setCashTenderedVES(totalVES.toFixed(2));
+    }
+  }, [totalVES]);
 
   // Copiar datos bancarios al portapapeles
   const copyBankData = (acc: BankAccount) => {
@@ -2387,9 +2402,7 @@ function CajaPageContent() {
           <div className="fixed bottom-22 left-3 right-3 sm:left-6 sm:right-6 z-40 max-w-lg mx-auto md:hidden pointer-events-none">
             <div className="pointer-events-auto bg-slate-900/95 dark:bg-slate-950/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
               <div
-                onClick={() => {
-                  document.getElementById('pos-ticket-panel')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setIsMobileTicketOpen(true)}
                 className="cursor-pointer"
                 title="Toca para ir al detalle del ticket"
               >
@@ -2410,17 +2423,23 @@ function CajaPageContent() {
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    const el = document.getElementById('pos-ticket-panel');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all"
+                  onClick={() => setIsMobileTicketOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5"
                 >
-                  Ver Ticket
+                  <Receipt size={14} className="text-emerald-400" />
+                  <span>Ver Ticket</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsFastTenderOpen(true)}
+                  onClick={() => {
+                    if (!cashTenderedUSD || Number(cashTenderedUSD) === 0) {
+                      setCashTenderedUSD(total > 0 ? total.toFixed(2) : '');
+                    }
+                    if (!cashTenderedVES || Number(cashTenderedVES) === 0) {
+                      setCashTenderedVES(totalVES > 0 ? totalVES.toFixed(2) : '');
+                    }
+                    setIsFastTenderOpen(true);
+                  }}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md btn-haptic"
                 >
                   <CreditCard size={13} />
@@ -2434,7 +2453,11 @@ function CajaPageContent() {
           {globalViewMode === 'express' && (
             <div className="hidden md:block fixed bottom-4 left-0 right-0 z-30 px-4 max-w-lg mx-auto pointer-events-none">
               <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
-                <div>
+                <div 
+                  onClick={() => setIsMobileTicketOpen(true)}
+                  className="cursor-pointer"
+                  title="Ver detalle del ticket"
+                >
                   <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                     {ticketLines.reduce((acc, l) => acc + l.quantity, 0)} ítem(s) en Ticket
                   </div>
@@ -2449,7 +2472,23 @@ function CajaPageContent() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setIsFastTenderOpen(true)}
+                    onClick={() => setIsMobileTicketOpen(true)}
+                    className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-all flex items-center gap-1.5"
+                  >
+                    <Receipt size={14} className="text-emerald-400" />
+                    <span>Ver Ticket</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!cashTenderedUSD || Number(cashTenderedUSD) === 0) {
+                        setCashTenderedUSD(total > 0 ? total.toFixed(2) : '');
+                      }
+                      if (!cashTenderedVES || Number(cashTenderedVES) === 0) {
+                        setCashTenderedVES(totalVES > 0 ? totalVES.toFixed(2) : '');
+                      }
+                      setIsFastTenderOpen(true);
+                    }}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-black transition-all shadow-md btn-haptic"
                   >
                     <CreditCard size={14} />
@@ -2461,6 +2500,179 @@ function CajaPageContent() {
           )}
         </>
       )}
+
+      {/* BOTTOM SHEET DE TICKET DE VENTA (ACCESO MÓVIL Y EXPRÉS) */}
+      <MobileBottomSheet
+        isOpen={isMobileTicketOpen}
+        onClose={() => setIsMobileTicketOpen(false)}
+        title="Ticket de Venta"
+        subtitle={`${ticketLines.reduce((acc, l) => acc + l.quantity, 0)} ítem(s) · ${selectedCustomerObj?.name || 'Cliente de Mostrador'}`}
+      >
+        <div className="space-y-4">
+          {/* Cliente actual */}
+          <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <User size={15} className="text-slate-400" />
+              <div>
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Cliente</span>
+                <span className="text-xs font-black text-foreground">
+                  {selectedCustomerObj?.name || 'Cliente de Mostrador'}
+                </span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsMobileTicketOpen(false);
+                setIsCustomerModalOpen(true);
+              }}
+              className="text-xs font-bold text-primary hover:underline px-2.5 py-1 rounded-lg bg-primary/10"
+            >
+              Cambiar
+            </button>
+          </div>
+
+          {/* Lista de Items */}
+          <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+            {ticketLines.length === 0 ? (
+              <div className="py-10 text-center text-slate-400 space-y-2">
+                <ShoppingCart size={32} className="mx-auto opacity-40 text-slate-400" />
+                <p className="text-xs font-medium">El ticket está vacío.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileTicketOpen(false)}
+                  className="text-xs text-primary font-bold hover:underline"
+                >
+                  Explorar catálogo de productos
+                </button>
+              </div>
+            ) : (
+              ticketLines.map((line) => {
+                const lineTotal = (line.item.base_price || 0) * line.quantity;
+                return (
+                  <div
+                    key={line.item.id}
+                    className="p-3 bg-card border border-border rounded-2xl flex flex-col gap-2"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-black text-foreground truncate">
+                          {line.item.name}
+                        </h4>
+                        <span className="text-[11px] font-mono font-bold text-slate-500">
+                          ${(line.item.base_price || 0).toFixed(2)} c/u
+                        </span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-xs font-mono font-black text-foreground block">
+                          ${lineTotal.toFixed(2)}
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          Bs. {(lineTotal * currentRate).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-border">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(line.item.id, -1)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-card text-foreground transition-all active:scale-90"
+                          title="Restar 1"
+                        >
+                          <Minus size={13} />
+                        </button>
+                        <span className="w-8 text-center text-xs font-black font-mono">
+                          {line.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(line.item.id, 1)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-card text-foreground transition-all active:scale-90"
+                          title="Sumar 1"
+                        >
+                          <Plus size={13} />
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => removeLine(line.item.id)}
+                        className="p-1.5 rounded-lg text-rose-500 hover:bg-rose-500/10 transition-colors"
+                        title="Eliminar del ticket"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Resumen y Totales */}
+          {ticketLines.length > 0 && (
+            <div className="pt-2 border-t border-border space-y-2">
+              <div className="flex justify-between text-xs text-slate-500">
+                <span>Subtotal:</span>
+                <span className="font-mono font-bold text-foreground">
+                  ${subtotal.toFixed(2)} (Bs. {subtotalVES.toLocaleString('es-VE', { minimumFractionDigits: 2 })})
+                </span>
+              </div>
+              {chargeTaxes && (
+                <div className="flex justify-between text-xs text-indigo-600 font-bold">
+                  <span>IVA (16%):</span>
+                  <span className="font-mono">+${taxAmount.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 block">
+                    Total a Cobrar
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    ≈ Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-mono">
+                  ${total.toFixed(2)} USD
+                </span>
+              </div>
+
+              {/* Botones de acción */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={clearCart}
+                  className="px-3 py-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 font-bold text-xs transition-colors flex items-center gap-1.5"
+                >
+                  <Trash2 size={14} />
+                  <span>Vaciar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileTicketOpen(false);
+                    if (!cashTenderedUSD || Number(cashTenderedUSD) === 0) {
+                      setCashTenderedUSD(total > 0 ? total.toFixed(2) : '');
+                    }
+                    if (!cashTenderedVES || Number(cashTenderedVES) === 0) {
+                      setCashTenderedVES(totalVES > 0 ? totalVES.toFixed(2) : '');
+                    }
+                    setIsFastTenderOpen(true);
+                  }}
+                  className="flex-1 py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-sm transition-all shadow-md flex items-center justify-center gap-2 btn-haptic"
+                >
+                  <CreditCard size={16} />
+                  <span>IR A COBRAR (${total.toFixed(2)}) ➔</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </MobileBottomSheet>
 
       {/* MODAL BOTTOM SHEET DE COBRO RÁPIDO */}
       <FastTenderBottomSheet

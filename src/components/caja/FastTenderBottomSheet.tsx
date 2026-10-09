@@ -56,6 +56,21 @@ export function FastTenderBottomSheet({
   const isCashUSD = paymentMethod === 'cash_usd';
   const isCashVES = paymentMethod === 'cash_ves';
 
+  // Auto-prellenar monto exacto de cobro al abrir o cambiar de método si está vacío
+  React.useEffect(() => {
+    if (isOpen) {
+      if (paymentMethod === 'cash_usd') {
+        if (!cashTenderedUSD || Number(cashTenderedUSD) === 0) {
+          setCashTenderedUSD(totalUSD > 0 ? totalUSD.toFixed(2) : '');
+        }
+      } else if (paymentMethod === 'cash_ves') {
+        if (!cashTenderedVES || Number(cashTenderedVES) === 0) {
+          setCashTenderedVES(totalVES > 0 ? totalVES.toFixed(2) : '');
+        }
+      }
+    }
+  }, [isOpen, paymentMethod, totalUSD, totalVES]);
+
   // Denominaciones comunes para cobro rápido en USD
   const COMMON_BILLS_USD = [
     Math.ceil(totalUSD),
@@ -99,7 +114,7 @@ export function FastTenderBottomSheet({
               type="button"
               onClick={() => {
                 setPaymentMethod('cash_usd');
-                setCashTenderedUSD(totalUSD.toString());
+                setCashTenderedUSD(totalUSD.toFixed(2));
               }}
               className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
                 paymentMethod === 'cash_usd'
@@ -175,7 +190,7 @@ export function FastTenderBottomSheet({
               <span className="text-[11px] font-bold text-slate-500">Monto Recibido ($ USD):</span>
               <button
                 type="button"
-                onClick={() => setCashTenderedUSD(totalUSD.toString())}
+                onClick={() => setCashTenderedUSD(totalUSD.toFixed(2))}
                 className="text-[11px] text-emerald-600 font-black hover:underline"
               >
                 Monto Exacto (${totalUSD.toFixed(2)})
@@ -188,7 +203,7 @@ export function FastTenderBottomSheet({
                 step="0.01"
                 value={cashTenderedUSD}
                 onChange={(e) => setCashTenderedUSD(e.target.value)}
-                placeholder={totalUSD.toString()}
+                placeholder={totalUSD.toFixed(2)}
                 className="flex-1 bg-background border border-input rounded-xl px-3 py-2 text-base font-black font-mono text-foreground focus:ring-2 focus:ring-emerald-500/30"
               />
             </div>
@@ -199,7 +214,7 @@ export function FastTenderBottomSheet({
                 <button
                   key={bill}
                   type="button"
-                  onClick={() => setCashTenderedUSD(bill.toString())}
+                  onClick={() => setCashTenderedUSD(bill.toFixed(2))}
                   className="px-3 py-1.5 rounded-lg border border-border bg-card hover:bg-emerald-50 dark:hover:bg-emerald-950/40 text-xs font-black font-mono shrink-0 transition-all btn-haptic"
                 >
                   ${bill}
@@ -220,6 +235,52 @@ export function FastTenderBottomSheet({
                   <span className="text-[10px] text-slate-500 font-mono">
                     ≈ Bs. {(changeDueUSD * currentRate).toFixed(2)}
                   </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 3B. CALCULADORA DE VUELTO RÁPIDA (SI ES EFECTIVO BS) */}
+        {isCashVES && (
+          <div className="p-3.5 rounded-2xl bg-teal-50 dark:bg-teal-950/30 border border-teal-500/20 space-y-2.5 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-500">Monto Recibido (Bs.):</span>
+              <button
+                type="button"
+                onClick={() => setCashTenderedVES(totalVES.toFixed(2))}
+                className="text-[11px] text-teal-600 dark:text-teal-400 font-black hover:underline"
+              >
+                Monto Exacto (Bs. {totalVES.toFixed(2)})
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                step="0.01"
+                value={cashTenderedVES}
+                onChange={(e) => setCashTenderedVES(e.target.value)}
+                placeholder={totalVES.toFixed(2)}
+                className="flex-1 bg-background border border-input rounded-xl px-3 py-2 text-base font-black font-mono text-foreground focus:ring-2 focus:ring-teal-500/30"
+              />
+            </div>
+
+            {/* Vuelto a Entregar en Bs */}
+            {changeDueVES > 0 && (
+              <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-between">
+                <span className="text-xs font-bold text-teal-700 dark:text-teal-400">
+                  Vuelto a Entregar:
+                </span>
+                <div className="text-right">
+                  <span className="text-base font-black text-teal-600 dark:text-teal-400 font-mono block">
+                    Bs. {changeDueVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                  {currentRate > 0 && (
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      ≈ ${(changeDueVES / currentRate).toFixed(2)} USD
+                    </span>
+                  )}
                 </div>
               </div>
             )}
