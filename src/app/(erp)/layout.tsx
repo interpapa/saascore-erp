@@ -56,7 +56,9 @@ export default function ERPLayout({
   const matchedRoute = Object.keys(routeToModuleId).find(route => pathname.startsWith(route));
   const targetModule = matchedRoute ? routeToModuleId[matchedRoute] : null;
   const isModuleDisabled = targetModule
-    ? (!enabledModules.includes(targetModule) && !(targetModule === 'inventario' && enabledModules.includes('catalogo')))
+    ? (!enabledModules.includes(targetModule) && 
+       !(targetModule === 'inventario' && enabledModules.includes('catalogo')) && 
+       !(targetModule === 'catalogo' && enabledModules.includes('inventario')))
     : false;
 
   return (

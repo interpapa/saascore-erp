@@ -39,12 +39,20 @@ export function MobileDock() {
 
   // Módulos activos en el ERP
   const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
-  const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
+  const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
-    : fallbackModules;
+    : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
+      ? (currentTenant?.metadata as any).active_modules
+      : null;
+  const enabledModules = tenantModules || fallbackModules;
 
-  // Preferencia del usuario o fallback (Dashboard siempre se fuerza luego)
-  const dockPreferences = (currentTenant?.metadata?.mobile_dock_modules as string[]) || ['caja', 'calendario', 'clientes', 'whatsapp'];
+  // Preferencia del usuario o fallback inteligente (Dashboard siempre se fuerza luego)
+  const rawDockPrefs = currentTenant?.metadata?.mobile_dock_modules as string[] | undefined;
+  const isInventarioEnabled = enabledModules.includes('inventario') || enabledModules.includes('catalogo');
+  const defaultDockPrefs = isInventarioEnabled
+    ? ['caja', 'inventario', 'clientes', enabledModules.includes('calendario') ? 'calendario' : 'whatsapp']
+    : ['caja', 'calendario', 'clientes', 'whatsapp'];
+  const dockPreferences = (rawDockPrefs && rawDockPrefs.length > 0) ? rawDockPrefs : defaultDockPrefs;
 
   // Todos los posibles módulos
   const allItems: DockItem[] = [

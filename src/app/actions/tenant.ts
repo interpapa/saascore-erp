@@ -310,9 +310,20 @@ export async function updateTenantSettings(
 
     // Construir payload — si viene activeModules, lo escribimos en la columna directa
     // para que moduleRegistry lo lea sin depender del JSONB metadata.
-    const updatePayload: Record<string, unknown> = { name, metadata };
+    let updatedMetadata = metadata;
+    const updatePayload: Record<string, unknown> = { name };
     if (activeModules !== undefined) {
-      updatePayload.active_modules = activeModules;
+      let normalized = [...activeModules];
+      if (normalized.includes('inventario') && !normalized.includes('catalogo')) normalized.push('catalogo');
+      if (normalized.includes('catalogo') && !normalized.includes('inventario')) normalized.push('inventario');
+      updatePayload.active_modules = normalized;
+
+      if (updatedMetadata && typeof updatedMetadata === 'object') {
+        updatedMetadata = { ...(updatedMetadata as Record<string, unknown>), active_modules: normalized };
+      }
+    }
+    if (updatedMetadata !== undefined) {
+      updatePayload.metadata = updatedMetadata;
     }
 
     const { data: tenant, error } = await db
@@ -539,12 +550,23 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
 function sanitizeTenantPayload(tenant: any) {
   if (!tenant) return null;
   const rawMeta = (tenant.metadata || {}) as Record<string, any>;
+  let modulesList = tenant.active_modules || rawMeta.active_modules || DEFAULT_ENABLED_MODULES;
+  if (Array.isArray(modulesList)) {
+    const hasInventario = modulesList.includes('inventario');
+    const hasCatalogo = modulesList.includes('catalogo');
+    if (hasInventario && !hasCatalogo) {
+      modulesList = [...modulesList, 'catalogo'];
+    } else if (hasCatalogo && !hasInventario) {
+      modulesList = [...modulesList, 'inventario'];
+    }
+  }
+
   const cleanMetadata = {
     plan: rawMeta.plan || 'pro',
     currency: rawMeta.currency || tenant.currency || 'USD',
     symbol: rawMeta.symbol || tenant.symbol || '$',
     exchange_rate: rawMeta.exchange_rate || 850.0,
-    active_modules: tenant.active_modules || rawMeta.active_modules || DEFAULT_ENABLED_MODULES,
+    active_modules: modulesList,
     booking_settings: rawMeta.booking_settings,
     public_theme: rawMeta.public_theme,
     integraciones: rawMeta.integraciones,
@@ -552,7 +574,7 @@ function sanitizeTenantPayload(tenant: any) {
 
   return {
     ...tenant,
-    active_modules: tenant.active_modules || cleanMetadata.active_modules,
+    active_modules: modulesList,
     metadata: cleanMetadata,
   };
 }
@@ -638,29 +660,66 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
       return { success: false, error: authCheck.error || 'No autorizado' };
     }
     const db = supabaseAdmin;
+
+    // Normalizar active_modules para sincronizar 'inventario' y 'catalogo'
+    let normalizedModules = updates.active_modules;
+    if (Array.isArray(normalizedModules)) {
+      const hasInventario = normalizedModules.includes('inventario');
+      const hasCatalogo = normalizedModules.includes('catalogo');
+      if (hasInventario && !hasCatalogo) {
+        normalizedModules = [...normalizedModules, 'catalogo'];
+      } else if (hasCatalogo && !hasInventario) {
+        normalizedModules = [...normalizedModules, 'inventario'];
+      }
+    }
+
+    // Traer metadata existente para mantener campos y sincronizar active_modules
+    let currentMetadata: any = {};
+    if (normalizedModules !== undefined || updates.metadata !== undefined) {
+      const { data: currentTenantRow } = await db
+        .from('tenants')
+        .select('metadata')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (currentTenantRow?.metadata) {
+        currentMetadata = currentTenantRow.metadata;
+      }
+    }
+
+    const payload: Record<string, any> = {};
+    if (updates.name !== undefined) payload.name = updates.name;
+    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.is_active !== undefined) payload.is_active = updates.is_active;
+
+    if (normalizedModules !== undefined) {
+      payload.active_modules = normalizedModules;
+      currentMetadata = {
+        ...currentMetadata,
+        ...(updates.metadata || {}),
+        active_modules: normalizedModules
+      };
+      payload.metadata = currentMetadata;
+    } else if (updates.metadata !== undefined) {
+      payload.metadata = { ...currentMetadata, ...updates.metadata };
+    }
+
     let { data: tenant, error } = await db
       .from('tenants')
-      .update({
-        name: updates.name,
-        active_modules: updates.active_modules,
-        metadata: updates.metadata
-      })
+      .update(payload)
       .eq('id', tenantId)
       .select()
       .single();
 
     if (error && (error.message.includes('active_modules') || error.message.includes('column'))) {
-      // Fallback: Si no existe active_modules en la BD, lo guardamos temporalmente dentro de metadata
-      const fallbackMetadata = {
-        ...(updates.metadata || {}),
-        active_modules: updates.active_modules
+      // Fallback: Si no existe la columna active_modules en la BD, lo guardamos dentro de metadata
+      delete payload.active_modules;
+      payload.metadata = {
+        ...currentMetadata,
+        active_modules: normalizedModules
       };
       const retry = await db
         .from('tenants')
-        .update({
-          name: updates.name,
-          metadata: fallbackMetadata
-        })
+        .update(payload)
         .eq('id', tenantId)
         .select()
         .single();

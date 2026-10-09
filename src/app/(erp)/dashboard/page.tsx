@@ -51,7 +51,7 @@ export default function LauncherPage() {
       icon: <Users className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
-      id: 'catalogo', 
+      id: 'inventario', 
       name: 'Inventario', 
       href: '/inventario',
       gradient: 'from-violet-500 to-purple-600',
@@ -158,13 +158,19 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin'];
-  const enabledModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin'];
+  const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
-    : fallbackModules;
+    : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
+      ? (currentTenant?.metadata as any).active_modules
+      : null;
+  const enabledModules = tenantModules || fallbackModules;
+
   const filteredApps = apps.filter((app) => {
     if (app.id === 'admin') return session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
-    return enabledModules.includes(app.id) || (app.id === 'inventario' && enabledModules.includes('catalogo'));
+    const isInventarioOrCatalogo = (app.id === 'inventario' || app.id === 'catalogo') &&
+      (enabledModules.includes('inventario') || enabledModules.includes('catalogo'));
+    return enabledModules.includes(app.id) || isInventarioOrCatalogo;
   });
 
   // La precarga manual (prefetch) fue eliminada porque saturaba el CPU en modo desarrollo
