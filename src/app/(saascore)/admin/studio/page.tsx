@@ -76,16 +76,16 @@ export default function StudioAdminPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="w-full space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-slate-400 hover:text-foreground transition-colors">
+          <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-slate-400 hover:text-foreground transition-colors btn-haptic">
             <ArrowLeft size={18} />
           </Link>
           <div>
-            <h1 className="text-3xl font-black text-foreground tracking-tight">Lego Studio</h1>
-            <p className="text-slate-500 font-medium">Entorno de arquitectura modular y catálogo de componentes base del Kernel</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">Lego Studio</h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">Entorno de arquitectura modular y catálogo de componentes base del Kernel</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-500/20">

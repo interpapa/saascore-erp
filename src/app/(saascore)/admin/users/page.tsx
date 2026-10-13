@@ -42,21 +42,32 @@ import { EmptyState } from '@/components/core/EmptyState';
 import { supabase } from '@/lib/supabase';
 
 const ALL_SYSTEM_MODULES = [
-  { id: 'caja', name: 'Caja POS' },
-  { id: 'clientes', name: 'Clientes CRM' },
-  { id: 'inventario', name: 'Inventario de Mercancía' },
-  { id: 'compras', name: 'Compras & Proveedores' },
-  { id: 'contabilidad', name: 'Contabilidad NIIF' },
-  { id: 'estadisticas', name: 'Reportes & Estadísticas' },
-  { id: 'calendario', name: 'Citas & Reservas' },
-  { id: 'whatsapp', name: 'WhatsApp CRM' },
-  { id: 'kanban', name: 'Órdenes de Trabajo' },
-  { id: 'odontologia', name: 'Odontología' },
-  { id: 'barberia', name: 'Barbería' },
-  { id: 'grooming', name: 'Grooming Canino' },
-  { id: 'equipo', name: 'Personal & Nómina' },
-  { id: 'franquicias', name: 'Franquicias' },
-  { id: 'config', name: 'Ajustes Generales' }
+  // Comercial & Finanzas
+  { id: 'caja', name: 'Caja POS', category: 'comercial' },
+  { id: 'clientes', name: 'Clientes CRM', category: 'comercial' },
+  { id: 'inventario', name: 'Inventario de Mercancía', category: 'comercial' },
+  { id: 'compras', name: 'Compras & Proveedores', category: 'comercial' },
+  { id: 'contabilidad', name: 'Contabilidad NIIF', category: 'comercial' },
+  { id: 'estadisticas', name: 'Reportes & Estadísticas', category: 'comercial' },
+  // Operaciones & CRM
+  { id: 'calendario', name: 'Citas & Reservas', category: 'operaciones' },
+  { id: 'whatsapp', name: 'WhatsApp CRM', category: 'operaciones' },
+  { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones' },
+  { id: 'equipo', name: 'Personal & Nómina', category: 'operaciones' },
+  { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones' },
+  // Salud & Especialidades Médicas
+  { id: 'odontologia', name: 'Odontología Especializada', category: 'salud' },
+  { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud' },
+  { id: 'med_general', name: 'Medicina General e Interna', category: 'salud' },
+  { id: 'med_pediatria', name: 'Pediatría y Puericultura', category: 'salud' },
+  { id: 'med_ginecologia', name: 'Ginecología y Obstetricia', category: 'salud' },
+  { id: 'med_dermatologia', name: 'Dermatología y Estética', category: 'salud' },
+  { id: 'med_traumatologia', name: 'Traumatología y Fisioterapia', category: 'salud' },
+  { id: 'med_oftalmologia', name: 'Oftalmología y Optometría', category: 'salud' },
+  // Servicios & Sistema
+  { id: 'barberia', name: 'Barbería & Estilo', category: 'servicios' },
+  { id: 'grooming', name: 'Grooming Canino', category: 'servicios' },
+  { id: 'config', name: 'Ajustes Generales', category: 'servicios' }
 ];
 
 export default function AdminUsersPage() {
@@ -312,62 +323,62 @@ export default function AdminUsersPage() {
   const activeUsersCount = users.filter(u => !u.is_banned).length;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+    <div className="w-full space-y-6 animate-in fade-in duration-300">
       {/* Header Principal */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight mb-1 flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight mb-1 flex items-center gap-2">
             <span>Usuarios & Control de Accesos</span>
             <span className="text-xs bg-primary/10 text-primary border border-primary/20 px-2.5 py-0.5 rounded-full font-bold">
               RBAC Live
             </span>
           </h1>
-          <p className="text-muted-foreground font-medium">
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium">
             Controla qué permisos, empresas y módulos tiene y no tiene cada usuario en la plataforma.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={fetchUsersAndTenants}
-            className="p-2.5 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all btn-haptic"
+            className="p-2 sm:p-2.5 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-muted transition-all btn-haptic shadow-2xs"
             title="Refrescar lista"
           >
-            <RefreshCw size={16} />
+            <RefreshCw size={15} />
           </button>
           <button 
             onClick={() => {
               if (tenants.length > 0) setNewTenantId(tenants[0].id);
               setIsCreateOpen(true);
             }}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
           >
-            <UserPlus size={18} /> Crear Usuario
+            <UserPlus size={16} /> Crear Usuario
           </button>
         </div>
       </div>
 
       {/* Tarjetas de Métricas Rápidas */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-card border border-border p-4 rounded-2xl shadow-2xs">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Cuentas</p>
-          <p className="text-2xl font-black text-foreground mt-1">{totalUsersCount}</p>
+        <div className="bg-card border border-border p-3.5 sm:p-4 rounded-2xl shadow-2xs">
+          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Cuentas</p>
+          <p className="text-xl sm:text-2xl font-black text-foreground mt-1">{totalUsersCount}</p>
         </div>
-        <div className="bg-card border border-border p-4 rounded-2xl shadow-2xs">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Administradores</p>
-          <p className="text-2xl font-black text-primary mt-1">{superadminCount}</p>
+        <div className="bg-card border border-border p-3.5 sm:p-4 rounded-2xl shadow-2xs">
+          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Administradores</p>
+          <p className="text-xl sm:text-2xl font-black text-primary mt-1">{superadminCount}</p>
         </div>
-        <div className="bg-card border border-border p-4 rounded-2xl shadow-2xs">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Empresas Conectadas</p>
-          <p className="text-2xl font-black text-foreground mt-1">{tenants.length}</p>
+        <div className="bg-card border border-border p-3.5 sm:p-4 rounded-2xl shadow-2xs">
+          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Empresas</p>
+          <p className="text-xl sm:text-2xl font-black text-foreground mt-1">{tenants.length}</p>
         </div>
-        <div className="bg-card border border-border p-4 rounded-2xl shadow-2xs">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cuentas Activas</p>
-          <p className="text-2xl font-black text-emerald-500 mt-1">{activeUsersCount}</p>
+        <div className="bg-card border border-border p-3.5 sm:p-4 rounded-2xl shadow-2xs">
+          <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Cuentas Activas</p>
+          <p className="text-xl sm:text-2xl font-black text-emerald-500 mt-1">{activeUsersCount}</p>
         </div>
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-card p-4 rounded-2xl border border-border shadow-2xs">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-card p-3.5 sm:p-4 rounded-2xl border border-border shadow-2xs">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -375,7 +386,7 @@ export default function AdminUsersPage() {
             placeholder="Buscar por correo o empresa..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
+            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
           />
           {searchTerm && (
             <button
@@ -387,11 +398,11 @@ export default function AdminUsersPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
           <select
             value={tenantFilter}
             onChange={(e) => setTenantFilter(e.target.value)}
-            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0 shadow-2xs"
           >
             <option value="all">Empresa: Todas</option>
             {tenants.map(t => (
@@ -402,7 +413,7 @@ export default function AdminUsersPage() {
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0"
+            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0 shadow-2xs"
           >
             <option value="all">Rol: Todos</option>
             <option value="superadmin">Superadmin</option>
@@ -433,7 +444,7 @@ export default function AdminUsersPage() {
       {/* Tabla Principal de Usuarios (Escritorio) */}
       <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden shadow-2xs">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left min-w-[850px]">
+          <table className="w-full text-left min-w-[760px]">
           <thead className="bg-muted/50 border-b border-border text-xs uppercase tracking-wider font-bold text-muted-foreground">
             <tr>
               <th className="p-4 pl-6">Usuario & Email</th>
@@ -689,22 +700,22 @@ export default function AdminUsersPage() {
 
       {/* MODAL EDITAR PERMISOS & MÓDULOS */}
       {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-card border border-border rounded-3xl w-full max-w-2xl p-6 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-3xl p-5 sm:p-7 shadow-2xl relative max-h-[92vh] overflow-y-auto">
             <button
               onClick={() => setSelectedUser(null)}
-              className="absolute top-5 right-5 p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
+              className="absolute top-5 right-5 p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors btn-haptic"
             >
               <X size={20} />
             </button>
 
-            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
-              <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-lg">
-                <SlidersHorizontal size={24} />
+            <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border pr-10">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-black text-lg shrink-0">
+                <SlidersHorizontal size={22} />
               </div>
               <div>
-                <h3 className="text-xl font-black text-foreground">Control de Permisos & Módulos</h3>
-                <p className="text-xs text-muted-foreground">Configurando accesos para <b>{selectedUser.email}</b></p>
+                <h3 className="text-lg sm:text-xl font-black text-foreground">Control de Permisos & Módulos</h3>
+                <p className="text-xs text-muted-foreground font-medium">Configurando accesos y módulos autorizados para <b>{selectedUser.email}</b></p>
               </div>
             </div>
 
@@ -718,7 +729,7 @@ export default function AdminUsersPage() {
                   <select
                     value={editRole}
                     onChange={(e) => setEditRole(e.target.value as UserRole)}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-2xs"
                   >
                     <option value="superadmin">Superadmin (Acceso Total)</option>
                     <option value="owner">Dueño / Owner (Dueño de Empresa)</option>
@@ -735,7 +746,7 @@ export default function AdminUsersPage() {
                   <select
                     value={editTenantId}
                     onChange={(e) => setEditTenantId(e.target.value)}
-                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
+                    className="w-full bg-background border border-border rounded-xl px-4 py-2.5 text-foreground text-sm font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all shadow-2xs"
                   >
                     {tenants.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
@@ -753,7 +764,7 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={() => setEditIsBanned(!editIsBanned)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all btn-haptic ${
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all btn-haptic shadow-2xs ${
                     editIsBanned
                       ? 'bg-rose-500 text-white'
                       : 'bg-emerald-500 text-white'
@@ -774,7 +785,7 @@ export default function AdminUsersPage() {
                     <button
                       type="button"
                       onClick={handleSelectAllModules}
-                      className="text-xs text-primary font-bold hover:underline"
+                      className="text-xs text-primary font-bold hover:underline btn-haptic"
                     >
                       Todos
                     </button>
@@ -782,14 +793,14 @@ export default function AdminUsersPage() {
                     <button
                       type="button"
                       onClick={handleDeselectAllModules}
-                      className="text-xs text-muted-foreground hover:text-foreground font-bold"
+                      className="text-xs text-muted-foreground hover:text-foreground font-bold btn-haptic"
                     >
                       Ninguno
                     </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto p-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-80 overflow-y-auto pr-1">
                   {ALL_SYSTEM_MODULES.map(mod => {
                     const hasMod = editAllowedModules.includes(mod.id);
 
@@ -797,18 +808,23 @@ export default function AdminUsersPage() {
                       <div
                         key={mod.id}
                         onClick={() => handleToggleModuleForUser(mod.id)}
-                        className={`flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer btn-haptic ${
+                        className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer btn-haptic ${
                           hasMod
-                            ? 'bg-primary/5 border-primary/30 text-foreground'
-                            : 'bg-card border-border text-muted-foreground opacity-60'
+                            ? 'bg-primary/10 border-primary/40 text-foreground shadow-2xs'
+                            : 'bg-card border-border/80 text-muted-foreground opacity-60 hover:opacity-100'
                         }`}
                       >
-                        <span className="text-xs font-bold">{mod.name}</span>
-                        {hasMod ? (
-                          <ToggleRight size={24} className="text-primary" />
-                        ) : (
-                          <ToggleLeft size={24} className="text-muted-foreground/40" />
-                        )}
+                        <div className="min-w-0 pr-2">
+                          <span className="text-xs font-bold block truncate">{mod.name}</span>
+                          <span className="text-[9px] font-mono font-bold uppercase text-muted-foreground">{mod.id}</span>
+                        </div>
+                        <div className="shrink-0">
+                          {hasMod ? (
+                            <ToggleRight size={24} className="text-primary" />
+                          ) : (
+                            <ToggleLeft size={24} className="text-muted-foreground/40" />
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -820,14 +836,14 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedUser(null)}
-                  className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                  className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all btn-haptic"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingUser}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 btn-haptic"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 btn-haptic"
                 >
                   {isSavingUser ? 'Guardando...' : <><Save size={16} /> Guardar Permisos</>}
                 </button>

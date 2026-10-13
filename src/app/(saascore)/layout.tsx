@@ -70,7 +70,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
       <AmbientBackground />
       <FloatingHeader />
 
-      <main className="relative z-10 pt-24 pb-24 md:pb-12 px-4 sm:px-6 max-w-7xl mx-auto w-full">
+      <main className="relative z-10 pt-20 sm:pt-24 pb-24 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full overflow-x-hidden">
         {/* Barra superior de navegación unificada del Módulo SaaS Admin */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6 sm:mb-8 pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-4 sm:p-5 rounded-3xl border shadow-xs overflow-hidden">
           {/* Botón directo de regreso al Dashboard + Título de Módulo */}
@@ -99,7 +99,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
 
           {/* Pestañas horizontales de navegación del módulo */}
           <div className="w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-            <nav className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-2xl w-max lg:w-auto">
+            <nav className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-2xl w-max max-w-full">
               {navItems.map((item) => {
                 const isActive = item.exact 
                   ? pathname === item.href 
@@ -127,26 +127,26 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
 
         {/* Telemetría y estado de servidores */}
         {healthData && (
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-6 p-3 sm:px-4 sm:py-2.5 bg-card/60 border border-border/80 rounded-2xl text-xs text-slate-500 font-mono shadow-2xs overflow-hidden">
-            <div className="flex items-center gap-4">
-              <span className="flex items-center gap-1.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3.5 sm:px-4 sm:py-2.5 bg-card/60 border border-border/80 rounded-2xl text-xs text-slate-500 font-mono shadow-2xs overflow-hidden">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="flex items-center gap-1.5 shrink-0">
                 <Database size={13} className="text-rose-500" />
                 <b className="text-foreground">{healthData.tenantsCount}</b> Empresas
               </span>
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 shrink-0">
                 <Users size={13} className="text-indigo-500" />
                 <b className="text-foreground">{healthData.usersCount}</b> Usuarios
               </span>
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 shrink-0">
                 <Activity size={13} className="text-emerald-500" />
                 <b className="text-foreground">{healthData.todayDocsCount}</b> Transacciones Hoy
               </span>
             </div>
-            <div className="flex items-center gap-3">
-              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full shrink-0">
                 <Zap size={11} /> {healthData.latencyMs}ms
               </span>
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] uppercase tracking-wider shrink-0">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Sistemas Operativos
               </div>
@@ -155,7 +155,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
         )}
 
         {/* Contenido del Módulo */}
-        <div className="animate-in fade-in duration-300">
+        <div className="animate-in fade-in duration-300 w-full overflow-hidden">
           {children}
         </div>
       </main>

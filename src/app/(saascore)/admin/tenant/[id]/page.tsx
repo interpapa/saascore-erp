@@ -322,11 +322,11 @@ export default function TenantAdminPage() {
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-24 space-y-6 animate-in fade-in">
-      {/* Header Sticky para Móviles */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0 sm:bg-transparent sm:backdrop-blur-none flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/60 sm:border-none mb-6">
-        <div className="flex items-center gap-4 w-full sm:w-auto">
-          <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0">
+    <div className="w-full max-w-5xl mx-auto space-y-6 pb-24 animate-in fade-in">
+      {/* Header Unificado */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/60 mb-6">
+        <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+          <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 btn-haptic">
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1 truncate">

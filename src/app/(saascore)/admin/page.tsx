@@ -24,7 +24,9 @@ import {
   Sparkles,
   Building2,
   UserPlus,
-  KeyRound
+  KeyRound,
+  Settings2,
+  ExternalLink
 } from 'lucide-react';
 import { 
   getAllTenants, 
@@ -43,28 +45,32 @@ import { supabase } from '@/lib/supabase';
 import { getActiveEnvironmentInfo } from '@/lib/supabaseConfig';
 
 const ALL_SYSTEM_MODULES = [
-  { id: 'caja', name: 'Caja POS' },
-  { id: 'clientes', name: 'Clientes CRM' },
-  { id: 'inventario', name: 'Inventario de Mercancía' },
-  { id: 'compras', name: 'Compras & Proveedores' },
-  { id: 'contabilidad', name: 'Contabilidad NIIF' },
-  { id: 'estadisticas', name: 'Reportes & Estadísticas' },
-  { id: 'calendario', name: 'Citas & Reservas' },
-  { id: 'whatsapp', name: 'WhatsApp CRM' },
-  { id: 'kanban', name: 'Órdenes de Trabajo' },
-  { id: 'odontologia', name: 'Odontología' },
-  { id: 'clinica', name: 'Clínica Médica (Base)' },
-  { id: 'med_general', name: 'Especialidad: Medicina General e Interna' },
-  { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura' },
-  { id: 'med_ginecologia', name: 'Especialidad: Ginecología y Obstetricia' },
-  { id: 'med_dermatologia', name: 'Especialidad: Dermatología y Estética' },
-  { id: 'med_traumatologia', name: 'Especialidad: Traumatología y Fisioterapia' },
-  { id: 'med_oftalmologia', name: 'Especialidad: Oftalmología y Optometría' },
-  { id: 'barberia', name: 'Barbería' },
-  { id: 'grooming', name: 'Grooming Canino' },
-  { id: 'equipo', name: 'Personal & Nómina' },
-  { id: 'franquicias', name: 'Franquicias' },
-  { id: 'config', name: 'Ajustes Generales' }
+  // Comercial & Finanzas
+  { id: 'caja', name: 'Caja POS', category: 'comercial', desc: 'Ventas, facturación y cobros rápidos' },
+  { id: 'clientes', name: 'Clientes CRM', category: 'comercial', desc: 'Ficha de clientes y control de saldos' },
+  { id: 'inventario', name: 'Inventario de Mercancía', category: 'comercial', desc: 'Stock, almacenes y recetas BOM' },
+  { id: 'compras', name: 'Compras & Proveedores', category: 'comercial', desc: 'Órdenes de compra y cuentas por pagar' },
+  { id: 'contabilidad', name: 'Contabilidad NIIF', category: 'comercial', desc: 'Asientos contables, libro mayor y balances' },
+  { id: 'estadisticas', name: 'Reportes & Estadísticas', category: 'comercial', desc: 'Métricas financieras y analítica de ventas' },
+  // Operaciones & CRM
+  { id: 'calendario', name: 'Citas & Reservas', category: 'operaciones', desc: 'Agenda de turnos y sincronización de citas' },
+  { id: 'whatsapp', name: 'WhatsApp CRM', category: 'operaciones', desc: 'Mensajería integrada y recordatorios' },
+  { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones', desc: 'Flujos operativos y tracking de servicios' },
+  { id: 'equipo', name: 'Personal & Nómina', category: 'operaciones', desc: 'Empleados, comisiones y control de roles' },
+  { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', desc: 'Gestión multisede y consolidación' },
+  // Salud & Especialidades Médicas
+  { id: 'odontologia', name: 'Odontología Especializada', category: 'salud', desc: 'Odontograma interactivo y sillón dental' },
+  { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', desc: 'Estación médica, SOAP y récipe digital' },
+  { id: 'med_general', name: 'Medicina General e Interna', category: 'salud', desc: 'Examen físico, triaje y PAM cardiovascular' },
+  { id: 'med_pediatria', name: 'Pediatría y Puericultura', category: 'salud', desc: 'Dosis por kg, vacunas y curvas de crecimiento' },
+  { id: 'med_ginecologia', name: 'Ginecología y Obstetricia', category: 'salud', desc: 'Fórmula obstétrica, FUM y gestograma' },
+  { id: 'med_dermatologia', name: 'Dermatología y Estética', category: 'salud', desc: 'Mapa anatómico, Fitzpatrick y procedimientos' },
+  { id: 'med_traumatologia', name: 'Traumatología y Fisioterapia', category: 'salud', desc: 'Goniometría, EVA y paquetes de rehabilitación' },
+  { id: 'med_oftalmologia', name: 'Oftalmología y Optometría', category: 'salud', desc: 'Refracción OD/OI, tonometría y fondo de ojo' },
+  // Servicios & Sistema
+  { id: 'barberia', name: 'Barbería & Estilo', category: 'servicios', desc: 'Sillón express y catálogo masculino' },
+  { id: 'grooming', name: 'Grooming Canino', category: 'servicios', desc: 'Mascotas, peluquería y suplementos' },
+  { id: 'config', name: 'Ajustes Generales', category: 'servicios', desc: 'Configuración general de la empresa' }
 ];
 
 export default function AdminTenantsPage() {
@@ -94,6 +100,7 @@ export default function AdminTenantsPage() {
   const [selectedTenantForModules, setSelectedTenantForModules] = useState<any | null>(null);
   const [tenantActiveModules, setTenantActiveModules] = useState<string[]>([]);
   const [isSavingModules, setIsSavingModules] = useState(false);
+  const [modulesCategoryFilter, setModulesCategoryFilter] = useState<'all' | 'comercial' | 'operaciones' | 'salud' | 'servicios'>('all');
 
   const [loadError, setLoadError] = useState<string | null>(null);
   const [envInfo, setEnvInfo] = useState<ReturnType<typeof getActiveEnvironmentInfo> | null>(null);
@@ -312,39 +319,41 @@ export default function AdminTenantsPage() {
   });
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+    <div className="w-full space-y-6 animate-in fade-in duration-300">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight mb-1">Gestión de Empresas (Tenants)</h1>
-          <p className="text-muted-foreground font-medium">Control maestro de acceso, telemetría y empresas de tu plataforma SaaS.</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight mb-1">Gestión de Empresas (Tenants)</h1>
+          <p className="text-muted-foreground text-xs sm:text-sm font-medium">Control maestro de acceso, telemetría y empresas de tu plataforma SaaS.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={fetchTenants}
             disabled={isLoading}
-            className="bg-card hover:bg-muted text-foreground border border-border px-3.5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50"
+            className="bg-card hover:bg-muted text-foreground border border-border px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 btn-haptic"
             title="Sincronizar y detectar automáticamente nuevos usuarios de Supabase"
           >
-            <RefreshCw size={16} className={`text-primary ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw size={15} className={`text-primary ${isLoading ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Sincronizar</span>
           </button>
           <Link
             href="/admin/users"
-            className="bg-card hover:bg-muted text-foreground border border-border px-4 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs"
+            className="bg-card hover:bg-muted text-foreground border border-border px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
           >
-            <Users size={18} className="text-primary" /> Gestionar Usuarios
+            <Users size={16} className="text-primary" /> 
+            <span>Usuarios</span>
           </Link>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
           >
-            <Shield size={18} /> Nueva Empresa
+            <Shield size={16} /> 
+            <span>Nueva Empresa</span>
           </button>
         </div>
       </div>
 
       {/* Barra de Búsqueda y Filtros Rápidos */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-card p-4 rounded-2xl border border-border shadow-xs">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-card p-3.5 sm:p-4 rounded-2xl border border-border shadow-xs">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -352,7 +361,7 @@ export default function AdminTenantsPage() {
             placeholder="Buscar por nombre de empresa o ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2 text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
+            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
           />
           {searchTerm && (
             <button
@@ -364,7 +373,7 @@ export default function AdminTenantsPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
           <div className="flex bg-muted/60 p-1 rounded-xl border border-border shrink-0">
             <button
               onClick={() => setStatusFilter('all')}
@@ -437,7 +446,7 @@ export default function AdminTenantsPage() {
       {/* Vista de Tabla para Escritorio / Pantallas Medianas y Grandes */}
       <div className="hidden md:block bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left min-w-[850px]">
+          <table className="w-full text-left min-w-[800px]">
           <thead className="bg-muted/50 border-b border-border text-xs uppercase tracking-wider font-bold text-muted-foreground">
             <tr>
               <th className="p-4 pl-6">Empresa (Tenant)</th>
@@ -489,7 +498,7 @@ export default function AdminTenantsPage() {
                           {isExpanded ? <ChevronDown size={18} className="text-primary" /> : <ChevronRight size={18} />}
                         </button>
                         <div>
-                          <div className="font-bold text-foreground text-base flex items-center gap-2">
+                          <div className="font-bold text-foreground text-sm sm:text-base flex items-center gap-2">
                             <span>{tenant.name}</span>
                             {tenant.user_count !== undefined && (
                               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
@@ -500,92 +509,98 @@ export default function AdminTenantsPage() {
                           <div className="text-xs text-muted-foreground font-mono mt-0.5 flex items-center gap-2">
                             <span>ID: {tenant.id.slice(0, 8)}...</span>
                             <span>•</span>
-                            <span className="truncate max-w-[200px]" title={ownerEmail}>👤 {ownerEmail}</span>
+                            <span className="truncate max-w-[180px]" title={ownerEmail}>👤 {ownerEmail}</span>
                           </div>
                         </div>
                       </div>
                     </td>
                     <td className="p-4">
                       {tenant.status === 'active' ? (
-                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <CheckCircle2 size={14} /> Activo
+                        <span className="inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <CheckCircle2 size={13} /> Activo
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider">
-                          <Ban size={14} /> Suspendido
+                        <span className="inline-flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider">
+                          <Ban size={13} /> Suspendido
                         </span>
                       )}
                     </td>
                     <td className="p-4">
                       <div className="text-sm text-foreground mb-1">
                         <span className="uppercase font-bold text-primary text-xs">{tenant.subscription_plan || 'basic'}</span>
-                        <span className="text-xs text-muted-foreground ml-2">({(tenant.active_modules || []).length} módulos)</span>
+                        <span className="text-xs text-muted-foreground ml-1.5 font-medium">({(tenant.active_modules || []).length} módulos)</span>
                       </div>
-                      <div className="flex gap-1.5 flex-wrap max-w-[260px]">
-                        {(tenant.active_modules || []).slice(0, 6).map((mod: string) => (
+                      <div className="flex gap-1 flex-wrap max-w-[220px]">
+                        {(tenant.active_modules || []).slice(0, 4).map((mod: string) => (
                           <button
                             key={mod}
                             onClick={() => handleAccessTenantModule(tenant, mod)}
-                            className="bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary text-[10px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border hover:border-primary/40 transition-colors btn-haptic cursor-pointer inline-flex items-center gap-1"
+                            className="bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary text-[10px] px-1.5 py-0.5 rounded-md uppercase font-bold tracking-wider border border-border hover:border-primary/40 transition-colors btn-haptic cursor-pointer inline-flex items-center gap-0.5"
                             title={`Acceder directamente al módulo ${mod.toUpperCase()} en ${tenant.name}`}
                           >
                             <span>{mod}</span>
                             <span className="opacity-40 text-[8px]">↗</span>
                           </button>
                         ))}
-                        {(tenant.active_modules || []).length > 6 && (
+                        {(tenant.active_modules || []).length > 4 && (
                           <button
-                            onClick={() => setExpandedTenantId(isExpanded ? null : tenant.id)}
-                            className="text-[10px] text-muted-foreground font-bold hover:text-foreground self-center px-1"
+                            onClick={() => handleOpenModulesModal(tenant)}
+                            className="text-[10px] text-primary font-bold hover:underline self-center px-1"
+                            title="Ver todos los módulos"
                           >
-                            +{(tenant.active_modules || []).length - 6} más
+                            +{(tenant.active_modules || []).length - 4} más
                           </button>
                         )}
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <CreditCard size={14} className={tenant.status === 'suspended' ? 'text-rose-500' : 'text-muted-foreground'} />
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <CreditCard size={13} className={tenant.status === 'suspended' ? 'text-rose-500' : 'text-muted-foreground'} />
                         {tenant.created_at && !isNaN(new Date(tenant.created_at).getTime()) 
                           ? new Date(tenant.created_at).toLocaleDateString() 
                           : 'N/A'}
                       </div>
                     </td>
                     <td className="p-4 pr-6 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleImpersonate(tenant)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center gap-1.5 btn-haptic"
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-primary/10 hover:bg-primary text-primary hover:text-primary-foreground border border-primary/20 flex items-center gap-1.5 btn-haptic shadow-2xs"
                           title="Entrar al ERP como esta empresa (Modo Soporte)"
                         >
                           <LogIn size={13} /> Entrar
                         </button>
-                        <button 
-                          onClick={() => handleToggleStatus(tenant.id, tenant.status)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors btn-haptic ${
-                            tenant.status === 'active' 
-                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 hover:bg-rose-500/20' 
-                              : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
-                          }`}
-                        >
-                          {tenant.status === 'active' ? 'Suspender' : 'Reactivar'}
-                        </button>
                         <button
                           onClick={() => handleOpenModulesModal(tenant)}
-                          className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-muted hover:bg-accent text-foreground border border-border flex items-center gap-1.5 btn-haptic"
-                          title="Activar o desactivar módulos para esta empresa"
+                          className="px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-muted hover:bg-accent text-foreground border border-border flex items-center gap-1.5 btn-haptic"
+                          title="Gestionar módulos activos de esta empresa"
                         >
                           <SlidersHorizontal size={13} className="text-primary" /> Módulos
                         </button>
-                        <Link href={`/admin/tenant/${tenant.id}`} className="px-3 py-1.5 text-foreground hover:bg-accent border border-border rounded-lg text-xs font-bold transition-colors">
-                          Detalles
+                        <Link 
+                          href={`/admin/tenant/${tenant.id}`} 
+                          className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted border border-border transition-colors btn-haptic"
+                          title="Configuración y Detalles de la Empresa"
+                        >
+                          <Settings2 size={15} />
                         </Link>
                         <button 
-                          onClick={() => handleDelete(tenant.id)}
-                          className="p-1.5 text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors"
-                          title="Eliminar empresa"
+                          onClick={() => handleToggleStatus(tenant.id, tenant.status)}
+                          className={`p-1.5 rounded-xl border transition-colors btn-haptic ${
+                            tenant.status === 'active' 
+                              ? 'text-rose-500 hover:bg-rose-500/10 border-rose-500/20' 
+                              : 'text-emerald-500 hover:bg-emerald-500/10 border-emerald-500/20'
+                          }`}
+                          title={tenant.status === 'active' ? 'Suspender Empresa' : 'Reactivar Empresa'}
                         >
-                          <Trash2 size={16} />
+                          {tenant.status === 'active' ? <Ban size={15} /> : <CheckCircle2 size={15} />}
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(tenant.id)}
+                          className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-colors btn-haptic"
+                          title="Eliminar empresa permanentemente"
+                        >
+                          <Trash2 size={15} />
                         </button>
                       </div>
                     </td>
@@ -978,85 +993,166 @@ export default function AdminTenantsPage() {
 
       {/* Modal Control Rápido de Módulos */}
       {selectedTenantForModules && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-2xl p-6 shadow-2xl relative max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-4xl p-4 sm:p-6 shadow-2xl relative max-h-[92vh] flex flex-col overflow-hidden">
             <button
               onClick={() => setSelectedTenantForModules(null)}
-              className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-lg hover:bg-muted transition-colors"
+              className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors btn-haptic z-10"
+              title="Cerrar modal"
             >
               <X size={20} />
             </button>
 
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
+            <div className="flex items-center gap-3 mb-4 pr-10">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                 <SlidersHorizontal size={20} />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-foreground">
+                <h3 className="text-base sm:text-lg font-black text-foreground tracking-tight">
                   Módulos de {selectedTenantForModules.name}
                 </h3>
-                <p className="text-xs text-muted-foreground">
-                  Activa o desactiva qué secciones puede ver y usar esta empresa en el ERP.
+                <p className="text-xs text-muted-foreground font-medium">
+                  Activa o desactiva qué secciones y especialidades puede ver y operar este tenant en el ERP.
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-border">
-              <span className="text-xs font-bold text-muted-foreground">
-                {tenantActiveModules.length} de {ALL_SYSTEM_MODULES.length} módulos habilitados
+            {/* Pestañas de Categoría */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2 border-b border-border/70">
+              <button
+                type="button"
+                onClick={() => setModulesCategoryFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all btn-haptic ${
+                  modulesCategoryFilter === 'all'
+                    ? 'bg-primary text-primary-foreground shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                Todos ({ALL_SYSTEM_MODULES.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModulesCategoryFilter('comercial')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all btn-haptic ${
+                  modulesCategoryFilter === 'comercial'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                💼 Comercial ({ALL_SYSTEM_MODULES.filter(m => m.category === 'comercial').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModulesCategoryFilter('operaciones')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all btn-haptic ${
+                  modulesCategoryFilter === 'operaciones'
+                    ? 'bg-amber-600 text-white shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                ⚡ Operaciones ({ALL_SYSTEM_MODULES.filter(m => m.category === 'operaciones').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModulesCategoryFilter('salud')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all btn-haptic ${
+                  modulesCategoryFilter === 'salud'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                🩺 Salud & Especialidades ({ALL_SYSTEM_MODULES.filter(m => m.category === 'salud').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setModulesCategoryFilter('servicios')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all btn-haptic ${
+                  modulesCategoryFilter === 'servicios'
+                    ? 'bg-purple-600 text-white shadow-xs'
+                    : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                ✂️ Belleza & Servicios ({ALL_SYSTEM_MODULES.filter(m => m.category === 'servicios').length})
+              </button>
+            </div>
+
+            {/* Contador y Acciones Rápidas */}
+            <div className="flex items-center justify-between pb-2 mb-2 text-xs">
+              <span className="font-bold text-muted-foreground">
+                <b className="text-primary">{tenantActiveModules.length}</b> de {ALL_SYSTEM_MODULES.length} módulos habilitados
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={handleSelectAllTenantModules}
-                  className="text-xs text-primary font-bold hover:underline"
+                  className="text-xs text-primary font-bold hover:underline btn-haptic"
                 >
                   Activar Todos
                 </button>
-                <span className="text-muted-foreground text-xs">•</span>
+                <span className="text-muted-foreground">•</span>
                 <button
                   type="button"
                   onClick={handleDeselectAllTenantModules}
-                  className="text-xs text-muted-foreground hover:text-destructive font-bold hover:underline"
+                  className="text-xs text-destructive font-bold hover:underline btn-haptic"
                 >
                   Desactivar Todos
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 py-2">
-              {ALL_SYSTEM_MODULES.map((mod) => {
-                const isActive = tenantActiveModules.includes(mod.id);
-                return (
-                  <button
-                    key={mod.id}
-                    type="button"
-                    onClick={() => handleToggleTenantModule(mod.id)}
-                    className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all btn-haptic ${
-                      isActive
-                        ? 'bg-primary/10 border-primary/30 text-foreground shadow-xs'
-                        : 'bg-muted/30 border-border/60 text-muted-foreground opacity-60 hover:opacity-100'
-                    }`}
-                  >
-                    <div className="truncate pr-2">
-                      <div className="font-bold text-xs truncate">{mod.name}</div>
-                      <div className="text-[10px] text-muted-foreground font-mono uppercase">{mod.id}</div>
-                    </div>
-                    {isActive ? (
-                      <ToggleRight size={22} className="text-primary shrink-0" />
-                    ) : (
-                      <ToggleLeft size={22} className="text-muted-foreground shrink-0" />
-                    )}
-                  </button>
-                );
-              })}
+            {/* Cuadrícula de Módulos */}
+            <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 gap-2.5 py-1">
+              {ALL_SYSTEM_MODULES
+                .filter(m => modulesCategoryFilter === 'all' || m.category === modulesCategoryFilter)
+                .map((mod) => {
+                  const isActive = tenantActiveModules.includes(mod.id);
+                  return (
+                    <button
+                      key={mod.id}
+                      type="button"
+                      onClick={() => handleToggleTenantModule(mod.id)}
+                      className={`flex items-start justify-between p-3 sm:p-3.5 rounded-2xl border text-left transition-all btn-haptic ${
+                        isActive
+                          ? 'bg-primary/10 border-primary/40 text-foreground shadow-2xs'
+                          : 'bg-muted/30 border-border/60 text-muted-foreground opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <div className="pr-3 flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="font-bold text-xs sm:text-sm text-foreground">
+                            {mod.name}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                          {mod.desc}
+                        </p>
+                        <div className="mt-1.5 flex items-center gap-1.5">
+                          <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded-md bg-background border border-border text-muted-foreground">
+                            {mod.id}
+                          </span>
+                          <span className="text-[9px] font-bold uppercase text-muted-foreground">
+                            {mod.category}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="shrink-0 mt-0.5">
+                        {isActive ? (
+                          <ToggleRight size={24} className="text-primary" />
+                        ) : (
+                          <ToggleLeft size={24} className="text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-4">
+            {/* Footer Fijo */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-3">
               <button
                 type="button"
                 onClick={() => setSelectedTenantForModules(null)}
-                className="px-4 py-2.5 rounded-xl text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all"
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all btn-haptic"
               >
                 Cancelar
               </button>
@@ -1064,7 +1160,7 @@ export default function AdminTenantsPage() {
                 type="button"
                 onClick={handleSaveTenantModules}
                 disabled={isSavingModules}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 btn-haptic"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 btn-haptic"
               >
                 <Save size={16} />
                 {isSavingModules ? 'Guardando...' : 'Guardar Módulos'}
