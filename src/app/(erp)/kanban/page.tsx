@@ -48,6 +48,7 @@ export default function KanbanPage() {
   const [dragOverColumnId, setDragOverColumnId] = useState<string | null>(null);
   const [filterMode, setFilterMode] = useState<'all' | 'with_steps' | 'mine'>('all');
   const [pendingAdvance, setPendingAdvance] = useState<{ ticketId: string; currentColId: string } | null>(null);
+  const [expandedOrderIds, setExpandedOrderIds] = useState<Record<string, boolean>>({});
 
   const COLUMNS = UNIVERSAL_COLUMNS;
 
@@ -338,7 +339,7 @@ export default function KanbanPage() {
                             </div>
                             {/* Inline checkboxes for steps */}
                             <div className="mt-2 space-y-1">
-                              {steps.slice(0, 4).map(step => (
+                              {(expandedOrderIds[ticket.id] ? steps : steps.slice(0, 4)).map(step => (
                                 <label key={step.id} className="flex items-center gap-2 cursor-pointer group">
                                   <input
                                     type="checkbox"
@@ -354,7 +355,13 @@ export default function KanbanPage() {
                                 </label>
                               ))}
                               {steps.length > 4 && (
-                                <p className="text-[10px] text-slate-400 pl-5">+{steps.length - 4} más...</p>
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedOrderIds(prev => ({ ...prev, [ticket.id]: !prev[ticket.id] }))}
+                                  className="text-[10px] font-bold text-primary hover:underline pl-5 cursor-pointer"
+                                >
+                                  {expandedOrderIds[ticket.id] ? 'Mostrar menos' : `+${steps.length - 4} más...`}
+                                </button>
                               )}
                             </div>
                           </div>

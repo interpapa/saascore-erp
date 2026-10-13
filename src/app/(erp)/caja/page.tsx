@@ -85,11 +85,13 @@ function CajaPageContent() {
   const [isFastTenderOpen, setIsFastTenderOpen] = useState(false);
   const [isMobileTicketOpen, setIsMobileTicketOpen] = useState(false);
 
-  const clientParam = searchParams.get('client') || searchParams.get('client_id');
+  const debtClientParam = searchParams.get('debt_client_id');
+  const debtAmountParam = searchParams.get('debt_amount');
+  const clientParam = searchParams.get('client') || searchParams.get('client_id') || debtClientParam;
   const appointmentIdParam = searchParams.get('appointment_id');
   const serviceIdParam = searchParams.get('service_id');
-  const priceParam = searchParams.get('price') || searchParams.get('amount');
-  const titleParam = searchParams.get('title') || searchParams.get('desc');
+  const priceParam = searchParams.get('price') || searchParams.get('amount') || debtAmountParam;
+  const titleParam = searchParams.get('title') || searchParams.get('desc') || (debtClientParam && debtAmountParam ? 'Abono / Liquidación de Deuda' : null);
 
   // Estado de Cita Vinculada (si proviene del Calendario)
   const [linkedAppointmentId, setLinkedAppointmentId] = useState<string | null>(appointmentIdParam || null);
@@ -240,7 +242,7 @@ function CajaPageContent() {
     }
   }, [clientParam]);
 
-  // Inyección de Servicio desde Citas / Calendario
+  // Inyección de Servicio desde Citas / Calendario / Deudas
   const hasInjectedAppointmentRef = useRef(false);
   useEffect(() => {
     if (hasInjectedAppointmentRef.current) return;
@@ -311,18 +313,24 @@ function CajaPageContent() {
         setRateInput((rateRes.rateData.rate || 36.5).toFixed(2));
       }
 
-      // Cargar órdenes de consulta dental pendientes de cobro
+      // Cargar órdenes pendientes de cobro (Odontología, Barbería, Grooming)
       try {
-        const dentalDocsRes = await getDocumentsAction(currentTenant.id, 'quote', 20, actor);
-        if (dentalDocsRes?.success && dentalDocsRes.documents) {
-          const pending = dentalDocsRes.documents.filter((d: any) =>
-            (d.status === 'draft' || d.status === 'pending') &&
-            (d.metadata?.payment_status === 'pending_cashier' || d.metadata?.source === 'dental_consultation')
-          );
-          setPendingDentalOrders(pending);
-        }
+        const [quoteRes, quotationRes] = await Promise.all([
+          getDocumentsAction(currentTenant.id, 'quote', 20, actor),
+          getDocumentsAction(currentTenant.id, 'quotation' as any, 20, actor),
+        ]);
+        const combinedDocs = [
+          ...(quoteRes?.success && quoteRes.documents ? quoteRes.documents : []),
+          ...(quotationRes?.success && quotationRes.documents ? quotationRes.documents : []),
+        ];
+        const uniqueDocs = Array.from(new Map(combinedDocs.map((d: any) => [d.id, d])).values());
+        const pending = uniqueDocs.filter((d: any) =>
+          (d.status === 'draft' || d.status === 'pending') &&
+          (d.metadata?.payment_status === 'pending_cashier' || d.metadata?.source === 'dental_consultation')
+        );
+        setPendingDentalOrders(pending);
       } catch (dErr) {
-        console.error('Error buscando órdenes dentales:', dErr);
+        console.error('Error buscando órdenes pendientes:', dErr);
       }
     } catch (err) {
       console.error('Error cargando POS:', err);
@@ -334,16 +342,22 @@ function CajaPageContent() {
   const loadPendingDentalOrders = useCallback(async () => {
     if (!currentTenant?.id || !actor) return;
     try {
-      const res = await getDocumentsAction(currentTenant.id, 'quote', 20, actor);
-      if (res?.success && res.documents) {
-        const pending = res.documents.filter((d: any) =>
-          (d.status === 'draft' || d.status === 'pending') &&
-          (d.metadata?.payment_status === 'pending_cashier' || d.metadata?.source === 'dental_consultation')
-        );
-        setPendingDentalOrders(pending);
-      }
+      const [quoteRes, quotationRes] = await Promise.all([
+        getDocumentsAction(currentTenant.id, 'quote', 20, actor),
+        getDocumentsAction(currentTenant.id, 'quotation' as any, 20, actor),
+      ]);
+      const combinedDocs = [
+        ...(quoteRes?.success && quoteRes.documents ? quoteRes.documents : []),
+        ...(quotationRes?.success && quotationRes.documents ? quotationRes.documents : []),
+      ];
+      const uniqueDocs = Array.from(new Map(combinedDocs.map((d: any) => [d.id, d])).values());
+      const pending = uniqueDocs.filter((d: any) =>
+        (d.status === 'draft' || d.status === 'pending') &&
+        (d.metadata?.payment_status === 'pending_cashier' || d.metadata?.source === 'dental_consultation')
+      );
+      setPendingDentalOrders(pending);
     } catch (err) {
-      console.error('Error cargando órdenes dentales:', err);
+      console.error('Error cargando órdenes pendientes:', err);
     }
   }, [currentTenant?.id, actor]);
 
@@ -2399,7 +2413,7 @@ function CajaPageContent() {
       {ticketLines.length > 0 && (
         <>
           {/* Versión Móvil: Flota siempre sobre el MobileDock para acceso inmediato */}
-          <div className="fixed bottom-22 left-3 right-3 sm:left-6 sm:right-6 z-40 max-w-lg mx-auto md:hidden pointer-events-none">
+          <div className="fixed bottom-22 left-3 right-3 sm:left-6 sm:right-6 z-40 max-w-lg mx-auto lg:hidden pointer-events-none">
             <div className="pointer-events-auto bg-slate-900/95 dark:bg-slate-950/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
               <div
                 onClick={() => setIsMobileTicketOpen(true)}

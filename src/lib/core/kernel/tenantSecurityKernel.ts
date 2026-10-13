@@ -5,9 +5,10 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { checkPermission, UserRole } from '@/lib/rbac';
+import { checkPermission, PERMISSION_ALIASES, UserRole } from '@/lib/rbac';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { assertModuleEnabled, ModuleId } from '@/lib/core/kernel/moduleRegistry';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 export interface KernelActor {
   email: string;
@@ -50,8 +51,16 @@ export async function validateKernelAccess(
       return { authorized: false, error: 'No tienes acceso a esta empresa.' };
     }
 
+    if (!isSuperAdminEmail(actor.email)) {
+      (actor as any).role = data[0].role;
+    }
+
+    const normalizedPermission = requiredPermission
+      ? (PERMISSION_ALIASES[requiredPermission] || requiredPermission)
+      : undefined;
+
     // Verificar permiso granular si se requiere uno específico
-    if (requiredPermission && !checkPermission(actor.role, requiredPermission)) {
+    if (normalizedPermission && !checkPermission(actor.role, normalizedPermission)) {
       await writeAuditLog({
         tenant_id: tenantId,
         actor_email: actor.email,
@@ -69,6 +78,7 @@ export async function validateKernelAccess(
     const MODULE_IDS_OPTIONAL = new Set<string>([
       'contabilidad', 'compras', 'caja', 'calendario', 'equipo', 'whatsapp', 'kanban',
       'catalogo', 'clientes', 'estadisticas', 'franquicias', 'integraciones',
+      'inventario', 'odontologia', 'barberia', 'grooming',
     ]);
     if (requiredPermission && MODULE_IDS_OPTIONAL.has(requiredPermission)) {
       const moduleCheck = await assertModuleEnabled(tenantId, requiredPermission as ModuleId);

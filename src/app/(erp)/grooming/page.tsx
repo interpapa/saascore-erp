@@ -731,7 +731,7 @@ export default function GroomingPage() {
                       onChange={(e) => setParasitesDetected(e.target.checked)}
                       className="rounded text-emerald-600"
                     />
-                    <span>Pulgas / Garrapatas (+ $8 Baño medicado)</span>
+                    <span>Pulgas / Garrapatas (+ ${pricingConfig.supplementPrices.tickFlea} Baño medicado)</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -741,7 +741,7 @@ export default function GroomingPage() {
                       onChange={(e) => setMattingLevel(e.target.checked ? 'severe' : 'none')}
                       className="rounded text-emerald-600"
                     />
-                    <span>Nudos Severos / Apelmazado (+ $10)</span>
+                    <span>Nudos Severos / Apelmazado (+ ${(pricingConfig.supplementPrices as any).knots ?? pricingConfig.supplementPrices.matting})</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -751,7 +751,7 @@ export default function GroomingPage() {
                       onChange={(e) => setTeethBrushed(e.target.checked)}
                       className="rounded text-emerald-600"
                     />
-                    <span>Cepillado Dental Enzimático (+ $5)</span>
+                    <span>Cepillado Dental Enzimático (+ ${pricingConfig.supplementPrices.teeth})</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">

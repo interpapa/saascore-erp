@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo - Motor de Revaluación por Diferencia en Cambio (NIIF 21 / IAS 21)
  * 
  * Calcula y genera los asientos de ajuste por la variación en la tasa oficial
@@ -51,7 +51,7 @@ export async function processFXRevaluation(
         description: `Ajuste por Revaluación Cambiaria (Tasa ${historicalBookedRate} -> ${newRate} ${currentFx.currency})`,
         lines: [
           { account_code: '1.1.02.01', account_name: 'Clientes Nacionales (AR)', debit: diffAmount, credit: 0 },
-          { account_code: '4.2', account_name: 'Otros Ingresos (Ganancia en Cambio)', debit: 0, credit: diffAmount },
+          { account_code: '4.2.01', account_name: 'Ingresos por Diferencial Cambiario / Otros Ingresos', debit: 0, credit: diffAmount },
         ],
       });
     } else {

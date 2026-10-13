@@ -167,7 +167,7 @@ export default function LauncherPage() {
   const enabledModules = tenantModules || fallbackModules;
 
   const filteredApps = apps.filter((app) => {
-    if (app.id === 'admin') return session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
+    if (app.id === 'admin') return session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
     const isInventarioOrCatalogo = (app.id === 'inventario' || app.id === 'catalogo') &&
       (enabledModules.includes('inventario') || enabledModules.includes('catalogo'));
     return enabledModules.includes(app.id) || isInventarioOrCatalogo;

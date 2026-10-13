@@ -101,6 +101,8 @@ export async function getCashSessionStatusAction(tenantId: string, actor: Action
       .select('total_amount, metadata, created_at')
       .eq('tenant_id', tenantId)
       .eq('type', 'invoice')
+      .neq('status', 'annulled')
+      .neq('status', 'voided')
       .gte('created_at', openSession.openedAt);
 
     let salesCashUSD = 0;

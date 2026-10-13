@@ -218,6 +218,9 @@ export function Odontogram({
           setTreatmentTitle(initialChart.treatmentPlan.title);
         }
         setShowTreatmentPanel(true);
+      } else {
+        setTreatmentProcedures([]);
+        setTreatmentTitle('Plan de Tratamiento Integral');
       }
     }
   }, [initialChart]);
@@ -393,7 +396,10 @@ export function Odontogram({
 
   const handleSaveWithPlan = () => {
     if (onSave) {
-      onSave(chart);
+      onSave({
+        ...chart,
+        treatmentPlan: buildTreatmentPlan(),
+      });
     }
   };
 

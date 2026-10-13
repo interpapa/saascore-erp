@@ -28,7 +28,7 @@ function ComprasPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('pos');
-  const initialItemParam = searchParams.get('item');
+  const initialItemParam = searchParams.get('item') || searchParams.get('reorder');
 
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0)
     ? currentTenant.active_modules

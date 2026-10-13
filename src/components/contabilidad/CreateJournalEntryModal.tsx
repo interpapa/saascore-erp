@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DEFAULT_CHART_OF_ACCOUNTS, AccountNode } from '@/lib/core/accounting/chartOfAccounts';
 import { X, Plus, Trash2, CheckCircle2, AlertTriangle, ShieldCheck } from 'lucide-react';
 
@@ -37,7 +37,10 @@ export function CreateJournalEntryModal({
   onSubmit,
   isSubmitting = false,
 }: CreateJournalEntryModalProps) {
-  const imputableAccounts = DEFAULT_CHART_OF_ACCOUNTS.filter((a) => !a.isHeader);
+  const imputableAccounts = useMemo(
+    () => DEFAULT_CHART_OF_ACCOUNTS.filter((a) => !a.isHeader),
+    []
+  );
 
   const [entryDate, setEntryDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState('');
@@ -57,7 +60,7 @@ export function CreateJournalEntryModal({
         { id: '2', account_code: imputableAccounts[1]?.code || '4.1.01', debit: '0', credit: '0', description: '' },
       ]);
     }
-  }, [isOpen, imputableAccounts]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

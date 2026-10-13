@@ -24,6 +24,10 @@ const AVAILABLE_MODULES = [
   { id: 'caja', name: 'Caja POS' },
   { id: 'calendario', name: 'Citas y Turnos' },
   { id: 'clientes', name: 'CRM (Clientes)' },
+  { id: 'inventario', name: 'Inventario' },
+  { id: 'odontologia', name: 'Odontología' },
+  { id: 'barberia', name: 'Barbería' },
+  { id: 'grooming', name: 'Peluquería Canina' },
   { id: 'whatsapp', name: 'WhatsApp' },
   { id: 'kanban', name: 'Kanban' },
   { id: 'equipo', name: 'Personal' },
@@ -255,7 +259,7 @@ export default function ConfiguracionPage() {
   };
 
   // Filtrar los módulos que el tenant tiene activos realmente
-  const fallbackModules = ['caja', 'clientes', 'catalogo', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'compras', 'contabilidad', 'calendario', 'odontologia', 'barberia', 'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 'config', 'admin', 'apps'];
   const tenantActiveModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) ? currentTenant.active_modules : fallbackModules;
 
   return (

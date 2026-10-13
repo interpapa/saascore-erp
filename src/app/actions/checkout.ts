@@ -341,6 +341,7 @@ export async function processSecureCheckout(
           currency_symbol: exchangeData.symbol,
           total_local: totalLocal,
           cart_lines: documentLines.map((line: any) => ({
+            item_id: line.item_id ?? line.itemId ?? null,
             description: line.description,
             quantity: line.quantity,
             unit_price: line.unit_price,

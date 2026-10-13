@@ -74,16 +74,7 @@ export default function BarberiaPage() {
     tipSplitWithShop: false
   });
 
-  const [selectedBarber, setSelectedBarber] = useState<ModuleStaffMember>({
-    id: 'barb-1',
-    name: 'Carlos "Master" Fade',
-    role: 'Master Barber',
-    specialty: 'Degradados & Barba',
-    avatar: '✂️',
-    commissionPercent: 50,
-    module: 'barberia',
-    isActive: true
-  });
+  const [selectedBarber, setSelectedBarber] = useState<ModuleStaffMember | null>(null);
 
   // Turno actual en Silla
   const [activeSession, setActiveSession] = useState<BarberQueueItem | null>(null);
@@ -138,10 +129,13 @@ export default function BarberiaPage() {
         // Si no hay seleccionado o el seleccionado ya no existe, tomar el primero activo
         const firstActive = staffRes.staff.find(s => s.isActive) || staffRes.staff[0];
         setSelectedBarber((prev) => {
-          const match = staffRes.staff?.find(s => s.id === prev.id);
+          const match = prev ? staffRes.staff?.find(s => s.id === prev.id) : undefined;
           return match || firstActive;
         });
         setNewClientBarberId((prev) => prev || firstActive.id);
+      } else {
+        setBarberStaff([]);
+        setSelectedBarber(null);
       }
 
       if (configRes.success && configRes.config) {
@@ -170,10 +164,10 @@ export default function BarberiaPage() {
         {
           clientName: newClientName.trim(),
           phone: newClientPhone.trim() || undefined,
-          barberId: assignedBarber.id,
-          barberName: assignedBarber.name,
+          barberId: assignedBarber?.id || '',
+          barberName: assignedBarber?.name || 'Sin asignar',
           services: [],
-          barberCommissionPercent: assignedBarber.commissionPercent
+          barberCommissionPercent: assignedBarber?.commissionPercent ?? pricingConfig.defaultCommissionPercent
         },
         tenantId,
         effectiveActor
@@ -247,7 +241,7 @@ export default function BarberiaPage() {
 
   const tipUSD = parseFloat(tipInput) || 0;
   const totalUSD = servicesSubtotal + tipUSD;
-  const barberPercent = selectedBarber.commissionPercent;
+  const barberPercent = selectedBarber?.commissionPercent ?? pricingConfig.defaultCommissionPercent;
   const barberCommissionUSD = (servicesSubtotal * barberPercent) / 100;
   const shopCutUSD = servicesSubtotal - barberCommissionUSD;
 
@@ -260,8 +254,8 @@ export default function BarberiaPage() {
         {
           clientName: activeSession.clientName,
           clientId: activeSession.clientId,
-          barberId: selectedBarber.id,
-          barberName: selectedBarber.name,
+          barberId: selectedBarber?.id || activeSession.barberId || '',
+          barberName: selectedBarber?.name || activeSession.barberName || 'Sin asignar',
           services: sessionServices,
           tipUSD,
           barberCommissionPercent: barberPercent
@@ -338,22 +332,26 @@ export default function BarberiaPage() {
           <div className="flex items-center gap-2 bg-background border border-border p-1.5 rounded-2xl shadow-2xs">
             <span className="text-xs font-bold text-slate-400 pl-2">Estilista:</span>
             <div className="flex items-center gap-1">
-              {barberStaff.map((barber) => (
-                <button
-                  key={barber.id}
-                  type="button"
-                  onClick={() => setSelectedBarber(barber)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic ${
-                    selectedBarber.id === barber.id
-                      ? 'bg-amber-600 text-white shadow-xs font-extrabold'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <span>{barber.avatar}</span>
-                  <span>{barber.name.split(' ')[0]}</span>
-                  <span className="text-[10px] opacity-75">({barber.commissionPercent}%)</span>
-                </button>
-              ))}
+              {barberStaff.length === 0 ? (
+                <span className="text-xs text-slate-400 px-2 py-1">Sin estilistas</span>
+              ) : (
+                barberStaff.map((barber) => (
+                  <button
+                    key={barber.id}
+                    type="button"
+                    onClick={() => setSelectedBarber(barber)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic ${
+                      selectedBarber?.id === barber.id
+                        ? 'bg-amber-600 text-white shadow-xs font-extrabold'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <span>{barber.avatar}</span>
+                    <span>{barber.name.split(' ')[0]}</span>
+                    <span className="text-[10px] opacity-75">({barber.commissionPercent}%)</span>
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
@@ -519,7 +517,7 @@ export default function BarberiaPage() {
               {activeSession && (
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold text-slate-400">
-                    Atendido por: <strong className="text-foreground">{selectedBarber.name}</strong>
+                    Atendido por: <strong className="text-foreground">{selectedBarber?.name || activeSession.barberName || 'Sin asignar'}</strong>
                   </span>
                 </div>
               )}
@@ -535,13 +533,13 @@ export default function BarberiaPage() {
                     const walkInMock: BarberQueueItem = {
                       id: `temp-${Date.now()}`,
                       clientName: 'Cliente Rápido en Silla',
-                      barberId: selectedBarber.id,
-                      barberName: selectedBarber.name,
+                      barberId: selectedBarber?.id || '',
+                      barberName: selectedBarber?.name || 'Sin asignar',
                       services: [],
                       status: 'in_chair',
                       arrivalTime: new Date().toISOString(),
                       tipUSD: 0,
-                      barberCommissionPercent: selectedBarber.commissionPercent
+                      barberCommissionPercent: selectedBarber?.commissionPercent ?? pricingConfig.defaultCommissionPercent
                     };
                     setActiveSession(walkInMock);
                     setSessionServices([]);

@@ -38,8 +38,10 @@ export async function runSyntheticQAFullSuite() {
   assert.equal(isOwnerWhitelisted, true, 'El correo de administración debe estar en whitelist');
   assert.equal(isSuperadminWhitelisted, true, 'El superadmin base debe estar en whitelist');
 
+  const authUserSuper = isSuperAdminAuthUser({ email: 'super@rendo.com', app_metadata: { role: 'superadmin' } });
   const authUserOwner = isSuperAdminAuthUser({ email: 'nuevo_dueno@empresa.com', app_metadata: { role: 'owner' } });
-  assert.equal(authUserOwner, true, 'Cuentas con rol owner tienen bypass administrativo verificado');
+  assert.equal(authUserSuper, true, 'Cuentas con rol superadmin tienen acceso administrativo global verificado');
+  assert.equal(authUserOwner, false, 'Cuentas con rol owner de empresa no escalan a superadmin global');
 
   // 1.2 Simulación de Tenants y Aislamiento
   const tenantAlpha = { id: 'ten-alpha-001', name: 'Farmacia & Suministros Alpha', active_modules: ['caja', 'inventario', 'compras', 'contabilidad', 'clientes'] };

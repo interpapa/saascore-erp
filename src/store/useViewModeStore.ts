@@ -30,13 +30,14 @@ export const useViewModeStore = create<ViewModeState>((set, get) => {
   // Escuchar redimensionamiento de pantalla automáticamente en el cliente
   if (typeof window !== 'undefined') {
     let timeoutId: NodeJS.Timeout | null = null;
+    let lastIsMobile = window.innerWidth < 1024;
     window.addEventListener('resize', () => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        const isMobile = window.innerWidth < 1024;
-        const newMode: ViewMode = isMobile ? 'express' : 'pro';
-        if (get().viewMode !== newMode) {
-          set({ viewMode: newMode, isMobile });
+        const currentIsMobile = window.innerWidth < 1024;
+        if (currentIsMobile !== lastIsMobile) {
+          lastIsMobile = currentIsMobile;
+          set({ isMobile: currentIsMobile, viewMode: currentIsMobile ? 'express' : 'pro' });
         }
       }, 100);
     });
@@ -46,10 +47,10 @@ export const useViewModeStore = create<ViewModeState>((set, get) => {
     viewMode: initial.viewMode,
     isMobile: initial.isMobile,
     hasHydrated: true,
-    setViewMode: (viewMode) => set({ viewMode, isMobile: viewMode === 'express' }),
+    setViewMode: (viewMode) => set({ viewMode, isMobile: typeof window !== 'undefined' ? window.innerWidth < 1024 : false }),
     toggleViewMode: () => set({ 
       viewMode: get().viewMode === 'express' ? 'pro' : 'express',
-      isMobile: get().viewMode !== 'express'
+      isMobile: typeof window !== 'undefined' ? window.innerWidth < 1024 : false
     }),
     syncWithViewport: () => {
       if (typeof window !== 'undefined') {

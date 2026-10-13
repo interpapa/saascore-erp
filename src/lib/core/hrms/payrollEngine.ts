@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo - Motor de Nómina Localizada & Asientos Contables (HRMS - GDPR)
  * 
  * Gestiona el cálculo de nómina (sueldos base, bonos, retenciones legales)
@@ -66,7 +66,7 @@ export async function processPayroll(
       description: `Nómina de Personal ${payrollNumber} (${payload.periodName})`,
       lines: [
         { account_code: '5.2.01', account_name: 'Sueldos y Salarios (Gasto)', debit: totalGross, credit: 0 },
-        { account_code: '2.1.02', account_name: 'Retenciones Fiscales por Pagar', debit: 0, credit: totalDeductions },
+        { account_code: '2.1.02.01', account_name: 'Retenciones Fiscales por Pagar', debit: 0, credit: totalDeductions },
         { account_code: '1.1.01.02', account_name: 'Bancos / Pasivo Laboral por Pagar', debit: 0, credit: totalNet },
       ],
     });

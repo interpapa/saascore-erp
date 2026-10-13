@@ -15,14 +15,37 @@ export interface RBACPolicy {
 export const defaultRoles: Record<UserRole, RBACPolicy> = {
   'superadmin': { role: 'superadmin', name: 'Arquitecto Rendo', permissions: '*' }, // Dios
   'owner': { role: 'owner', name: 'Dueño (Full Access)', permissions: '*' }, // Administrador del Negocio
-  'manager': { role: 'manager', name: 'Gerente', permissions: ['crm', 'finanzas', 'inventario', 'registros', 'equipo', 'reportes'] },
-  'technician': { role: 'technician', name: 'Técnico / Operativo', permissions: ['registros', 'inventario'] },
-  'seller': { role: 'seller', name: 'Ventas / Cajero', permissions: ['crm', 'registros', 'finanzas'] }
+  'manager': {
+    role: 'manager',
+    name: 'Gerente',
+    permissions: ['crm', 'finanzas', 'inventario', 'registros', 'equipo', 'reportes', 'calendario', 'whatsapp', 'kanban', 'contabilidad']
+  },
+  'technician': {
+    role: 'technician',
+    name: 'Técnico / Operativo',
+    permissions: ['registros', 'inventario', 'calendario', 'kanban']
+  },
+  'seller': {
+    role: 'seller',
+    name: 'Ventas / Cajero',
+    permissions: ['crm', 'registros', 'finanzas', 'inventario', 'calendario', 'whatsapp']
+  }
 };
 
-export const checkPermission = (userRole: UserRole, requiredPermission: string): boolean => {
+export const PERMISSION_ALIASES: Record<string, Permission> = {
+  clientes: 'crm',
+  catalogo: 'inventario',
+  compras: 'inventario',
+  configuracion: 'config',
+};
+
+export const hasPermission = (userRole: UserRole, requiredPermission: string): boolean => {
   const policy = defaultRoles[userRole];
   if (!policy) return false;
   if (policy.permissions === '*') return true;
-  return policy.permissions.includes(requiredPermission as any);
+  const normalized = PERMISSION_ALIASES[requiredPermission] || requiredPermission;
+  return policy.permissions.includes(normalized as Permission);
 };
+
+export const checkPermission = hasPermission;
+

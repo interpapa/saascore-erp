@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Rendo - Plan Contable Jerárquico (Chart of Accounts - NIIF / IFRS)
  * 
  * Estructura estándar de cuentas contables organizada por niveles jerárquicos:
@@ -50,7 +50,8 @@ export const DEFAULT_CHART_OF_ACCOUNTS: AccountNode[] = [
   { code: '4.1', name: 'Ingresos Operacionales', type: 'revenue', level: 2, parentCode: '4', isHeader: true },
   { code: '4.1.01', name: 'Ventas de Productos', type: 'revenue', level: 3, parentCode: '4.1', isHeader: false },
   { code: '4.1.02', name: 'Ingresos por Servicios', type: 'revenue', level: 3, parentCode: '4.1', isHeader: false },
-  { code: '4.2', name: 'Otros Ingresos (Ganancia en Cambio)', type: 'revenue', level: 2, parentCode: '4', isHeader: false },
+  { code: '4.2', name: 'Otros Ingresos (Ganancia en Cambio)', type: 'revenue', level: 2, parentCode: '4', isHeader: true },
+  { code: '4.2.01', name: 'Ingresos por Diferencial Cambiario / Otros Ingresos', type: 'revenue', level: 3, parentCode: '4.2', isHeader: false },
 
   // 5. GASTOS
   { code: '5', name: 'GASTOS', type: 'expense', level: 1, isHeader: true },

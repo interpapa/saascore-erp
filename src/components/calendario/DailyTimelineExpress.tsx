@@ -57,8 +57,11 @@ export function DailyTimelineExpress({
     onDateChange(new Date());
   };
 
-  // Filtrar citas del día seleccionado
-  const dateStr = currentDate.toISOString().split('T')[0];
+  // Filtrar citas del día seleccionado (usando fecha local para evitar salto a las 8:00 PM UTC-4)
+  const year = currentDate.getFullYear();
+  const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+  const day = String(currentDate.getDate()).padStart(2, '0');
+  const dateStr = `${year}-${month}-${day}`;
   const dayAppointments = appointments
     .filter((a) => a.start_time.startsWith(dateStr))
     .sort((a, b) => a.start_time.localeCompare(b.start_time));

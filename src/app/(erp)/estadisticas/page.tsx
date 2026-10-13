@@ -482,13 +482,13 @@ export default function EstadisticasPage() {
     let unassignedCostCount = 0;
 
     const totalInventoryCost = products.reduce((sum, i) => {
-      const rawCost = i.acquisition_cost ?? i.cost_price;
+      const rawCost = Number(i.cost ?? i.acquisition_cost ?? i.cost_price ?? 0);
       const stock = Number(i.stock ?? i.stock_quantity ?? 0);
-      if (rawCost === null || rawCost === undefined || isNaN(Number(rawCost)) || Number(rawCost) === 0) {
+      if (isNaN(rawCost) || rawCost === 0) {
         unassignedCostCount++;
         return sum; // Estrictamente $0.00 si no fue parametrizado
       }
-      return sum + Number(rawCost) * Math.max(0, stock);
+      return sum + rawCost * Math.max(0, stock);
     }, 0);
 
     const totalInventorySale = products.reduce((sum, i) => {
@@ -506,7 +506,7 @@ export default function EstadisticasPage() {
     const lowStockAlerts: AlertRow[] = products
       .filter((i) => {
         const stock = Number(i.stock ?? i.stock_quantity ?? 0);
-        const min = Number(i.min_stock_alert ?? 5);
+        const min = Number(i.metadata?.min_stock ?? i.min_stock_alert ?? 5);
         return stock <= min;
       })
       .slice(0, 10)
@@ -514,7 +514,7 @@ export default function EstadisticasPage() {
         id: i.id,
         name: i.name,
         stock: Number(i.stock ?? i.stock_quantity ?? 0),
-        minStock: Number(i.min_stock_alert ?? 5),
+        minStock: Number(i.metadata?.min_stock ?? i.min_stock_alert ?? 5),
         category: i.category || 'General',
       }));
 
@@ -523,7 +523,7 @@ export default function EstadisticasPage() {
     products.forEach((p) => {
       const cat = (p.category || 'Sin Categoría').trim();
       const stock = Math.max(0, Number(p.stock ?? p.stock_quantity ?? 0));
-      const cost = Number(p.acquisition_cost ?? p.cost_price ?? 0);
+      const cost = Number(p.cost ?? p.acquisition_cost ?? p.cost_price ?? 0);
       const price = Number(p.base_price ?? 0);
       if (!categoryMap[cat]) {
         categoryMap[cat] = { name: cat, count: 0, totalCost: 0, totalSale: 0 };
@@ -1499,7 +1499,7 @@ export default function EstadisticasPage() {
                           {isExhausted ? 'Agotado (0 uds)' : `${item.stock} uds`}
                         </span>
                         <button
-                          onClick={() => router.push(`/compras?reorder=${encodeURIComponent(item.name)}`)}
+                          onClick={() => router.push(`/compras?item=${encodeURIComponent(item.id)}&reorder=${encodeURIComponent(item.name)}`)}
                           className="btn-base btn-secondary btn-sm text-xs py-1.5 px-3"
                         >
                           Emitir PO

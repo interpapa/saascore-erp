@@ -41,8 +41,8 @@ export function isSuperAdminEmail(email?: string | null): boolean {
 export function isSuperAdminAuthUser(user?: { email?: string | null; app_metadata?: any; user_metadata?: any } | null): boolean {
   if (!user) return false;
   if (isSuperAdminEmail(user.email)) return true;
-  if (user.app_metadata?.role === 'superadmin' || user.app_metadata?.is_superadmin === true || user.app_metadata?.role === 'owner') return true;
-  if (user.user_metadata?.role === 'superadmin' || user.user_metadata?.is_superadmin === true || user.user_metadata?.role === 'owner') return true;
+  if (user.app_metadata?.role === 'superadmin' || user.app_metadata?.is_superadmin === true) return true;
+  if (user.user_metadata?.role === 'superadmin' || user.user_metadata?.is_superadmin === true) return true;
   return false;
 }
 

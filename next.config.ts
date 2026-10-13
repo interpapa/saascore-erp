@@ -27,7 +27,6 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL: resolvedUrl,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: resolvedAnon,
-    SUPABASE_SERVICE_ROLE_KEY: resolvedService,
   },
   async headers() {
     return [

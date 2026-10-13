@@ -24,7 +24,7 @@ export default function StudioAdminPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isDeploying, setIsDeploying] = useState(false);
 
-  const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
+  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
 
   if (!isSuper) {
     return (

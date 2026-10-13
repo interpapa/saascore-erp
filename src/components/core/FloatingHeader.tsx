@@ -7,6 +7,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Breadcrumbs } from '@/components/core/Breadcrumbs';
 import { CommandPalette } from '@/components/core/CommandPalette';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 interface NotificationItem {
   id: string;
@@ -184,7 +185,7 @@ export function FloatingHeader() {
           </div>
 
           {/* Acceso directo SuperAdmin / Rendo Hub */}
-          {(session?.role === 'superadmin' || session?.role === 'owner') && (
+          {(session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail)) && (
             <>
               <div className="w-px h-6 bg-border mx-1" />
               <Link

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Building2, Plus, MapPin, DollarSign, Crown, Phone, Users, Activity, BarChart3, Search } from 'lucide-react';
 import { getEntitiesAction } from '@/app/actions/entities';
 import { getDocumentsAction } from '@/app/actions/documents';
@@ -10,6 +11,7 @@ import { useActionActor } from '@/hooks/useActionActor';
 import { BranchModal } from '@/components/franquicias/BranchModal';
 
 export default function FranquiciasPage() {
+  const router = useRouter();
   const currentTenant = useTenantResolver();
   const actor = useActionActor();
   const [branches, setBranches] = useState<Entity[]>([]);
@@ -194,11 +196,19 @@ export default function FranquiciasPage() {
                   
                   {/* Card Footer */}
                   <div className="border-t border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
-                    <button className="text-sm font-bold text-slate-500 hover:text-primary transition-colors flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => router.push('/estadisticas')}
+                      className="text-sm font-bold text-slate-500 hover:text-primary transition-colors flex items-center gap-1.5"
+                    >
                       <BarChart3 size={16} />
                       Métricas
                     </button>
-                    <button className="text-sm font-bold text-slate-500 hover:text-primary transition-colors flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => router.push('/inventario')}
+                      className="text-sm font-bold text-slate-500 hover:text-primary transition-colors flex items-center gap-1.5"
+                    >
                       <Activity size={16} />
                       Inventario
                     </button>

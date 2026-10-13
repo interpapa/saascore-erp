@@ -27,6 +27,7 @@ interface ClientDrawerProps {
   onClose: () => void;
   onEdit?: (client: Entity) => void;
   onDelete?: (id: string) => void;
+  onRefresh?: () => void;
   tenantId?: string;
   actor?: any;
   customSchema?: CustomFieldDefinition[];
@@ -41,6 +42,7 @@ export function ClientDrawer({
   onClose, 
   onEdit, 
   onDelete,
+  onRefresh,
   tenantId,
   actor,
   customSchema = [],
@@ -217,6 +219,7 @@ export function ClientDrawer({
           if (client.metadata) {
             (client.metadata as any).total_debt = res.newDebt;
           }
+          onRefresh?.();
           toast({
             variant: 'success',
             title: 'Abono Registrado',
@@ -242,6 +245,7 @@ export function ClientDrawer({
           if (client.metadata) {
             (client.metadata as any).total_debt = res.newDebt;
           }
+          onRefresh?.();
           toast({
             variant: 'success',
             title: 'Deuda Registrada',

@@ -29,8 +29,8 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   } | null>(null);
 
   useEffect(() => {
-    // Permitir acceso a superadmin, owner o emails en lista blanca administrativa
-    const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
+    // Permitir acceso a superadmin o emails en lista blanca administrativa
+    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
     if (isSuper) {
       setIsAuthorized(true);
     } else {
@@ -40,9 +40,9 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   }, [session, router]);
 
   useEffect(() => {
-    const isSuper = session?.role === 'superadmin' || session?.role === 'owner' || isSuperAdminEmail(session?.userEmail);
+    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
     if (isSuper && session?.userEmail) {
-      const activeActor = actor || { email: session.userEmail || '', role: (session.role || 'owner') as any };
+      const activeActor = actor || { email: session.userEmail || '', role: (session.role || 'superadmin') as any };
       getSystemHealthAdminAction(activeActor)
         .then(res => {
           if (res.success && res.data) {

@@ -687,7 +687,7 @@ export default function ClientesPage() {
                             )}
                             <button
                               type="button"
-                              onClick={() => router.push(`/caja?client_id=${client.id}`)}
+                              onClick={() => router.push(hasDebt ? `/caja?debt_client_id=${client.id}&debt_amount=${debt}` : `/caja?client_id=${client.id}`)}
                               className="px-2 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-all flex items-center gap-1 border border-indigo-500/20 btn-haptic"
                               title="Cobrar en Caja"
                             >
@@ -780,17 +780,19 @@ export default function ClientesPage() {
                         </td>
                         <td className="p-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDrawerInitialTab('registros');
-                                setSelectedClient(client);
-                              }}
-                              className="p-1.5 rounded-lg border border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
-                              title="Abrir Historia Clínica y Fotos en 1 clic"
-                            >
-                              <Stethoscope size={13} />
-                            </button>
+                            {isDentalActive && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDrawerInitialTab('registros');
+                                  setSelectedClient(client);
+                                }}
+                                className="p-1.5 rounded-lg border border-blue-500/20 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                title="Abrir Historia Clínica y Fotos en 1 clic"
+                              >
+                                <Stethoscope size={13} />
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => router.push(`/calendario?client=${client.id}`)}
@@ -851,6 +853,7 @@ export default function ClientesPage() {
           setClientToEdit(c);
           setIsModalOpen(true);
         }}
+        onRefresh={fetchClients}
         tenantId={currentTenant?.id}
         actor={actor}
         customSchema={customSchema}

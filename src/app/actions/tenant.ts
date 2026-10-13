@@ -27,12 +27,8 @@ async function verifySuperAdminActor(
     email = callerOrActor;
   }
 
-  // 1. Verificación por rol explícito (superadmin u owner) o lista blanca de superadmin (0ms de latencia)
-  if (callerRole === 'superadmin' || callerRole === 'owner') {
-    return { authorized: true };
-  }
-
-  if (email && isSuperAdminEmail(email)) {
+  // 1. Verificación por rol explícito (superadmin) o lista blanca de superadmin (0ms de latencia)
+  if (callerRole === 'superadmin' || (email && isSuperAdminEmail(email))) {
     return { authorized: true };
   }
 
@@ -323,7 +319,18 @@ export async function updateTenantSettings(
       }
     }
     if (updatedMetadata !== undefined) {
-      updatePayload.metadata = updatedMetadata;
+      const { data: existingTenantRow } = await db
+        .from('tenants')
+        .select('metadata')
+        .eq('id', tenantId)
+        .maybeSingle();
+      const existingMetadata = (existingTenantRow?.metadata && typeof existingTenantRow.metadata === 'object')
+        ? (existingTenantRow.metadata as Record<string, unknown>)
+        : {};
+      updatePayload.metadata = {
+        ...existingMetadata,
+        ...(updatedMetadata && typeof updatedMetadata === 'object' ? (updatedMetadata as Record<string, unknown>) : {}),
+      };
     }
 
     const { data: tenant, error } = await db
@@ -621,6 +628,35 @@ export async function getUserTenant(userEmail: string, userId?: string) {
 
     if (tenantError || !tenant) {
       return { success: false, tenant: null, role: null, error: 'Tenant not found' };
+    }
+
+    // 3. Consultar si el usuario tiene app_metadata.allowed_modules en Supabase Auth
+    try {
+      let authUser: any = null;
+      if (userId) {
+        const { data: byIdData } = await db.auth.admin.getUserById(userId);
+        authUser = byIdData?.user || null;
+      }
+      if (!authUser) {
+        const { data: listData } = await db.auth.admin.listUsers({ perPage: 1000 });
+        authUser = listData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail.toLowerCase()) || null;
+      }
+      const allowedModules = authUser?.app_metadata?.allowed_modules;
+      if (Array.isArray(allowedModules) && allowedModules.length > 0) {
+        const normalizedAllowed = [...allowedModules];
+        if (normalizedAllowed.includes('inventario') && !normalizedAllowed.includes('catalogo')) {
+          normalizedAllowed.push('catalogo');
+        }
+        if (normalizedAllowed.includes('catalogo') && !normalizedAllowed.includes('inventario')) {
+          normalizedAllowed.push('inventario');
+        }
+        tenant.active_modules = normalizedAllowed;
+        if (tenant.metadata && typeof tenant.metadata === 'object') {
+          (tenant.metadata as Record<string, unknown>).active_modules = normalizedAllowed;
+        }
+      }
+    } catch {
+      // Continuar con active_modules del tenant si falla la consulta de Auth
     }
 
     return {
@@ -1167,6 +1203,7 @@ export async function updateUserRoleAndPermissionsAdminAction(
         .from('user_tenants')
         .select('id')
         .ilike('user_email', cleanEmail)
+        .eq('tenant_id', tenantId)
         .limit(1);
 
       if (existingLink && existingLink.length > 0) {

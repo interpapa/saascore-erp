@@ -182,7 +182,18 @@ export default function OdontologiaPage() {
       ]);
 
       if (custRes.status === 'fulfilled' && custRes.value?.success && custRes.value?.entities) {
-        setCustomers(custRes.value.entities);
+        const loadedPatients = custRes.value.entities;
+        setCustomers(loadedPatients);
+        if (typeof window !== 'undefined') {
+          const searchParams = new URLSearchParams(window.location.search);
+          const urlPatientId = searchParams.get('client_id') || searchParams.get('client');
+          if (urlPatientId) {
+            const matchedPatient = loadedPatients.find((p: Entity) => p.id === urlPatientId);
+            if (matchedPatient) {
+              setSelectedPatient(matchedPatient);
+            }
+          }
+        }
       }
 
       if (apptRes.status === 'fulfilled' && apptRes.value?.success && apptRes.value?.appointments) {
