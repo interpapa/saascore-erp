@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Sparkles,
   Stethoscope,
+  HeartPulse,
   Scissors,
   Dog
 } from 'lucide-react';
@@ -135,6 +136,13 @@ export default function LauncherPage() {
       icon: <Stethoscope className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
+      id: 'clinica', 
+      name: 'Clínica Médica', 
+      href: '/clinica',
+      gradient: 'from-rose-500 to-red-600',
+      icon: <HeartPulse className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
       id: 'apps', 
       name: 'Marketplace', 
       href: '/apps',
@@ -158,16 +166,19 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin'];
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
       : null;
-  const enabledModules = tenantModules || fallbackModules;
+  const enabledModules: string[] = tenantModules || fallbackModules;
 
   const filteredApps = apps.filter((app) => {
     if (app.id === 'admin') return session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    if (app.id === 'clinica') {
+      return enabledModules.includes('clinica') || enabledModules.some((m) => m.startsWith('med_'));
+    }
     const isInventarioOrCatalogo = (app.id === 'inventario' || app.id === 'catalogo') &&
       (enabledModules.includes('inventario') || enabledModules.includes('catalogo'));
     return enabledModules.includes(app.id) || isInventarioOrCatalogo;

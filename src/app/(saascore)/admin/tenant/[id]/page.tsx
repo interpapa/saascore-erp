@@ -64,6 +64,16 @@ const ALL_MODULES = [
   },
   { id: 'whatsapp', name: 'WhatsApp Inbox', features: [] },
   { id: 'kanban', name: 'Órdenes de Trabajo', features: [] },
+  { id: 'odontologia', name: 'Odontología & Salud Dental', features: [] },
+  { id: 'clinica', name: 'Clínica Médica (Base)', features: [] },
+  { id: 'med_general', name: 'Especialidad: Medicina General e Interna', features: [] },
+  { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura', features: [] },
+  { id: 'med_ginecologia', name: 'Especialidad: Ginecología y Obstetricia', features: [] },
+  { id: 'med_dermatologia', name: 'Especialidad: Dermatología y Estética', features: [] },
+  { id: 'med_traumatologia', name: 'Especialidad: Traumatología y Fisioterapia', features: [] },
+  { id: 'med_oftalmologia', name: 'Especialidad: Oftalmología y Optometría', features: [] },
+  { id: 'barberia', name: 'Barbería & Estilo Masculino', features: [] },
+  { id: 'grooming', name: 'Peluquería & Spa Canino', features: [] },
   { id: 'equipo', name: 'Personal HRMS', features: [] },
   { id: 'franquicias', name: 'Franquicias', features: [] },
   { id: 'integraciones', name: 'Conexiones API', features: [] },
@@ -168,7 +178,7 @@ export default function TenantAdminPage() {
       active_modules: activeModules,
       metadata: { ...(tenant.metadata || {}), features: featureFlags },
     });
-    const target = modId === 'catalogo' ? '/inventario' : modId === 'config' ? '/configuracion' : `/${modId}`;
+    const target = modId === 'catalogo' ? '/inventario' : modId === 'config' ? '/configuracion' : modId.startsWith('med_') ? '/clinica' : `/${modId}`;
     toast({
       variant: 'success',
       title: 'Acceso Directo al Módulo',
@@ -220,7 +230,11 @@ export default function TenantAdminPage() {
       setActiveModules(activeModules.filter(m => m !== modId));
       if (expandedModule === modId) setExpandedModule(null);
     } else {
-      setActiveModules([...activeModules, modId]);
+      const next = [...activeModules, modId];
+      if (modId.startsWith('med_') && !next.includes('clinica')) {
+        next.push('clinica');
+      }
+      setActiveModules(next);
       setExpandedModule(modId); // Expandir automáticamente al activarlo
     }
   };
@@ -234,6 +248,14 @@ export default function TenantAdminPage() {
     setIsSaving(true);
     const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
     
+    const finalModules = activeModules.some(m => m.startsWith('med_')) && !activeModules.includes('clinica')
+      ? [...activeModules, 'clinica']
+      : activeModules;
+
+    if (finalModules.length !== activeModules.length) {
+      setActiveModules(finalModules);
+    }
+
     const newMetadata = {
       ...(tenant.metadata || {}),
       features: featureFlags
@@ -241,21 +263,21 @@ export default function TenantAdminPage() {
 
     const updates = {
       name,
-      active_modules: activeModules,
+      active_modules: finalModules,
       metadata: newMetadata
     };
 
     const result = await updateTenantAdminAction(tenant.id, updates, activeActor);
     if (result.success) {
       toast({ variant: 'success', title: 'Guardado', description: 'Configuración de módulos actualizada exitosamente.' });
-      setTenant((prev: any) => ({ ...prev, name, active_modules: activeModules, metadata: newMetadata }));
+      setTenant((prev: any) => ({ ...prev, name, active_modules: finalModules, metadata: newMetadata }));
       const currentStoreTenant = useERPStore.getState().currentTenant;
       if (currentStoreTenant && currentStoreTenant.id === tenant.id) {
         useERPStore.getState().setCurrentTenant({
           ...currentStoreTenant,
           id: currentStoreTenant.id,
           name,
-          active_modules: activeModules,
+          active_modules: finalModules,
           metadata: newMetadata,
         });
       }

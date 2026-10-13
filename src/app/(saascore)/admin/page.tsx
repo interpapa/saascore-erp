@@ -53,6 +53,13 @@ const ALL_SYSTEM_MODULES = [
   { id: 'whatsapp', name: 'WhatsApp CRM' },
   { id: 'kanban', name: 'Órdenes de Trabajo' },
   { id: 'odontologia', name: 'Odontología' },
+  { id: 'clinica', name: 'Clínica Médica (Base)' },
+  { id: 'med_general', name: 'Especialidad: Medicina General e Interna' },
+  { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura' },
+  { id: 'med_ginecologia', name: 'Especialidad: Ginecología y Obstetricia' },
+  { id: 'med_dermatologia', name: 'Especialidad: Dermatología y Estética' },
+  { id: 'med_traumatologia', name: 'Especialidad: Traumatología y Fisioterapia' },
+  { id: 'med_oftalmologia', name: 'Especialidad: Oftalmología y Optometría' },
   { id: 'barberia', name: 'Barbería' },
   { id: 'grooming', name: 'Grooming Canino' },
   { id: 'equipo', name: 'Personal & Nómina' },
@@ -217,7 +224,7 @@ export default function AdminTenantsPage() {
       metadata: tenant.metadata,
     });
     const target = moduleId 
-      ? (moduleId === 'catalogo' ? '/inventario' : moduleId === 'config' ? '/configuracion' : `/${moduleId}`) 
+      ? (moduleId === 'catalogo' ? '/inventario' : moduleId === 'config' ? '/configuracion' : moduleId.startsWith('med_') ? '/clinica' : `/${moduleId}`) 
       : '/dashboard';
     toast({
       variant: 'success',
@@ -237,7 +244,11 @@ export default function AdminTenantsPage() {
     if (tenantActiveModules.includes(modId)) {
       setTenantActiveModules(tenantActiveModules.filter(m => m !== modId));
     } else {
-      setTenantActiveModules([...tenantActiveModules, modId]);
+      const next = [...tenantActiveModules, modId];
+      if (modId.startsWith('med_') && !next.includes('clinica')) {
+        next.push('clinica');
+      }
+      setTenantActiveModules(next);
     }
   };
 
@@ -254,9 +265,13 @@ export default function AdminTenantsPage() {
     setIsSavingModules(true);
     const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
 
+    const finalModules = tenantActiveModules.some(m => m.startsWith('med_')) && !tenantActiveModules.includes('clinica')
+      ? [...tenantActiveModules, 'clinica']
+      : tenantActiveModules;
+
     const result = await updateTenantAdminAction(
       selectedTenantForModules.id,
-      { active_modules: tenantActiveModules },
+      { active_modules: finalModules },
       activeActor
     );
 
@@ -268,7 +283,7 @@ export default function AdminTenantsPage() {
       });
       setTenants(prev => prev.map(t => 
         t.id === selectedTenantForModules.id 
-          ? { ...t, active_modules: tenantActiveModules } 
+          ? { ...t, active_modules: finalModules } 
           : t
       ));
       setSelectedTenantForModules(null);

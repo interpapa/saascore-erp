@@ -21,6 +21,7 @@ import {
   Settings,
   ShieldAlert,
   Stethoscope,
+  HeartPulse,
   Scissors,
   Dog
 } from 'lucide-react';
@@ -38,13 +39,13 @@ export function MobileDock() {
   const { currentTenant } = useERPStore();
 
   // Módulos activos en el ERP
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
       : null;
-  const enabledModules = tenantModules || fallbackModules;
+  const enabledModules: string[] = tenantModules || fallbackModules;
 
   // Preferencia del usuario o fallback inteligente (Dashboard siempre se fuerza luego)
   const rawDockPrefs = currentTenant?.metadata?.mobile_dock_modules as string[] | undefined;
@@ -62,6 +63,7 @@ export function MobileDock() {
     { id: 'barberia', label: 'Barbería', href: '/barberia', icon: Scissors },
     { id: 'grooming', label: 'Grooming', href: '/grooming', icon: Dog },
     { id: 'odontologia', label: 'Dental', href: '/odontologia', icon: Stethoscope },
+    { id: 'clinica', label: 'Clínica', href: '/clinica', icon: HeartPulse },
     { id: 'clientes', label: 'CRM', href: '/clientes', icon: Users },
     { id: 'whatsapp', label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
     { id: 'kanban', label: 'Kanban', href: '/kanban', icon: LayoutGrid },
@@ -83,7 +85,9 @@ export function MobileDock() {
     if (item.id === 'dashboard') return true;
     const isModuleActiveInDock = item.id === 'inventario'
       ? (enabledModules.includes('inventario') || enabledModules.includes('catalogo'))
-      : enabledModules.includes(item.id);
+      : item.id === 'clinica'
+        ? (enabledModules.includes('clinica') || enabledModules.some(m => m.startsWith('med_')))
+        : enabledModules.includes(item.id);
     const isItemInPreferences = item.id === 'inventario'
       ? (dockPreferences.includes('inventario') || dockPreferences.includes('catalogo'))
       : dockPreferences.includes(item.id);

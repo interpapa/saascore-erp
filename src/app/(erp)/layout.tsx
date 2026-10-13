@@ -26,6 +26,7 @@ const routeToModuleId: Record<string, string> = {
   '/franquicias': 'franquicias',
   '/integraciones': 'integraciones',
   '/odontologia': 'odontologia',
+  '/clinica': 'clinica',
   '/barberia': 'barberia',
   '/grooming': 'grooming',
   '/apps': 'apps'
@@ -44,19 +45,20 @@ export default function ERPLayout({
   const stopImpersonation = useERPStore(s => s.stopImpersonation);
 
   // Verificar si la ruta actual es un módulo inactivo
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'odontologia', 'barberia', 'grooming', 'config', 'admin'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'config', 'admin'];
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
       : null;
-  const enabledModules = tenantModules || fallbackModules;
+  const enabledModules: string[] = tenantModules || fallbackModules;
 
   // Buscamos si la ruta actual (o su prefijo) corresponde a un módulo del ERP
   const matchedRoute = Object.keys(routeToModuleId).find(route => pathname.startsWith(route));
   const targetModule = matchedRoute ? routeToModuleId[matchedRoute] : null;
   const isModuleDisabled = targetModule
     ? (!enabledModules.includes(targetModule) && 
+       !(targetModule === 'clinica' && enabledModules.some(m => m.startsWith('med_'))) &&
        !(targetModule === 'inventario' && enabledModules.includes('catalogo')) && 
        !(targetModule === 'catalogo' && enabledModules.includes('inventario')))
     : false;

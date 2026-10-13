@@ -20,10 +20,26 @@ export type ModuleId =
   | 'integraciones' 
   | 'estadisticas'
   | 'odontologia'
+  | 'clinica'
+  | 'med_general'
+  | 'med_pediatria'
+  | 'med_ginecologia'
+  | 'med_dermatologia'
+  | 'med_traumatologia'
+  | 'med_oftalmologia'
   | 'barberia'
   | 'grooming'
   | 'config' 
   | 'admin';
+
+export const MEDICAL_SPECIALTY_MODULE_IDS: ModuleId[] = [
+  'med_general',
+  'med_pediatria',
+  'med_ginecologia',
+  'med_dermatologia',
+  'med_traumatologia',
+  'med_oftalmologia',
+];
 
 export interface ModuleDefinition {
   id: ModuleId;
@@ -135,6 +151,55 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     description: 'Odontograma digital interactivo, ortodoncia con brackets, endodoncia, periodoncia y procesos Kanban dentales.',
     dependencies: ['clientes', 'calendario', 'kanban'],
   },
+  clinica: {
+    id: 'clinica',
+    name: 'Clínica Médica (Base)',
+    category: 'operaciones',
+    description: 'Historia clínica electrónica multipropósito, triaje de signos vitales, récipe médico y despacho a Caja POS.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
+  med_general: {
+    id: 'med_general',
+    name: 'Especialidad: Medicina General e Interna',
+    category: 'operaciones',
+    description: 'Consulta integral de medicina interna, evaluación por sistemas, riesgo cardiovascular y control metabólico.',
+    dependencies: ['clinica'],
+  },
+  med_pediatria: {
+    id: 'med_pediatria',
+    name: 'Especialidad: Pediatría y Puericultura',
+    category: 'operaciones',
+    description: 'Control de niño sano, percentiles antropométricos OMS, esquema de inmunización y dosificación pediátrica por kg.',
+    dependencies: ['clinica'],
+  },
+  med_ginecologia: {
+    id: 'med_ginecologia',
+    name: 'Especialidad: Ginecología y Obstetricia',
+    category: 'operaciones',
+    description: 'Fórmula obstétrica, calculadora gestacional por FUM, control prenatal, citología y colposcopia.',
+    dependencies: ['clinica'],
+  },
+  med_dermatologia: {
+    id: 'med_dermatologia',
+    name: 'Especialidad: Dermatología y Estética',
+    category: 'operaciones',
+    description: 'Fototipo de Fitzpatrick, regla dermatoscópica ABCDE, mapeo de lesiones cutáneas y protocolos dermoestéticos.',
+    dependencies: ['clinica'],
+  },
+  med_traumatologia: {
+    id: 'med_traumatologia',
+    name: 'Especialidad: Traumatología y Fisioterapia',
+    category: 'operaciones',
+    description: 'Goniometría articular (ROM), fuerza muscular de Daniels, maniobras ortopédicas y plan de rehabilitación física.',
+    dependencies: ['clinica'],
+  },
+  med_oftalmologia: {
+    id: 'med_oftalmologia',
+    name: 'Especialidad: Oftalmología y Optometría',
+    category: 'operaciones',
+    description: 'Agudeza visual Snellen, refracción subjetiva OD/OI (Esfera, Cilindro, Eje, Adición, DIP) y tonometría ocular.',
+    dependencies: ['clinica'],
+  },
   barberia: {
     id: 'barberia',
     name: 'Barbería & Estilo Masculino',
@@ -166,6 +231,13 @@ export const DEFAULT_ENABLED_MODULES: ModuleId[] = [
   'estadisticas',
   'franquicias',
   'odontologia',
+  'clinica',
+  'med_general',
+  'med_pediatria',
+  'med_ginecologia',
+  'med_dermatologia',
+  'med_traumatologia',
+  'med_oftalmologia',
   'barberia',
   'grooming',
 ];
@@ -180,9 +252,17 @@ export function isModuleActive(
   // Módulos core siempre activos
   if (MODULE_CATALOG[moduleId]?.isCore) return true;
   if (!activeModules || activeModules.length === 0) {
+    if (moduleId === 'clinica') {
+      return DEFAULT_ENABLED_MODULES.includes('clinica') ||
+        MEDICAL_SPECIALTY_MODULE_IDS.some(id => DEFAULT_ENABLED_MODULES.includes(id));
+    }
     return DEFAULT_ENABLED_MODULES.includes(moduleId) || 
       (moduleId === 'inventario' && DEFAULT_ENABLED_MODULES.includes('catalogo')) ||
       (moduleId === 'catalogo' && DEFAULT_ENABLED_MODULES.includes('inventario'));
+  }
+  if (moduleId === 'clinica') {
+    return activeModules.includes('clinica') ||
+      activeModules.some(m => m.startsWith('med_'));
   }
   return activeModules.includes(moduleId) || 
     (moduleId === 'inventario' && activeModules.includes('catalogo')) || 
@@ -247,6 +327,7 @@ export async function assertModuleEnabled(
     }
 
     const isTargetEnabled = enabledList.includes(moduleId) || 
+      (moduleId === 'clinica' && enabledList.some(m => m.startsWith('med_'))) ||
       (moduleId === 'inventario' && enabledList.includes('catalogo')) || 
       (moduleId === 'catalogo' && enabledList.includes('inventario'));
 

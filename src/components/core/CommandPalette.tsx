@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle, Stethoscope, Scissors, Dog } from 'lucide-react';
+import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle, Stethoscope, HeartPulse, Scissors, Dog } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface CommandItem {
@@ -25,7 +25,8 @@ const COMMAND_ITEMS: CommandItem[] = [
   { id: '10', title: 'Barbería — Estación de Silla y Turnos', category: 'módulo', href: '/barberia', icon: Scissors },
   { id: '11', title: 'Grooming — Peluquería y Spa Canino', category: 'módulo', href: '/grooming', icon: Dog },
   { id: '12', title: 'Odontología — Odontograma y Brackets', category: 'módulo', href: '/odontologia', icon: Stethoscope },
-  { id: '13', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
+  { id: '13', title: 'Clínica Médica — Historia Clínica y Especialidades', category: 'módulo', href: '/clinica', icon: HeartPulse },
+  { id: '14', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
 ];
 
 export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
