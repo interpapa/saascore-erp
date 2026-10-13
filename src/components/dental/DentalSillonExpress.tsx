@@ -37,6 +37,9 @@ interface DentalSillonExpressProps {
   ) => Promise<void>;
   onOpenCheckout?: () => void;
   isSaving?: boolean;
+  doctors?: Array<{ id: string; name: string; specialty?: string; commissionPercent?: number; avatar?: string }>;
+  selectedDoctorId?: string;
+  onSelectDoctorId?: (id: string) => void;
 }
 
 // Mapeo anatómico de cuadrantes FDI adultos
@@ -70,6 +73,9 @@ export function DentalSillonExpress({
   onSendToCashier,
   onOpenCheckout,
   isSaving = false,
+  doctors,
+  selectedDoctorId,
+  onSelectDoctorId,
 }: DentalSillonExpressProps) {
   // Cuadrante Activo
   const [activeQuadrant, setActiveQuadrant] = useState<'Q1' | 'Q2' | 'Q3' | 'Q4'>('Q1');
@@ -237,6 +243,37 @@ export function DentalSillonExpress({
 
   return (
     <div className="space-y-5 pb-24">
+      {/* 0. SELECCIÓN DE ODONTÓLOGO TRATANTE EN SILLÓN */}
+      {doctors && doctors.length > 0 && (
+        <div className="bg-card border border-border rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold text-sm">
+              👨‍⚕️
+            </div>
+            <div>
+              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                Odontólogo Tratante en Sillón
+              </span>
+              <span className="text-xs font-black text-foreground">
+                {doctors.find((d) => d.id === selectedDoctorId)?.name || 'Selecciona especialista'}
+              </span>
+            </div>
+          </div>
+          <select
+            value={selectedDoctorId || ''}
+            onChange={(e) => onSelectDoctorId?.(e.target.value)}
+            className="bg-slate-50 dark:bg-slate-900 border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground focus:ring-2 focus:ring-teal-500/20"
+          >
+            <option value="">Seleccionar odontólogo...</option>
+            {doctors.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.avatar || '🦷'} {doc.name} ({doc.specialty || 'General'})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* 1. SELECCIÓN DE CUADRANTE TÁCTIL */}
       <div className="bg-card border border-border rounded-2xl p-3 shadow-xs">
         <div className="flex items-center justify-between mb-2">
@@ -682,8 +719,8 @@ export function DentalSillonExpress({
       <div className="fixed bottom-16 md:bottom-4 left-0 right-0 z-30 px-4 max-w-lg mx-auto pointer-events-none">
         <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
           <div>
-            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-              {sessionItems.length === 0 ? 'Sin tratamientos hoy' : `${sessionItems.length} tratamiento(s)`}
+            <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate max-w-[200px]">
+              {doctors?.find((d) => d.id === selectedDoctorId) ? `👨‍⚕️ ${doctors.find((d) => d.id === selectedDoctorId)?.name}` : 'Odontólogo'} · {sessionItems.length === 0 ? 'Sin tratamientos hoy' : `${sessionItems.length} ítem(s)`}
             </div>
             <div className="text-lg font-black text-teal-400 font-mono">
               ${totalSessionUSD.toFixed(2)}

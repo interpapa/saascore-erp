@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X, ShoppingCart } from 'lucide-react';
+import { X, ShoppingCart, User, Stethoscope, ChevronRight, FileText } from 'lucide-react';
 
 interface PendingDentalOrdersModalProps {
   isOpen: boolean;
@@ -36,29 +36,40 @@ export function PendingDentalOrdersModal({
         className="absolute inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in"
         onClick={onClose}
       />
-      <div className="relative w-full max-w-lg bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+      <div className="relative w-full max-w-xl bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95 max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
-          <h3 className="text-base font-black text-foreground flex items-center gap-2">
-            <span className="text-lg">🩺</span>
-            <span>Consultas Médicas y Odontológicas por Cobrar</span>
-          </h3>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center font-bold">
+              <Stethoscope size={18} />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-foreground">
+                Consultas y Procedimientos por Cobrar
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Órdenes enviadas desde sillón odontológico o consultas médicas
+              </p>
+            </div>
+          </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-foreground"
+            className="p-1.5 text-slate-400 hover:text-foreground rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="space-y-3 overflow-y-auto pr-1 flex-1">
+        <div className="space-y-3.5 overflow-y-auto pr-1 flex-1">
           {filteredOrders.length === 0 ? (
-            <div className="text-center py-12 text-slate-400 space-y-1">
-              <p className="text-xs font-bold">
-                No hay consultas médicas u odontológicas pendientes de cobro
+            <div className="text-center py-12 text-slate-400 space-y-2">
+              <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/80 flex items-center justify-center mx-auto text-xl">
+                🦷
+              </div>
+              <p className="text-xs font-bold text-foreground">
+                No hay órdenes de consulta pendientes en caja
               </p>
-              <p className="text-[11px] text-slate-500">
-                Cuando los especialistas u odontólogos despachen una orden desde
-                consulta, aparecerá aquí automáticamente.
+              <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                Cuando los odontólogos o médicos despachen un paciente desde el sillón, aparecerá aquí con su desglose para ser cobrado.
               </p>
             </div>
           ) : (
@@ -69,102 +80,123 @@ export function PendingDentalOrdersModal({
               const specialtyBadge = isClinica
                 ? meta.specialty_name || 'Clínica Médica'
                 : meta.specialty_name || 'Odontología';
+              
               const doctorName =
                 meta.doctor_name ||
+                meta.doctor?.name ||
                 meta.created_by_doctor ||
-                (isClinica ? 'Médico Especialista' : 'Odontólogo');
+                (isClinica ? 'Médico Especialista' : 'Odontólogo Tratante');
+              
               const patientName =
                 order.entity?.name || meta.patient_name || meta.title || 'Paciente';
+
+              const totalUSD = Number(order.total_amount || 0);
+              const totalVES = totalUSD * exchangeRate;
 
               return (
                 <div
                   key={order.id}
-                  className={`p-4 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/40 space-y-2.5 transition-all ${
+                  className={`p-4 rounded-2xl border transition-all space-y-3 bg-card shadow-sm ${
                     isClinica
-                      ? 'hover:border-rose-500/50'
-                      : 'hover:border-teal-500/50'
+                      ? 'border-rose-500/30 hover:border-rose-500 bg-rose-500/5'
+                      : 'border-teal-500/30 hover:border-teal-500 bg-teal-500/5'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  {/* Fila 1: Odontólogo y Paciente destacados */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/60 pb-2.5">
                     <div className="space-y-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-xs font-black text-foreground">
-                          {patientName}
-                        </p>
+                      {/* Badge Odontólogo Tratante */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span
-                          className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                          className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-lg border ${
                             isClinica
                               ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
                               : 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20'
                           }`}
                         >
-                          {specialtyBadge}
+                          👨‍⚕️ {isClinica ? 'Médico' : 'Odontólogo'}: <strong>{doctorName}</strong>
+                        </span>
+
+                        <span className="text-[10px] font-mono text-slate-400 px-1">
+                          #{order.document_number}
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-400 font-mono">
-                        Orden: #{order.document_number} · Dr: {doctorName}
-                      </p>
+
+                      {/* Paciente */}
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-foreground pt-0.5">
+                        <User size={13} className="text-slate-400 shrink-0" />
+                        <span>Paciente:</span>
+                        <span className="text-sm font-black text-foreground">{patientName}</span>
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
+
+                    {/* Monto Total */}
+                    <div className="text-left sm:text-right shrink-0">
                       <span
-                        className={`text-sm font-black font-mono block ${
-                          isClinica
-                            ? 'text-rose-600 dark:text-rose-400'
-                            : 'text-teal-600 dark:text-teal-400'
+                        className={`text-base font-black font-mono block leading-none ${
+                          isClinica ? 'text-rose-600 dark:text-rose-400' : 'text-teal-600 dark:text-teal-400'
                         }`}
                       >
-                        ${Number(order.total_amount || 0).toFixed(2)}
+                        ${totalUSD.toFixed(2)} USD
                       </span>
-                      <span className="text-[10px] font-mono text-slate-400">
-                        Bs.{' '}
-                        {(
-                          Number(order.total_amount || 0) * exchangeRate
-                        ).toLocaleString('es-VE', { maximumFractionDigits: 0 })}
+                      <span className="text-[11px] font-mono text-slate-400">
+                        Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>
 
-                  {/* Procedimientos o conceptos incluidos */}
+                  {/* Fila 2: Procedimientos y costes detallados */}
                   {items.length > 0 && (
-                    <div className="space-y-1 py-1.5 border-t border-border/40 text-[11px]">
-                      {items.map((it: any, iIdx: number) => {
-                        const label =
-                          it.procedureName ||
-                          it.description ||
-                          it.name ||
-                          'Servicio Médico';
-                        const unitCost = Number(
-                          it.cost ?? it.price ?? it.amount ?? 0
-                        );
-                        return (
-                          <div
-                            key={iIdx}
-                            className="flex justify-between text-slate-600 dark:text-slate-300"
-                          >
-                            <span>
-                              • {label}
-                              {it.toothNum ? ` (Pieza ${it.toothNum})` : ''}
-                            </span>
-                            <span className="font-mono font-bold">
-                              ${unitCost.toFixed(2)}
-                            </span>
-                          </div>
-                        );
-                      })}
+                    <div className="space-y-1.5 py-1 text-xs">
+                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">
+                        Tratamientos Realizados en Sillón:
+                      </span>
+                      <div className="bg-slate-50/80 dark:bg-slate-900/80 rounded-xl p-2.5 border border-border/50 space-y-1.5">
+                        {items.map((it: any, iIdx: number) => {
+                          const label =
+                            it.procedureName ||
+                            it.description ||
+                            it.name ||
+                            'Procedimiento Odontológico';
+                          const unitCost = Number(
+                            it.cost ?? it.price ?? it.amount ?? 0
+                          );
+                          return (
+                            <div
+                              key={iIdx}
+                              className="flex items-center justify-between text-foreground text-xs"
+                            >
+                              <span className="flex items-center gap-1.5">
+                                <span className="text-teal-500 text-[10px]">•</span>
+                                <span className="font-semibold">{label}</span>
+                                {it.toothNum && (
+                                  <span className="text-[10px] font-mono px-1.5 py-0.2 bg-teal-500/10 text-teal-600 dark:text-teal-400 rounded-md">
+                                    Pieza {it.toothNum}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="font-mono font-bold text-foreground shrink-0">
+                                ${unitCost.toFixed(2)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
+                  {/* Fila 3: Botón de Cobro Inmediato */}
                   <button
                     type="button"
                     onClick={() => onLoadOrder(order)}
-                    className={`w-full py-2 text-white text-xs font-bold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 btn-haptic ${
+                    className={`w-full py-2.5 text-white text-xs font-black rounded-xl transition-all shadow-md flex items-center justify-center gap-2 btn-haptic ${
                       isClinica
-                        ? 'bg-rose-600 hover:bg-rose-700'
-                        : 'bg-teal-600 hover:bg-teal-700'
+                        ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/20'
+                        : 'bg-teal-600 hover:bg-teal-700 shadow-teal-600/20'
                     }`}
                   >
-                    <ShoppingCart size={14} />
-                    <span>Cargar al Ticket de Caja</span>
+                    <ShoppingCart size={15} />
+                    <span>Cargar al Ticket de Caja para Cobrar ➔</span>
                   </button>
                 </div>
               );
@@ -176,7 +208,7 @@ export function PendingDentalOrdersModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+            className="px-4 py-2 rounded-xl border border-border text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
           >
             Cerrar
           </button>

@@ -78,15 +78,42 @@ export function buildInvoiceJournalLines(invoice: Document): JournalEntryLine[] 
     });
   }
 
+  const isServiceSource = meta.source === 'odontologia' || meta.source === 'dental_consultation' || meta.source === 'clinica';
+  const revenueAccountCode = isServiceSource ? '4.1.02' : '4.1.01';
+  const revenueAccountName = isServiceSource ? 'Ingresos por Servicios' : 'Ventas de Productos';
+
   const lines: JournalEntryLine[] = [
     ...debitLines,
     {
-      account_code: '4.1.01',
-      account_name: 'Ventas de Productos',
+      account_code: revenueAccountCode,
+      account_name: revenueAccountName,
       debit: 0,
       credit: invoice.subtotal_amount
     }
   ];
+
+  // Si la venta tiene asociado un odontólogo o médico con comisión pactada, provisionar honorarios por pagar
+  const commissionPercent = Number(meta.doctor_commission_percent || meta.doctor?.commissionPercent || 0);
+  if (commissionPercent > 0 && invoice.subtotal_amount > 0) {
+    const honorarium = new Decimal(invoice.subtotal_amount).times(commissionPercent).dividedBy(100).toDecimalPlaces(2).toNumber();
+    if (honorarium > 0) {
+      const doctorLabel = meta.doctor_name || meta.doctor?.name ? ` (${meta.doctor_name || meta.doctor?.name})` : '';
+      lines.push(
+        {
+          account_code: '5.2.03',
+          account_name: `Honorarios Médicos y Odontológicos${doctorLabel}`,
+          debit: honorarium,
+          credit: 0
+        },
+        {
+          account_code: '2.1.01.02',
+          account_name: `Honorarios Médicos y Odontológicos por Pagar${doctorLabel}`,
+          debit: 0,
+          credit: honorarium
+        }
+      );
+    }
+  }
 
   if (invoice.tax_amount > 0) {
     lines.push({

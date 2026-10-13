@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   DollarSign, 
   Plus, 
@@ -10,17 +10,21 @@ import {
   X, 
   Edit3, 
   Save, 
-  Sparkles, 
   Sliders,
-  ShieldAlert,
-  Layers,
-  Sparkle
+  Trash2,
+  Search,
+  Eye,
+  EyeOff,
+  RotateCcw
 } from 'lucide-react';
 import { DentalProcedureDefinition, DENTAL_PROCEDURES_MASTER } from '@/lib/dental/proceduresCatalog';
 import { 
   quickUpdateItemPriceAction, 
   quickCreateModuleServiceAction, 
-  saveModulePricingConfigAction 
+  saveModulePricingConfigAction,
+  quickUpdateModuleProcedureAction,
+  toggleModuleProcedureStatusAction,
+  deleteModuleProcedureAction
 } from '@/app/actions/modulePricing';
 import type { DentalPricingConfig } from '@/lib/modulePricingDefaults';
 import { ActionActor } from '@/app/actions/entities';
@@ -43,11 +47,15 @@ export function DentalPricingTab({
 }: DentalPricingTabProps) {
   const { toast } = useToast();
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
+
+  // Edición rápida inline de precio
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editingPrice, setEditingPrice] = useState<number>(0);
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
 
-  // Parámetros clínicos
+  // Parámetros clínicos globales
   const [config, setConfig] = useState<DentalPricingConfig>(pricingConfig);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
 
@@ -56,7 +64,21 @@ export function DentalPricingTab({
   const [newProcName, setNewProcName] = useState('');
   const [newProcPrice, setNewProcPrice] = useState<string>('40');
   const [newProcCategory, setNewProcCategory] = useState<string>('ortodoncia');
+  const [newProcDuration, setNewProcDuration] = useState<number>(45);
+  const [newProcDesc, setNewProcDesc] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  // Modal edición completa de procedimiento
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingProc, setEditingProc] = useState<{
+    id: string;
+    name: string;
+    priceUSD: number;
+    category: string;
+    durationMin: number;
+    description: string;
+  } | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const categories = [
     { id: 'all', label: 'Todos' },
@@ -69,18 +91,38 @@ export function DentalPricingTab({
     { id: 'preventiva', label: 'Preventiva / Limpieza' }
   ];
 
-  // Procedimientos filtrados
+  // Procedimientos disponibles
   const displayList = procedures.length > 0 ? procedures : DENTAL_PROCEDURES_MASTER;
 
-  const filteredProcedures = displayList.filter(p => {
-    if (activeCategory === 'all') return true;
-    const cat = (p.category || '').toLowerCase();
-    return cat.includes(activeCategory);
-  });
+  const filteredProcedures = useMemo(() => {
+    return displayList.filter(p => {
+      // Filtro de activos / inactivos
+      const isProcActive = p.is_active !== false;
+      if (!showInactive && !isProcActive) return false;
+      if (showInactive && isProcActive) return false;
+
+      // Filtro por categoría
+      if (activeCategory !== 'all') {
+        const cat = (p.category || p.categoryLabel || '').toLowerCase();
+        if (!cat.includes(activeCategory)) return false;
+      }
+
+      // Filtro por texto de búsqueda
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = (p.name || '').toLowerCase().includes(query);
+        const matchesCat = (p.category || p.categoryLabel || '').toLowerCase().includes(query);
+        const matchesDesc = (p.description || '').toLowerCase().includes(query);
+        if (!matchesName && !matchesCat && !matchesDesc) return false;
+      }
+
+      return true;
+    });
+  }, [displayList, showInactive, activeCategory, searchQuery]);
 
   const handleStartEditPrice = (proc: any) => {
     setEditingItemId(proc.id);
-    setEditingPrice(Number(proc.base_price || proc.defaultCostUSD || proc.price || 0));
+    setEditingPrice(Number(proc.base_price || proc.defaultPriceUSD || proc.defaultCostUSD || proc.price || 0));
   };
 
   const handleSavePriceInline = async (proc: any) => {
@@ -118,6 +160,88 @@ export function DentalPricingTab({
       toast({ variant: 'error', title: 'Error', description: err.message });
     } finally {
       setIsUpdatingPrice(false);
+    }
+  };
+
+  const handleOpenEditModal = (proc: any) => {
+    setEditingProc({
+      id: proc.id,
+      name: proc.name,
+      priceUSD: Number(proc.base_price || proc.defaultPriceUSD || proc.defaultCostUSD || proc.price || 0),
+      category: proc.category || 'operatoria',
+      durationMin: Number(proc.estimatedDurationMin || proc.metadata?.duration_minutes || 45),
+      description: proc.description || '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveFullEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProc || !editingProc.name.trim()) return;
+
+    setIsSavingEdit(true);
+    try {
+      const res = await quickUpdateModuleProcedureAction(
+        tenantId,
+        editingProc.id,
+        {
+          name: editingProc.name.trim(),
+          priceUSD: editingProc.priceUSD,
+          category: editingProc.category,
+          description: editingProc.description.trim(),
+          durationMin: editingProc.durationMin,
+          moduleType: 'odontologia',
+        },
+        actor
+      );
+
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Procedimiento actualizado',
+          description: `Se han guardado los cambios para "${editingProc.name}".`,
+        });
+        setIsEditModalOpen(false);
+        setEditingProc(null);
+        onRefresh();
+      } else {
+        toast({ variant: 'error', title: 'Error al actualizar', description: res.error });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error', description: err.message });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleToggleProcedureStatus = async (proc: any, newStatus: boolean) => {
+    try {
+      const res = await toggleModuleProcedureStatusAction(
+        tenantId,
+        {
+          id: proc.id,
+          name: proc.name,
+          category: proc.category,
+          base_price: Number(proc.base_price || proc.defaultPriceUSD || 0),
+        },
+        newStatus,
+        actor
+      );
+
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: newStatus ? 'Procedimiento Activado' : 'Procedimiento Quitado / Oculto',
+          description: newStatus 
+            ? `"${proc.name}" vuelve a estar disponible en el baremo y sillón.` 
+            : `"${proc.name}" ha sido quitado del baremo clínico y no aparecerá en caja ni en sillón.`,
+        });
+        onRefresh();
+      } else {
+        toast({ variant: 'error', title: 'Error al cambiar estado', description: res.error });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error', description: err.message });
     }
   };
 
@@ -163,6 +287,8 @@ export function DentalPricingTab({
           name: newProcName.trim(),
           priceUSD: Number(newProcPrice) || 40,
           category: `Odontología - ${newProcCategory}`,
+          description: newProcDesc.trim() || undefined,
+          durationMin: Number(newProcDuration) || 45,
           moduleType: 'odontologia'
         },
         actor
@@ -173,6 +299,8 @@ export function DentalPricingTab({
         setIsNewModalOpen(false);
         setNewProcName('');
         setNewProcPrice('40');
+        setNewProcDesc('');
+        setNewProcDuration(45);
         onRefresh();
       } else {
         toast({ variant: 'error', title: 'Error al crear', description: res.error });
@@ -187,23 +315,23 @@ export function DentalPricingTab({
   return (
     <div className="space-y-6">
       {/* 1. Aranceles Base de Especialidades Odontológicas */}
-      <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+      <div className="bg-card border border-border p-5 rounded-3xl shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-indigo-500" />
+            <Sliders className="w-5 h-5 text-teal-500" />
             <div>
-              <h3 className="font-black text-slate-900 dark:text-white">
+              <h3 className="font-black text-foreground">
                 Aranceles Base de Especialidades Odontológicas
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Tarifas por defecto para mensualidades de ortodoncia, brackets caídos y tratamientos endodónticos.
+              <p className="text-xs text-slate-500">
+                Tarifas por defecto para mensualidades de ortodoncia, reposición de brackets y tratamientos endodónticos.
               </p>
             </div>
           </div>
           <button
             onClick={handleSaveGlobalConfig}
             disabled={isSavingConfig}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/20 transition-all self-end sm:self-auto"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs shadow-md shadow-teal-600/20 transition-all self-end sm:self-auto"
           >
             <Save className="w-3.5 h-3.5" />
             {isSavingConfig ? 'Guardando...' : 'Guardar Aranceles Base'}
@@ -212,77 +340,77 @@ export function DentalPricingTab({
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {/* Mensualidad Ortodoncia */}
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Ortodoncia Mensual</span>
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-border">
+            <span className="text-xs font-bold text-foreground block">Ortodoncia Mensual</span>
             <span className="text-[10px] text-slate-400 block mb-2">Control & cambio de arco</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-bold text-indigo-600">$</span>
+              <span className="text-sm font-bold text-teal-600">$</span>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={config.orthoMonthlyFeeUSD}
                 onChange={(e) => setConfig({ ...config, orthoMonthlyFeeUSD: Number(e.target.value) })}
-                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-border rounded-lg text-foreground"
               />
             </div>
           </div>
 
           {/* Reposición Bracket Caído */}
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Bracket Caído / Roto</span>
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-border">
+            <span className="text-xs font-bold text-foreground block">Bracket Caído / Roto</span>
             <span className="text-[10px] text-slate-400 block mb-2">Recargo por pieza</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-bold text-indigo-600">$</span>
+              <span className="text-sm font-bold text-teal-600">$</span>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={config.bracketReplacementFeeUSD}
                 onChange={(e) => setConfig({ ...config, bracketReplacementFeeUSD: Number(e.target.value) })}
-                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-border rounded-lg text-foreground"
               />
             </div>
           </div>
 
           {/* Endodoncia por conducto */}
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Endodoncia / Conducto</span>
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-border">
+            <span className="text-xs font-bold text-foreground block">Endodoncia / Conducto</span>
             <span className="text-[10px] text-slate-400 block mb-2">Base instrumentación</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-bold text-indigo-600">$</span>
+              <span className="text-sm font-bold text-teal-600">$</span>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={config.endoCanalBaseUSD}
                 onChange={(e) => setConfig({ ...config, endoCanalBaseUSD: Number(e.target.value) })}
-                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-border rounded-lg text-foreground"
               />
             </div>
           </div>
 
           {/* Periodoncia Tartrectomía */}
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">Limpieza / Raspaje</span>
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-border">
+            <span className="text-xs font-bold text-foreground block">Limpieza / Raspaje</span>
             <span className="text-[10px] text-slate-400 block mb-2">Profilaxis ultrasonido</span>
             <div className="flex items-center gap-1">
-              <span className="text-sm font-bold text-indigo-600">$</span>
+              <span className="text-sm font-bold text-teal-600">$</span>
               <input
                 type="number"
                 min="0"
                 step="1"
                 value={config.perioCleaningBaseUSD}
                 onChange={(e) => setConfig({ ...config, perioCleaningBaseUSD: Number(e.target.value) })}
-                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-border rounded-lg text-foreground"
               />
             </div>
           </div>
 
           {/* Honorario Promedio Doctor */}
-          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200/60 dark:border-slate-800/60">
-            <span className="text-xs font-bold text-slate-700 dark:text-slate-300 block">% Honorario Médico</span>
-            <span className="text-[10px] text-slate-400 block mb-2">Liquidación por defecto</span>
+          <div className="p-3.5 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-border">
+            <span className="text-xs font-bold text-foreground block">% Honorario Médico</span>
+            <span className="text-[10px] text-slate-400 block mb-2">Liquidación sugerida</span>
             <div className="flex items-center gap-1">
               <input
                 type="number"
@@ -290,136 +418,223 @@ export function DentalPricingTab({
                 max="90"
                 value={config.defaultDoctorCommissionPercent}
                 onChange={(e) => setConfig({ ...config, defaultDoctorCommissionPercent: Number(e.target.value) })}
-                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-white"
+                className="w-full px-2 py-1 text-sm font-black bg-white dark:bg-slate-900 border border-border rounded-lg text-foreground"
               />
-              <span className="text-xs font-bold text-indigo-600">%</span>
+              <span className="text-xs font-bold text-teal-600">%</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Cabecera de Catálogo & Filtros */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+      {/* Cabecera de Catálogo, Filtros & Búsqueda */}
+      <div className="space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Barra de Búsqueda */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              placeholder="Buscar procedimiento por nombre o categoría..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3.5 py-2 rounded-2xl border border-border bg-card text-foreground text-xs focus:border-teal-500 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto">
+            {/* Toggle Activos / Inactivos */}
+            <button
+              onClick={() => setShowInactive(!showInactive)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-colors ${
+                showInactive
+                  ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                  : 'bg-card text-slate-500 border-border hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+            >
+              {showInactive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+              <span>{showInactive ? 'Viendo Procedimientos Quitados' : 'Ver Procedimientos Quitados'}</span>
+            </button>
+
+            {/* Botón Nuevo Procedimiento */}
+            <button
+              onClick={() => setIsNewModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs shadow-md shadow-teal-600/20 transition-all"
+            >
+              <Plus className="w-4 h-4" />
+              <span>+ Nuevo Procedimiento</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Categorías */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {categories.map((cat) => (
             <button
               key={cat.id}
               onClick={() => setActiveCategory(cat.id)}
               className={`px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-colors ${
                 activeCategory === cat.id
-                  ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'bg-card text-slate-600 dark:text-slate-300 border border-border hover:bg-slate-50 dark:hover:bg-slate-800'
               }`}
             >
               {cat.label}
             </button>
           ))}
         </div>
-
-        <button
-          onClick={() => setIsNewModalOpen(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/20 transition-all self-end sm:self-auto"
-        >
-          <Plus className="w-4 h-4" />
-          + Nuevo Procedimiento
-        </button>
       </div>
 
       {/* Grid de Procedimientos Odontológicos con Edición de Arancel */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredProcedures.map((proc: any) => {
-          const isEditing = editingItemId === proc.id;
-          const currentPrice = Number(proc.base_price || proc.defaultCostUSD || proc.price || 0);
+        {filteredProcedures.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-slate-400 bg-card border border-border rounded-3xl p-8">
+            <Stethoscope className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-700 mb-2" />
+            <p className="text-sm font-bold text-foreground">No se encontraron procedimientos</p>
+            <p className="text-xs text-slate-500 mt-1">
+              {showInactive 
+                ? 'No hay ningún procedimiento quitado u oculto en esta categoría.' 
+                : 'Intenta cambiar el término de búsqueda o crea uno nuevo con el botón superior.'}
+            </p>
+          </div>
+        ) : (
+          filteredProcedures.map((proc: any) => {
+            const isEditing = editingItemId === proc.id;
+            const currentPrice = Number(proc.base_price || proc.defaultPriceUSD || proc.defaultCostUSD || proc.price || 0);
+            const isProcActive = proc.is_active !== false;
 
-          return (
-            <div
-              key={proc.id}
-              className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-700/60 transition-all shadow-sm flex flex-col justify-between"
-            >
-              <div>
-                <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider block">
-                  {proc.category || 'Odontología'}
-                </span>
-
-                <h4 className="font-bold text-sm text-slate-900 dark:text-white mt-1 leading-snug">
-                  {proc.name}
-                </h4>
-
-                {proc.description && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
-                    {proc.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Arancel y Edición Inline */}
-              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            return (
+              <div
+                key={proc.id}
+                className={`p-4 bg-card rounded-2xl border transition-all shadow-sm flex flex-col justify-between ${
+                  isProcActive 
+                    ? 'border-border hover:border-teal-500/50' 
+                    : 'border-dashed border-rose-500/40 opacity-70 bg-rose-500/5'
+                }`}
+              >
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
-                    Arancel al Paciente
-                  </span>
-                  {isEditing ? (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-sm font-bold text-emerald-600">$</span>
-                      <input
-                        type="number"
-                        step="1"
-                        min="0"
-                        value={editingPrice}
-                        onChange={(e) => setEditingPrice(Number(e.target.value))}
-                        className="w-20 px-2 py-1 text-sm font-bold bg-white dark:bg-slate-800 border border-emerald-500 rounded-lg text-slate-900 dark:text-white"
-                        autoFocus
-                      />
-                      <button
-                        onClick={() => handleSavePriceInline(proc)}
-                        disabled={isUpdatingPrice}
-                        className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
-                        title="Guardar arancel"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setEditingItemId(null)}
-                        className="p-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"
-                        title="Cancelar"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-lg font-black text-slate-900 dark:text-white">
-                      ${currentPrice.toFixed(2)}
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider">
+                      {proc.categoryLabel || proc.category || 'Odontología'}
                     </span>
+                    {proc.estimatedDurationMin && (
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
+                        <Clock className="w-3 h-3" />
+                        {proc.estimatedDurationMin}m
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className="font-bold text-sm text-foreground leading-snug">
+                    {proc.name}
+                  </h4>
+
+                  {proc.description && (
+                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                      {proc.description}
+                    </p>
                   )}
                 </div>
 
-                {!isEditing && (
-                  <button
-                    onClick={() => handleStartEditPrice(proc)}
-                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500 rounded-xl transition-colors"
-                    title="Editar arancel"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
-                )}
+                {/* Arancel, Edición Inline y Acciones */}
+                <div className="mt-4 pt-3 border-t border-border flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
+                      Arancel al Paciente
+                    </span>
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="text-sm font-bold text-emerald-600">$</span>
+                        <input
+                          type="number"
+                          step="1"
+                          min="0"
+                          value={editingPrice}
+                          onChange={(e) => setEditingPrice(Number(e.target.value))}
+                          className="w-20 px-2 py-1 text-sm font-bold bg-white dark:bg-slate-800 border border-emerald-500 rounded-lg text-foreground"
+                          autoFocus
+                        />
+                        <button
+                          onClick={() => handleSavePriceInline(proc)}
+                          disabled={isUpdatingPrice}
+                          className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+                          title="Guardar arancel"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setEditingItemId(null)}
+                          className="p-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg"
+                          title="Cancelar"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-lg font-black text-foreground">
+                        ${currentPrice.toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+
+                  {!isEditing && (
+                    <div className="flex items-center gap-1">
+                      {/* Botón Edición Rápida Precio */}
+                      <button
+                        onClick={() => handleStartEditPrice(proc)}
+                        className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-teal-600 rounded-xl transition-colors"
+                        title="Editar precio rápido"
+                      >
+                        <DollarSign className="w-4 h-4" />
+                      </button>
+
+                      {/* Botón Edición Completa */}
+                      <button
+                        onClick={() => handleOpenEditModal(proc)}
+                        className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-teal-600 rounded-xl transition-colors"
+                        title="Editar datos del procedimiento"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+
+                      {/* Botón Quitar / Restaurar */}
+                      {isProcActive ? (
+                        <button
+                          onClick={() => handleToggleProcedureStatus(proc, false)}
+                          className="p-1.5 hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 rounded-xl transition-colors"
+                          title="Quitar / Desactivar este procedimiento del baremo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleProcedureStatus(proc, true)}
+                          className="p-1.5 bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 rounded-xl transition-colors"
+                          title="Reactivar procedimiento"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Modal Nuevo Procedimiento */}
       {isNewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
-                <Stethoscope className="w-5 h-5 text-indigo-500" />
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card rounded-3xl p-6 border border-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-teal-500" />
                 Nuevo Procedimiento Odontológico
               </h3>
               <button
                 onClick={() => setIsNewModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="p-1.5 text-slate-400 hover:text-foreground rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -427,7 +642,7 @@ export function DentalPricingTab({
 
             <form onSubmit={handleCreateProcedure} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                <label className="block text-xs font-bold text-foreground uppercase mb-1">
                   Nombre del Tratamiento *
                 </label>
                 <input
@@ -436,33 +651,49 @@ export function DentalPricingTab({
                   placeholder="ej. Férula Miorrelajante Michigan / Plano de Mordida"
                   value={newProcName}
                   onChange={(e) => setNewProcName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                  Arancel Base ($ USD) *
-                </label>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  required
-                  value={newProcPrice}
-                  onChange={(e) => setNewProcPrice(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-indigo-500 focus:outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                    Arancel ($ USD) *
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    value={newProcPrice}
+                    onChange={(e) => setNewProcPrice(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                    Duración (Minutos)
+                  </label>
+                  <input
+                    type="number"
+                    step="5"
+                    min="10"
+                    value={newProcDuration}
+                    onChange={(e) => setNewProcDuration(Number(e.target.value))}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
+                <label className="block text-xs font-bold text-foreground uppercase mb-1">
                   Especialidad / Categoría
                 </label>
                 <select
                   value={newProcCategory}
                   onChange={(e) => setNewProcCategory(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white text-sm focus:border-indigo-500 focus:outline-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
                 >
                   <option value="ortodoncia">Ortodoncia & Brackets</option>
                   <option value="endodoncia">Endodoncia Rotatoria</option>
@@ -474,21 +705,149 @@ export function DentalPricingTab({
                 </select>
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+              <div>
+                <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                  Descripción Clínica (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Detalles sobre instrumental, insumos o recomendaciones..."
+                  value={newProcDesc}
+                  onChange={(e) => setNewProcDesc(e.target.value)}
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-xs focus:border-teal-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-border">
                 <button
                   type="button"
                   onClick={() => setIsNewModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl"
+                  className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-foreground rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/20 transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs shadow-md shadow-teal-600/20 transition-all"
                 >
                   <Save className="w-4 h-4" />
                   {isCreating ? 'Guardando...' : 'Crear Procedimiento'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edición Completa de Procedimiento */}
+      {isEditModalOpen && editingProc && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-card rounded-3xl p-6 border border-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-teal-500" />
+                Editar Procedimiento Odontológico
+              </h3>
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-foreground rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveFullEdit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                  Nombre del Tratamiento *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingProc.name}
+                  onChange={(e) => setEditingProc({ ...editingProc, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                    Arancel ($ USD) *
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    required
+                    value={editingProc.priceUSD}
+                    onChange={(e) => setEditingProc({ ...editingProc, priceUSD: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                    Duración (Minutos)
+                  </label>
+                  <input
+                    type="number"
+                    step="5"
+                    min="10"
+                    value={editingProc.durationMin}
+                    onChange={(e) => setEditingProc({ ...editingProc, durationMin: Number(e.target.value) })}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                  Especialidad / Categoría
+                </label>
+                <select
+                  value={editingProc.category}
+                  onChange={(e) => setEditingProc({ ...editingProc, category: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-sm focus:border-teal-500 focus:outline-none"
+                >
+                  <option value="ortodoncia">Ortodoncia & Brackets</option>
+                  <option value="endodoncia">Endodoncia Rotatoria</option>
+                  <option value="periodoncia">Periodoncia & Enjuagues</option>
+                  <option value="operatoria">Operatoria / Estética</option>
+                  <option value="cirugia">Cirugía Oral & Maxilofacial</option>
+                  <option value="protesis">Prótesis & Oclusión</option>
+                  <option value="preventiva">Odontología Preventiva</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-foreground uppercase mb-1">
+                  Descripción Clínica
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingProc.description}
+                  onChange={(e) => setEditingProc({ ...editingProc, description: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-slate-50 dark:bg-slate-950 text-foreground text-xs focus:border-teal-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-2 border-t border-border">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-foreground rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingEdit}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl font-bold text-xs shadow-md shadow-teal-600/20 transition-all"
+                >
+                  <Save className="w-4 h-4" />
+                  {isSavingEdit ? 'Guardando...' : 'Guardar Cambios'}
                 </button>
               </div>
             </form>

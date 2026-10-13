@@ -36,7 +36,8 @@ export async function processSecureCheckout(
   idempotencyKey?: string,
   chargeTaxes: boolean = false,
   paymentBreakdown?: Array<{ method: 'cash' | 'card' | 'transfer' | 'credit'; amount: number }>,
-  appointmentId?: string
+  appointmentId?: string,
+  extraMetadata?: Record<string, any>
 ) {
   try {
     // Rate Limiting Guard
@@ -349,6 +350,7 @@ export async function processSecureCheckout(
           currency_local: exchangeData.currency,
           currency_symbol: exchangeData.symbol,
           total_local: totalLocal,
+          ...(extraMetadata || {}),
           cart_lines: documentLines.map((line: any) => ({
             item_id: line.item_id ?? line.itemId ?? null,
             description: line.description,

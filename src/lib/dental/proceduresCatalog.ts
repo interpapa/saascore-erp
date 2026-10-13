@@ -311,38 +311,50 @@ export const DENTAL_PROCEDURES_MASTER: DentalProcedureDefinition[] = [
  * en el inventario/catálogo del tenant para ofrecer precios personalizados sin perder cobertura.
  */
 export function mergeTenantDentalServices(
-  tenantItems: Array<{ id: string; name: string; base_price?: number; type?: string; metadata?: any }>
+  tenantItems: Array<{ id: string; name: string; base_price?: number; type?: string; is_active?: boolean; metadata?: any }>
 ): DentalProcedureDefinition[] {
   const customProcedures: DentalProcedureDefinition[] = [];
+  const disabledMasterNames = new Set<string>();
 
-  // 1. Identificar servicios clínicos creados por la empresa
+  // 1. Identificar servicios clínicos creados o modificados por la empresa
   for (const item of tenantItems || []) {
     if (item.type === 'service') {
+      // Si el ítem fue desactivado o quitado por la clínica, se omite y se registra para ocultar del catálogo base
+      if (item.is_active === false) {
+        disabledMasterNames.add(item.name.toLowerCase().trim());
+        continue;
+      }
+
       const existingMatch = DENTAL_PROCEDURES_MASTER.find(
-        p => p.name.toLowerCase() === item.name.toLowerCase()
+        p => p.name.toLowerCase().trim() === item.name.toLowerCase().trim()
       );
 
       if (existingMatch) {
-        // Sobrescribir precio con el precio configurado por la empresa
+        // Sobrescribir precio, categoría y duración configurada por la empresa
         customProcedures.push({
           ...existingMatch,
           id: item.id,
-          defaultPriceUSD: Number(item.base_price || existingMatch.defaultPriceUSD),
+          name: item.name,
+          category: (item.metadata?.category || existingMatch.category) as any,
+          categoryLabel: item.metadata?.categoryLabel || existingMatch.categoryLabel,
+          defaultPriceUSD: Number(item.base_price !== undefined ? item.base_price : existingMatch.defaultPriceUSD),
+          estimatedDurationMin: Number(item.metadata?.duration_minutes || existingMatch.estimatedDurationMin),
         });
       } else {
-        // Nuevo servicio no contemplado en el catálogo base
+        // Nuevo servicio no contemplado en el catálogo base (creado por la clínica)
+        const cat = item.metadata?.category || 'restauradora';
         customProcedures.push({
           id: item.id,
           code: `SERV-${item.id.slice(0, 4).toUpperCase()}`,
           name: item.name,
-          category: 'restauradora',
-          categoryLabel: 'Servicio Clínico',
+          category: cat as any,
+          categoryLabel: item.metadata?.categoryLabel || cat,
           defaultPriceUSD: Number(item.base_price || 40),
           estimatedDurationMin: Number(item.metadata?.duration_minutes || 45),
-          sessionsRequired: 1,
-          applicableTo: 'tooth',
-          color: '#0d9488',
-          stages: [
+          sessionsRequired: Number(item.metadata?.sessionsRequired || 1),
+          applicableTo: (item.metadata?.applicableTo || 'tooth') as any,
+          color: item.metadata?.color || '#0d9488',
+          stages: Array.isArray(item.metadata?.stages) ? item.metadata.stages : [
             { id: `stg-custom-1`, title: `Ejecución de ${item.name}`, order: 1, sessionNumber: 1 }
           ]
         });
@@ -350,9 +362,12 @@ export function mergeTenantDentalServices(
     }
   }
 
-  // 2. Agregar los procedimientos maestros que la empresa no haya creado aún
+  // 2. Agregar los procedimientos maestros que la empresa no haya desactivado ni creado aún
   for (const master of DENTAL_PROCEDURES_MASTER) {
-    const alreadyIncluded = customProcedures.some(p => p.name.toLowerCase() === master.name.toLowerCase());
+    if (disabledMasterNames.has(master.name.toLowerCase().trim())) {
+      continue;
+    }
+    const alreadyIncluded = customProcedures.some(p => p.name.toLowerCase().trim() === master.name.toLowerCase().trim());
     if (!alreadyIncluded) {
       customProcedures.push(master);
     }

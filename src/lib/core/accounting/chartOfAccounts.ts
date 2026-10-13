@@ -36,6 +36,7 @@ export const DEFAULT_CHART_OF_ACCOUNTS: AccountNode[] = [
   { code: '2.1', name: 'Pasivo Corriente', type: 'liability', level: 2, parentCode: '2', isHeader: true },
   { code: '2.1.01', name: 'Cuentas por Pagar Comerciales', type: 'liability', level: 3, parentCode: '2.1', isHeader: true },
   { code: '2.1.01.01', name: 'Proveedores Nacionales (AP)', type: 'liability', level: 4, parentCode: '2.1.01', isHeader: false },
+  { code: '2.1.01.02', name: 'Honorarios Médicos y Odontológicos por Pagar', type: 'liability', level: 4, parentCode: '2.1.01', isHeader: false },
   { code: '2.1.02', name: 'Obligaciones Fiscales e Impuestos', type: 'liability', level: 3, parentCode: '2.1', isHeader: true },
   { code: '2.1.02.01', name: 'Débito Fiscal IVA por Pagar', type: 'liability', level: 4, parentCode: '2.1.02', isHeader: false },
   { code: '2.1.02.02', name: 'Impuestos y Recargos Adicionales por Enterar', type: 'liability', level: 4, parentCode: '2.1.02', isHeader: false },
@@ -59,4 +60,5 @@ export const DEFAULT_CHART_OF_ACCOUNTS: AccountNode[] = [
   { code: '5.2', name: 'Gastos Operativos y Administrativos', type: 'expense', level: 2, parentCode: '5', isHeader: true },
   { code: '5.2.01', name: 'Sueldos y Salarios', type: 'expense', level: 3, parentCode: '5.2', isHeader: false },
   { code: '5.2.02', name: 'Pérdida por Diferencia en Cambio', type: 'expense', level: 3, parentCode: '5.2', isHeader: false },
+  { code: '5.2.03', name: 'Honorarios Médicos y Odontológicos', type: 'expense', level: 3, parentCode: '5.2', isHeader: false },
 ];

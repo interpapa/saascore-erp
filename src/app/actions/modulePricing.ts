@@ -234,3 +234,170 @@ export async function quickCreateModuleServiceAction(
     return { success: false, error: (err as Error).message };
   }
 }
+
+/**
+ * Actualiza nombre, arancel, categoría o duración de un procedimiento existente
+ */
+export async function quickUpdateModuleProcedureAction(
+  tenantId: string,
+  procedureId: string,
+  data: {
+    name: string;
+    priceUSD: number;
+    category?: string;
+    description?: string;
+    durationMin?: number;
+    moduleType?: 'odontologia' | 'barberia' | 'grooming' | 'clinica';
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string; updatedItemId?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!data.name || !data.name.trim()) {
+      return { success: false, error: 'El nombre del procedimiento es requerido.' };
+    }
+    if (data.priceUSD < 0) {
+      return { success: false, error: 'El precio no puede ser negativo.' };
+    }
+
+    const isRealUUID = isValidUUID(procedureId) && !isTemporaryId(procedureId);
+
+    if (isRealUUID) {
+      const { error } = await supabaseAdmin
+        .from('items')
+        .update({
+          name: data.name.trim(),
+          base_price: data.priceUSD,
+          category: data.category || 'Odontología',
+          description: data.description || null,
+          metadata: {
+            vertical: data.moduleType || 'odontologia',
+            category: data.category,
+            duration_minutes: data.durationMin || 45,
+          },
+        })
+        .eq('id', procedureId)
+        .eq('tenant_id', tenantId);
+
+      if (error) return { success: false, error: error.message };
+      return { success: true, updatedItemId: procedureId };
+    }
+
+    // Si viene del catálogo maestro en memoria, creamos el registro en items para independizarlo
+    const { data: inserted, error: insertErr } = await supabaseAdmin
+      .from('items')
+      .insert({
+        tenant_id: tenantId,
+        type: 'service',
+        name: data.name.trim(),
+        category: data.category || 'Odontología',
+        description: data.description || null,
+        base_price: data.priceUSD,
+        cost: 0,
+        is_active: true,
+        metadata: {
+          vertical: data.moduleType || 'odontologia',
+          category: data.category,
+          duration_minutes: data.durationMin || 45,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (insertErr) return { success: false, error: insertErr.message };
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'module_procedure.customized',
+      target_type: 'item',
+      target_id: inserted.id,
+      metadata: { name: data.name, price: data.priceUSD },
+    });
+
+    return { success: true, updatedItemId: inserted.id };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Activa o desactiva (oculta/quita) un procedimiento para que la clínica no dependa de programadores
+ */
+export async function toggleModuleProcedureStatusAction(
+  tenantId: string,
+  procedure: { id: string; name: string; category?: string; base_price?: number },
+  isActive: boolean,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    const isRealUUID = isValidUUID(procedure.id) && !isTemporaryId(procedure.id);
+
+    if (isRealUUID) {
+      const { error } = await supabaseAdmin
+        .from('items')
+        .update({ is_active: isActive })
+        .eq('id', procedure.id)
+        .eq('tenant_id', tenantId);
+
+      if (error) return { success: false, error: error.message };
+    } else {
+      // Si era del catálogo maestro en memoria, creamos el registro con is_active = isActive
+      const { error: insertErr } = await supabaseAdmin
+        .from('items')
+        .insert({
+          tenant_id: tenantId,
+          type: 'service',
+          name: procedure.name,
+          category: procedure.category || 'Odontología',
+          base_price: Number(procedure.base_price || 0),
+          cost: 0,
+          is_active: isActive,
+          metadata: {
+            vertical: 'odontologia',
+            category: procedure.category,
+            source: 'master_catalog_override',
+          },
+        });
+
+      if (insertErr) return { success: false, error: insertErr.message };
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: isActive ? 'module_procedure.activated' : 'module_procedure.deactivated',
+      target_type: 'item',
+      target_id: procedure.id,
+      metadata: { name: procedure.name, isActive },
+    });
+
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Elimina o desactiva permanentemente un procedimiento clínico
+ */
+export async function deleteModuleProcedureAction(
+  tenantId: string,
+  procedureId: string,
+  procedureName: string,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  return toggleModuleProcedureStatusAction(
+    tenantId,
+    { id: procedureId, name: procedureName },
+    false,
+    actor
+  );
+}

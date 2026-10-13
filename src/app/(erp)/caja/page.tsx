@@ -171,10 +171,18 @@ function CajaPageContent() {
   const [success, setSuccess] = useState(false);
   const [copiedBankId, setCopiedBankId] = useState<string | null>(null);
 
-  // Consultas Odontológicas Pendientes de Cobro (Despachadas desde Sillón)
+  // Consultas Odontológicas y Médicas Pendientes de Cobro (Despachadas desde Sillón o Consultorio)
   const [pendingDentalOrders, setPendingDentalOrders] = useState<any[]>([]);
   const [linkedDentalDocId, setLinkedDentalDocId] = useState<string | null>(null);
   const [isDentalOrdersModalOpen, setIsDentalOrdersModalOpen] = useState(false);
+  const [loadedConsultationInfo, setLoadedConsultationInfo] = useState<{
+    doctorId?: string;
+    doctorName?: string;
+    doctorCommissionPercent?: number;
+    patientName?: string;
+    source?: string;
+    orderNumber?: string;
+  } | null>(null);
 
   // Formulario Nuevo Cliente Rápido
   const [docPrefix, setDocPrefix] = useState<'V' | 'J' | 'E' | 'G'>('V');
@@ -397,13 +405,26 @@ function CajaPageContent() {
       setSelectedCustomer(customerId);
     }
 
+    const docId = meta.doctor_id || meta.doctor?.id;
+    const docName = meta.doctor_name || meta.doctor?.name || meta.created_by_doctor;
+    const patName = meta.patient_name || order.entity?.name || meta.title || 'Paciente';
+
+    setLoadedConsultationInfo({
+      doctorId: docId,
+      doctorName: docName,
+      doctorCommissionPercent: Number(meta.doctor_commission_percent || meta.doctor?.commissionPercent || 0),
+      patientName: patName,
+      source: meta.source || 'odontologia',
+      orderNumber: order.document_number,
+    });
+
     setLinkedDentalDocId(order.id);
     setIsDentalOrdersModalOpen(false);
 
     toast({
       variant: 'success',
-      title: 'Consulta Dental Cargada',
-      description: `Orden #${order.document_number} cargada en caja. Procede a registrar el cobro.`,
+      title: 'Consulta Cargada en Caja',
+      description: `Orden #${order.document_number} (${docName ? `Dr(a). ${docName}` : 'Odontólogo'} · ${patName}) cargada para cobro.`,
     });
   };
 
@@ -1014,6 +1035,15 @@ function CajaPageContent() {
           type: (l.item.type as 'product' | 'service') || 'product',
         }));
 
+        const extraMeta = loadedConsultationInfo ? {
+          source: loadedConsultationInfo.source || 'odontologia',
+          doctor_id: loadedConsultationInfo.doctorId,
+          doctor_name: loadedConsultationInfo.doctorName,
+          doctor_commission_percent: loadedConsultationInfo.doctorCommissionPercent,
+          patient_name: loadedConsultationInfo.patientName,
+          linked_consultation_doc_id: linkedDentalDocId,
+        } : undefined;
+
         const result = await processSecureCheckout(
           cartPayload,
           customerId,
@@ -1024,7 +1054,8 @@ function CajaPageContent() {
           undefined,
           chargeTaxes,
           paymentBreakdown,
-          linkedAppointmentId || undefined
+          linkedAppointmentId || undefined,
+          extraMeta
         );
 
         if (!result.success) throw new Error(result.error);
@@ -1051,6 +1082,7 @@ function CajaPageContent() {
         if (linkedDentalDocId) {
           updateDocumentStatusAction(linkedDentalDocId, 'invoiced', currentTenant.id, effectiveActor).catch(console.error);
           setLinkedDentalDocId(null);
+          setLoadedConsultationInfo(null);
           loadPendingDentalOrders();
         }
 
@@ -1763,6 +1795,42 @@ function CajaPageContent() {
                   title="Desvincular de la cita"
                 >
                   <X size={12} />
+                </button>
+              </div>
+            )}
+
+            {loadedConsultationInfo && (
+              <div className="bg-teal-500/10 border border-teal-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs animate-in fade-in duration-200">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-teal-500 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-sm">
+                    👨‍⚕️
+                  </div>
+                  <div className="truncate">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-black text-teal-700 dark:text-teal-300 text-xs">
+                        {loadedConsultationInfo.doctorName ? `Dr(a). ${loadedConsultationInfo.doctorName}` : 'Odontólogo Tratante'}
+                      </span>
+                      {loadedConsultationInfo.doctorCommissionPercent && loadedConsultationInfo.doctorCommissionPercent > 0 ? (
+                        <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-500/15 px-1.5 py-0.5 rounded">
+                          Honorario: {loadedConsultationInfo.doctorCommissionPercent}%
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-[10px] text-slate-500 block truncate">
+                      Paciente: <strong className="text-foreground">{loadedConsultationInfo.patientName}</strong> · Orden #{loadedConsultationInfo.orderNumber}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoadedConsultationInfo(null);
+                    setLinkedDentalDocId(null);
+                  }}
+                  className="p-1 rounded-md text-slate-400 hover:text-rose-500 hover:bg-rose-500/10 transition-colors shrink-0"
+                  title="Desvincular consulta odontológica"
+                >
+                  <X size={13} />
                 </button>
               </div>
             )}
@@ -2665,6 +2733,33 @@ function CajaPageContent() {
               Cambiar
             </button>
           </div>
+
+          {loadedConsultationInfo && (
+            <div className="p-2.5 bg-teal-500/10 border border-teal-500/30 rounded-2xl flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base">👨‍⚕️</span>
+                <div className="truncate">
+                  <span className="font-black text-teal-700 dark:text-teal-300 text-xs block truncate">
+                    {loadedConsultationInfo.doctorName ? `Dr(a). ${loadedConsultationInfo.doctorName}` : 'Odontólogo Tratante'}
+                  </span>
+                  <span className="text-[10px] text-slate-500 block truncate">
+                    Paciente: {loadedConsultationInfo.patientName} · Orden #{loadedConsultationInfo.orderNumber}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoadedConsultationInfo(null);
+                  setLinkedDentalDocId(null);
+                }}
+                className="text-slate-400 hover:text-rose-500 p-1"
+                title="Desvincular consulta"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          )}
 
           {/* Lista de Items */}
           <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">

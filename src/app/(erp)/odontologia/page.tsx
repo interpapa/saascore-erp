@@ -1316,6 +1316,9 @@ export default function OdontologiaPage() {
               onSendToCashier={handleExpressSendToCashier}
               onOpenCheckout={() => setIsCheckoutModalOpen(true)}
               isSaving={isSavingChart}
+              doctors={dentalStaff.filter((d) => d.isActive)}
+              selectedDoctorId={selectedDoctorId}
+              onSelectDoctorId={setSelectedDoctorId}
             />
           </div>
         ) : (

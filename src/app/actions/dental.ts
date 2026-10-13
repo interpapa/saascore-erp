@@ -635,9 +635,16 @@ export async function sendDentalOrderToCashierAction(
 
     const docMetadata = {
       title: `Consulta Odontológica — ${patientName}`,
-      source: 'dental_consultation',
+      source: 'odontologia',
+      source_module: 'odontologia',
+      specialty_name: 'Odontología',
       pipeline: 'dental',
       payment_status: 'pending_cashier',
+      doctor_id: doctorInfo?.doctorId || null,
+      doctor_name: doctorInfo?.doctorName || 'Odontólogo Tratante',
+      doctor_commission_percent: doctorInfo?.doctorCommissionPercent || 50,
+      patient_id: patientId,
+      patient_name: patientName,
       doctor: doctorInfo ? {
         id: doctorInfo.doctorId,
         name: doctorInfo.doctorName,
