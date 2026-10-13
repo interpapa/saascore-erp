@@ -222,7 +222,14 @@ export async function processSecureCheckout(
 
     for (const cartItem of cart) {
       const realItem = dbItems.find(i => i.id === cartItem.itemId);
-      const unitPrice = realItem ? Number(realItem.base_price) : (Number(cartItem.price) || 0);
+      // Soporte de Precio Manual, Negociado en Mostrador y Precio al Mayor:
+      // Si el cajero modificó el precio a mano o seleccionó precio al mayor (cartItem.price >= 0),
+      // respetamos el precio enviado en la orden. Si no viene definido o no es válido,
+      // tomamos como fallback el precio base de la base de datos (o 0).
+      let unitPrice = realItem ? Number(realItem.base_price) : 0;
+      if (typeof cartItem.price === 'number' && !isNaN(cartItem.price) && cartItem.price >= 0) {
+        unitPrice = Number(cartItem.price);
+      }
       const itemName = realItem ? realItem.name : (cartItem.name || 'Servicio de Cita');
 
       const lineSubtotal = new Decimal(unitPrice).times(cartItem.quantity);
@@ -233,7 +240,9 @@ export async function processSecureCheckout(
         description: itemName,
         quantity: cartItem.quantity,
         unit_price: unitPrice,
-        tax_amount: 0
+        tax_amount: 0,
+        original_base_price: realItem ? Number(realItem.base_price) : unitPrice,
+        price_overridden: realItem ? Math.abs(Number(realItem.base_price) - unitPrice) > 0.001 : false
       });
     }
 
@@ -346,7 +355,9 @@ export async function processSecureCheckout(
             quantity: line.quantity,
             unit_price: line.unit_price,
             tax_amount: line.tax_amount,
-            total: new Decimal(line.unit_price).times(line.quantity).toNumber()
+            total: new Decimal(line.unit_price).times(line.quantity).toNumber(),
+            original_base_price: line.original_base_price,
+            price_overridden: line.price_overridden
           }))
         }
       }])

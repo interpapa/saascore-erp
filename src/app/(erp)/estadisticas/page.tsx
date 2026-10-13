@@ -105,6 +105,30 @@ interface CategoryStat {
   totalSale: number;
 }
 
+interface DayOfWeekStat {
+  dayIndex: number;
+  dayName: string;
+  amount: number;
+  count: number;
+  percentage: number;
+}
+
+interface PeakHourStat {
+  hour: number;
+  label: string;
+  amount: number;
+  count: number;
+}
+
+interface TopProfitableProductStat {
+  name: string;
+  units: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  marginPct: number;
+}
+
 /* ─────────────────────────────────────────────
    Helper: Filtrado por Período
 ───────────────────────────────────────────── */
@@ -361,8 +385,75 @@ export default function EstadisticasPage() {
 
     const averageTicket = validInvoices.length > 0 ? totalRevenue / validInvoices.length : 0;
 
-    // 2. Ranking Real de Top 5 Productos Más Vendidos
+    // 1.1 Promedio de Ventas Diarias & Días con Actividad Comercial
+    const uniqueDaysSet = new Set<string>();
+    validInvoices.forEach((inv) => {
+      const dStr = (inv.issue_date || inv.created_at || '').slice(0, 10);
+      if (dStr) uniqueDaysSet.add(dStr);
+    });
+    const activeDaysCount = Math.max(1, uniqueDaysSet.size);
+    const dailySalesAverage = totalRevenue / activeDaysCount;
+
+    // 1.2 Día Pico de la Semana & Hora Pico de Facturación
+    const DAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+    const dayMap: Record<number, { amount: number; count: number }> = {
+      0: { amount: 0, count: 0 },
+      1: { amount: 0, count: 0 },
+      2: { amount: 0, count: 0 },
+      3: { amount: 0, count: 0 },
+      4: { amount: 0, count: 0 },
+      5: { amount: 0, count: 0 },
+      6: { amount: 0, count: 0 },
+    };
+    const hourMap: Record<number, { amount: number; count: number }> = {};
+
+    validInvoices.forEach((inv) => {
+      const d = new Date(inv.issue_date || inv.created_at);
+      if (!isNaN(d.getTime())) {
+        const dayIdx = d.getDay();
+        const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
+        dayMap[dayIdx].amount += amt;
+        dayMap[dayIdx].count += 1;
+
+        const hr = d.getHours();
+        if (!hourMap[hr]) hourMap[hr] = { amount: 0, count: 0 };
+        hourMap[hr].amount += amt;
+        hourMap[hr].count += 1;
+      }
+    });
+
+    const dayOfWeekStats: DayOfWeekStat[] = [1, 2, 3, 4, 5, 6, 0].map((idx) => {
+      const d = dayMap[idx];
+      return {
+        dayIndex: idx,
+        dayName: DAY_NAMES[idx],
+        amount: d.amount,
+        count: d.count,
+        percentage: totalRevenue > 0 ? Math.round((d.amount / totalRevenue) * 100) : 0,
+      };
+    });
+
+    const peakDay = [...dayOfWeekStats].sort((a, b) => b.amount - a.amount)[0] || null;
+
+    const hourlyStats: PeakHourStat[] = Object.entries(hourMap).map(([hrStr, data]) => {
+      const hr = Number(hrStr);
+      const periodStr = hr >= 12 ? 'PM' : 'AM';
+      const displayHr = hr % 12 === 0 ? 12 : hr % 12;
+      return {
+        hour: hr,
+        label: `${displayHr}:00 ${periodStr}`,
+        amount: data.amount,
+        count: data.count,
+      };
+    });
+
+    const peakHour = [...hourlyStats].sort((a, b) => b.amount - a.amount)[0] || null;
+
+    // 2. Ranking Real de Top 5 Productos y Rentabilidad Neta Aportada
+    let realCOGS = 0;
     const productSalesMap: Record<string, { name: string; units: number; revenue: number }> = {};
+    const profitabilityMap: Record<string, { name: string; units: number; revenue: number; cost: number; profit: number }> = {};
+
     validInvoices.forEach((inv) => {
       const lines = inv.metadata?.cart_lines || inv.lines || [];
       if (Array.isArray(lines)) {
@@ -372,14 +463,32 @@ export default function EstadisticasPage() {
           const rev = Number(
             line.total !== undefined ? line.total : qty * Number(line.unit_price || 0)
           );
+          const matchedItem = rawItems.find(
+            (i) => i.id === (line.item_id || line.itemId) || i.name.toLowerCase().trim() === name.toLowerCase().trim()
+          );
+          const unitCost = Number(matchedItem?.cost ?? matchedItem?.acquisition_cost ?? 0);
+          const lineCost = unitCost * qty;
+          realCOGS += lineCost;
+
           if (!productSalesMap[name]) {
             productSalesMap[name] = { name, units: 0, revenue: 0 };
           }
           productSalesMap[name].units += qty;
           productSalesMap[name].revenue += rev;
+
+          if (!profitabilityMap[name]) {
+            profitabilityMap[name] = { name, units: 0, revenue: 0, cost: 0, profit: 0 };
+          }
+          profitabilityMap[name].units += qty;
+          profitabilityMap[name].revenue += rev;
+          profitabilityMap[name].cost += lineCost;
+          profitabilityMap[name].profit += (rev - lineCost);
         });
       }
     });
+
+    const realGrossProfit = totalRevenue - realCOGS;
+    const realGrossMarginPct = totalRevenue > 0 ? (realGrossProfit / totalRevenue) * 100 : 0;
 
     const topProducts: TopProductStat[] = Object.values(productSalesMap)
       .sort((a, b) => b.revenue - a.revenue)
@@ -387,6 +496,14 @@ export default function EstadisticasPage() {
       .map((p) => ({
         ...p,
         share: totalRevenue > 0 ? Math.round((p.revenue / totalRevenue) * 100) : 0,
+      }));
+
+    const topProfitableProducts: TopProfitableProductStat[] = Object.values(profitabilityMap)
+      .sort((a, b) => b.profit - a.profit)
+      .slice(0, 5)
+      .map((p) => ({
+        ...p,
+        marginPct: p.revenue > 0 ? Math.round((p.profit / p.revenue) * 100) : 0,
       }));
 
     // 3. Ranking Real de Top 5 Clientes por Volumen de Facturación
@@ -627,7 +744,16 @@ export default function EstadisticasPage() {
       pendingRevenue,
       pendingInvoicesCount: pendingInvoices.length,
       averageTicket,
+      dailySalesAverage,
+      activeDaysCount,
+      peakDay,
+      peakHour,
+      dayOfWeekStats,
+      realCOGS,
+      realGrossProfit,
+      realGrossMarginPct,
       topProducts,
+      topProfitableProducts,
       topClients,
       paymentMethods,
       productsCount: products.length,
@@ -681,7 +807,12 @@ export default function EstadisticasPage() {
     const exportData: ExportRow[] = [
       { categoria: 'General', metrica: 'Período Auditado', valor: period.toUpperCase(), detalle: `Generado el ${new Date().toLocaleString()}` },
       { categoria: 'Ventas', metrica: 'Ingresos Facturados Reales', valor: `$${metrics.totalRevenue.toFixed(2)}`, detalle: `${metrics.validInvoicesCount} facturas cobradas` },
+      { categoria: 'Ventas', metrica: 'Promedio de Ventas Diarias', valor: `$${metrics.dailySalesAverage.toFixed(2)}`, detalle: `Calculado sobre ${metrics.activeDaysCount} días con actividad` },
       { categoria: 'Ventas', metrica: 'Ticket Promedio por Venta', valor: `$${metrics.averageTicket.toFixed(2)}`, detalle: 'Ingreso promedio por transacción' },
+      { categoria: 'Ventas', metrica: 'Utilidad Bruta Real de Ventas', valor: `$${metrics.realGrossProfit.toFixed(2)}`, detalle: 'Ingresos menos Costo Real de Mercancía Vendida (COGS)' },
+      { categoria: 'Ventas', metrica: 'Margen Comercial Real de Ventas', valor: `${metrics.realGrossMarginPct.toFixed(1)}%`, detalle: 'Rentabilidad neta sobre facturación' },
+      { categoria: 'Ventas', metrica: 'Día Pico de Venta', valor: metrics.peakDay?.dayName || 'N/A', detalle: metrics.peakDay ? `$${metrics.peakDay.amount.toFixed(2)} (${metrics.peakDay.percentage}% del total)` : 'Sin ventas' },
+      { categoria: 'Ventas', metrica: 'Hora Pico de Afluencia', valor: metrics.peakHour?.label || 'N/A', detalle: metrics.peakHour ? `${metrics.peakHour.count} ventas ($${metrics.peakHour.amount.toFixed(2)})` : 'Sin datos' },
       { categoria: 'Ventas', metrica: 'Facturas Pendientes de Cobro', valor: `$${metrics.pendingRevenue.toFixed(2)}`, detalle: `${metrics.pendingInvoicesCount} documentos` },
       { categoria: 'Cartera', metrica: 'Cuentas por Cobrar (CxC)', valor: `$${metrics.totalCxC.toFixed(2)}`, detalle: `${metrics.cxcPercentage}% de cartera exigible` },
       { categoria: 'Compras', metrica: 'Cuentas por Pagar (CxP)', valor: `$${metrics.totalCxP.toFixed(2)}`, detalle: `${metrics.openPOsCount} órdenes de compra abiertas` },
@@ -909,7 +1040,7 @@ export default function EstadisticasPage() {
       ───────────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <section className="space-y-6">
-          {/* Tarjetas KPI Superiores */}
+          {/* Tarjetas KPI Superiores: Rendimiento Comercial & Financiero */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard
               label="Ingresos Facturados"
@@ -923,13 +1054,52 @@ export default function EstadisticasPage() {
               linkLabel={hasCaja ? 'Ver Caja POS' : undefined}
             />
             <KPICard
+              label="Promedio de Ventas Diarias"
+              value={`${fmt(metrics.dailySalesAverage)}/día`}
+              subValue={metrics.validInvoicesCount > 0 ? `En ${metrics.activeDaysCount} día(s) con actividad` : 'Sin actividad en período'}
+              trend={metrics.dailySalesAverage > 0 ? 'up' : 'neutral'}
+              icon={<Calendar size={20} />}
+              accentColor="var(--primary)"
+              accentBg="var(--primary-50)"
+            />
+            <KPICard
               label="Ticket Promedio"
               value={fmt(metrics.averageTicket)}
-              subValue={metrics.validInvoicesCount > 0 ? 'Por venta completada' : 'Sin ventas en período'}
+              subValue={metrics.validInvoicesCount > 0 ? 'Por cliente / venta completada' : 'Sin ventas en período'}
               trend="neutral"
               icon={<ShoppingCart size={20} />}
               accentColor="var(--primary)"
               accentBg="var(--primary-50)"
+            />
+            <KPICard
+              label="Rentabilidad Real de Venta"
+              value={`${metrics.realGrossMarginPct.toFixed(1)}%`}
+              subValue={`Utilidad: +${fmt(metrics.realGrossProfit)} s/ ventas`}
+              trend={metrics.realGrossMarginPct >= 20 ? 'up' : 'neutral'}
+              icon={<TrendingUp size={20} />}
+              accentColor="var(--success)"
+              accentBg="var(--success-50)"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KPICard
+              label="Día Pico de Ventas"
+              value={metrics.peakDay?.amount ? metrics.peakDay.dayName : 'N/A'}
+              subValue={metrics.peakDay?.amount ? `${fmt(metrics.peakDay.amount)} (${metrics.peakDay.percentage}% del total)` : 'Sin ventas registradas'}
+              trend="neutral"
+              icon={<Award size={20} />}
+              accentColor="var(--warning)"
+              accentBg="var(--warning-50)"
+            />
+            <KPICard
+              label="Hora Pico Más Concurrida"
+              value={metrics.peakHour?.label || 'N/A'}
+              subValue={metrics.peakHour?.count ? `${metrics.peakHour.count} ventas (${fmt(metrics.peakHour.amount)})` : 'Sin datos suficientes'}
+              trend="neutral"
+              icon={<Clock size={20} />}
+              accentColor="var(--info)"
+              accentBg="var(--info-50)"
             />
             {hasInventario ? (
               <KPICard
@@ -963,7 +1133,7 @@ export default function EstadisticasPage() {
               value={fmt(metrics.totalCxC)}
               subValue={hasCompras ? `CxP a proveedores: ${fmt(metrics.totalCxP)}` : 'Saldos exigibles'}
               trend={metrics.totalCxC >= metrics.totalCxP ? 'up' : 'down'}
-              icon={<TrendingUp size={20} />}
+              icon={<Wallet size={20} />}
               accentColor="var(--warning)"
               accentBg="var(--warning-50)"
               onClick={hasCRM ? () => router.push('/clientes') : undefined}
@@ -1211,7 +1381,7 @@ export default function EstadisticasPage() {
       ───────────────────────────────────────────── */}
       {activeTab === 'sales' && (
         <section className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-card border border-border rounded-2xl p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
                 Total Facturado
@@ -1223,26 +1393,132 @@ export default function EstadisticasPage() {
             </div>
             <div className="bg-card border border-border rounded-2xl p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Ticket Promedio
+                Promedio de Venta Diaria
+              </p>
+              <p className="text-2xl font-bold text-primary">{fmt(metrics.dailySalesAverage)}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Calculado sobre {metrics.activeDaysCount} día(s) con actividad
+              </p>
+            </div>
+            <div className="bg-card border border-border rounded-2xl p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                Ticket Promedio (AOV)
               </p>
               <p className="text-2xl font-bold text-foreground">{fmt(metrics.averageTicket)}</p>
               <p className="text-xs text-muted-foreground mt-1">Recaudación media por cliente atendido</p>
             </div>
             <div className="bg-card border border-border rounded-2xl p-5">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Facturación Pendiente
+                Utilidad Real en Ventas
               </p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {fmt(metrics.pendingRevenue)}
+              <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                +{fmt(metrics.realGrossProfit)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {metrics.pendingInvoicesCount} facturas en borrador o en proceso
+                Margen comercial neto: <span className="font-bold text-foreground">{metrics.realGrossMarginPct.toFixed(1)}%</span>
               </p>
             </div>
           </div>
 
-          {/* Grilla: Top Clientes y Top Productos */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Grilla de Patrones de Consumo: Días de la Semana y Horas Pico */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Concentración por Día de la Semana */}
+            <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Calendar size={16} style={{ color: 'var(--primary)' }} />
+                    Distribución de Ventas por Día de la Semana
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Permite planificar compras, turnos de personal y promociones según la afluencia semanal
+                  </p>
+                </div>
+                {metrics.peakDay?.amount ? (
+                  <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                    Día Estrella: {metrics.peakDay.dayName}
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 pt-2">
+                {metrics.dayOfWeekStats.map((d) => {
+                  const isPeak = metrics.peakDay?.dayIndex === d.dayIndex && d.amount > 0;
+                  return (
+                    <div
+                      key={d.dayIndex}
+                      className={`p-2.5 rounded-xl border text-center transition-all ${
+                        isPeak
+                          ? 'bg-amber-500/10 border-amber-500/40 shadow-xs'
+                          : 'bg-muted/30 border-border/60 hover:bg-muted/50'
+                      }`}
+                    >
+                      <span className="text-[11px] font-black uppercase block text-muted-foreground">
+                        {d.dayName.slice(0, 3)}
+                      </span>
+                      <span className="text-sm font-black font-mono block text-foreground mt-1">
+                        {fmt(d.amount)}
+                      </span>
+                      <div className="w-full bg-muted rounded-full h-1.5 mt-2 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isPeak ? 'bg-amber-500' : 'bg-primary'
+                          }`}
+                          style={{ width: `${Math.max(d.percentage, d.amount > 0 ? 8 : 0)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground mt-1 block">
+                        {d.count} vtas ({d.percentage}%)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Hora Pico y Facturación Pendiente */}
+            <div className="bg-card border border-border rounded-2xl p-6 flex flex-col justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
+                  <Clock size={16} style={{ color: 'var(--info)' }} />
+                  Horario de Mayor Afluencia
+                </h3>
+                <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Hora Pico Registrada:</span>
+                    <span className="text-xs font-black text-foreground bg-background px-2 py-0.5 rounded border border-border">
+                      {metrics.peakHour?.label || 'Sin datos'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Volumen en Hora Pico:</span>
+                    <span className="text-sm font-black text-primary font-mono">
+                      {fmt(metrics.peakHour?.amount || 0)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground font-medium">Tickets Despachados:</span>
+                    <span className="text-xs font-bold text-foreground">
+                      {metrics.peakHour?.count || 0} ventas
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-border/50 pt-3 mt-4">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Facturas en Borrador / Presupuestos:</span>
+                  <span className="font-bold text-amber-600 dark:text-amber-400">
+                    {metrics.pendingInvoicesCount} ({fmt(metrics.pendingRevenue)})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Grilla: Top Clientes, Top Productos y Top Rentables */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Top Clientes */}
             <div className="bg-card border border-border rounded-2xl p-6">
               <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
                 <Users size={16} style={{ color: 'var(--primary)' }} />
@@ -1267,10 +1543,11 @@ export default function EstadisticasPage() {
               )}
             </div>
 
+            {/* Top Productos por Recaudación */}
             <div className="bg-card border border-border rounded-2xl p-6">
               <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
                 <Award size={16} style={{ color: 'var(--warning)' }} />
-                Top Productos Vendidos
+                Top Productos Más Vendidos
               </h3>
               {metrics.topProducts.length === 0 ? (
                 <p className="text-xs text-muted-foreground py-6 text-center">
@@ -1285,6 +1562,38 @@ export default function EstadisticasPage() {
                         <p className="text-[11px] text-muted-foreground">{p.units} unidades vendidas</p>
                       </div>
                       <span className="text-xs font-bold text-foreground">{fmt(p.revenue)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Top Productos por Rentabilidad (Ganancia Real en $) */}
+            <div className="bg-card border border-border rounded-2xl p-6">
+              <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+                <TrendingUp size={16} style={{ color: 'var(--success)' }} />
+                Top Productos Más Rentables
+              </h3>
+              {metrics.topProfitableProducts.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-6 text-center">
+                  Sin datos de rentabilidad disponibles.
+                </p>
+              ) : (
+                <div className="divide-y divide-border/60">
+                  {metrics.topProfitableProducts.map((p, idx) => (
+                    <div key={idx} className="py-2.5 flex items-center justify-between first:pt-0 last:pb-0">
+                      <div>
+                        <p className="text-xs font-semibold text-foreground">{p.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {p.units} uds · Margen {p.marginPct}%
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 block">
+                          +{fmt(p.profit)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Utilidad Neta</span>
+                      </div>
                     </div>
                   ))}
                 </div>

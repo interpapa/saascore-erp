@@ -514,6 +514,40 @@ function CajaPageContent() {
     }
   };
 
+  // Helper para verificar y aplicar tarifa mayorista si califica por cantidad
+  const applyAutoWholesaleIfEligible = (line: { item: any; quantity: number }, newQty: number) => {
+    const wholesalePrice = Number(line.item.metadata?.wholesale_price || 0);
+    const minQty = Number(line.item.metadata?.wholesale_min_qty || 3);
+    const retailPrice = Number(line.item._retailPrice ?? line.item._originalPrice ?? line.item.base_price ?? 0);
+
+    // Si tiene precio al mayor y el usuario NO ha fijado un precio manual personalizado
+    if (wholesalePrice > 0 && !line.item._priceManuallyEdited) {
+      if (newQty >= minQty && line.item._pricingMode !== 'wholesale') {
+        return {
+          ...line,
+          quantity: newQty,
+          item: {
+            ...line.item,
+            _retailPrice: retailPrice,
+            base_price: wholesalePrice,
+            _pricingMode: 'wholesale' as const,
+          },
+        };
+      } else if (newQty < minQty && line.item._pricingMode === 'wholesale') {
+        return {
+          ...line,
+          quantity: newQty,
+          item: {
+            ...line.item,
+            base_price: retailPrice,
+            _pricingMode: 'retail' as const,
+          },
+        };
+      }
+    }
+    return { ...line, quantity: newQty };
+  };
+
   // Operaciones del Carrito
   const addLine = (item: any) => {
     const existing = ticketLines.find((l) => l.item.id === item.id);
@@ -526,12 +560,58 @@ function CajaPageContent() {
       }
     }
     if (existing) {
-      setTicketLines(
-        ticketLines.map((l) => (l.item.id === item.id ? { ...l, quantity: l.quantity + 1 } : l))
+      setTicketLines((prev) =>
+        prev.map((l) => (l.item.id === item.id ? applyAutoWholesaleIfEligible(l, l.quantity + 1) : l))
       );
     } else {
-      setTicketLines([...ticketLines, { item, quantity: 1 }]);
+      const wholesalePrice = Number(item.metadata?.wholesale_price || 0);
+      const minQty = Number(item.metadata?.wholesale_min_qty || 3);
+      const initialLine = {
+        item: {
+          ...item,
+          _retailPrice: item.base_price,
+          _originalPrice: item.base_price,
+          _pricingMode: 'retail' as const,
+        },
+        quantity: 1,
+      };
+      setTicketLines((prev) => [...prev, initialLine]);
     }
+  };
+
+  // Alternar manualmente entre Precio al Mayor y Detal para un producto en el ticket
+  const toggleWholesalePrice = (itemId: string) => {
+    setTicketLines((prev) =>
+      prev.map((l) => {
+        if (l.item.id === itemId) {
+          const wholesale = Number(l.item.metadata?.wholesale_price || 0);
+          if (wholesale <= 0) return l;
+
+          const defaultRetailPrice = Number(l.item._retailPrice ?? l.item._originalPrice ?? l.item.base_price ?? 0);
+          const isCurrentlyWholesale = l.item._pricingMode === 'wholesale' || Math.abs((l.item.base_price || 0) - wholesale) < 0.001;
+          const nextPrice = isCurrentlyWholesale ? defaultRetailPrice : wholesale;
+
+          toast({
+            variant: 'info',
+            title: isCurrentlyWholesale ? 'Tarifa al Detal' : 'Tarifa al Mayor Aplicada',
+            description: `${l.item.name}: $${nextPrice.toFixed(2)} USD c/u`,
+          });
+
+          return {
+            ...l,
+            item: {
+              ...l.item,
+              _retailPrice: defaultRetailPrice,
+              _originalPrice: defaultRetailPrice,
+              base_price: nextPrice,
+              _pricingMode: isCurrentlyWholesale ? 'retail' : 'wholesale',
+              _priceManuallyEdited: false,
+            },
+          };
+        }
+        return l;
+      })
+    );
   };
 
   // Cobro Rápido / Concepto Libre (Autonomía total sin inventario)
@@ -574,8 +654,8 @@ function CajaPageContent() {
   };
 
   const updateQuantity = (itemId: string, delta: number) => {
-    setTicketLines(
-      ticketLines
+    setTicketLines((prev) =>
+      prev
         .map((l) => {
           if (l.item.id === itemId) {
             const newQ = l.quantity + delta;
@@ -587,7 +667,7 @@ function CajaPageContent() {
                 return l;
               }
             }
-            return { ...l, quantity: newQ };
+            return applyAutoWholesaleIfEligible(l, newQ);
           }
           return l;
         })
@@ -607,18 +687,18 @@ function CajaPageContent() {
             const stockVal = l.item.stock ?? l.item.stock_quantity ?? 0;
             if (stockVal > 0 && exactQty > stockVal) {
               toast({ variant: 'warning', title: 'Stock Limitado', description: `Solo hay ${stockVal} unidades disponibles.` });
-              return { ...l, quantity: stockVal };
+              return applyAutoWholesaleIfEligible(l, stockVal);
             }
           }
-          return { ...l, quantity: exactQty };
+          return applyAutoWholesaleIfEligible(l, exactQty);
         }
         return l;
       })
     );
   };
 
-  const handleSaveLinePrice = (itemId: string) => {
-    const numPrice = parseFloat(tempPriceValue);
+  const handleSaveLinePrice = (itemId: string, overrideVal?: number) => {
+    const numPrice = overrideVal !== undefined ? overrideVal : parseFloat(tempPriceValue);
     if (isNaN(numPrice) || numPrice < 0) {
       toast({ variant: 'warning', title: 'Precio Inválido', description: 'Ingresa un precio mayor o igual a 0.' });
       return;
@@ -626,13 +706,16 @@ function CajaPageContent() {
     setTicketLines((prev) =>
       prev.map((l) => {
         if (l.item.id === itemId) {
-          const originalPrice = l.item._originalPrice ?? l.item.base_price ?? 0;
+          const originalPrice = l.item._originalPrice ?? l.item._retailPrice ?? l.item.base_price ?? 0;
           return {
             ...l,
             item: {
               ...l.item,
+              _retailPrice: l.item._retailPrice ?? originalPrice,
               _originalPrice: originalPrice,
               base_price: numPrice,
+              _priceManuallyEdited: true,
+              _pricingMode: 'manual',
             },
           };
         }
@@ -640,7 +723,7 @@ function CajaPageContent() {
       })
     );
     setEditingPriceItemId(null);
-    toast({ variant: 'success', title: 'Precio Actualizado', description: `Precio unitario fijado en $${numPrice.toFixed(2)} USD` });
+    toast({ variant: 'success', title: 'Precio Modificado', description: `Precio unitario fijado a mano en $${numPrice.toFixed(2)} USD` });
   };
 
   const clearCart = () => {
@@ -1747,7 +1830,7 @@ function CajaPageContent() {
                           {line.item.name}
                         </span>
                         <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                          {/* Precio unitario interactivo con opción a modificar */}
+                          {/* Precio unitario interactivo con opción a modificar a mano */}
                           <button
                             type="button"
                             onClick={() => {
@@ -1755,7 +1838,7 @@ function CajaPageContent() {
                               setTempPriceValue(String(line.item.base_price || 0));
                             }}
                             className="text-[11px] text-slate-500 hover:text-primary font-mono flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group/p"
-                            title="Haz clic para modificar el precio o aplicar un descuento a esta línea"
+                            title="Haz clic para modificar el precio a mano o aplicar un descuento a esta línea"
                           >
                             <span className="font-bold text-foreground">
                               ${Number(line.item.base_price || 0).toFixed(2)}
@@ -1763,6 +1846,28 @@ function CajaPageContent() {
                             <span className="text-[10px] text-slate-400">c/u</span>
                             <Edit3 size={11} className="text-slate-400 group-hover/p:text-primary transition-colors ml-0.5" />
                           </button>
+
+                          {/* Alternador Detal / Mayor para artículos con precio mayorista configurado */}
+                          {line.item.metadata?.wholesale_price && Number(line.item.metadata.wholesale_price) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleWholesalePrice(line.item.id)}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-md transition-all flex items-center gap-1 border btn-haptic ${
+                                line.item._pricingMode === 'wholesale'
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                  : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 hover:bg-indigo-100'
+                              }`}
+                              title={`Toca para alternar entre Detal ($${Number(line.item._retailPrice || line.item.base_price).toFixed(2)}) y Mayor ($${Number(line.item.metadata.wholesale_price).toFixed(2)})`}
+                            >
+                              <span>{line.item._pricingMode === 'wholesale' ? 'Tarifa: MAYOR' : 'Tarifa: DETAL'}</span>
+                            </button>
+                          )}
+
+                          {line.item._priceManuallyEdited && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                              Precio a Mano
+                            </span>
+                          )}
 
                           {hasDiscount && (
                             <span className="text-[10px] line-through text-slate-400 font-mono" title="Precio de catálogo original">
@@ -1794,13 +1899,13 @@ function CajaPageContent() {
                       </div>
                     </div>
 
-                    {/* Editor Rápido de Precio Unitario / Descuentos */}
+                    {/* Editor Rápido de Precio Unitario a Mano / Descuentos */}
                     {isEditingPrice && (
                       <div className="p-2.5 bg-slate-50 dark:bg-slate-800/80 border border-primary/30 rounded-xl space-y-2 animate-in fade-in duration-150">
                         <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
-                          <span>Modificar Precio Unitario:</span>
+                          <span>Editar Precio Unitario a Mano:</span>
                           <span className="text-primary font-mono text-[10px]">
-                            Original: ${Number(line.item._originalPrice ?? line.item.base_price ?? 0).toFixed(2)}
+                            Original: ${Number(line.item._originalPrice ?? line.item._retailPrice ?? line.item.base_price ?? 0).toFixed(2)}
                           </span>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -1824,7 +1929,7 @@ function CajaPageContent() {
                             type="button"
                             onClick={() => handleSaveLinePrice(line.item.id)}
                             className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold btn-haptic"
-                            title="Confirmar precio"
+                            title="Confirmar precio manual"
                           >
                             Guardar
                           </button>
@@ -1837,15 +1942,27 @@ function CajaPageContent() {
                             ✕
                           </button>
                         </div>
-                        {/* Atajos de Descuento Rápido */}
+                        {/* Atajos de Descuento Rápido y Tarifa Mayor */}
                         <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+                          {line.item.metadata?.wholesale_price && Number(line.item.metadata.wholesale_price) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const wPrice = Number(line.item.metadata.wholesale_price);
+                                setTempPriceValue(wPrice.toFixed(2));
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold border border-indigo-300"
+                            >
+                              Mayor (${Number(line.item.metadata.wholesale_price).toFixed(2)})
+                            </button>
+                          )}
                           <span className="text-[10px] text-slate-400 font-bold">Descuentos:</span>
                           {[5, 10, 15, 20].map((pct) => (
                             <button
                               key={pct}
                               type="button"
                               onClick={() => {
-                                const orig = Number(line.item._originalPrice ?? line.item.base_price ?? 0);
+                                const orig = Number(line.item._originalPrice ?? line.item._retailPrice ?? line.item.base_price ?? 0);
                                 const discounted = Math.max(0, orig * (1 - pct / 100));
                                 setTempPriceValue(discounted.toFixed(2));
                               }}
@@ -1854,10 +1971,13 @@ function CajaPageContent() {
                               -{pct}%
                             </button>
                           ))}
-                          {originalPrice !== undefined && (
+                          {(originalPrice !== undefined || line.item._retailPrice !== undefined) && (
                             <button
                               type="button"
-                              onClick={() => setTempPriceValue(Number(originalPrice).toFixed(2))}
+                              onClick={() => {
+                                const baseVal = Number(line.item._retailPrice ?? line.item._originalPrice ?? line.item.base_price ?? 0);
+                                setTempPriceValue(baseVal.toFixed(2));
+                              }}
                               className="px-2 py-0.5 rounded-md bg-card border border-border text-[10px] font-bold text-slate-400 hover:text-foreground"
                             >
                               Restablecer
@@ -2573,9 +2693,41 @@ function CajaPageContent() {
                         <h4 className="text-xs font-black text-foreground truncate">
                           {line.item.name}
                         </h4>
-                        <span className="text-[11px] font-mono font-bold text-slate-500">
-                          ${(line.item.base_price || 0).toFixed(2)} c/u
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPriceItemId(line.item.id);
+                              setTempPriceValue(String(line.item.base_price || 0));
+                            }}
+                            className="text-[11px] font-mono font-bold text-slate-500 hover:text-primary flex items-center gap-1"
+                            title="Toca para modificar precio a mano"
+                          >
+                            <span>${(line.item.base_price || 0).toFixed(2)} c/u</span>
+                            <Edit3 size={11} className="text-slate-400" />
+                          </button>
+
+                          {line.item.metadata?.wholesale_price && Number(line.item.metadata.wholesale_price) > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleWholesalePrice(line.item.id)}
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border btn-haptic ${
+                                line.item._pricingMode === 'wholesale'
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
+                                  : 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-300'
+                              }`}
+                              title="Toca para alternar Detal / Mayor"
+                            >
+                              {line.item._pricingMode === 'wholesale' ? 'MAYOR' : 'DETAL'}
+                            </button>
+                          )}
+
+                          {line.item._priceManuallyEdited && (
+                            <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-amber-500/10 text-amber-600 border border-amber-500/20">
+                              Manual
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <span className="text-xs font-mono font-black text-foreground block">
@@ -2586,6 +2738,40 @@ function CajaPageContent() {
                         </span>
                       </div>
                     </div>
+
+                    {/* Editor Rápido de Precio Unitario Móvil */}
+                    {editingPriceItemId === line.item.id && (
+                      <div className="p-2 bg-slate-50 dark:bg-slate-800/80 rounded-xl border border-primary/30 flex items-center gap-1.5 animate-in fade-in duration-150">
+                        <span className="text-xs font-bold text-slate-400">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          autoFocus
+                          value={tempPriceValue}
+                          onChange={(e) => setTempPriceValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleSaveLinePrice(line.item.id);
+                            else if (e.key === 'Escape') setEditingPriceItemId(null);
+                          }}
+                          className="flex-1 bg-background border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-foreground"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveLinePrice(line.item.id)}
+                          className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold btn-haptic"
+                        >
+                          OK
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingPriceItemId(null)}
+                          className="px-2 py-1 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between pt-1 border-t border-border/50">
                       <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-border">

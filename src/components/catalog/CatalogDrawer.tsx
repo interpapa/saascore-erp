@@ -132,11 +132,34 @@ export function CatalogDrawer({ item, isOpen, onClose, onEdit, onDelete, onQuick
                   <span className="text-[10px] text-slate-400">Base de compra</span>
                 </div>
                 <div className="bg-background p-3 rounded-xl border border-border">
-                  <p className="text-[10px] uppercase font-bold text-slate-500">Precio de Venta</p>
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Precio Detal</p>
                   <p className="text-lg font-black text-primary">${price.toFixed(2)}</p>
                   <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">+${profitUnit.toFixed(2)} ganancia/ud</span>
                 </div>
               </div>
+
+              {Boolean((item.metadata as any)?.wholesale_price && Number((item.metadata as any).wholesale_price) > 0) && (
+                <div className="bg-indigo-50/70 dark:bg-indigo-950/30 p-3 rounded-xl border border-indigo-200 dark:border-indigo-800/40 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] uppercase font-black tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                      Precio de Venta al Mayor
+                    </span>
+                    <span className="text-base font-black font-mono text-foreground">
+                      ${Number((item.metadata as any).wholesale_price).toFixed(2)} USD
+                    </span>
+                    <span className="text-[11px] text-slate-500 block">
+                      Mínimo: {Number((item.metadata as any).wholesale_min_qty || 3)} unidades
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                      {Number((item.metadata as any).wholesale_price) > cost
+                        ? `${(((Number((item.metadata as any).wholesale_price) - cost) / Number((item.metadata as any).wholesale_price)) * 100).toFixed(0)}% margen`
+                        : '0% margen'}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {isProduct && (
                 <div className="pt-2 border-t border-border grid grid-cols-2 gap-3 text-xs">

@@ -21,16 +21,22 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
 
   // Estado para cálculo en vivo de márgenes
   const [salePrice, setSalePrice] = useState<number>(0);
+  const [wholesalePrice, setWholesalePrice] = useState<number>(0);
+  const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(3);
   const [costPrice, setCostPrice] = useState<number>(0);
 
   useEffect(() => {
     if (editItem) {
       setItemType(editItem.type || 'product');
       setSalePrice(Number(editItem.base_price || 0));
+      setWholesalePrice(Number(editItem.metadata?.wholesale_price || 0));
+      setWholesaleMinQty(Number(editItem.metadata?.wholesale_min_qty || 3));
       setCostPrice(Number(editItem.cost || 0));
     } else {
       setItemType('product');
       setSalePrice(0);
+      setWholesalePrice(0);
+      setWholesaleMinQty(3);
       setCostPrice(0);
       setActiveFormTab('general');
     }
@@ -41,13 +47,20 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
     const profit = Math.max(0, salePrice - costPrice);
     const margin = salePrice > 0 ? ((profit / salePrice) * 100) : 0;
     const markup = costPrice > 0 ? ((profit / costPrice) * 100) : (salePrice > 0 ? 100 : 0);
+
+    const wholesaleProfit = wholesalePrice > 0 ? Math.max(0, wholesalePrice - costPrice) : 0;
+    const wholesaleMargin = wholesalePrice > 0 ? ((wholesaleProfit / wholesalePrice) * 100) : 0;
+
     return {
       profit,
       margin: margin.toFixed(1),
       markup: markup.toFixed(1),
-      isNegative: salePrice > 0 && salePrice < costPrice
+      isNegative: salePrice > 0 && salePrice < costPrice,
+      wholesaleProfit,
+      wholesaleMargin: wholesaleMargin.toFixed(1),
+      hasWholesale: wholesalePrice > 0,
     };
-  }, [salePrice, costPrice]);
+  }, [salePrice, wholesalePrice, costPrice]);
 
   if (!isOpen) return null;
 
@@ -67,6 +80,11 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
     }
 
     const basePrice = Number(formData.get('base_price') || 0);
+    const rawWholesalePrice = formData.get('wholesale_price');
+    const wholesalePriceVal = rawWholesalePrice !== null && rawWholesalePrice !== '' ? Number(rawWholesalePrice) : null;
+    const rawWholesaleMinQty = formData.get('wholesale_min_qty');
+    const wholesaleMinQtyVal = rawWholesaleMinQty ? Number(rawWholesaleMinQty) : 3;
+
     const cost = Number(formData.get('cost') || 0);
     const stockQuantity = itemType === 'product' ? Number(formData.get('stock_quantity') || 0) : 0;
     const minStock = Number(formData.get('min_stock') || 5);
@@ -88,6 +106,8 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
       stock_quantity: stockQuantity,
       metadata: {
         ...(editItem?.metadata || {}),
+        wholesale_price: wholesalePriceVal && wholesalePriceVal > 0 ? wholesalePriceVal : null,
+        wholesale_min_qty: wholesalePriceVal && wholesalePriceVal > 0 ? Math.max(2, wholesaleMinQtyVal) : null,
         unit_of_measure: itemType === 'service' ? 'servicio' : ((formData.get('unit_of_measure') as string) || 'unidad'),
         min_stock: itemType === 'product' ? minStock : 0,
         max_stock: itemType === 'product' && maxStock > 0 ? maxStock : null,
@@ -296,47 +316,99 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
 
           {/* PESTAÑA 2: PRECIOS & COSTOS */}
           <div className={activeFormTab === 'pricing' ? 'space-y-5 animate-in fade-in duration-150' : 'hidden'}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-500 block mb-1">
-                  {itemType === 'service' ? 'Costo Estimado de Insumos / Materiales ($ USD)' : 'Costo de Adquisición ($ USD)'}
-                </label>
-                <div className="relative">
-                  <input
-                    name="cost"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={costPrice || ''}
-                    onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-background border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:outline-hidden focus:ring-2 focus:ring-primary/20"
-                  />
-                  <DollarSign size={16} className="absolute left-3 top-3 text-slate-400" />
-                </div>
-                <span className="text-[11px] text-slate-500 mt-1 block">
-                  {itemType === 'service' ? 'Gasto en materiales por cada atención.' : 'Precio al que compraste el producto a tu proveedor.'}
+            <div>
+              <label className="text-xs font-bold text-slate-500 block mb-1">
+                {itemType === 'service' ? 'Costo Estimado de Insumos / Materiales ($ USD)' : 'Costo de Adquisición ($ USD)'}
+              </label>
+              <div className="relative">
+                <input
+                  name="cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={costPrice || ''}
+                  onChange={(e) => setCostPrice(parseFloat(e.target.value) || 0)}
+                  className="w-full bg-background border border-border rounded-xl pl-9 pr-3 py-2.5 text-sm font-bold focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+                />
+                <DollarSign size={16} className="absolute left-3 top-3 text-slate-400" />
+              </div>
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                {itemType === 'service' ? 'Gasto en materiales por cada atención.' : 'Precio al que compraste el producto a tu proveedor.'}
+              </span>
+            </div>
+
+            {/* Precios Detal y Mayor */}
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <DollarSign size={14} className="text-primary" />
+                  Precios Diferenciados (Detal y Mayor)
                 </span>
+                <span className="text-[11px] text-slate-500 font-medium">Un solo producto, múltiples tarifas</span>
               </div>
 
-              <div>
-                <label className="text-xs font-bold text-foreground block mb-1">Precio de Venta al Público ($ USD) *</label>
-                <div className="relative">
-                  <input
-                    name="base_price"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={salePrice || ''}
-                    onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
-                    required
-                    className="w-full bg-background border-2 border-primary/40 rounded-xl pl-9 pr-3 py-2.5 text-base font-black text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40"
-                  />
-                  <DollarSign size={18} className="absolute left-3 top-3 text-primary" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-foreground block mb-1">Precio de Venta al Detal ($ USD) *</label>
+                  <div className="relative">
+                    <input
+                      name="base_price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={salePrice || ''}
+                      onChange={(e) => setSalePrice(parseFloat(e.target.value) || 0)}
+                      required
+                      className="w-full bg-background border-2 border-primary/40 rounded-xl pl-9 pr-3 py-2.5 text-base font-black text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/40"
+                    />
+                    <DollarSign size={18} className="absolute left-3 top-3 text-primary" />
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Tarifa estándar unitaria al consumidor final.</span>
                 </div>
-                <span className="text-[11px] text-slate-500 mt-1 block">Precio facturado en Caja POS y presupuestos.</span>
+
+                <div>
+                  <label className="text-xs font-bold text-indigo-600 dark:text-indigo-400 block mb-1">
+                    Precio de Venta al Mayor ($ USD) <span className="text-[10px] text-slate-400 font-normal">(Opcional)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      name="wholesale_price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={wholesalePrice || ''}
+                      onChange={(e) => setWholesalePrice(parseFloat(e.target.value) || 0)}
+                      className="w-full bg-background border-2 border-indigo-500/40 rounded-xl pl-9 pr-3 py-2.5 text-base font-black text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/40"
+                    />
+                    <DollarSign size={18} className="absolute left-3 top-3 text-indigo-500" />
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Tarifa especial para compras en volumen.</span>
+                </div>
               </div>
+
+              {wholesalePrice > 0 && (
+                <div className="pt-2 border-t border-border/60 flex items-center gap-3">
+                  <div className="w-48">
+                    <label className="text-[11px] font-bold text-slate-500 block mb-1">
+                      Cantidad Mínima para Mayor:
+                    </label>
+                    <input
+                      name="wholesale_min_qty"
+                      type="number"
+                      min="2"
+                      value={wholesaleMinQty}
+                      onChange={(e) => setWholesaleMinQty(parseInt(e.target.value) || 2)}
+                      className="w-full bg-background border border-border rounded-xl px-3 py-1.5 text-sm font-bold focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                    />
+                  </div>
+                  <div className="flex-1 text-xs text-slate-500 pt-3">
+                    A partir de <span className="font-bold text-foreground">{wholesaleMinQty} unidades</span>, Caja POS permitirá o sugerirá aplicar este precio automáticamente.
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Panel de Análisis de Margen y Rentabilidad */}
@@ -357,13 +429,13 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
 
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div className="bg-background/80 p-2.5 rounded-xl border border-border">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold">Ganancia Neta</p>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Ganancia Detal</p>
                   <p className={`text-lg font-black ${financialMetrics.isNegative ? 'text-red-500' : 'text-foreground'}`}>
                     ${financialMetrics.profit.toFixed(2)}
                   </p>
                 </div>
                 <div className="bg-background/80 p-2.5 rounded-xl border border-border">
-                  <p className="text-[10px] text-slate-500 uppercase font-bold">Margen Comercial</p>
+                  <p className="text-[10px] text-slate-500 uppercase font-bold">Margen Detal</p>
                   <p className={`text-lg font-black ${financialMetrics.isNegative ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
                     {financialMetrics.margin}%
                   </p>
@@ -375,6 +447,18 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
                   </p>
                 </div>
               </div>
+
+              {financialMetrics.hasWholesale && (
+                <div className="mt-3 pt-3 border-t border-border flex items-center justify-between text-xs px-1">
+                  <span className="text-slate-500">Rentabilidad al Mayor (${wholesalePrice.toFixed(2)}/ud):</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-foreground">Ganancia: ${financialMetrics.wholesaleProfit.toFixed(2)}</span>
+                    <span className="font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                      {financialMetrics.wholesaleMargin}% margen
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

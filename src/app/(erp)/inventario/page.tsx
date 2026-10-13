@@ -922,10 +922,15 @@ export default function InventarioPage() {
                     <div className="mt-3 pt-3 border-t border-border/60">
                       <div className="flex justify-between items-end">
                         <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Precio Venta</p>
+                          <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Precio Venta (Detal)</p>
                           <p className="text-xl font-black text-foreground">
                             ${price.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </p>
+                          {Boolean((item.metadata as any)?.wholesale_price && Number((item.metadata as any).wholesale_price) > 0) && (
+                            <p className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 font-mono">
+                              Mayor: ${Number((item.metadata as any).wholesale_price).toFixed(2)} (≥{Number((item.metadata as any).wholesale_min_qty || 3)}u)
+                            </p>
+                          )}
                           {cost > 0 && (
                             <p className="text-[10px] text-slate-400">
                               Costo: ${cost.toFixed(2)} ({marginPct}% mrg.)
@@ -1028,8 +1033,13 @@ export default function InventarioPage() {
                         <td className="p-3.5 text-right font-mono font-bold text-slate-500">
                           ${cost.toFixed(2)}
                         </td>
-                        <td className="p-3.5 text-right font-mono font-black text-foreground">
-                          ${price.toFixed(2)}
+                        <td className="p-3.5 text-right font-mono">
+                          <span className="font-black text-foreground block">${price.toFixed(2)}</span>
+                          {Boolean((item.metadata as any)?.wholesale_price && Number((item.metadata as any).wholesale_price) > 0) && (
+                            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold block" title={`Precio al mayor a partir de ${Number((item.metadata as any).wholesale_min_qty || 3)} unidades`}>
+                              Mayor: ${Number((item.metadata as any).wholesale_price).toFixed(2)} (≥{Number((item.metadata as any).wholesale_min_qty || 3)}u)
+                            </span>
+                          )}
                         </td>
                         <td className="p-3.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
                           {marginPct}%
