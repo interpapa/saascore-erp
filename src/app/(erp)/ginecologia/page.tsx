@@ -30,7 +30,8 @@ import {
   Square,
   Shield,
   HelpCircle,
-  FolderOpen
+  FolderOpen,
+  X
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -105,11 +106,17 @@ export default function GinecologiaPage() {
   });
 
   // Signos Vitales Maternos
-  const [vitals, setVitals] = useState({
+  const [vitals, setVitals] = useState<{
+    bloodPressure: string;
+    heartRate: number | '';
+    weightKg: number | '';
+    heightCm: number | '';
+    temperature: number | '';
+  }>({
     bloodPressure: '120/80',
     heartRate: 75,
-    weightKg: 60,
-    heightCm: 165,
+    weightKg: '',
+    heightCm: '',
     temperature: 36.5,
   });
 
@@ -134,6 +141,10 @@ export default function GinecologiaPage() {
     biopsyTaken: false,
     biopsyLocation: '',
   });
+
+  // Búsqueda interactiva de pacientes
+  const [patientSearchQuery, setPatientSearchQuery] = useState('');
+  const [isPatientDropdownOpen, setIsPatientDropdownOpen] = useState(false);
 
   // SOAP & Diagnóstico
   const [chiefComplaint, setChiefComplaint] = useState('Control prenatal de rutina.');
@@ -173,13 +184,28 @@ export default function GinecologiaPage() {
     return patients.find((p) => p.id === selectedPatientId) || null;
   }, [patients, selectedPatientId]);
 
+  const filteredPatients = useMemo(() => {
+    if (!patientSearchQuery.trim()) return patients.slice(0, 30);
+    const q = patientSearchQuery.toLowerCase();
+    return patients.filter((p) =>
+      p.name?.toLowerCase().includes(q) ||
+      p.tax_id?.toLowerCase().includes(q) ||
+      p.phone?.toLowerCase().includes(q)
+    );
+  }, [patients, patientSearchQuery]);
+
   const activeDoctor = useMemo(() => {
     return doctors.find((d) => d.id === selectedDoctorId) || null;
   }, [doctors, selectedDoctorId]);
 
-  // Cálculo de IMC Materno
+  // Cálculo de IMC Materno dinámico con validación de peso y talla
   const bmiInfo = useMemo(() => {
-    return calculateBMI(Number(vitals.weightKg || 0), Number(vitals.heightCm || 0));
+    const w = Number(vitals.weightKg);
+    const h = Number(vitals.heightCm);
+    if (!w || !h || w <= 0 || h <= 0) {
+      return { bmi: 0, category: 'Pendiente de registrar peso/talla', color: '#94a3b8' };
+    }
+    return calculateBMI(w, h);
   }, [vitals.weightKg, vitals.heightCm]);
 
   // Carga inicial de pacientes, médicos y catálogo
@@ -198,9 +224,19 @@ export default function GinecologiaPage() {
       }
 
       if (employeesRes.success && employeesRes.entities) {
-        setDoctors(employeesRes.entities);
-        if (employeesRes.entities.length > 0 && !selectedDoctorId) {
-          setSelectedDoctorId(employeesRes.entities[0].id);
+        const medicalDocs = employeesRes.entities.filter((e: any) => {
+          const m = e.metadata || {};
+          return (
+            m.is_doctor ||
+            m.is_gineco ||
+            m.doctor_config?.is_active ||
+            (Array.isArray(m.modules) && (m.modules.includes('ginecologia') || m.modules.includes('clinica')))
+          );
+        });
+        const finalDocs = medicalDocs.length > 0 ? medicalDocs : employeesRes.entities;
+        setDoctors(finalDocs);
+        if (finalDocs.length > 0 && !selectedDoctorId) {
+          setSelectedDoctorId(finalDocs[0].id);
         }
       }
 
@@ -442,7 +478,13 @@ export default function GinecologiaPage() {
           encounterType: activeTab === 'obstetricia' ? 'prenatal' : 'ginecologia',
           chiefComplaint,
           profileUpdates: profile,
-          vitals,
+          vitals: {
+            bloodPressure: vitals.bloodPressure || undefined,
+            heartRate: vitals.heartRate === '' ? undefined : Number(vitals.heartRate),
+            weightKg: vitals.weightKg === '' ? undefined : Number(vitals.weightKg),
+            heightCm: vitals.heightCm === '' ? undefined : Number(vitals.heightCm),
+            temperature: vitals.temperature === '' ? undefined : Number(vitals.temperature),
+          },
           obstetricExam: {
             ...obstetricExam,
             fumUsed: profile.fum || '',
@@ -593,23 +635,87 @@ export default function GinecologiaPage() {
 
           {/* Selectores de Paciente y Médico */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            {/* Selector de Paciente */}
-            <div className="relative min-w-[240px]">
-              <select
-                value={selectedPatientId}
-                onChange={(e) => setSelectedPatientId(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-2xl border border-border bg-background text-sm font-bold text-foreground focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 outline-none transition-all appearance-none pr-8 cursor-pointer"
-              >
-                <option value="">-- Seleccionar Paciente --</option>
-                {patients.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} {p.tax_id ? `(${p.tax_id})` : ''}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                <ChevronRight size={16} className="rotate-90" />
-              </div>
+            {/* Selector Predictivo de Paciente */}
+            <div className="relative min-w-[280px]">
+              {selectedPatientId && activePatient ? (
+                <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl border border-pink-500/40 bg-pink-500/10 text-xs font-bold text-foreground">
+                  <div className="truncate mr-2">
+                    <span className="text-pink-600 dark:text-pink-400 block truncate">{activePatient.name}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {activePatient.tax_id ? `ID: ${activePatient.tax_id}` : 'Sin ID'} {activePatient.phone ? `· ${activePatient.phone}` : ''}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPatientId('');
+                      setPatientSearchQuery('');
+                    }}
+                    className="p-1 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-500/10 transition-colors"
+                    title="Cambiar paciente"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <div className="flex items-center px-3 py-2 rounded-2xl border border-border bg-background focus-within:ring-2 focus-within:ring-pink-500/30 focus-within:border-pink-500">
+                    <Search size={14} className="text-slate-400 mr-2 shrink-0" />
+                    <input
+                      type="text"
+                      value={patientSearchQuery}
+                      onChange={(e) => {
+                        setPatientSearchQuery(e.target.value);
+                        setIsPatientDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsPatientDropdownOpen(true)}
+                      placeholder="Buscar paciente (nombre, cédula)..."
+                      className="w-full bg-transparent text-xs font-bold text-foreground outline-none"
+                    />
+                  </div>
+
+                  {isPatientDropdownOpen && (
+                    <>
+                      <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setIsPatientDropdownOpen(false)}
+                      />
+                      <div className="absolute left-0 right-0 top-full mt-1.5 z-50 max-h-64 overflow-y-auto bg-card border border-border rounded-2xl shadow-xl py-1.5 animate-in fade-in zoom-in-95">
+                        {filteredPatients.length === 0 ? (
+                          <div className="p-3 text-center text-xs text-slate-400">
+                            No se encontraron pacientes
+                          </div>
+                        ) : (
+                          filteredPatients.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPatientId(p.id);
+                                setIsPatientDropdownOpen(false);
+                                setPatientSearchQuery('');
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:bg-pink-500/10 transition-colors flex items-center justify-between group"
+                            >
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-foreground group-hover:text-pink-600 truncate">
+                                  {p.name}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  {p.tax_id ? `ID: ${p.tax_id} ` : ''}{p.phone ? `· Tel: ${p.phone}` : ''}
+                                </p>
+                              </div>
+                              <span className="text-[10px] text-pink-500 opacity-0 group-hover:opacity-100 font-bold">
+                                Seleccionar →
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Botón Nueva Paciente */}
@@ -787,8 +893,11 @@ export default function GinecologiaPage() {
                 <input
                   type="number"
                   step="0.1"
-                  value={vitals.weightKg}
-                  onChange={(e) => setVitals((v) => ({ ...v, weightKg: Number(e.target.value) }))}
+                  value={vitals.weightKg === '' ? '' : vitals.weightKg}
+                  onChange={(e) =>
+                    setVitals((v) => ({ ...v, weightKg: e.target.value === '' ? '' : Number(e.target.value) }))
+                  }
+                  placeholder="Ej: 62.5"
                   className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
                 />
               </div>
@@ -798,19 +907,27 @@ export default function GinecologiaPage() {
                 <span className="text-[10px] font-bold text-slate-500 uppercase block">Talla (cm)</span>
                 <input
                   type="number"
-                  value={vitals.heightCm}
-                  onChange={(e) => setVitals((v) => ({ ...v, heightCm: Number(e.target.value) }))}
+                  value={vitals.heightCm === '' ? '' : vitals.heightCm}
+                  onChange={(e) =>
+                    setVitals((v) => ({ ...v, heightCm: e.target.value === '' ? '' : Number(e.target.value) }))
+                  }
+                  placeholder="Ej: 165"
                   className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
                 />
               </div>
 
-              {/* IMC Materno Calculado */}
+              {/* IMC Materno Calculado Dinámicamente */}
               <div className="p-2.5 rounded-2xl bg-card border border-border col-span-2 sm:col-span-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">IMC Calculado</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase block">IMC (OMS)</span>
+                  <span className="text-[9px] text-slate-400 font-mono" title="Fórmula OMS: Peso (kg) ÷ [Talla (m)]²">
+                    kg/m²
+                  </span>
+                </div>
                 <p className="text-sm font-black text-foreground mt-0.5">
                   {bmiInfo.bmi > 0 ? `${bmiInfo.bmi} kg/m²` : '—'}
                 </p>
-                <span className="text-[10px] font-bold" style={{ color: bmiInfo.color }}>
+                <span className="text-[10px] font-bold block truncate" style={{ color: bmiInfo.color }}>
                   {bmiInfo.category}
                 </span>
               </div>
@@ -860,7 +977,7 @@ export default function GinecologiaPage() {
           }`}
         >
           <FileText size={15} />
-          <span>3. Evolución SOAP & Récipe</span>
+          <span>3. Evolución Médica, Diagnóstico & Récipe</span>
         </button>
 
         <button
@@ -990,22 +1107,6 @@ export default function GinecologiaPage() {
                   <option value="severo">Severo (+++) (Descartar Preeclampsia)</option>
                 </select>
               </div>
-            </div>
-
-            {/* Hallazgos Ecográficos */}
-            <div className="space-y-1.5 pt-2">
-              <label className="text-xs font-bold text-slate-500">
-                Hallazgos Sonográficos / Ecografía en Consultorio:
-              </label>
-              <textarea
-                value={obstetricExam.ultrasoundFindings}
-                onChange={(e) =>
-                  setObstetricExam((prev) => ({ ...prev, ultrasoundFindings: e.target.value }))
-                }
-                rows={2}
-                placeholder="Feto único intrauterino en situación longitudinal, dorso anterior. Líquido amniótico normal (ILA 14cm). Placenta fúndica posterior Grado I."
-                className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
-              />
             </div>
           </div>
         </div>
@@ -1185,123 +1286,224 @@ export default function GinecologiaPage() {
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {activeTab === 'soap_recipe' && (
         <div className="space-y-5">
-          {/* SOAP Médico */}
-          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
-            <h4 className="text-base font-black text-foreground flex items-center gap-2">
-              <FileText size={18} className="text-pink-500" />
-              Evolución Clínica SOAP
-            </h4>
+          {/* Evolución Médica & Diagnóstico Clínico */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+              <div>
+                <h4 className="text-base font-black text-foreground flex items-center gap-2">
+                  <FileText size={18} className="text-pink-500" />
+                  Evolución Clínica & Diagnóstico
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Registro del motivo de consulta, diagnóstico, acto médico y conducta terapéutica
+                </p>
+              </div>
 
-            {/* Motivo de Consulta */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-500">Motivo de Consulta Principal:</label>
+              <button
+                type="button"
+                onClick={handleSaveEncounter}
+                disabled={isSavingEncounter || !selectedPatientId}
+                className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black transition-all flex items-center justify-center gap-2 shadow-xs btn-haptic disabled:opacity-40 whitespace-nowrap"
+              >
+                <Save size={15} />
+                <span>{isSavingEncounter ? 'Guardando...' : 'Guardar Consulta en Historial'}</span>
+              </button>
+            </div>
+
+            {/* 1. Motivo de Consulta con Atajos Rápidos */}
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-pink-600 block">
+                1. Motivo de Consulta Principal:
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: '🤰 Control Prenatal de Rutina', text: 'Control prenatal de rutina.' },
+                  { label: '🌸 Chequeo Ginecológico Anual', text: 'Chequeo ginecológico y citología preventiva.' },
+                  { label: '💧 Flujo / Infección Vaginal', text: 'Secreción vaginal atípica y prurito vulvar.' },
+                  { label: '⚡ Dolor Pélvico / Dismenorrea', text: 'Dolor pélvico espasmódico / dismenorrea moderada.' },
+                  { label: '🩸 Sangrado Anormal / Retraso', text: 'Retraso menstrual y sangrado uterino anormal.' },
+                  { label: '👶 Control Post-Parto / Puerperio', text: 'Evaluación de puerperio mediato y lactancia.' },
+                  { label: '🔬 Citología / Colposcopia', text: 'Toma de citología cervical PAP y colposcopia.' },
+                ].map((m) => (
+                  <button
+                    key={m.label}
+                    type="button"
+                    onClick={() => setChiefComplaint(m.text)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition-all btn-haptic ${
+                      chiefComplaint === m.text
+                        ? 'bg-pink-500 text-white border-pink-500 shadow-2xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-border hover:bg-pink-500/10 hover:text-pink-600'
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
               <input
                 type="text"
                 value={chiefComplaint}
                 onChange={(e) => setChiefComplaint(e.target.value)}
-                placeholder="Ej: Control prenatal de 24 semanas / Flujo vaginal pruriginoso / Retraso menstrual..."
-                className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+                placeholder="Describe el motivo por el cual acude la paciente..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* S: Subjetivo */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-pink-600">S — Subjetivo (Anamnesis):</label>
-                <textarea
-                  value={soapSubjective}
-                  onChange={(e) => setSoapSubjective(e.target.value)}
-                  rows={3}
-                  placeholder="Paciente refiere movimientos fetales activos, sin pérdidas hemáticas ni transvaginales..."
-                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
-                />
-              </div>
-
-              {/* O: Objetivo */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-pink-600">O — Objetivo (Examen Físico):</label>
-                <textarea
-                  value={soapObjective}
-                  onChange={(e) => setSoapObjective(e.target.value)}
-                  rows={3}
-                  placeholder="Abdomen grávido, AU 24cm, FCF 142 lpm. Extremidades sin edema..."
-                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
-                />
-              </div>
-
-              {/* A: Análisis & Diagnóstico */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-pink-600">A — Análisis / Diagnóstico:</label>
-                <textarea
-                  value={soapAssessment}
-                  onChange={(e) => setSoapAssessment(e.target.value)}
-                  rows={3}
-                  placeholder="Embarazo de 24 sem por FUM en adecuada evolución. Eutrófica..."
-                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
-                />
-              </div>
-
-              {/* P: Plan Terapéutico */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black text-pink-600">P — Plan & Conducta:</label>
-                <textarea
-                  value={soapPlan}
-                  onChange={(e) => setSoapPlan(e.target.value)}
-                  rows={3}
-                  placeholder="Continuar hierro + ácido fólico. Solicitar test de O'Sullivan y control en 4 semanas..."
-                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
-                />
-              </div>
-            </div>
-
-            {/* Buscador CIE-10 Gineco-Obstétrico */}
-            <div className="pt-2 border-t border-border/50 space-y-2">
-              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
-                <Search size={13} className="text-pink-500" />
-                <span>Codificación CIE-10 Gineco-Obstétrica:</span>
+            {/* 2. Diagnóstico Clínico & CIE-10 */}
+            <div className="space-y-2 pt-1 border-t border-border/50">
+              <label className="text-xs font-black uppercase tracking-wider text-pink-600 block">
+                2. Diagnóstico Clínico & CIE-10:
               </label>
 
+              {/* Botones de Diagnósticos Frecuentes */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { name: 'Embarazo Normoevolutivo', code: 'Z34.0', desc: 'Supervisión de primer embarazo normal' },
+                  { name: 'Vaginitis / Candidiasis', code: 'N76.0', desc: 'Vaginitis aguda' },
+                  { name: 'Miomatosis Uterina', code: 'D25.9', desc: 'Leiomioma del útero, sin otra especificación' },
+                  { name: 'Ovario Poliquístico (SOP)', code: 'E28.2', desc: 'Síndrome de ovario poliquístico' },
+                  { name: 'Dismenorrea Primaria', code: 'N94.4', desc: 'Dismenorrea primaria' },
+                  { name: 'Infección Urinaria en Embarazo', code: 'O23.4', desc: 'Infección no especificada de las vías urinarias en el embarazo' },
+                  { name: 'Cervicitis / VPH', code: 'N72', desc: 'Enfermedad inflamatoria del cuello uterino' },
+                ].map((d) => (
+                  <button
+                    key={d.name}
+                    type="button"
+                    onClick={() => {
+                      setSoapAssessment(d.name);
+                      setSelectedCie10({ code: d.code, description: d.desc });
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition-all btn-haptic ${
+                      soapAssessment === d.name
+                        ? 'bg-pink-500 text-white border-pink-500 shadow-2xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-border hover:bg-pink-500/10 hover:text-pink-600'
+                    }`}
+                  >
+                    <span>{d.name}</span>
+                    <span className="ml-1 text-[10px] font-mono opacity-70">[{d.code}]</span>
+                  </button>
+                ))}
+              </div>
+
+              <input
+                type="text"
+                value={soapAssessment}
+                onChange={(e) => setSoapAssessment(e.target.value)}
+                placeholder="Diagnóstico médico principal..."
+                className="w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+              />
+
+              {/* Codificación CIE-10 */}
               {selectedCie10 ? (
-                <div className="flex items-center justify-between p-3 rounded-2xl bg-pink-500/10 border border-pink-500/30">
-                  <div>
-                    <span className="font-mono font-black text-pink-600 text-sm">[{selectedCie10.code}]</span>{' '}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-pink-500/10 border border-pink-500/30">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-black text-pink-600 text-xs">[{selectedCie10.code}]</span>
                     <span className="font-bold text-foreground text-xs">{selectedCie10.description}</span>
                   </div>
                   <button
+                    type="button"
                     onClick={() => setSelectedCie10(null)}
                     className="p-1 text-slate-400 hover:text-rose-500"
+                    title="Quitar CIE-10"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={cie10Search}
-                    onChange={(e) => setCie10Search(e.target.value)}
-                    placeholder="Buscar CIE-10 (ej: embarazo, vaginitis, mioma, preeclampsia)..."
-                    className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
-                  />
-                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-                    {GINECO_CIE10_CATALOG.filter(
-                      (c) =>
-                        c.description.toLowerCase().includes(cie10Search.toLowerCase()) ||
-                        c.code.toLowerCase().includes(cie10Search.toLowerCase())
-                    ).map((c) => (
-                      <button
-                        key={c.code}
-                        type="button"
-                        onClick={() => setSelectedCie10({ code: c.code, description: c.description })}
-                        className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-pink-500/10 hover:text-pink-600 hover:border-pink-500/30 text-[11px] font-bold border border-border text-foreground transition-all flex items-center gap-1.5 btn-haptic"
-                      >
-                        <span className="font-mono text-pink-500">[{c.code}]</span>
-                        <span className="truncate max-w-[220px]">{c.description}</span>
-                      </button>
-                    ))}
+                <div className="space-y-1.5">
+                  <div className="flex items-center px-3 py-1.5 rounded-xl border border-border bg-background">
+                    <Search size={13} className="text-slate-400 mr-2 shrink-0" />
+                    <input
+                      type="text"
+                      value={cie10Search}
+                      onChange={(e) => setCie10Search(e.target.value)}
+                      placeholder="Buscar otro código CIE-10 por nombre o código..."
+                      className="w-full bg-transparent text-xs font-bold text-foreground outline-none"
+                    />
                   </div>
+                  {cie10Search.trim() && (
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                      {GINECO_CIE10_CATALOG.filter(
+                        (c) =>
+                          c.description.toLowerCase().includes(cie10Search.toLowerCase()) ||
+                          c.code.toLowerCase().includes(cie10Search.toLowerCase())
+                      ).map((c) => (
+                        <button
+                          key={c.code}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCie10({ code: c.code, description: c.description });
+                            if (!soapAssessment) setSoapAssessment(c.description);
+                            setCie10Search('');
+                          }}
+                          className="px-2 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-pink-500/10 hover:text-pink-600 hover:border-pink-500/30 text-[11px] font-bold border border-border text-foreground transition-all flex items-center gap-1.5 btn-haptic"
+                        >
+                          <span className="font-mono text-pink-500">[{c.code}]</span>
+                          <span className="truncate max-w-[200px]">{c.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
+
+            {/* 3. Nota de Evolución Médica & Examen Clínico */}
+            <div className="space-y-2 pt-1 border-t border-border/50">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-pink-600 block">
+                  3. Nota de Evolución Clínica & Examen:
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSoapSubjective(
+                        'Paciente femenina acude a control prenatal programado. Refiere movimientos fetales activos, niega pérdidas hemáticas o transvaginales. Al examen físico: Abdomen grávido, altura uterina acorde a edad gestacional, FCF rítmica y reactiva. Sin edema patológico en extremidades.'
+                      );
+                    }}
+                    className="text-[11px] font-bold text-pink-600 hover:underline flex items-center gap-1"
+                  >
+                    <Sparkles size={12} />
+                    <span>Plantilla Control Prenatal</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSoapSubjective(
+                        'Paciente acude a chequeo ginecológico preventivo. Asintomática al interrogatorio. Genitales externos e internos normoconfigurados, mucosa elástica, sin flujo patológico ni sangrado activo. Cuello uterino eutrófico.'
+                      );
+                    }}
+                    className="text-[11px] font-bold text-pink-600 hover:underline flex items-center gap-1"
+                  >
+                    <Sparkles size={12} />
+                    <span>Plantilla Chequeo Ginecológico</span>
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={soapSubjective}
+                onChange={(e) => {
+                  setSoapSubjective(e.target.value);
+                  setSoapObjective(e.target.value);
+                }}
+                rows={4}
+                placeholder="Escribe la evolución clínica, síntomas referidos por la paciente, hallazgos de la exploración física y respuesta terapéutica..."
+                className="w-full p-3.5 rounded-2xl border border-border bg-background text-xs font-medium text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none leading-relaxed"
+              />
+            </div>
+
+            {/* 4. Plan Terapéutico & Conducta */}
+            <div className="space-y-2 pt-1 border-t border-border/50">
+              <label className="text-xs font-black uppercase tracking-wider text-pink-600 block">
+                4. Plan Terapéutico, Cuidados & Próxima Cita:
+              </label>
+              <textarea
+                value={soapPlan}
+                onChange={(e) => setSoapPlan(e.target.value)}
+                rows={3}
+                placeholder="Indica el plan médico, suplementación, paraclinicos solicitados, recomendaciones dietéticas o fecha del próximo control..."
+                className="w-full p-3 rounded-2xl border border-border bg-background text-xs font-medium text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none leading-relaxed"
+              />
             </div>
           </div>
 

@@ -152,13 +152,6 @@ export default function LauncherPage() {
       icon: <HeartPulse className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
-      id: 'apps', 
-      name: 'Marketplace', 
-      href: '/apps',
-      gradient: 'from-yellow-400 to-amber-500',
-      icon: <Grid className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
-    },
-    { 
       id: 'config', 
       name: 'Ajustes', 
       href: '/configuracion',
@@ -188,7 +181,6 @@ export default function LauncherPage() {
 
   const filteredApps = apps.filter((app) => {
     if (app.id === 'admin') return isSuper;
-    if (app.id === 'apps') return isSuper || isOwner;
     if (app.id === 'config') return isSuper || isOwner || session?.role === 'manager';
 
     // 1. Debe estar activo en la empresa

@@ -20,7 +20,9 @@ import {
   AlertTriangle,
   Sparkles,
   Stethoscope,
-  Dog
+  Dog,
+  Baby,
+  HeartPulse
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -54,7 +56,9 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   const isOdontologiaActive = tenantModules.includes('odontologia');
   const isBarberiaActive = tenantModules.includes('barberia');
   const isGroomingActive = tenantModules.includes('grooming');
-  const hasAnySpecializedModule = isOdontologiaActive || isBarberiaActive || isGroomingActive;
+  const isGinecologiaActive = tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia');
+  const isClinicaActive = tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_'));
+  const hasAnySpecializedModule = isOdontologiaActive || isBarberiaActive || isGroomingActive || isGinecologiaActive || isClinicaActive;
 
   const { toast } = useToast();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,6 +101,13 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     groomerSpecialty: 'Corte a Tijera & Baño',
     groomerCommission: 45,
     groomerAvatar: '🐩',
+    // Configuración para Ginecología / Médicos
+    isDoctor: false,
+    doctorRole: 'Ginecólogo(a) Obstetra',
+    doctorSpecialty: 'Control Prenatal & Colposcopia',
+    doctorLicense: '',
+    doctorCommission: 50,
+    doctorAvatar: '🩺',
   };
   
   const [form, setForm] = useState(defaultForm);
@@ -115,8 +126,9 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     setSaveError(null);
     const meta = (emp.metadata || {}) as any;
     const isBarber = Boolean(meta.is_barber || meta.barber_config?.is_active || meta.module === 'barberia' || (Array.isArray(meta.modules) && meta.modules.includes('barberia')));
-    const isDentist = Boolean(meta.is_dentist || meta.is_doctor || meta.dentist_config?.is_active || meta.module === 'odontologia' || (Array.isArray(meta.modules) && meta.modules.includes('odontologia')));
+    const isDentist = Boolean(meta.is_dentist || meta.dentist_config?.is_active || meta.module === 'odontologia' || (Array.isArray(meta.modules) && meta.modules.includes('odontologia')));
     const isGroomer = Boolean(meta.is_groomer || meta.groomer_config?.is_active || meta.module === 'grooming' || (Array.isArray(meta.modules) && meta.modules.includes('grooming')));
+    const isDoctor = Boolean(meta.is_doctor || meta.is_gineco || meta.doctor_config?.is_active || meta.module === 'ginecologia' || meta.module === 'clinica' || (Array.isArray(meta.modules) && (meta.modules.includes('ginecologia') || meta.modules.includes('clinica'))));
 
     setForm({
       name: emp.name || '',
@@ -153,6 +165,14 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       groomerSpecialty: meta.groomer_config?.specialty || (isGroomer ? (meta.specialty || 'Corte a Tijera & Baño') : 'Corte a Tijera & Baño'),
       groomerCommission: Number(meta.groomer_config?.commission_percent ?? meta.commission_percent ?? 45),
       groomerAvatar: meta.groomer_config?.avatar || (isGroomer ? (meta.avatar || '🐩') : '🐩'),
+
+      // Médico / Ginecólogo
+      isDoctor,
+      doctorRole: meta.doctor_config?.role || (isDoctor ? (meta.role || 'Ginecólogo(a) Obstetra') : 'Ginecólogo(a) Obstetra'),
+      doctorSpecialty: meta.doctor_config?.specialty || (isDoctor ? (meta.specialty || 'Control Prenatal & Colposcopia') : 'Control Prenatal & Colposcopia'),
+      doctorLicense: meta.doctor_config?.license_number || meta.licenseNumber || meta.license_number || '',
+      doctorCommission: Number(meta.doctor_config?.commission_percent ?? meta.commission_percent ?? 50),
+      doctorAvatar: meta.doctor_config?.avatar || (isDoctor ? (meta.avatar || '🩺') : '🩺'),
     });
     setIsModalOpen(true);
   };
@@ -198,6 +218,16 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       if (!form.isGroomer && assignedModules.includes('grooming')) {
         const idx = assignedModules.indexOf('grooming');
         if (idx !== -1) assignedModules.splice(idx, 1);
+      }
+
+      if (form.isDoctor) {
+        if (!assignedModules.includes('ginecologia')) assignedModules.push('ginecologia');
+        if (!assignedModules.includes('clinica')) assignedModules.push('clinica');
+      } else {
+        const gIdx = assignedModules.indexOf('ginecologia');
+        if (gIdx !== -1) assignedModules.splice(gIdx, 1);
+        const cIdx = assignedModules.indexOf('clinica');
+        if (cIdx !== -1) assignedModules.splice(cIdx, 1);
       }
 
       const payload = {
@@ -250,6 +280,18 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             avatar: form.groomerAvatar || '🐩',
           },
 
+          // Configuración Ginecología & Clínica Médica
+          is_doctor: form.isDoctor,
+          is_gineco: form.isDoctor,
+          doctor_config: {
+            is_active: form.isDoctor,
+            role: form.doctorRole,
+            specialty: form.doctorSpecialty,
+            license_number: form.doctorLicense,
+            commission_percent: Number(form.doctorCommission) || 50,
+            avatar: form.doctorAvatar || '🩺',
+          },
+
           // Compatibilidad legacy si solo tiene un rol principal activo:
           ...(form.isBarber ? {
             role: form.barberRole,
@@ -270,6 +312,13 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             commission_percent: form.groomerCommission,
             avatar: form.groomerAvatar,
             module: 'grooming'
+          } : form.isDoctor ? {
+            role: form.doctorRole,
+            specialty: form.doctorSpecialty,
+            licenseNumber: form.doctorLicense,
+            commission_percent: form.doctorCommission,
+            avatar: form.doctorAvatar,
+            module: isGinecologiaActive ? 'ginecologia' : 'clinica'
           } : {}),
         },
       };
@@ -1185,6 +1234,126 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                                     className={`w-8 h-8 rounded-xl text-base flex items-center justify-center border transition-all ${
                                       form.groomerAvatar === emoji
                                         ? 'border-emerald-500 bg-emerald-500/20 scale-105'
+                                        : 'border-border bg-background hover:bg-slate-100 dark:hover:bg-slate-800'
+                                    }`}
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* CARD 4: GINECOLOGÍA & CLÍNICA MÉDICA (Solo si 'ginecologia' o 'clinica' está activo) */}
+                    {(isGinecologiaActive || isClinicaActive) && (
+                      <div className="bg-pink-500/5 dark:bg-pink-950/20 border border-pink-500/20 rounded-2xl p-4.5 space-y-3.5 transition-all">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-pink-500/10 text-pink-600 dark:text-pink-400 flex items-center justify-center text-xl font-bold border border-pink-500/20">
+                              🩺
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-black text-foreground">Ginecología & Clínica Médica</h4>
+                                <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                  Módulo Activo
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500">
+                                Habilita a este colaborador como Médico Tratante / Ginecólogo para atender consultas, controles prenatales y emitir órdenes a caja.
+                              </p>
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => setForm({ ...form, isDoctor: !form.isDoctor })}
+                            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out ${
+                              form.isDoctor ? 'bg-pink-500' : 'bg-slate-300 dark:bg-slate-700'
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                form.isDoctor ? 'translate-x-2.5' : '-translate-x-2.5'
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {form.isDoctor && (
+                          <div className="pt-3 border-t border-pink-500/20 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in">
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                                Cargo / Rol Clínico
+                              </label>
+                              <input
+                                type="text"
+                                value={form.doctorRole}
+                                onChange={(e) => setForm({ ...form, doctorRole: e.target.value })}
+                                placeholder="Ej: Ginecólogo Obstetra, Médico General"
+                                className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background text-foreground font-semibold"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                                Subespecialidad / Enfoque
+                              </label>
+                              <input
+                                type="text"
+                                value={form.doctorSpecialty}
+                                onChange={(e) => setForm({ ...form, doctorSpecialty: e.target.value })}
+                                placeholder="Ej: Control Prenatal, Eco 4D, Colposcopia"
+                                className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background text-foreground"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                                Nº Colegiatura / Matrícula Médica (MPPS)
+                              </label>
+                              <input
+                                type="text"
+                                value={form.doctorLicense}
+                                onChange={(e) => setForm({ ...form, doctorLicense: e.target.value })}
+                                placeholder="Ej: MPPS-94812 / ColMed-342"
+                                className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background text-foreground font-mono"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                                Comisión / Honorarios (%)
+                              </label>
+                              <div className="relative">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  value={form.doctorCommission}
+                                  onChange={(e) => setForm({ ...form, doctorCommission: Number(e.target.value) || 0 })}
+                                  className="w-full text-xs px-3 py-2 pr-7 rounded-xl border border-border bg-background text-foreground font-bold font-mono"
+                                />
+                                <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">%</span>
+                              </div>
+                            </div>
+
+                            <div className="sm:col-span-2">
+                              <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
+                                Emoji / Distintivo en Consulta
+                              </label>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {['🩺', '👶', '🌸', '🔬', '⚕️', '👩‍⚕️', '👨‍⚕️', '💊', '❤️'].map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => setForm({ ...form, doctorAvatar: emoji })}
+                                    className={`w-8 h-8 rounded-xl text-base flex items-center justify-center border transition-all ${
+                                      form.doctorAvatar === emoji
+                                        ? 'border-pink-500 bg-pink-500/20 scale-105'
                                         : 'border-border bg-background hover:bg-slate-100 dark:hover:bg-slate-800'
                                     }`}
                                   >

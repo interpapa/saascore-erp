@@ -37,7 +37,8 @@ import {
   Sliders,
   Tag,
   ArrowRightLeft,
-  UserPlus
+  UserPlus,
+  FolderOpen
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Odontogram } from '@/components/dental/Odontogram';
@@ -48,6 +49,7 @@ import { DentalScheduleModal } from '@/components/dental/DentalScheduleModal';
 import { PatientProfileModal } from '@/components/dental/PatientProfileModal';
 import { PatientSelectModal } from '@/components/dental/PatientSelectModal';
 import { NewConsumableModal } from '@/components/dental/NewConsumableModal';
+import { FullPatientRecordModal } from '@/components/dental/FullPatientRecordModal';
 import { OrthodonticsTracker } from '@/components/dental/OrthodonticsTracker';
 import { EndodonticsSheet } from '@/components/dental/EndodonticsSheet';
 import { PeriodonticsMiniChart } from '@/components/dental/PeriodonticsMiniChart';
@@ -166,6 +168,7 @@ export default function OdontologiaPage() {
   const [isSelectPatientModalOpen, setIsSelectPatientModalOpen] = useState(false);
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isFullRecordModalOpen, setIsFullRecordModalOpen] = useState(false);
   const [isNewConsumableModalOpen, setIsNewConsumableModalOpen] = useState(false);
   const [isSubmittingPatient, setIsSubmittingPatient] = useState(false);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -1550,12 +1553,22 @@ export default function OdontologiaPage() {
 
               <button
                 type="button"
+                onClick={() => setIsFullRecordModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 text-xs font-black transition-all shadow-sm shadow-teal-600/20 btn-haptic"
+                title="Abrir Expediente Clínico Completo con historial, tratamientos y antecedentes"
+              >
+                <FolderOpen size={14} />
+                <span>Expediente Completo</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setIsProfileModalOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 text-xs font-bold transition-all border border-teal-500/30 btn-haptic shadow-2xs"
                 title="Ver y editar ficha completa, antecedentes e historia médica del paciente"
               >
                 <UserCheck size={14} />
-                <span>Ver / Editar Ficha</span>
+                <span>Editar Ficha</span>
               </button>
 
               {patientWorkOrders.length > 0 && (
@@ -3109,6 +3122,34 @@ export default function OdontologiaPage() {
           onSuccess={(updated) => {
             setSelectedPatient(updated);
             setCustomers((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+          }}
+        />
+      )}
+
+      {/* MODAL DE EXPEDIENTE CLÍNICO INTEGRAL DEL PACIENTE */}
+      {selectedPatient && (
+        <FullPatientRecordModal
+          isOpen={isFullRecordModalOpen}
+          onClose={() => setIsFullRecordModalOpen(false)}
+          patient={selectedPatient}
+          chart={currentChart}
+          evolutions={patientEvolutions}
+          workOrders={patientWorkOrders}
+          appointments={todayAppointments}
+          tenantId={tenantId}
+          actor={effectiveActor}
+          onOpenEditProfile={() => {
+            setIsFullRecordModalOpen(false);
+            setIsProfileModalOpen(true);
+          }}
+          onOpenSchedule={() => {
+            setIsFullRecordModalOpen(false);
+            setIsScheduleModalOpen(true);
+          }}
+          onRefresh={() => {
+            if (selectedPatient) {
+              loadPatientChartAndEvolutions(selectedPatient.id);
+            }
           }}
         />
       )}

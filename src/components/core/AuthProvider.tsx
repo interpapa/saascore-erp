@@ -175,6 +175,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!session && !isPublic) {
       router.push('/login');
     } 
+    // Si el usuario ya está autenticado y está en la pantalla de /login -> Directo al sistema
+    else if (session && pathname === '/login') {
+      if (session.tenantId && session.tenantId !== 'global-admin') {
+        router.replace('/dashboard');
+      } else if (session.role === 'superadmin') {
+        router.replace('/admin');
+      } else {
+        router.replace('/onboarding');
+      }
+    }
     // Usuario autenticado con empresa activa que quedó en /onboarding -> Directo a su Dashboard
     else if (session && session.tenantId && session.tenantId !== 'global-admin' && pathname === '/onboarding') {
       router.push('/dashboard');

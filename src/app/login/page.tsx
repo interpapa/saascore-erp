@@ -24,6 +24,13 @@ export default function LoginPage() {
   const activeSession = useERPStore((s) => s.session);
 
   useEffect(() => {
+    if (activeSession?.userEmail && activeSession?.tenantId) {
+      const destination = activeSession.tenantId !== 'global-admin' ? '/dashboard' : '/admin';
+      router.replace(destination);
+    }
+  }, [activeSession, router]);
+
+  useEffect(() => {
     if (countdown === null) return;
     if (countdown <= 0) {
       setCountdown(null);
@@ -188,37 +195,6 @@ export default function LoginPage() {
 
         {/* Formulario */}
         <div className="px-8 pb-10">
-          {activeSession?.userEmail && (
-            <div className="mb-5 p-3.5 bg-primary/10 border border-primary/20 rounded-2xl flex items-center justify-between text-xs animate-in fade-in">
-              <div className="min-w-0 pr-2">
-                <span className="font-bold text-foreground block">Sesión activa:</span>
-                <span className="text-slate-500 font-medium truncate block">{activeSession.userEmail}</span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => router.push(activeSession.tenantId && activeSession.tenantId !== 'global-admin' ? '/dashboard' : '/admin')}
-                  className="px-2.5 py-1.5 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-colors text-[11px]"
-                >
-                  Entrar
-                </button>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    await supabase.auth.signOut();
-                    useERPStore.getState().setSession(null);
-                    useERPStore.getState().setCurrentTenant(null);
-                    setEmail('');
-                    setPassword('');
-                  }}
-                  className="px-2 py-1.5 bg-slate-200 dark:bg-slate-800 text-foreground font-semibold rounded-lg hover:bg-slate-300 dark:hover:bg-slate-700 transition-colors text-[11px]"
-                >
-                  Salir
-                </button>
-              </div>
-            </div>
-          )}
-
           <form onSubmit={handleSubmit} noValidate className="space-y-5">
             {error && (
               <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-sm p-3.5 rounded-xl font-medium leading-relaxed animate-in slide-in-from-top-2">
