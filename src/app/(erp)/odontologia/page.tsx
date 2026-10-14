@@ -129,6 +129,7 @@ export default function OdontologiaPage() {
   // Estaciones Clínicas Panorámicas (Opción A: Flujo paso a paso)
   type ClinicalStation = 'diagnostico' | 'especialidades' | 'evolucion' | 'expediente';
   const [clinicalStation, setClinicalStation] = useState<ClinicalStation>('diagnostico');
+  const [diagViewMode, setDiagViewMode] = useState<'odontograma' | 'historial'>('odontograma');
   const [specialtySubTab, setSpecialtySubTab] = useState<'ortodoncia' | 'endodoncia' | 'periodoncia'>('ortodoncia');
 
   // Evolución Médica de la Consulta de Hoy
@@ -1008,7 +1009,7 @@ export default function OdontologiaPage() {
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-28 space-y-5 animate-in fade-in duration-300">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 pt-20 pb-44 md:pb-28 space-y-5 animate-in fade-in duration-300">
       {/* 1. CABECERA & CONTROLES DE LA ESTACIÓN */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-4">
         <div>
@@ -1671,7 +1672,7 @@ export default function OdontologiaPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {/* STEPPER DE ESTACIONES CLÍNICAS (FLUJO PANORÁMICO PASO A PASO) */}
+            {/* STEPPER DE ESTACIONES CLÍNICAS (FLUJO CLÍNICO PASO A PASO) */}
             <div className="bg-card border border-border rounded-3xl p-2 sm:p-2.5 shadow-xs">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button
@@ -1690,34 +1691,14 @@ export default function OdontologiaPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-xs font-black uppercase tracking-wide truncate block">Diagnóstico & Plan</span>
+                      <span className="text-xs font-black uppercase tracking-wide truncate block">1. Diagnóstico & Plan</span>
                       {plannedTreatments.length > 0 && (
                         <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-600 text-white shrink-0">
                           {plannedTreatments.length}
                         </span>
                       )}
                     </div>
-                    <span className="text-[10px] text-slate-400 truncate block">Odontograma 360° + Presupuesto</span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setClinicalStation('especialidades')}
-                  className={`py-3 px-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
-                    clinicalStation === 'especialidades'
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-xs'
-                      : 'border-transparent text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
-                    clinicalStation === 'especialidades' ? 'bg-amber-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
-                  }`}>
-                    2
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-xs font-black uppercase tracking-wide truncate block">Especialidades</span>
-                    <span className="text-[10px] text-slate-400 truncate block">Brackets, Endo & Perio</span>
+                    <span className="text-[10px] text-slate-400 truncate block">Odontograma + Historial</span>
                   </div>
                 </button>
 
@@ -1733,11 +1714,31 @@ export default function OdontologiaPage() {
                   <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
                     clinicalStation === 'evolucion' ? 'bg-cyan-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                   }`}>
+                    2
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black uppercase tracking-wide truncate block">2. Consulta de Hoy</span>
+                    <span className="text-[10px] text-slate-400 truncate block">Evolución, Insumos & Récipe</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClinicalStation('especialidades')}
+                  className={`py-3 px-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                    clinicalStation === 'especialidades'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-xs'
+                      : 'border-transparent text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                    clinicalStation === 'especialidades' ? 'bg-amber-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>
                     3
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-black uppercase tracking-wide truncate block">Evolución & Insumos</span>
-                    <span className="text-[10px] text-slate-400 truncate block">Nota SOAP + Fármacos</span>
+                    <span className="text-xs font-black uppercase tracking-wide truncate block">3. Especialidades</span>
+                    <span className="text-[10px] text-slate-400 truncate block">Brackets, Endo & Perio</span>
                   </div>
                 </button>
 
@@ -1756,7 +1757,7 @@ export default function OdontologiaPage() {
                     4
                   </div>
                   <div className="min-w-0 flex-1">
-                    <span className="text-xs font-black uppercase tracking-wide truncate block">Expediente & Citas</span>
+                    <span className="text-xs font-black uppercase tracking-wide truncate block">4. Expediente & Citas</span>
                     <span className="text-[10px] text-slate-400 truncate block">Rx, Documentos & Turnos</span>
                   </div>
                 </button>
@@ -2421,7 +2422,7 @@ export default function OdontologiaPage() {
 
       {/* 5. DOCK INFERIOR FIJO: ACCIONES DE COBRO Y CIERRE DE CONSULTA (SOLO EN MODO PRO) */}
       {selectedPatient && viewMode === 'pro' && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl py-3 px-4 sm:px-8 animate-in slide-in-from-bottom duration-300">
+        <div className="fixed bottom-20 md:bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl py-2.5 sm:py-3 px-4 sm:px-8 animate-in slide-in-from-bottom duration-300">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Resumen Clínico */}
             <div className="flex items-center gap-3 w-full sm:w-auto">

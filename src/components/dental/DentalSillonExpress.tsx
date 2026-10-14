@@ -242,7 +242,7 @@ export function DentalSillonExpress({
   const exodonciaMatch = dynamicProcedures.find(p => p.name.toLowerCase().includes('extrac') || p.name.toLowerCase().includes('exodon')) || { name: 'Extracción Simple', cost: 40 };
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-5 pb-40">
       {/* 0. SELECCIÓN DE ODONTÓLOGO TRATANTE EN SILLÓN */}
       {doctors && doctors.length > 0 && (
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
@@ -715,15 +715,15 @@ export function DentalSillonExpress({
         </form>
       </MobileBottomSheet>
 
-      {/* 6. BARRA INFERIOR FIJA: ACCIÓN INMEDIATA A CAJA POS */}
-      <div className="fixed bottom-16 md:bottom-4 left-0 right-0 z-30 px-4 max-w-lg mx-auto pointer-events-none">
-        <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
+      {/* 6. BARRA INFERIOR FIJA: ACCIÓN INMEDIATA A CAJA POS (POSICIONADA SOBRE EL DOCK MÓVIL) */}
+      <div className="fixed bottom-24 md:bottom-6 left-0 right-0 z-50 px-4 max-w-lg mx-auto pointer-events-none">
+        <div className="pointer-events-auto bg-slate-900/95 dark:bg-black/95 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700/80 backdrop-blur-xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200">
           <div>
             <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate max-w-[200px]">
               {doctors?.find((d) => d.id === selectedDoctorId) ? `👨‍⚕️ ${doctors.find((d) => d.id === selectedDoctorId)?.name}` : 'Odontólogo'} · {sessionItems.length === 0 ? 'Sin tratamientos hoy' : `${sessionItems.length} ítem(s)`}
             </div>
-            <div className="text-lg font-black text-teal-400 font-mono">
-              ${totalSessionUSD.toFixed(2)}
+            <div className="text-xl font-black text-teal-400 font-mono">
+              ${totalSessionUSD.toFixed(2)} USD
             </div>
           </div>
 

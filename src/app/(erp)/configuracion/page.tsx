@@ -26,6 +26,7 @@ const AVAILABLE_MODULES = [
   { id: 'clientes', name: 'CRM (Clientes)' },
   { id: 'inventario', name: 'Inventario' },
   { id: 'odontologia', name: 'Odontología' },
+  { id: 'clinica', name: 'Clínica Médica' },
   { id: 'barberia', name: 'Barbería' },
   { id: 'grooming', name: 'Peluquería Canina' },
   { id: 'whatsapp', name: 'WhatsApp' },
@@ -118,6 +119,9 @@ export default function ConfiguracionPage() {
     }
   }, [currentTenant, actor]);
 
+  const [isSavingDock, setIsSavingDock] = useState(false);
+  const [dockSaveFeedback, setDockSaveFeedback] = useState<string | null>(null);
+
   const toggleDockModule = (moduleId: string) => {
     setFormData(prev => {
       const isSelected = prev.mobile_dock_modules.includes(moduleId);
@@ -130,6 +134,35 @@ export default function ConfiguracionPage() {
         return { ...prev, mobile_dock_modules: [...prev.mobile_dock_modules, moduleId] };
       }
     });
+  };
+
+  const handleSaveMobileDock = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (!currentTenant || !actor) return;
+    setIsSavingDock(true);
+    setDockSaveFeedback(null);
+    try {
+      const updatedMetadata = {
+        ...currentTenant.metadata,
+        mobile_dock_modules: formData.mobile_dock_modules
+      };
+      const result = await updateTenantSettings(currentTenant.id, currentTenant.name, updatedMetadata, undefined, actor);
+      if (!result.success) throw new Error(result.error);
+
+      setCurrentTenant({
+        ...currentTenant,
+        metadata: updatedMetadata
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rendo_mobile_dock', JSON.stringify(formData.mobile_dock_modules));
+      }
+      setDockSaveFeedback('¡Accesos rápidos guardados con éxito!');
+      setTimeout(() => setDockSaveFeedback(null), 3500);
+    } catch (err: unknown) {
+      setDockSaveFeedback('Error al guardar: ' + ((err as Error).message || 'Error desconocido'));
+    } finally {
+      setIsSavingDock(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -259,7 +292,7 @@ export default function ConfiguracionPage() {
   };
 
   // Filtrar los módulos que el tenant tiene activos realmente
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'compras', 'contabilidad', 'calendario', 'odontologia', 'barberia', 'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'compras', 'contabilidad', 'calendario', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 'config', 'admin', 'apps'];
   const tenantActiveModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) ? currentTenant.active_modules : fallbackModules;
 
   return (
@@ -492,7 +525,11 @@ export default function ConfiguracionPage() {
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {AVAILABLE_MODULES.filter(m => tenantActiveModules.includes(m.id)).map(module => {
+            {AVAILABLE_MODULES.filter(m => {
+              if (m.id === 'clinica') return tenantActiveModules.includes('clinica') || tenantActiveModules.some((t: string) => t.startsWith('med_'));
+              if (m.id === 'inventario' || m.id === 'catalogo') return tenantActiveModules.includes('inventario') || tenantActiveModules.includes('catalogo');
+              return tenantActiveModules.includes(m.id);
+            }).map(module => {
               const isSelected = formData.mobile_dock_modules.includes(module.id);
               return (
                 <div 
@@ -512,9 +549,28 @@ export default function ConfiguracionPage() {
               );
             })}
           </div>
-          <p className="text-xs text-indigo-500 font-bold mt-4">
-            Seleccionados: {formData.mobile_dock_modules.length} de 5
-          </p>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-6 pt-4 border-t border-border">
+            <p className="text-xs text-indigo-500 font-bold">
+              Seleccionados: {formData.mobile_dock_modules.length} de 5
+            </p>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              {dockSaveFeedback && (
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-in fade-in">
+                  {dockSaveFeedback}
+                </span>
+              )}
+              <Button
+                type="button"
+                onClick={handleSaveMobileDock}
+                isLoading={isSavingDock}
+                className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs btn-haptic"
+              >
+                <Save size={14} className="mr-1.5" />
+                Guardar Accesos Rápidos
+              </Button>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end pt-4">
