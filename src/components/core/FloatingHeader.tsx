@@ -184,8 +184,8 @@ export function FloatingHeader() {
             <ThemeToggle />
           </div>
 
-          {/* Acceso directo SuperAdmin / Rendo Hub */}
-          {isSuperAdminEmail(session?.userEmail) && (
+          {/* Acceso directo SuperAdmin / Rendo Hub (Exclusivo SuperAdmin) */}
+          {session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail) && (
             <>
               <div className="w-px h-6 bg-border mx-1" />
               <Link

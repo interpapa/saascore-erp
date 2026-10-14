@@ -781,178 +781,284 @@ export default function GinecologiaPage() {
             {/* Fila Superior: Ficha y Fórmula Obstétrica G-P-C-A */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-pink-500/5 dark:bg-pink-500/10 border border-pink-500/20 p-3.5 rounded-2xl">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-pink-600 dark:text-pink-400 block">
+                <span className="text-xs font-black uppercase tracking-wider text-pink-600 dark:text-pink-400 block">
                   Paciente Activa en Consulta
                 </span>
-                <p className="text-base font-black text-foreground">{activePatient.name}</p>
+                <p className="text-lg font-black text-foreground">{activePatient.name}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {activePatient.tax_id ? `ID: ${activePatient.tax_id} • ` : ''}
-                  Tel: {activePatient.phone || 'Sin teléfono'}
+                  {activePatient.tax_id ? `Cédula/ID: ${activePatient.tax_id} • ` : ''}
+                  Tel: {activePatient.phone || 'Sin teléfono registrado'}
                 </p>
               </div>
 
-              {/* Botonera de Fórmula Obstétrica G - P - C - A */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-black text-slate-600 dark:text-slate-300 mr-1">
-                  Fórmula Obstétrica:
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-pink-600 bg-pink-500/10 px-3 py-1.5 rounded-xl border border-pink-500/20">
+                  Historia Clínica Activa
                 </span>
+              </div>
+            </div>
 
-                {/* Gestas */}
-                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
-                  <span className="text-xs font-black text-pink-600 mr-1.5">G:</span>
-                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
-                    {profile.gestas}
+            {/* Fórmula Obstétrica G-P-C-A con Significado Explícito y Botones Grandes */}
+            <div className="bg-gradient-to-r from-pink-500/10 via-rose-500/5 to-purple-500/10 border border-pink-500/20 p-4 rounded-3xl space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-pink-500 animate-pulse" />
+                  <span className="text-xs font-black uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                    Fórmula Obstétrica Reproductiva (G • P • C • A)
                   </span>
-                  <div className="flex flex-col ml-1.5">
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  Usa los botones grandes [+] y [-] para ajustar el historial gestacional
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* G: Gestas */}
+                <div className="bg-card border border-border/80 hover:border-pink-500/40 p-3.5 rounded-2xl shadow-xs transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-xl bg-pink-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                        G
+                      </span>
+                      <span className="text-[10px] font-black text-pink-600 bg-pink-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        Total
+                      </span>
+                    </div>
+                    <p className="text-sm font-black text-foreground mt-2">Gestas</p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Total de embarazos
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/50">
                     <button
-                      onClick={() => adjustObstetricParam('gestas', 1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
-                    >
-                      ▲
-                    </button>
-                    <button
+                      type="button"
                       onClick={() => adjustObstetricParam('gestas', -1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                      className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-black text-lg flex items-center justify-center transition-colors btn-haptic"
+                      title="Disminuir Gestas"
                     >
-                      ▼
+                      <Minus size={16} />
+                    </button>
+                    <span className="text-2xl font-black text-foreground font-mono">
+                      {profile.gestas}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustObstetricParam('gestas', 1)}
+                      className="w-9 h-9 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-black text-lg flex items-center justify-center shadow-xs transition-colors btn-haptic"
+                      title="Aumentar Gestas"
+                    >
+                      <Plus size={16} />
                     </button>
                   </div>
                 </div>
 
-                {/* Partos */}
-                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
-                  <span className="text-xs font-black text-pink-600 mr-1.5">P:</span>
-                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
-                    {profile.partos}
-                  </span>
-                  <div className="flex flex-col ml-1.5">
+                {/* P: Partos */}
+                <div className="bg-card border border-border/80 hover:border-pink-500/40 p-3.5 rounded-2xl shadow-xs transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-xl bg-purple-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                        P
+                      </span>
+                      <span className="text-[10px] font-black text-purple-600 bg-purple-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        Vaginales
+                      </span>
+                    </div>
+                    <p className="text-sm font-black text-foreground mt-2">Partos</p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Partos naturales
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/50">
                     <button
-                      onClick={() => adjustObstetricParam('partos', 1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
-                    >
-                      ▲
-                    </button>
-                    <button
+                      type="button"
                       onClick={() => adjustObstetricParam('partos', -1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                      className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-black text-lg flex items-center justify-center transition-colors btn-haptic"
+                      title="Disminuir Partos"
                     >
-                      ▼
+                      <Minus size={16} />
+                    </button>
+                    <span className="text-2xl font-black text-foreground font-mono">
+                      {profile.partos}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustObstetricParam('partos', 1)}
+                      className="w-9 h-9 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-lg flex items-center justify-center shadow-xs transition-colors btn-haptic"
+                      title="Aumentar Partos"
+                    >
+                      <Plus size={16} />
                     </button>
                   </div>
                 </div>
 
-                {/* Cesáreas */}
-                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
-                  <span className="text-xs font-black text-pink-600 mr-1.5">C:</span>
-                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
-                    {profile.cesareas}
-                  </span>
-                  <div className="flex flex-col ml-1.5">
+                {/* C: Cesáreas */}
+                <div className="bg-card border border-border/80 hover:border-pink-500/40 p-3.5 rounded-2xl shadow-xs transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-xl bg-blue-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                        C
+                      </span>
+                      <span className="text-[10px] font-black text-blue-600 bg-blue-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        Cirugía
+                      </span>
+                    </div>
+                    <p className="text-sm font-black text-foreground mt-2">Cesáreas</p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Partos por cesárea
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/50">
                     <button
-                      onClick={() => adjustObstetricParam('cesareas', 1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
-                    >
-                      ▲
-                    </button>
-                    <button
+                      type="button"
                       onClick={() => adjustObstetricParam('cesareas', -1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                      className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-black text-lg flex items-center justify-center transition-colors btn-haptic"
+                      title="Disminuir Cesáreas"
                     >
-                      ▼
+                      <Minus size={16} />
+                    </button>
+                    <span className="text-2xl font-black text-foreground font-mono">
+                      {profile.cesareas}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustObstetricParam('cesareas', 1)}
+                      className="w-9 h-9 rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-black text-lg flex items-center justify-center shadow-xs transition-colors btn-haptic"
+                      title="Aumentar Cesáreas"
+                    >
+                      <Plus size={16} />
                     </button>
                   </div>
                 </div>
 
-                {/* Abortos */}
-                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
-                  <span className="text-xs font-black text-pink-600 mr-1.5">A:</span>
-                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
-                    {profile.abortos}
-                  </span>
-                  <div className="flex flex-col ml-1.5">
+                {/* A: Abortos */}
+                <div className="bg-card border border-border/80 hover:border-pink-500/40 p-3.5 rounded-2xl shadow-xs transition-all flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="w-8 h-8 rounded-xl bg-amber-500 text-white font-black text-sm flex items-center justify-center shadow-xs">
+                        A
+                      </span>
+                      <span className="text-[10px] font-black text-amber-600 bg-amber-500/10 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        Pérdidas
+                      </span>
+                    </div>
+                    <p className="text-sm font-black text-foreground mt-2">Abortos</p>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Pérdidas gestacionales
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-border/50">
                     <button
-                      onClick={() => adjustObstetricParam('abortos', 1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
-                    >
-                      ▲
-                    </button>
-                    <button
+                      type="button"
                       onClick={() => adjustObstetricParam('abortos', -1)}
-                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                      className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-black text-lg flex items-center justify-center transition-colors btn-haptic"
+                      title="Disminuir Abortos"
                     >
-                      ▼
+                      <Minus size={16} />
+                    </button>
+                    <span className="text-2xl font-black text-foreground font-mono">
+                      {profile.abortos}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => adjustObstetricParam('abortos', 1)}
+                      className="w-9 h-9 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-lg flex items-center justify-center shadow-xs transition-colors btn-haptic"
+                      title="Aumentar Abortos"
+                    >
+                      <Plus size={16} />
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Fila Inferior: Triaje y Signos Vitales Maternos */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            {/* Fila Inferior: Triaje y Signos Vitales Maternos con Tipografía Clara */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {/* Presión Arterial */}
-              <div className="p-2.5 rounded-2xl bg-card border border-border">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Presión Arterial</span>
-                <input
-                  type="text"
-                  value={vitals.bloodPressure}
-                  onChange={(e) => setVitals((v) => ({ ...v, bloodPressure: e.target.value }))}
-                  placeholder="120/80"
-                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
-                />
+              <div className="p-3.5 rounded-2xl bg-card border border-border shadow-2xs hover:border-pink-500/30 transition-all">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">
+                  Presión Arterial
+                </span>
+                <div className="flex items-baseline justify-between mt-1">
+                  <input
+                    type="text"
+                    value={vitals.bloodPressure}
+                    onChange={(e) => setVitals((v) => ({ ...v, bloodPressure: e.target.value }))}
+                    placeholder="120/80"
+                    className="w-full text-base font-black text-foreground bg-transparent outline-none font-mono"
+                  />
+                  <span className="text-xs font-bold text-slate-400 font-mono shrink-0">mmHg</span>
+                </div>
               </div>
 
               {/* Frecuencia Cardíaca */}
-              <div className="p-2.5 rounded-2xl bg-card border border-border">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">FC Materna (lpm)</span>
-                <input
-                  type="number"
-                  value={vitals.heartRate}
-                  onChange={(e) => setVitals((v) => ({ ...v, heartRate: Number(e.target.value) }))}
-                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
-                />
+              <div className="p-3.5 rounded-2xl bg-card border border-border shadow-2xs hover:border-pink-500/30 transition-all">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">
+                  FC Materna
+                </span>
+                <div className="flex items-baseline justify-between mt-1">
+                  <input
+                    type="number"
+                    value={vitals.heartRate}
+                    onChange={(e) => setVitals((v) => ({ ...v, heartRate: Number(e.target.value) }))}
+                    className="w-full text-base font-black text-foreground bg-transparent outline-none font-mono"
+                  />
+                  <span className="text-xs font-bold text-slate-400 font-mono shrink-0">lpm</span>
+                </div>
               </div>
 
               {/* Peso Materno */}
-              <div className="p-2.5 rounded-2xl bg-card border border-border">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Peso (kg)</span>
-                <input
-                  type="number"
-                  step="0.1"
-                  value={vitals.weightKg === '' ? '' : vitals.weightKg}
-                  onChange={(e) =>
-                    setVitals((v) => ({ ...v, weightKg: e.target.value === '' ? '' : Number(e.target.value) }))
-                  }
-                  placeholder="Ej: 62.5"
-                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
-                />
+              <div className="p-3.5 rounded-2xl bg-card border border-border shadow-2xs hover:border-pink-500/30 transition-all">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">
+                  Peso
+                </span>
+                <div className="flex items-baseline justify-between mt-1">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={vitals.weightKg === '' ? '' : vitals.weightKg}
+                    onChange={(e) =>
+                      setVitals((v) => ({ ...v, weightKg: e.target.value === '' ? '' : Number(e.target.value) }))
+                    }
+                    placeholder="62.5"
+                    className="w-full text-base font-black text-foreground bg-transparent outline-none font-mono"
+                  />
+                  <span className="text-xs font-bold text-slate-400 font-mono shrink-0">kg</span>
+                </div>
               </div>
 
               {/* Talla Materna */}
-              <div className="p-2.5 rounded-2xl bg-card border border-border">
-                <span className="text-[10px] font-bold text-slate-500 uppercase block">Talla (cm)</span>
-                <input
-                  type="number"
-                  value={vitals.heightCm === '' ? '' : vitals.heightCm}
-                  onChange={(e) =>
-                    setVitals((v) => ({ ...v, heightCm: e.target.value === '' ? '' : Number(e.target.value) }))
-                  }
-                  placeholder="Ej: 165"
-                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
-                />
+              <div className="p-3.5 rounded-2xl bg-card border border-border shadow-2xs hover:border-pink-500/30 transition-all">
+                <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">
+                  Talla
+                </span>
+                <div className="flex items-baseline justify-between mt-1">
+                  <input
+                    type="number"
+                    value={vitals.heightCm === '' ? '' : vitals.heightCm}
+                    onChange={(e) =>
+                      setVitals((v) => ({ ...v, heightCm: e.target.value === '' ? '' : Number(e.target.value) }))
+                    }
+                    placeholder="165"
+                    className="w-full text-base font-black text-foreground bg-transparent outline-none font-mono"
+                  />
+                  <span className="text-xs font-bold text-slate-400 font-mono shrink-0">cm</span>
+                </div>
               </div>
 
               {/* IMC Materno Calculado Dinámicamente */}
-              <div className="p-2.5 rounded-2xl bg-card border border-border col-span-2 sm:col-span-1">
+              <div className="p-3.5 rounded-2xl bg-card border border-border col-span-2 sm:col-span-1 shadow-2xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">IMC (OMS)</span>
-                  <span className="text-[9px] text-slate-400 font-mono" title="Fórmula OMS: Peso (kg) ÷ [Talla (m)]²">
+                  <span className="text-xs font-black text-slate-500 uppercase tracking-wider block">
+                    IMC (OMS)
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono" title="Fórmula OMS: Peso (kg) ÷ [Talla (m)]²">
                     kg/m²
                   </span>
                 </div>
-                <p className="text-sm font-black text-foreground mt-0.5">
-                  {bmiInfo.bmi > 0 ? `${bmiInfo.bmi} kg/m²` : '—'}
+                <p className="text-base font-black text-foreground mt-1 font-mono">
+                  {bmiInfo.bmi > 0 ? `${bmiInfo.bmi}` : '—'}
                 </p>
-                <span className="text-[10px] font-bold block truncate" style={{ color: bmiInfo.color }}>
+                <span className="text-xs font-black block truncate mt-0.5" style={{ color: bmiInfo.color }}>
                   {bmiInfo.category}
                 </span>
               </div>
@@ -1067,10 +1173,15 @@ export default function GinecologiaPage() {
               Exploración Obstétrica de la Sesión
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Altura Uterina */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500">Altura Uterina (cm):</label>
+              <div className="space-y-1.5 p-3.5 rounded-2xl bg-card border border-border shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-500">
+                    Altura Uterina
+                  </label>
+                  <span className="text-xs font-bold text-pink-600 font-mono">cm</span>
+                </div>
                 <input
                   type="number"
                   value={obstetricExam.uterineHeightCm || ''}
@@ -1078,71 +1189,127 @@ export default function GinecologiaPage() {
                     setObstetricExam((prev) => ({ ...prev, uterineHeightCm: Number(e.target.value) }))
                   }
                   placeholder="Ej: 24"
-                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+                  className="w-full text-base font-black text-foreground bg-transparent outline-none font-mono"
                 />
               </div>
 
               {/* FCF Doppler Fetal */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500">FCF Doppler (lpm):</label>
+              <div className="space-y-1.5 p-3.5 rounded-2xl bg-card border border-border shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-500">
+                    FCF Doppler Fetal
+                  </label>
+                  <span className="text-xs font-bold text-pink-600 font-mono">lpm</span>
+                </div>
                 <input
                   type="number"
                   value={obstetricExam.fetalHeartRateBpm || ''}
                   onChange={(e) =>
                     setObstetricExam((prev) => ({ ...prev, fetalHeartRateBpm: Number(e.target.value) }))
                   }
-                  placeholder="Ej: 142"
-                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+                  placeholder="Ej: 142 (Normal: 110-160)"
+                  className="w-full text-base font-black text-foreground bg-transparent outline-none font-mono"
                 />
               </div>
+            </div>
 
+            {/* Selectores Visuales Táctiles Grandes */}
+            <div className="space-y-4 pt-1 border-t border-border/60">
               {/* Movimientos Fetales */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500">Movimientos Fetales:</label>
-                <select
-                  value={obstetricExam.fetalMovements}
-                  onChange={(e) =>
-                    setObstetricExam((prev) => ({ ...prev, fetalMovements: e.target.value as any }))
-                  }
-                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
-                >
-                  <option value="presentes">Presentes y activos</option>
-                  <option value="disminuidos">Disminuidos</option>
-                  <option value="ausentes">Ausentes (Alerta)</option>
-                </select>
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 block">
+                  Movimientos Fetales:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'presentes', label: '✅ Presentes y Activos', desc: 'Movimientos normales' },
+                    { id: 'disminuidos', label: '⚠️ Disminuidos', desc: 'Menor actividad percibida' },
+                    { id: 'ausentes', label: '🚨 Ausentes (Alerta)', desc: 'Sin movimientos percibidos' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setObstetricExam((prev) => ({ ...prev, fetalMovements: opt.id as any }))}
+                      className={`p-3 rounded-2xl text-left border transition-all btn-haptic ${
+                        obstetricExam.fetalMovements === opt.id
+                          ? opt.id === 'ausentes'
+                            ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                            : opt.id === 'disminuidos'
+                              ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                              : 'bg-pink-500 text-white border-pink-600 shadow-xs'
+                          : 'bg-card text-foreground border-border hover:bg-pink-500/10'
+                      }`}
+                    >
+                      <p className="text-xs font-black">{opt.label}</p>
+                      <p className={`text-[11px] mt-0.5 ${obstetricExam.fetalMovements === opt.id ? 'opacity-90' : 'text-slate-400'}`}>
+                        {opt.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Presentación Fetal */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500">Presentación Fetal:</label>
-                <select
-                  value={obstetricExam.presentation}
-                  onChange={(e) =>
-                    setObstetricExam((prev) => ({ ...prev, presentation: e.target.value as any }))
-                  }
-                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
-                >
-                  <option value="cefalica">Cefálica</option>
-                  <option value="podalica">Podálica / Pelviana</option>
-                  <option value="transversa">Transversa</option>
-                </select>
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 block">
+                  Presentación Fetal:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {[
+                    { id: 'cefalica', label: '👶 Cefálica', desc: 'Cabeza orientada a pelvis' },
+                    { id: 'podalica', label: '🔄 Podálica / Pelviana', desc: 'Glúteos / pies abajo' },
+                    { id: 'transversa', label: '↔️ Transversa', desc: 'Posición perpendicular' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setObstetricExam((prev) => ({ ...prev, presentation: opt.id as any }))}
+                      className={`p-3 rounded-2xl text-left border transition-all btn-haptic ${
+                        obstetricExam.presentation === opt.id
+                          ? 'bg-purple-600 text-white border-purple-700 shadow-xs'
+                          : 'bg-card text-foreground border-border hover:bg-purple-500/10'
+                      }`}
+                    >
+                      <p className="text-xs font-black">{opt.label}</p>
+                      <p className={`text-[11px] mt-0.5 ${obstetricExam.presentation === opt.id ? 'opacity-90' : 'text-slate-400'}`}>
+                        {opt.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* Edema Materno */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-500">Edema de Miembros:</label>
-                <select
-                  value={obstetricExam.edema}
-                  onChange={(e) =>
-                    setObstetricExam((prev) => ({ ...prev, edema: e.target.value as any }))
-                  }
-                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
-                >
-                  <option value="ausente">Ausente</option>
-                  <option value="leve">Leve (+)</option>
-                  <option value="moderado">Moderado (++)</option>
-                  <option value="severo">Severo (+++) (Descartar Preeclampsia)</option>
-                </select>
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-500 block">
+                  Edema de Miembros:
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    { id: 'ausente', label: 'Ausente', desc: 'Sin retención' },
+                    { id: 'leve', label: 'Leve (+)', desc: 'Tobillos al final del día' },
+                    { id: 'moderado', label: 'Moderado (++)', desc: 'Piernas y manos' },
+                    { id: 'severo', label: 'Severo (+++)', desc: 'Descartar Preeclampsia' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setObstetricExam((prev) => ({ ...prev, edema: opt.id as any }))}
+                      className={`p-3 rounded-2xl text-left border transition-all btn-haptic ${
+                        obstetricExam.edema === opt.id
+                          ? opt.id === 'severo'
+                            ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                            : 'bg-pink-500 text-white border-pink-600 shadow-xs'
+                          : 'bg-card text-foreground border-border hover:bg-pink-500/10'
+                      }`}
+                    >
+                      <p className="text-xs font-black">{opt.label}</p>
+                      <p className={`text-[11px] mt-0.5 ${obstetricExam.edema === opt.id ? 'opacity-90' : 'text-slate-400'}`}>
+                        {opt.desc}
+                      </p>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -1213,79 +1380,173 @@ export default function GinecologiaPage() {
               Especuloscopia, Test de Schiller & Colposcopia
             </h4>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Test de Ácido Acético */}
-              <div className="space-y-1.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border">
-                <label className="text-xs font-black text-slate-700 dark:text-slate-300">
-                  Prueba de Ácido Acético al 3-5%:
+            {/* Prueba de Ácido Acético al 3-5% */}
+            <div className="space-y-2 p-4 rounded-3xl bg-card border border-border shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                  Prueba de Ácido Acético al 3-5% (Reacción Acetoblanca):
                 </label>
-                <select
-                  value={gynecologicExam.aceticAcidTest}
-                  onChange={(e) =>
-                    setGynecologicExam((prev) => ({ ...prev, aceticAcidTest: e.target.value as any }))
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none cursor-pointer"
-                >
-                  <option value="normal">Normal (Sin epitelio acetoblanco)</option>
-                  <option value="acetoblanco_tenue">Epitelio acetoblanco tenue (Bajo grado / LSIL)</option>
-                  <option value="acetoblanco_denso">Epitelio acetoblanco denso opaco (Alto grado / HSIL)</option>
-                  <option value="mosaico">Mosaico vascular evidente</option>
-                  <option value="punteado">Punteado basófilo</option>
-                </select>
+                <span className="text-[11px] text-slate-400 font-medium">Toca para seleccionar</span>
               </div>
-
-              {/* Test de Schiller */}
-              <div className="space-y-1.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border">
-                <label className="text-xs font-black text-slate-700 dark:text-slate-300">
-                  Test de Schiller (Solución de Lugol):
-                </label>
-                <select
-                  value={gynecologicExam.schillerTest}
-                  onChange={(e) =>
-                    setGynecologicExam((prev) => ({ ...prev, schillerTest: e.target.value as any }))
-                  }
-                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none cursor-pointer"
-                >
-                  <option value="positivo_caoba">Schiller Negativo / Caoba Normal (Capta yodo)</option>
-                  <option value="negativo_yodonegativo">
-                    Schiller Positivo / Zona Yodonegativa Mostaza (Sospecha)
-                  </option>
-                  <option value="no_realizado">No realizado en esta sesión</option>
-                </select>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  { id: 'normal', label: '✅ Normal', desc: 'Sin epitelio acetoblanco' },
+                  { id: 'acetoblanco_tenue', label: '⚠️ Tenue (LSIL)', desc: 'Epitelio acetoblanco fino / bajo grado' },
+                  { id: 'acetoblanco_denso', label: '🚨 Denso Opaco (HSIL)', desc: 'Epitelio grueso / sospecha alto grado' },
+                  { id: 'mosaico', label: '🔶 Mosaico Vascular', desc: 'Patrón vascular en mosaico' },
+                  { id: 'punteado', label: '🟣 Punteado Basófilo', desc: 'Capilares punteados atípicos' },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setGynecologicExam((prev) => ({ ...prev, aceticAcidTest: opt.id as any }))}
+                    className={`p-3 rounded-2xl text-left border transition-all btn-haptic ${
+                      gynecologicExam.aceticAcidTest === opt.id
+                        ? opt.id === 'acetoblanco_denso'
+                          ? 'bg-rose-500 text-white border-rose-600 shadow-xs'
+                          : opt.id === 'acetoblanco_tenue'
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            : 'bg-pink-500 text-white border-pink-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-900/40 text-foreground border-border hover:bg-pink-500/10'
+                    }`}
+                  >
+                    <p className="text-xs font-black">{opt.label}</p>
+                    <p className={`text-[11px] mt-0.5 ${gynecologicExam.aceticAcidTest === opt.id ? 'opacity-90' : 'text-slate-400'}`}>
+                      {opt.desc}
+                    </p>
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Clasificación Bethesda */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-500">
-                Clasificación Citopatológica Bethesda (PAP):
-              </label>
-              <select
-                value={gynecologicExam.bethesdaPapClassification}
-                onChange={(e) =>
-                  setGynecologicExam((prev) => ({ ...prev, bethesdaPapClassification: e.target.value }))
-                }
-                className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none cursor-pointer"
-              >
-                <option value="Negativo para lesión intraepitelial o malignidad (NILM)">
-                  NILM — Negativo para lesión intraepitelial o malignidad
-                </option>
-                <option value="ASC-US — Células escamosas atípicas de significado indeterminado">
-                  ASC-US — Células escamosas atípicas de significado indeterminado
-                </option>
-                <option value="LSIL — Lesión intraepitelial escamosa de bajo grado (CIN I)">
-                  LSIL — Lesión intraepitelial de bajo grado (CIN I / VPH)
-                </option>
-                <option value="ASC-H — Células escamosas atípicas, no se descarta HSIL">
-                  ASC-H — Atipia escamosa, no se descarta alto grado
-                </option>
-                <option value="HSIL — Lesión intraepitelial escamosa de alto grado (CIN II / CIN III)">
-                  HSIL — Lesión intraepitelial de alto grado (CIN II / CIN III / CIS)
-                </option>
-                <option value="AGC — Células glandulares atípicas (Endocervicales / Endometriales)">
-                  AGC — Células glandulares atípicas
-                </option>
-              </select>
+            {/* Test de Schiller (Lugol) */}
+            <div className="space-y-2 p-4 rounded-3xl bg-card border border-border shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                  Test de Schiller (Tinción con Solución de Lugol):
+                </label>
+                <span className="text-[11px] text-slate-400 font-medium">Toca para seleccionar</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  {
+                    id: 'positivo_caoba',
+                    label: '🟤 Schiller Negativo / Caoba',
+                    desc: 'Normal: El epitelio sano capta yodo homogéneamente',
+                  },
+                  {
+                    id: 'negativo_yodonegativo',
+                    label: '🟡 Schiller Positivo / Mostaza',
+                    desc: 'Zona Yodonegativa (Sospecha: tomar biopsia dirigida)',
+                  },
+                  {
+                    id: 'no_realizado',
+                    label: '⚪ No Realizado',
+                    desc: 'No se aplicó Lugol en esta consulta',
+                  },
+                ].map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setGynecologicExam((prev) => ({ ...prev, schillerTest: opt.id as any }))}
+                    className={`p-3 rounded-2xl text-left border transition-all btn-haptic ${
+                      gynecologicExam.schillerTest === opt.id
+                        ? opt.id === 'negativo_yodonegativo'
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                          : 'bg-pink-500 text-white border-pink-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-900/40 text-foreground border-border hover:bg-pink-500/10'
+                    }`}
+                  >
+                    <p className="text-xs font-black">{opt.label}</p>
+                    <p className={`text-[11px] mt-0.5 ${gynecologicExam.schillerTest === opt.id ? 'opacity-90' : 'text-slate-400'}`}>
+                      {opt.desc}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Clasificación Citopatológica Bethesda (PAP) */}
+            <div className="space-y-2 p-4 rounded-3xl bg-card border border-border shadow-xs">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                  Clasificación Citopatológica Bethesda (PAP):
+                </label>
+                <span className="text-[11px] text-slate-400 font-medium">Diagnóstico de Citología</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {[
+                  {
+                    val: 'Negativo para lesión intraepitelial o malignidad (NILM)',
+                    code: 'NILM',
+                    name: 'Normal / Negativo',
+                    desc: 'Sin signos de lesión intraepitelial o malignidad',
+                    color: 'emerald',
+                  },
+                  {
+                    val: 'ASC-US — Células escamosas atípicas de significado indeterminado',
+                    code: 'ASC-US',
+                    name: 'Atipia Indeterminada',
+                    desc: 'Células escamosas atípicas de significado incierto',
+                    color: 'amber',
+                  },
+                  {
+                    val: 'LSIL — Lesión intraepitelial escamosa de bajo grado (CIN I)',
+                    code: 'LSIL',
+                    name: 'Bajo Grado (CIN I / VPH)',
+                    desc: 'Displasia leve vinculada a infección por VPH',
+                    color: 'orange',
+                  },
+                  {
+                    val: 'ASC-H — Células escamosas atípicas, no se descarta HSIL',
+                    code: 'ASC-H',
+                    name: 'Atipia Sugestiva de Alto Grado',
+                    desc: 'No se descarta lesión intraepitelial de alto grado',
+                    color: 'rose',
+                  },
+                  {
+                    val: 'HSIL — Lesión intraepitelial escamosa de alto grado (CIN II / CIN III)',
+                    code: 'HSIL',
+                    name: 'Alto Grado (CIN II / CIN III)',
+                    desc: 'Displasia moderada a severa / carcinoma in situ',
+                    color: 'red',
+                  },
+                  {
+                    val: 'AGC — Células glandulares atípicas (Endocervicales / Endometriales)',
+                    code: 'AGC',
+                    name: 'Atipia Glandular',
+                    desc: 'Células endocervicales o endometriales atípicas',
+                    color: 'purple',
+                  },
+                ].map((b) => (
+                  <button
+                    key={b.code}
+                    type="button"
+                    onClick={() => setGynecologicExam((prev) => ({ ...prev, bethesdaPapClassification: b.val }))}
+                    className={`p-3 rounded-2xl text-left border transition-all btn-haptic ${
+                      gynecologicExam.bethesdaPapClassification === b.val
+                        ? 'bg-pink-500 text-white border-pink-600 shadow-xs'
+                        : 'bg-slate-50 dark:bg-slate-900/40 text-foreground border-border hover:bg-pink-500/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
+                        gynecologicExam.bethesdaPapClassification === b.val
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-200 dark:bg-slate-800 text-foreground'
+                      }`}>
+                        {b.code}
+                      </span>
+                    </div>
+                    <p className="text-xs font-black mt-1">{b.name}</p>
+                    <p className={`text-[11px] mt-0.5 leading-tight ${
+                      gynecologicExam.bethesdaPapClassification === b.val ? 'opacity-90' : 'text-slate-400'
+                    }`}>
+                      {b.desc}
+                    </p>
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Checkbox de Biopsia */}

@@ -19,9 +19,7 @@ const DEFAULT_SUPERADMINS = [
   'interpapadavid2811@gmail.com',
   'valerasilvamariajose@gmail.com',
   'admin@rendo.com',
-  'admin@rendomundial.com',
-  'rodolfo@rendo.com',
-  'rodolfo@gmail.com'
+  'rodolfo@rendo.com'
 ];
 const rawSuperAdmins = process.env.SUPERADMIN_EMAIL || '';
 export const SUPERADMIN_EMAILS = Array.from(

@@ -29,18 +29,18 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   } | null>(null);
 
   useEffect(() => {
-    // Permitir acceso EXCLUSIVO a emails autorizados en lista blanca de Rendo Hub
-    const isSuper = isSuperAdminEmail(session?.userEmail);
+    // Permitir acceso EXCLUSIVO a superadmins autenticados en lista blanca de Rendo Hub
+    const isSuper = session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail);
     if (isSuper) {
       setIsAuthorized(true);
     } else {
       setIsAuthorized(false);
       router.replace('/dashboard');
     }
-  }, [session?.userEmail, router]);
+  }, [session?.role, session?.userEmail, router]);
 
   useEffect(() => {
-    const isSuper = isSuperAdminEmail(session?.userEmail);
+    const isSuper = session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail);
     if (isSuper && session?.userEmail) {
       const activeActor = actor || { email: session.userEmail || '', role: 'superadmin' as any };
       getSystemHealthAdminAction(activeActor)
