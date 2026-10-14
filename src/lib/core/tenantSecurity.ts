@@ -15,25 +15,8 @@ export interface SecurityActor {
   token?: string;
 }
 
-const DEFAULT_SUPERADMINS = [
-  'interpapadavid2811@gmail.com',
-  'valerasilvamariajose@gmail.com',
-  'admin@rendo.com',
-  'rodolfo@rendo.com'
-];
-const rawSuperAdmins = process.env.SUPERADMIN_EMAIL || '';
-export const SUPERADMIN_EMAILS = Array.from(
-  new Set([
-    ...DEFAULT_SUPERADMINS,
-    ...rawSuperAdmins.split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-  ])
-);
-
-export function isSuperAdminEmail(email?: string | null): boolean {
-  if (!email) return false;
-  const clean = email.trim().toLowerCase();
-  return SUPERADMIN_EMAILS.includes(clean);
-}
+export { SUPERADMIN_EMAILS, isSuperAdminEmail } from './superadminWhitelist';
+import { isSuperAdminEmail } from './superadminWhitelist';
 
 export function isSuperAdminAuthUser(user?: { email?: string | null; app_metadata?: any; user_metadata?: any } | null): boolean {
   if (!user) return false;

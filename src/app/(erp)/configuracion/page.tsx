@@ -295,7 +295,7 @@ export default function ConfiguracionPage() {
   };
 
   // Filtrar los módulos que el tenant tiene activos realmente
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'compras', 'contabilidad', 'calendario', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 'config', 'admin', 'apps'];
+  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'compras', 'contabilidad', 'calendario', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 'config', 'apps'];
   const tenantActiveModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) ? currentTenant.active_modules : fallbackModules;
 
   return (

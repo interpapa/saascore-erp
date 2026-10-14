@@ -64,7 +64,7 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     name: 'Rendo Hub',
     category: 'administracion',
     description: 'Consola global de administración del software SaaS.',
-    isCore: true,
+    isCore: false,
   },
   clientes: {
     id: 'clientes',
@@ -258,6 +258,8 @@ export function isModuleActive(
   activeModules: string[] | undefined | null,
   moduleId: ModuleId
 ): boolean {
+  // Rendo Hub es la consola central SaaS, nunca un módulo de clientes
+  if (moduleId === 'admin') return false;
   // Módulos core siempre activos
   if (MODULE_CATALOG[moduleId]?.isCore) return true;
   if (!activeModules || activeModules.length === 0) {

@@ -45,6 +45,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await getUserTenant(cleanEmail, user.id);
 
       if (result.success && result.tenant) {
+        if (!isSuper && useERPStore.getState().impersonatedTenant) {
+          useERPStore.getState().stopImpersonation();
+        }
         setCurrentTenant({
           id: result.tenant.id,
           name: result.tenant.name,
@@ -61,8 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Si getUserTenant no devolvió tenant pero es Superadmin, darle acceso global
-      if (isSuper || result.role === 'superadmin') {
+      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, darle acceso global
+      if (isSuper) {
         setSession({
           userEmail: cleanEmail,
           role: 'superadmin',

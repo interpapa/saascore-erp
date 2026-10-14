@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { UserRole } from '@/lib/rbac';
+import { isSuperAdminEmail } from '@/lib/core/superadminWhitelist';
 
 export interface Tenant {
   id: string;
@@ -77,6 +78,18 @@ export const useERPStore = create<ERPState>()(
         state?.setHasHydrated(true);
         if (state?.session && isSessionExpired(state.session)) {
           state.setSession(null);
+        }
+        // Blindaje Anti-Fuga: Purgar residuos de superadmin e impersonación si el email no es superadmin
+        if (state) {
+          const isSuper = isSuperAdminEmail(state.session?.userEmail);
+          if (!isSuper) {
+            if (state.session && state.session.role === 'superadmin') {
+              state.setSession({ ...state.session, role: 'owner' });
+            }
+            if (state.impersonatedTenant) {
+              state.stopImpersonation();
+            }
+          }
         }
       },
     }

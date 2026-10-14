@@ -28,7 +28,7 @@ export async function runSeguridadTests() {
   // 3. Kernel de Módulos (Disponibilidad y Core Modules)
   console.log('1.3 Activación de módulos y protección de módulos Core');
   assert.equal(isModuleActive([], 'config'), true, 'Módulo config es Core y siempre debe estar activo');
-  assert.equal(isModuleActive([], 'admin'), true, 'Módulo admin es Core y siempre debe estar activo');
+  assert.equal(isModuleActive([], 'admin'), false, 'Módulo admin (Rendo Hub) nunca debe estar activo para un tenant común');
   assert.equal(isModuleActive([], 'clientes'), true, 'Módulo clientes es Core y siempre debe estar activo');
 
   // 4. Módulos opcionales / marketplace

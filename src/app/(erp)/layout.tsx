@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { FloatingHeader } from '@/components/core/FloatingHeader';
 import { AmbientBackground } from '@/components/core/AmbientBackground';
@@ -48,8 +48,15 @@ export default function ERPLayout({
   const impersonatedTenant = useERPStore(s => s.impersonatedTenant);
   const stopImpersonation = useERPStore(s => s.stopImpersonation);
 
-  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+  const isSuper = session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail);
   const isOwner = session?.role === 'owner';
+
+  // Blindaje Anti-Fuga: si un cliente común tiene datos residuales de impersonación en su storage, purgar de inmediato
+  useEffect(() => {
+    if (!isSuper && impersonatedTenant) {
+      stopImpersonation();
+    }
+  }, [isSuper, impersonatedTenant, stopImpersonation]);
 
   // 1. Módulos activos del tenant
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
@@ -100,7 +107,7 @@ export default function ERPLayout({
       <AmbientBackground />
 
       <div className="relative z-10 flex flex-col min-h-screen">
-        {impersonatedTenant && (
+        {isSuper && impersonatedTenant && (
           <div className="bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 text-white text-xs py-2 px-4 sticky top-0 z-50 flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-2 font-bold truncate">
               <Eye size={15} className="animate-pulse shrink-0" />
