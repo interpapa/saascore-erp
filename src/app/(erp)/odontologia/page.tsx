@@ -35,7 +35,9 @@ import {
   ShieldAlert,
   ClipboardList,
   Sliders,
-  Tag
+  Tag,
+  ArrowRightLeft,
+  UserPlus
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Odontogram } from '@/components/dental/Odontogram';
@@ -44,6 +46,7 @@ import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { DentalCheckoutModal } from '@/components/dental/DentalCheckoutModal';
 import { DentalScheduleModal } from '@/components/dental/DentalScheduleModal';
 import { PatientProfileModal } from '@/components/dental/PatientProfileModal';
+import { PatientSelectModal } from '@/components/dental/PatientSelectModal';
 import { NewConsumableModal } from '@/components/dental/NewConsumableModal';
 import { OrthodonticsTracker } from '@/components/dental/OrthodonticsTracker';
 import { EndodonticsSheet } from '@/components/dental/EndodonticsSheet';
@@ -148,6 +151,7 @@ export default function OdontologiaPage() {
   const [allergyInput, setAllergyInput] = useState('');
 
   // Modales
+  const [isSelectPatientModalOpen, setIsSelectPatientModalOpen] = useState(false);
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isNewConsumableModalOpen, setIsNewConsumableModalOpen] = useState(false);
@@ -156,6 +160,11 @@ export default function OdontologiaPage() {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
   const [isSendingToCashier, setIsSendingToCashier] = useState(false);
+
+  // Edición rápida de precios y procedimientos en presupuesto
+  const [editingTreatmentId, setEditingTreatmentId] = useState<string | null>(null);
+  const [tempPriceInput, setTempPriceInput] = useState<string>('');
+  const [selectedCatalogToAdd, setSelectedCatalogToAdd] = useState<string>('');
 
   // Tasa de cambio oficial / configurada
   const tenantMeta = (currentTenant?.metadata as Record<string, any>) || {};
@@ -292,38 +301,13 @@ export default function OdontologiaPage() {
     return mergeTenantDentalServices(dentalServices);
   }, [dentalServices]);
 
-  // CÁLCULO DE TRATAMIENTOS PLANIFICADOS (EXCLUYE CONDICIONES EXISTENTES)
-  // Regla Clínica: Los tratamientos existentes (hechos por otros dentistas en el pasado)
-  // NO deben sumarse al presupuesto ni facturarse al paciente hoy.
+  // CÁLCULO DE TRATAMIENTOS PLANIFICADOS UNIFICADO
+  // Combina procedimientos del plan explícito + condiciones activas marcadas en el odontograma
+  // Excluye condiciones existentes/históricas y evita duplicaciones
   const plannedTreatments = useMemo(() => {
     if (!currentChart) return [];
 
-    // 1. Si existe un plan explícito guardado
-    if (currentChart.treatmentPlan?.procedures && currentChart.treatmentPlan.procedures.length > 0) {
-      return currentChart.treatmentPlan.procedures.map((p, idx) => {
-        const match = unifiedDentalCatalog.find(
-          (c) => c.name.toLowerCase() === p.procedure.toLowerCase() || (p.conditionCode && c.conditionCode === p.conditionCode)
-        );
-        return {
-          id: p.id || `proc-${idx}`,
-          toothNum: p.toothNumber || 'General',
-          condition: p.conditionCode || 'Tratamiento',
-          code: p.conditionCode || 'general',
-          procedureName: p.procedure,
-          category: p.category || match?.categoryLabel || 'General',
-          cost: typeof p.estimatedCost === 'number' ? p.estimatedCost : (match?.defaultPriceUSD || 40),
-          color: match?.color || '#0ea5e9',
-          stages: p.stages || match?.stages || [],
-          notes: p.notes,
-          completed: p.completed || false,
-        };
-      });
-    }
-
-    // 2. Deducir tratamientos a partir del odontograma activo
-    // FILTRO CRÍTICO: Excluir c.status === 'existente'
-    if (!currentChart.teeth) return [];
-    const list: Array<{
+    const unifiedMap = new Map<string, {
       id: string;
       toothNum: string;
       condition: string;
@@ -335,35 +319,79 @@ export default function OdontologiaPage() {
       stages: Array<{ id: string; title: string; order: number; sessionNumber?: number }>;
       notes?: string;
       completed: boolean;
-    }> = [];
+      source: 'tooth' | 'plan';
+    }>();
 
-    Object.entries(currentChart.teeth).forEach(([num, data]) => {
-      data.conditions?.forEach((c, cIdx) => {
-        // Omitir piezas ausentes e información puramente histórica preexistente
-        if (c.code !== 'ausente' && c.status !== 'existente') {
-          const match = unifiedDentalCatalog.find((p) => p.conditionCode === c.code);
-          const procName = match ? match.name : (c.label || `Tratamiento ${c.code.toUpperCase()}`);
-          const cost = match ? match.defaultPriceUSD : 40.0;
-          const category = match ? match.categoryLabel : 'Restauradora';
-          const stages = match?.stages || [];
+    // 1. Incorporar condiciones planificadas marcadas en el arco dental
+    if (currentChart.teeth) {
+      Object.entries(currentChart.teeth).forEach(([num, data]) => {
+        data.conditions?.forEach((c, cIdx) => {
+          if (c.code !== 'ausente' && c.status !== 'existente') {
+            const match = unifiedDentalCatalog.find((p) => p.conditionCode === c.code);
+            const procName = match ? match.name : (c.label || `Tratamiento ${c.code.toUpperCase()}`);
+            const cost = typeof c.customPrice === 'number' ? c.customPrice : (match ? match.defaultPriceUSD : 40.0);
+            const category = match ? match.categoryLabel : 'Restauradora';
+            const stages = match?.stages || [];
+            const key = `${num}-${procName.toLowerCase()}`;
 
-          list.push({
-            id: `auto-${num}-${c.code}-${cIdx}`,
-            toothNum: num,
-            condition: c.label || c.code.toUpperCase(),
-            code: c.code,
-            procedureName: procName,
-            category,
-            cost,
-            color: c.color || match?.color || '#0ea5e9',
-            stages,
-            notes: c.notes || data.notes,
-            completed: c.status === 'realizado',
+            unifiedMap.set(key, {
+              id: `auto-${num}-${c.code}-${cIdx}`,
+              toothNum: num,
+              condition: c.label || c.code.toUpperCase(),
+              code: c.code,
+              procedureName: procName,
+              category,
+              cost,
+              color: c.color || match?.color || '#0ea5e9',
+              stages,
+              notes: c.notes || data.notes,
+              completed: c.status === 'realizado',
+              source: 'tooth',
+            });
+          }
+        });
+      });
+    }
+
+    // 2. Incorporar procedimientos explícitos guardados en el plan de tratamiento
+    if (currentChart.treatmentPlan?.procedures) {
+      currentChart.treatmentPlan.procedures.forEach((p, idx) => {
+        const match = unifiedDentalCatalog.find(
+          (c) => c.name.toLowerCase() === p.procedure.toLowerCase() || (p.conditionCode && c.conditionCode === p.conditionCode)
+        );
+        const toothNum = p.toothNumber || 'General';
+        const key = `${toothNum}-${p.procedure.toLowerCase()}`;
+
+        // Si ya existe (derivado del odontograma), respetar el costo personalizado o notas del plan
+        const existing = unifiedMap.get(key);
+        if (existing) {
+          unifiedMap.set(key, {
+            ...existing,
+            cost: typeof p.estimatedCost === 'number' && p.estimatedCost > 0 ? p.estimatedCost : existing.cost,
+            notes: p.notes || existing.notes,
+            completed: p.completed ?? existing.completed,
+            stages: p.stages && p.stages.length > 0 ? p.stages : existing.stages,
+          });
+        } else {
+          unifiedMap.set(key, {
+            id: p.id || `plan-${idx}-${Date.now()}`,
+            toothNum,
+            condition: p.conditionCode || 'Tratamiento',
+            code: p.conditionCode || 'general',
+            procedureName: p.procedure,
+            category: p.category || match?.categoryLabel || 'General',
+            cost: typeof p.estimatedCost === 'number' ? p.estimatedCost : (match?.defaultPriceUSD || 40),
+            color: match?.color || '#0ea5e9',
+            stages: p.stages || match?.stages || [],
+            notes: p.notes,
+            completed: p.completed || false,
+            source: 'plan',
           });
         }
       });
-    });
-    return list;
+    }
+
+    return Array.from(unifiedMap.values());
   }, [currentChart, unifiedDentalCatalog]);
 
   // Totales presupuestarios
@@ -450,6 +478,144 @@ export default function OdontologiaPage() {
       toast({ variant: 'error', title: 'Error de red', description: (err as Error).message });
     } finally {
       setIsSavingChart(false);
+    }
+  };
+
+  // AGREGAR PROCEDIMIENTO RÁPIDO DEL CATÁLOGO AL PLAN DE TRATAMIENTO
+  const handleAddProcedureToPlan = (procedureId: string) => {
+    if (!selectedPatient || !procedureId) return;
+    const item = unifiedDentalCatalog.find((p) => p.id === procedureId);
+    if (!item) return;
+
+    const currentPlan = currentChart?.treatmentPlan || {
+      id: `plan-${Date.now()}`,
+      title: `Plan Odontológico — ${selectedPatient.name}`,
+      teeth: [],
+      procedures: [],
+      totalCost: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    const newProc = {
+      id: `proc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      toothNumber: 'Gral',
+      conditionCode: item.code,
+      procedure: item.name,
+      category: item.categoryLabel,
+      estimatedCost: item.defaultPriceUSD,
+      completed: false,
+      stages: item.stages || [],
+      notes: 'Añadido desde catálogo de procedimientos',
+    };
+
+    const updatedPlan: DentalTreatmentPlan = {
+      ...currentPlan,
+      procedures: [...(currentPlan.procedures || []), newProc],
+      totalCost: (currentPlan.totalCost || 0) + item.defaultPriceUSD,
+    };
+
+    const updatedChart: DentalChart = {
+      ...(currentChart || {
+        mode: 'adult',
+        teeth: {},
+        supernumeraryTeeth: [],
+        lastUpdated: new Date().toISOString(),
+      }),
+      treatmentPlan: updatedPlan,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    handleSaveChart(updatedChart);
+    toast({
+      variant: 'success',
+      title: 'Procedimiento Añadido',
+      description: `${item.name} se agregó al presupuesto activo.`,
+    });
+  };
+
+  // QUITAR PROCEDIMIENTO DEL PLAN O CONDICIÓN DEL DIENTE
+  const handleRemovePlannedTreatment = (treatment: { id: string; toothNum: string; code: string; source: 'tooth' | 'plan' }) => {
+    if (!currentChart || !selectedPatient) return;
+
+    if (treatment.source === 'plan' && currentChart.treatmentPlan) {
+      const filtered = (currentChart.treatmentPlan.procedures || []).filter((p) => p.id !== treatment.id);
+      const updatedChart: DentalChart = {
+        ...currentChart,
+        treatmentPlan: {
+          ...currentChart.treatmentPlan,
+          procedures: filtered,
+          totalCost: filtered.reduce((sum, p) => sum + (p.estimatedCost || 0), 0),
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      handleSaveChart(updatedChart);
+      toast({ variant: 'info', title: 'Procedimiento Eliminado', description: 'Se quitó del presupuesto activo.' });
+      return;
+    }
+
+    if (treatment.source === 'tooth' && currentChart.teeth && currentChart.teeth[treatment.toothNum]) {
+      const toothData = currentChart.teeth[treatment.toothNum];
+      const updatedConditions = (toothData.conditions || []).filter((c) => !(c.code === treatment.code && c.status !== 'existente'));
+      const updatedChart: DentalChart = {
+        ...currentChart,
+        teeth: {
+          ...currentChart.teeth,
+          [treatment.toothNum]: {
+            ...toothData,
+            conditions: updatedConditions,
+          },
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      handleSaveChart(updatedChart);
+      toast({ variant: 'info', title: 'Tratamiento Quitado', description: `Se removió de la pieza #${treatment.toothNum}.` });
+    }
+  };
+
+  // ACTUALIZAR PRECIO PERSONALIZADO DE UN TRATAMIENTO EN VIVO
+  const handleUpdateTreatmentCost = (treatment: { id: string; toothNum: string; code: string; source: 'tooth' | 'plan' }, newCost: number) => {
+    if (!currentChart || !selectedPatient || isNaN(newCost) || newCost < 0) return;
+
+    if (treatment.source === 'plan' && currentChart.treatmentPlan) {
+      const updated = (currentChart.treatmentPlan.procedures || []).map((p) => {
+        if (p.id === treatment.id) {
+          return { ...p, estimatedCost: newCost };
+        }
+        return p;
+      });
+      const updatedChart: DentalChart = {
+        ...currentChart,
+        treatmentPlan: {
+          ...currentChart.treatmentPlan,
+          procedures: updated,
+          totalCost: updated.reduce((sum, p) => sum + (p.estimatedCost || 0), 0),
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      handleSaveChart(updatedChart);
+      return;
+    }
+
+    if (treatment.source === 'tooth' && currentChart.teeth && currentChart.teeth[treatment.toothNum]) {
+      const toothData = currentChart.teeth[treatment.toothNum];
+      const updatedConditions = (toothData.conditions || []).map((c) => {
+        if (c.code === treatment.code && c.status !== 'existente') {
+          return { ...c, customPrice: newCost };
+        }
+        return c;
+      });
+      const updatedChart: DentalChart = {
+        ...currentChart,
+        teeth: {
+          ...currentChart.teeth,
+          [treatment.toothNum]: {
+            ...toothData,
+            conditions: updatedConditions,
+          },
+        },
+        lastUpdated: new Date().toISOString(),
+      };
+      handleSaveChart(updatedChart);
     }
   };
 
@@ -867,9 +1033,18 @@ export default function OdontologiaPage() {
         <div className="flex items-center gap-2.5 flex-wrap">
           {selectedPatient ? (
             <div className="flex items-center gap-1.5 p-1 bg-teal-500/10 border border-teal-500/30 rounded-2xl">
-              <span className="text-xs font-black text-teal-600 dark:text-teal-400 px-2 py-1">
+              <span className="text-xs font-black text-teal-600 dark:text-teal-400 px-2 py-1 flex items-center gap-1">
                 Sillón: <strong className="text-foreground">{selectedPatient.name.split(' ')[0]}</strong>
               </span>
+              <button
+                type="button"
+                onClick={() => setIsSelectPatientModalOpen(true)}
+                className="px-2.5 py-1 bg-card hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground border border-border rounded-xl text-xs font-bold transition-all shadow-2xs btn-haptic flex items-center gap-1"
+                title="Cambiar paciente en sillón"
+              >
+                <ArrowRightLeft size={13} className="text-teal-500" />
+                <span>Cambiar</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
@@ -889,11 +1064,29 @@ export default function OdontologiaPage() {
                 <CreditCard size={13} />
                 <span>Cobrar (${totalBudgetUSD.toFixed(0)})</span>
               </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPatient(null)}
+                className="p-1 text-slate-400 hover:text-foreground rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+                title="Desocupar sillón"
+              >
+                <X size={14} />
+              </button>
             </div>
           ) : (
-            <div className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-border flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-slate-400" />
-              <span>Sillón Desocupado</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSelectPatientModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black transition-all shadow-sm shadow-teal-600/20 btn-haptic"
+              >
+                <Users size={14} />
+                <span>Seleccionar Paciente</span>
+              </button>
+              <div className="text-xs font-bold text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-border flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                <span>Sillón Desocupado</span>
+              </div>
             </div>
           )}
 
@@ -1064,8 +1257,8 @@ export default function OdontologiaPage() {
         </div>
 
         {/* Buscador de Pacientes (4 columnas en desktop) */}
-        <div className="lg:col-span-4 relative">
-          <div className="relative">
+        <div className="lg:col-span-4 flex items-center gap-2">
+          <div className="relative flex-1">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -1090,36 +1283,46 @@ export default function OdontologiaPage() {
                 <X size={14} />
               </button>
             )}
+
+            {/* Menú Flotante de Resultados de Búsqueda */}
+            {isSearchOpen && searchResults.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden divide-y divide-border">
+                {searchResults.map((cust) => (
+                  <button
+                    key={cust.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedPatient(cust);
+                      setSearchQuery('');
+                      setIsSearchOpen(false);
+                    }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors flex items-center justify-between group"
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-foreground group-hover:text-teal-600 transition-colors">
+                        {cust.name}
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-mono">
+                        {cust.tax_id ? `ID: ${cust.tax_id} · ` : ''}
+                        {cust.phone || 'Sin teléfono'}
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Menú Flotante de Resultados de Búsqueda */}
-          {isSearchOpen && searchResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-1.5 bg-card border border-border rounded-2xl shadow-xl z-50 overflow-hidden divide-y divide-border">
-              {searchResults.map((cust) => (
-                <button
-                  key={cust.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPatient(cust);
-                    setSearchQuery('');
-                    setIsSearchOpen(false);
-                  }}
-                  className="w-full px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors flex items-center justify-between group"
-                >
-                  <div>
-                    <p className="text-xs font-bold text-foreground group-hover:text-teal-600 transition-colors">
-                      {cust.name}
-                    </p>
-                    <p className="text-[10px] text-slate-400 font-mono">
-                      {cust.tax_id ? `ID: ${cust.tax_id} · ` : ''}
-                      {cust.phone || 'Sin teléfono'}
-                    </p>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </button>
-              ))}
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={() => setIsSelectPatientModalOpen(true)}
+            className="p-2.5 bg-card hover:bg-slate-100 dark:hover:bg-slate-800 border border-border rounded-2xl text-xs font-bold text-teal-600 dark:text-teal-400 flex items-center gap-1.5 shrink-0 btn-haptic shadow-xs"
+            title="Abrir directorio completo de pacientes"
+          >
+            <Users size={15} />
+            <span className="hidden sm:inline">Directorio</span>
+          </button>
         </div>
       </div>
 
@@ -1157,6 +1360,16 @@ export default function OdontologiaPage() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setIsSelectPatientModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all shadow-2xs btn-haptic"
+                title="Cambiar paciente en sillón"
+              >
+                <ArrowRightLeft size={14} className="text-teal-500" />
+                <span>Cambiar Paciente</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setIsProfileModalOpen(true)}
@@ -1272,34 +1485,168 @@ export default function OdontologiaPage() {
           </div>
         </div>
       ) : (
-        /* Estado Vacío de Sillón Dental */
-        <div className="bg-card border border-dashed border-border rounded-3xl p-10 text-center space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-teal-500/10 text-teal-600 mx-auto flex items-center justify-center">
-            <Stethoscope size={32} />
+        /* Estado Vacío de Sillón Dental - HUB DE RECEPCIÓN Y ENTRADA AL SILLÓN */
+        <div className="bg-card border border-border rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                <Stethoscope size={28} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-foreground">Sillón Dental Desocupado</h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Elige un paciente del directorio, atiende una cita del día o registra un nuevo paciente para comenzar su diagnóstico en el odontograma.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setIsSelectPatientModalOpen(true)}
+                className="px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-black transition-all shadow-md shadow-teal-600/20 flex items-center gap-2 btn-haptic"
+              >
+                <Users size={16} />
+                <span>Abrir Directorio ({customers.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsNewPatientModalOpen(true)}
+                className="px-4 py-2.5 bg-primary text-primary-foreground rounded-xl text-xs font-black hover:bg-primary/90 transition-all flex items-center gap-1.5 btn-haptic shadow-sm shadow-primary/20"
+              >
+                <UserPlus size={16} />
+                <span>+ Registrar Paciente</span>
+              </button>
+            </div>
           </div>
-          <div className="max-w-md mx-auto space-y-1">
-            <h3 className="text-base font-black text-foreground">Sillón Dental Desocupado</h3>
-            <p className="text-xs text-slate-500">
-              Selecciona una cita de la barra superior, busca un paciente en el directorio o registra uno nuevo para comenzar el diagnóstico en odontograma.
-            </p>
-          </div>
-          <div className="flex items-center justify-center gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setIsNewPatientModalOpen(true)}
-              className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl hover:bg-primary/90 transition-all btn-haptic shadow-md"
-            >
-              + Registrar Paciente
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (customers.length > 0) setSelectedPatient(customers[0]);
-              }}
-              className="px-4 py-2 bg-secondary text-foreground text-xs font-bold rounded-xl hover:bg-secondary/80 transition-all"
-            >
-              Cargar Paciente Reciente
-            </button>
+
+          {/* Citas de Hoy Esperando Pasar al Sillón */}
+          {todayAppointments.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock size={14} className="text-teal-500" />
+                  Citas Agendadas para Hoy ({todayAppointments.length})
+                </span>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  Listas para pasar a sillón
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {todayAppointments.slice(0, 6).map((appt) => {
+                  const apptPatient = customers.find((c) => c.id === (appt.client_id || appt.entity_id));
+                  const apptTime = appt.start_time ? appt.start_time.slice(11, 16) : '09:00';
+                  return (
+                    <div
+                      key={appt.id}
+                      className="p-3.5 rounded-2xl border border-border bg-background hover:border-teal-500/40 transition-all flex items-center justify-between gap-3 shadow-2xs group"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                            {apptTime}
+                          </span>
+                          <span className="text-xs font-bold text-foreground truncate">
+                            {appt.client_name || apptPatient?.name || 'Paciente'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-1 truncate">
+                          {appt.service_title || 'Consulta Odontológica'}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (apptPatient) {
+                            setSelectedPatient(apptPatient);
+                          } else if (appt.client_id || appt.entity_id) {
+                            const pId = appt.client_id || appt.entity_id;
+                            const found = customers.find((c) => c.id === pId);
+                            if (found) setSelectedPatient(found);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-teal-500/10 text-teal-600 hover:bg-teal-600 hover:text-white dark:text-teal-400 dark:hover:text-white text-xs font-bold transition-all shrink-0 btn-haptic"
+                      >
+                        Pasar a Sillón
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Directorio de Pacientes Recientes */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                <Users size={14} className="text-teal-500" />
+                Pacientes en Directorio
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsSelectPatientModalOpen(true)}
+                className="text-xs font-bold text-teal-600 hover:underline flex items-center gap-1"
+              >
+                <span>Ver todos los {customers.length} pacientes</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
+
+            {customers.length === 0 ? (
+              <div className="p-8 text-center border border-dashed border-border rounded-2xl">
+                <p className="text-xs font-bold text-slate-500">No hay pacientes registrados aún</p>
+                <button
+                  type="button"
+                  onClick={() => setIsNewPatientModalOpen(true)}
+                  className="mt-2 text-xs font-bold text-teal-600 hover:underline"
+                >
+                  Registrar el primer paciente
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {customers.slice(0, 6).map((cust) => {
+                  const meta = (cust.metadata as Record<string, any>) || {};
+                  const allergies = meta.allergies || '';
+                  const debt = Number(meta.total_debt || meta.pending_debt || 0);
+
+                  return (
+                    <div
+                      key={cust.id}
+                      onClick={() => setSelectedPatient(cust)}
+                      className="p-3.5 rounded-2xl border border-border bg-background hover:border-teal-500/50 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-2xs group btn-haptic"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 flex items-center justify-center font-black text-sm shrink-0 group-hover:scale-105 transition-transform">
+                          {cust.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-foreground truncate group-hover:text-teal-600 transition-colors">
+                            {cust.name}
+                          </p>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-mono mt-0.5">
+                            {cust.tax_id && <span>ID: {cust.tax_id}</span>}
+                            {debt > 0 ? (
+                              <span className="text-red-500 font-bold font-sans">Deuda: ${debt.toFixed(0)}</span>
+                            ) : (
+                              <span className="text-emerald-500 font-sans">Al día</span>
+                            )}
+                          </div>
+                          {allergies && (
+                            <span className="text-[9px] font-bold text-rose-500 truncate block mt-0.5" title={allergies}>
+                              ⚠️ {allergies}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs font-bold text-slate-400 group-hover:text-teal-600 transition-colors shrink-0">
+                        Atender →
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1470,13 +1817,46 @@ export default function OdontologiaPage() {
                   </div>
                 </div>
 
-                {/* Lista de Procedimientos Derivados del Odontograma */}
+                {/* Selector Rápido para Añadir Procedimiento General del Catálogo al Plan */}
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                      <Plus size={13} className="text-teal-500" />
+                      Agregar Procedimiento al Plan
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {unifiedDentalCatalog.length} disponibles
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedCatalogToAdd}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val) {
+                          handleAddProcedureToPlan(val);
+                          setSelectedCatalogToAdd('');
+                        }
+                      }}
+                      className="flex-1 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground focus:outline-hidden font-medium"
+                    >
+                      <option value="">Seleccionar del catálogo (Limpieza, Blanqueamiento, Exodoncia...)</option>
+                      {unifiedDentalCatalog.map((proc) => (
+                        <option key={proc.id} value={proc.id}>
+                          {proc.name} — ${proc.defaultPriceUSD} USD ({proc.categoryLabel})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Lista de Procedimientos Derivados del Odontograma y Plan */}
                 <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
                   {plannedTreatments.length === 0 ? (
                     <div className="text-center py-10 text-slate-400 border border-dashed border-border rounded-2xl p-4">
                       <p className="text-xs font-bold">Sin tratamientos activos planificados</p>
                       <p className="text-[11px] text-slate-500 mt-1">
-                        Marca caries, coronas o tratamientos en el odontograma con el estado <strong>Planificado Hoy</strong> para sumarlos al presupuesto.
+                        Marca caries, coronas o tratamientos en el odontograma o agrégalos desde el selector de arriba para sumarlos al presupuesto.
                       </p>
                     </div>
                   ) : (
@@ -1485,58 +1865,141 @@ export default function OdontologiaPage() {
                         key={t.id}
                         className="p-3 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-3 hover:border-teal-500/40 transition-all"
                       >
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2.5 min-w-0">
                           <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-black text-xs shrink-0">
                             #{t.toothNum}
                           </div>
-                          <div>
-                            <p className="text-xs font-bold text-foreground leading-tight">{t.procedureName}</p>
-                            <p className="text-[10px] text-slate-400">{t.category} {t.notes ? `· ${t.notes}` : ''}</p>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-foreground leading-tight truncate">{t.procedureName}</p>
+                            <p className="text-[10px] text-slate-400 truncate">{t.category} {t.notes ? `· ${t.notes}` : ''}</p>
                           </div>
                         </div>
 
-                        <div className="text-right shrink-0">
-                          <span className="text-xs font-black font-mono text-foreground block">
-                            ${t.cost.toFixed(2)}
-                          </span>
-                          <span className="text-[10px] font-mono text-slate-400">
-                            Bs. {(t.cost * currentExchangeRate).toFixed(0)}
-                          </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {editingTreatmentId === t.id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-bold text-slate-400">$</span>
+                              <input
+                                type="number"
+                                step="0.5"
+                                value={tempPriceInput}
+                                onChange={(e) => setTempPriceInput(e.target.value)}
+                                className="w-16 bg-background border border-teal-500 rounded-lg px-1.5 py-0.5 text-xs font-bold font-mono text-foreground text-right"
+                                autoFocus
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const num = parseFloat(tempPriceInput);
+                                  if (!isNaN(num) && num >= 0) {
+                                    handleUpdateTreatmentCost(t, num);
+                                  }
+                                  setEditingTreatmentId(null);
+                                }}
+                                className="p-1 rounded-md bg-teal-600 text-white hover:bg-teal-700"
+                                title="Guardar precio"
+                              >
+                                <Check size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingTreatmentId(null)}
+                                className="p-1 rounded-md text-slate-400 hover:text-foreground"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              className="text-right cursor-pointer group/price"
+                              onClick={() => {
+                                setEditingTreatmentId(t.id);
+                                setTempPriceInput(String(t.cost));
+                              }}
+                              title="Clic para editar precio del procedimiento"
+                            >
+                              <span className="text-xs font-black font-mono text-foreground block group-hover/price:text-teal-600 transition-colors">
+                                ${t.cost.toFixed(2)} ✏️
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                Bs. {(t.cost * currentExchangeRate).toFixed(0)}
+                              </span>
+                            </div>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePlannedTreatment(t)}
+                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                            title="Quitar procedimiento del plan"
+                          >
+                            <X size={14} />
+                          </button>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
 
-                {/* Botón para enviar a Kanban de Procesos */}
+                {/* Acciones del Presupuesto: Despacho a Caja POS, Cobro en Sillón y Kanban */}
                 {plannedTreatments.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const plan: DentalTreatmentPlan = {
-                        id: `plan-${Date.now()}`,
-                        title: `Plan Odontológico — ${selectedPatient.name}`,
-                        teeth: Array.from(new Set(plannedTreatments.map((t) => t.toothNum))),
-                        procedures: plannedTreatments.map((p) => ({
-                          toothNumber: p.toothNum,
-                          conditionCode: p.code,
-                          procedure: p.procedureName,
-                          category: p.category,
-                          estimatedCost: p.cost,
-                          completed: p.completed,
-                          stages: p.stages,
-                          notes: p.notes,
-                        })),
-                        totalCost: totalBudgetUSD,
-                        createdAt: new Date().toISOString(),
-                      };
-                      handleCreateKanban(plan);
-                    }}
-                    className="w-full py-2.5 rounded-xl border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/20 transition-all flex items-center justify-center gap-2"
-                  >
-                    <KanbanSquare size={15} />
-                    <span>Transferir a Tablero Kanban de Casos</span>
-                  </button>
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    {/* Botón Principal: Despachar a Caja POS */}
+                    <button
+                      type="button"
+                      disabled={isSendingToCashier}
+                      onClick={handleSendOrderToCashier}
+                      className="w-full py-2.5 px-4 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 text-white text-xs font-black hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 btn-haptic disabled:opacity-50"
+                    >
+                      <Send size={15} className={isSendingToCashier ? 'animate-bounce' : ''} />
+                      <span>
+                        {isSendingToCashier
+                          ? 'Despachando a Caja...'
+                          : `Despachar a Caja POS ($${totalBudgetUSD.toFixed(0)} USD)`}
+                      </span>
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      {/* Botón Cobro Inmediato en Sillón */}
+                      <button
+                        type="button"
+                        onClick={() => setIsCheckoutModalOpen(true)}
+                        className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-black dark:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs truncate"
+                      >
+                        <CreditCard size={13} />
+                        <span className="truncate">Cobrar en Sillón</span>
+                      </button>
+
+                      {/* Botón Kanban */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const plan: DentalTreatmentPlan = {
+                            id: `plan-${Date.now()}`,
+                            title: `Plan Odontológico — ${selectedPatient.name}`,
+                            teeth: Array.from(new Set(plannedTreatments.map((t) => t.toothNum))),
+                            procedures: plannedTreatments.map((p) => ({
+                              toothNumber: p.toothNum,
+                              conditionCode: p.code,
+                              procedure: p.procedureName,
+                              category: p.category,
+                              estimatedCost: p.cost,
+                              completed: p.completed,
+                              stages: p.stages,
+                              notes: p.notes,
+                            })),
+                            totalCost: totalBudgetUSD,
+                            createdAt: new Date().toISOString(),
+                          };
+                          handleCreateKanban(plan);
+                        }}
+                        className="py-2 px-3 rounded-xl border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/20 transition-all flex items-center justify-center gap-1.5 truncate"
+                      >
+                        <KanbanSquare size={13} />
+                        <span className="truncate">Enviar a Kanban</span>
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
@@ -2118,6 +2581,22 @@ export default function OdontologiaPage() {
           setInventoryItems((prev) => [newItem, ...prev]);
           setSelectedConsumableId(newItem.id);
         }}
+      />
+
+      {/* MODAL DE SELECCIÓN Y BÚSQUEDA FLUIDA DE PACIENTES */}
+      <PatientSelectModal
+        isOpen={isSelectPatientModalOpen}
+        onClose={() => setIsSelectPatientModalOpen(false)}
+        patients={customers}
+        onSelectPatient={(p) => {
+          setSelectedPatient(p);
+          setIsSelectPatientModalOpen(false);
+        }}
+        onOpenNewPatientModal={() => {
+          setIsSelectPatientModalOpen(false);
+          setIsNewPatientModalOpen(true);
+        }}
+        currentPatientId={selectedPatient?.id}
       />
     </div>
   );

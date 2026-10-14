@@ -15,6 +15,7 @@ export interface ToothCondition {
   notes?: string;
   color?: string;  // Para condiciones personalizadas
   status?: 'existente' | 'planificado' | 'realizado'; // ⚪ Existente (otro dentista, no cobra), 🔴 Planificado (hoy, presupuesta), 🟢 Realizado (hecho por nosotros)
+  customPrice?: number; // Precio personalizado acordado para el procedimiento en esta pieza
   date?: string;
   performer?: string;
 }
