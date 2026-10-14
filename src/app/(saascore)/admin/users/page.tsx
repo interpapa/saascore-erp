@@ -135,7 +135,7 @@ export default function AdminUsersPage() {
         }
       }
 
-      const targetEmail = email || '1@gmail.com';
+      const targetEmail = email || 'admin@rendo.com';
       const activeActor: any = actor || {
         email: targetEmail,
         role: 'superadmin' as const,

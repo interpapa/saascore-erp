@@ -131,7 +131,7 @@ export default function AdminTenantsPage() {
         }
       }
 
-      const targetEmail = email || '1@gmail.com';
+      const targetEmail = email || 'admin@rendo.com';
       const activeActor = actor || {
         email: targetEmail,
         role: 'superadmin' as const,

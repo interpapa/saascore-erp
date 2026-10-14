@@ -29,20 +29,20 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   } | null>(null);
 
   useEffect(() => {
-    // Permitir acceso a superadmin o emails en lista blanca administrativa
-    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    // Permitir acceso EXCLUSIVO a emails autorizados en lista blanca de Rendo Hub
+    const isSuper = isSuperAdminEmail(session?.userEmail);
     if (isSuper) {
       setIsAuthorized(true);
     } else {
       setIsAuthorized(false);
       router.replace('/dashboard');
     }
-  }, [session, router]);
+  }, [session?.userEmail, router]);
 
   useEffect(() => {
-    const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+    const isSuper = isSuperAdminEmail(session?.userEmail);
     if (isSuper && session?.userEmail) {
-      const activeActor = actor || { email: session.userEmail || '', role: (session.role || 'superadmin') as any };
+      const activeActor = actor || { email: session.userEmail || '', role: 'superadmin' as any };
       getSystemHealthAdminAction(activeActor)
         .then(res => {
           if (res.success && res.data) {

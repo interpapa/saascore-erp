@@ -74,7 +74,6 @@ export default function AppsManagerPage() {
     { id: 'equipo', name: 'Personal & Nómina', category: 'administracion', icon: Users, gradient: 'from-indigo-400 to-indigo-600', description: 'Registro de empleados, marcaje de asistencia y liquidación de sueldos.' },
     { id: 'franquicias', name: 'Franquicias & Sedes', category: 'administracion', icon: Building2, gradient: 'from-cyan-500 to-blue-600', description: 'Control de múltiples locales, sucursales y consolidación de ingresos.' },
     { id: 'config', name: 'Ajustes del Sistema', category: 'administracion', icon: Settings, gradient: 'from-slate-500 to-slate-700', description: 'Datos del negocio, logotipo y moneda principal.', isCore: true },
-    { id: 'admin', name: 'Rendo Hub', category: 'administracion', icon: Crown, gradient: 'from-pink-500 to-rose-600', description: 'Consola global de administración del software SaaS.', isCore: true },
   ];
 
   const handleToggleModule = async (moduleId: string) => {
@@ -218,15 +217,7 @@ export default function AppsManagerPage() {
                     <IconComp size={26} strokeWidth={1.5} />
                   </div>
                   
-                  {mod.id === 'admin' ? (
-                    <Link
-                      href="/admin"
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500 hover:text-white btn-haptic"
-                      title="Abrir Rendo Hub"
-                    >
-                      <Crown size={14} /> Abrir Consola ➔
-                    </Link>
-                  ) : mod.isCore ? (
+                  {mod.isCore ? (
                     <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
                       Núcleo Base
                     </span>

@@ -17,7 +17,6 @@ export interface SecurityActor {
 
 const DEFAULT_SUPERADMINS = [
   'interpapadavid2811@gmail.com',
-  '1@gmail.com',
   'valerasilvamariajose@gmail.com',
   'admin@rendo.com',
   'admin@rendomundial.com',

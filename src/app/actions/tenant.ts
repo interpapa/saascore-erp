@@ -657,10 +657,14 @@ export async function getUserTenant(userEmail: string, userId?: string) {
         }
       }
 
+      const assignedRole: UserRole = isSuperAdmin
+        ? 'superadmin'
+        : (membership.role === 'superadmin' ? 'owner' : (membership.role as UserRole));
+
       return {
         success: true,
         tenant: sanitizeTenantPayload(tenant),
-        role: isSuperAdmin ? 'superadmin' : (membership.role as UserRole),
+        role: assignedRole,
         allowedModules: Array.isArray(allowedModules) ? allowedModules : undefined,
         operationalPermissions: Array.isArray(operationalPermissions) ? operationalPermissions : [],
       };
@@ -668,10 +672,14 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       // Continuar con active_modules del tenant si falla la consulta de Auth
     }
 
+    const assignedRole: UserRole = isSuperAdmin
+      ? 'superadmin'
+      : (membership.role === 'superadmin' ? 'owner' : (membership.role as UserRole));
+
     return {
       success: true,
       tenant: sanitizeTenantPayload(tenant),
-      role: isSuperAdmin ? 'superadmin' : (membership.role as UserRole),
+      role: assignedRole,
     };
   } catch (error: any) {
     return { success: false, tenant: null, role: null, error: error.message };

@@ -185,7 +185,7 @@ export function FloatingHeader() {
           </div>
 
           {/* Acceso directo SuperAdmin / Rendo Hub */}
-          {(session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail)) && (
+          {isSuperAdminEmail(session?.userEmail) && (
             <>
               <div className="w-px h-6 bg-border mx-1" />
               <Link

@@ -22,24 +22,23 @@ import { Button } from '@/components/ui/Button';
 
 const AVAILABLE_MODULES = [
   { id: 'caja', name: 'Caja POS' },
-  { id: 'calendario', name: 'Citas y Turnos' },
   { id: 'clientes', name: 'CRM (Clientes)' },
   { id: 'inventario', name: 'Inventario' },
+  { id: 'calendario', name: 'Citas y Turnos' },
   { id: 'odontologia', name: 'Odontología' },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia' },
   { id: 'clinica', name: 'Clínica Médica' },
   { id: 'barberia', name: 'Barbería' },
   { id: 'grooming', name: 'Peluquería Canina' },
-  { id: 'whatsapp', name: 'WhatsApp' },
-  { id: 'kanban', name: 'Kanban' },
-  { id: 'equipo', name: 'Personal' },
-  { id: 'compras', name: 'Compras' },
-  { id: 'catalogo', name: 'Catálogo' },
+  { id: 'whatsapp', name: 'WhatsApp CRM' },
+  { id: 'kanban', name: 'Órdenes de Trabajo' },
+  { id: 'equipo', name: 'Personal & Nómina' },
+  { id: 'compras', name: 'Compras y Proveedores' },
+  { id: 'catalogo', name: 'Catálogo de Productos' },
   { id: 'contabilidad', name: 'Contabilidad' },
-  { id: 'estadisticas', name: 'Estadísticas' },
+  { id: 'estadisticas', name: 'Estadísticas & Reportes' },
   { id: 'franquicias', name: 'Franquicias' },
-  { id: 'apps', name: 'Apps / Extensiones' },
-  { id: 'config', name: 'Ajustes' },
-  { id: 'admin', name: 'Super Admin' },
+  { id: 'config', name: 'Ajustes del Sistema' },
 ];
 
 export default function ConfiguracionPage() {
@@ -105,7 +104,11 @@ export default function ConfiguracionPage() {
         currency: (currentTenant.metadata as any)?.currency || 'USD',
         language: (currentTenant.metadata as any)?.language || 'es',
         logo_url: (currentTenant.metadata as any)?.logo_url || '',
-        mobile_dock_modules: ((currentTenant.metadata as any)?.mobile_dock_modules as string[]) || ['caja', 'calendario', 'clientes', 'whatsapp']
+        mobile_dock_modules: ((currentTenant.metadata as any)?.mobile_dock_modules as string[]) || (
+          ((currentTenant.active_modules || []).includes('inventario') || (currentTenant.active_modules || []).includes('catalogo'))
+            ? ['caja', 'clientes', 'inventario']
+            : ['caja', 'clientes', 'calendario']
+        )
       });
 
       if (actor) {
@@ -128,8 +131,8 @@ export default function ConfiguracionPage() {
       if (isSelected) {
         return { ...prev, mobile_dock_modules: prev.mobile_dock_modules.filter(m => m !== moduleId) };
       } else {
-        if (prev.mobile_dock_modules.length >= 5) {
-          return prev; // MAX 5 items
+        if (prev.mobile_dock_modules.length >= 3) {
+          return prev; // MÁXIMO 3 módulos adicionales para mantener 4 accesos en total junto con Inicio
         }
         return { ...prev, mobile_dock_modules: [...prev.mobile_dock_modules, moduleId] };
       }
@@ -521,7 +524,7 @@ export default function ConfiguracionPage() {
             Navegación Móvil (Acceso Rápido)
           </h2>
           <p className="text-xs font-medium text-slate-500 mb-6 max-w-2xl">
-            Selecciona hasta 5 módulos para que aparezcan en la barra de navegación inferior en tu teléfono. El botón de Inicio siempre estará incluido por defecto.
+            Selecciona hasta 3 módulos para que aparezcan en la barra de navegación inferior en tu teléfono. El botón de Inicio siempre estará incluido por defecto (total 4 accesos rápidos óptimos).
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -552,7 +555,7 @@ export default function ConfiguracionPage() {
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-6 pt-4 border-t border-border">
             <p className="text-xs text-indigo-500 font-bold">
-              Seleccionados: {formData.mobile_dock_modules.length} de 5
+              Seleccionados: {formData.mobile_dock_modules.length} de 3 (más Inicio = {formData.mobile_dock_modules.length + 1} accesos)
             </p>
             <div className="flex items-center gap-3 w-full sm:w-auto">
               {dockSaveFeedback && (

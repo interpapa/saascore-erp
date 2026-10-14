@@ -168,7 +168,7 @@ export default function LauncherPage() {
   ];
 
   // Filtramos las aplicaciones según los módulos activos del negocio y los permisos del empleado
-  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+  const isSuper = isSuperAdminEmail(session?.userEmail);
   const isOwner = session?.role === 'owner';
 
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
