@@ -15,6 +15,7 @@ import { runQASchemaResilienceTests } from './09_qa_schema_resilience.test';
 import { runEnterpriseEnhancementsTests } from './10_enterprise_enhancements.test';
 import { runDualModeWorkflowsTests } from './11_dual_mode_workflows.test';
 import { runRendoSaludTests } from './12_rendo_salud.test';
+import { runGinecologiaObstetriciaTests } from './13_ginecologia_obstetricia.test';
 import { runSyntheticQAFullSuite } from './synthetic_full_qa';
 import { runConcurrencyAndIdempotencyTests } from './concurrency_race_qa';
 import { runFuzzingHostileDataTests } from './fuzzing_data_qa';
@@ -38,9 +39,10 @@ async function main() {
     { name: '10. Mejoras de Grado Enterprise (ESC/POS & Worker Queue)', fn: runEnterpriseEnhancementsTests },
     { name: '11. Paradigma Dual & Flujos Operativos UX', fn: runDualModeWorkflowsTests },
     { name: '12. Clínica Médica Multi-Especialidad (Rendo Salud)', fn: runRendoSaludTests },
-    { name: '13. QA Sintético Extenso de Interconexión Total', fn: runSyntheticQAFullSuite },
-    { name: '14. Concurrencia, Carrera e Idempotencia en Ráfaga', fn: runConcurrencyAndIdempotencyTests },
-    { name: '15. Fuzzing Hostil & Resiliencia de Datos Extremos', fn: runFuzzingHostileDataTests },
+    { name: '13. Ginecología & Obstetricia (Módulo Dedicado)', fn: runGinecologiaObstetriciaTests },
+    { name: '14. QA Sintético Extenso de Interconexión Total', fn: runSyntheticQAFullSuite },
+    { name: '15. Concurrencia, Carrera e Idempotencia en Ráfaga', fn: runConcurrencyAndIdempotencyTests },
+    { name: '16. Fuzzing Hostil & Resiliencia de Datos Extremos', fn: runFuzzingHostileDataTests },
   ];
 
   let passed = 0;

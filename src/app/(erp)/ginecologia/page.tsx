@@ -1,0 +1,1815 @@
+'use client';
+
+export const dynamic = 'force-dynamic';
+
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { 
+  Baby, 
+  Search, 
+  UserPlus, 
+  Save, 
+  Send, 
+  Printer, 
+  FileText, 
+  Activity, 
+  Calendar, 
+  Stethoscope, 
+  DollarSign, 
+  CheckCircle2, 
+  AlertCircle, 
+  Clock, 
+  Trash2, 
+  Plus, 
+  Minus, 
+  Heart, 
+  Layers, 
+  ChevronRight, 
+  Sparkles, 
+  CheckSquare, 
+  Square,
+  Shield,
+  HelpCircle,
+  FolderOpen
+} from 'lucide-react';
+import { useERPStore } from '@/store/useERPStore';
+import { useActionActor } from '@/hooks/useActionActor';
+import { useToast } from '@/components/core/ToastProvider';
+import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
+import { getItemsAction } from '@/app/actions/items';
+import { 
+  getGinecoPatientRecordAction, 
+  saveGinecoEncounterAction, 
+  sendGinecoOrderToCashierAction, 
+  getPatientGinecoWorkOrdersAction, 
+  updateGinecoWorkOrderStepAction,
+  GinecoObstetricProfile,
+  PatientGinecoWorkOrder
+} from '@/app/actions/ginecologia';
+import { 
+  GINECO_PROCEDURES_MASTER, 
+  GINECO_CIE10_CATALOG, 
+  GINECO_PRESCRIPTION_TEMPLATES, 
+  mergeTenantGinecoServices,
+  GinecoProcedureDefinition 
+} from '@/lib/ginecologia/proceduresCatalog';
+import { GestationalWheelWidget } from '@/components/ginecologia/GestationalWheelWidget';
+import { GinecoPrescriptionPrintModal } from '@/components/ginecologia/GinecoPrescriptionPrintModal';
+import { calculateBMI } from '@/lib/medical/clinicalCalculators';
+
+type ActiveTab = 'obstetricia' | 'ginecologia' | 'soap_recipe' | 'procedimientos' | 'historial';
+
+export default function GinecologiaPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { currentTenant, session } = useERPStore();
+  const tenantMeta = (currentTenant?.metadata as Record<string, any>) || {};
+  const exchangeRate = Number(tenantMeta.exchange_rate?.rate || tenantMeta.exchange_rate || 850.0);
+  const actor = useActionActor();
+  const { toast } = useToast();
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>('obstetricia');
+
+  // Pacientes y Médicos
+  const [patients, setPatients] = useState<any[]>([]);
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('');
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string>('');
+  const [isLoadingPatients, setIsLoadingPatients] = useState(true);
+
+  // Modal para nueva paciente
+  const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientTaxId, setNewPatientTaxId] = useState('');
+  const [newPatientPhone, setNewPatientPhone] = useState('');
+  const [newPatientBirthDate, setNewPatientBirthDate] = useState('');
+  const [newPatientAllergies, setNewPatientAllergies] = useState('');
+  const [isSubmittingPatient, setIsSubmittingPatient] = useState(false);
+
+  // Perfil Gineco-Obstétrico de la Paciente Activa
+  const [profile, setProfile] = useState<GinecoObstetricProfile>({
+    gestas: 0,
+    partos: 0,
+    cesareas: 0,
+    abortos: 0,
+    ectopicos: 0,
+    hijosVivos: 0,
+    fum: '',
+    menarquia: 12,
+    ritmoMenstrual: '28 x 4',
+    dismenorrea: false,
+    ciclosRegulares: true,
+    metodoAnticonceptivo: 'Ninguno',
+    alergias: '',
+    patologiasCronicas: '',
+  });
+
+  // Signos Vitales Maternos
+  const [vitals, setVitals] = useState({
+    bloodPressure: '120/80',
+    heartRate: 75,
+    weightKg: 60,
+    heightCm: 165,
+    temperature: 36.5,
+  });
+
+  // Examen Obstétrico
+  const [obstetricExam, setObstetricExam] = useState({
+    uterineHeightCm: 0,
+    fetalHeartRateBpm: 140,
+    fetalMovements: 'presentes' as 'presentes' | 'disminuidos' | 'ausentes',
+    presentation: 'cefalica' as 'cefalica' | 'podalica' | 'transversa',
+    edema: 'ausente' as 'ausente' | 'leve' | 'moderado' | 'severo',
+    ultrasoundFindings: '',
+  });
+
+  // Examen Ginecológico & Citología
+  const [gynecologicExam, setGynecologicExam] = useState({
+    inspectionVulva: 'Genitales externos normoconfigurados sin lesiones activas.',
+    speculoscopyVagina: 'Mucosa vaginal elástica, rosada, sin flujo patológico.',
+    speculoscopyCervix: 'Cuello uterino eutrófico, orificio cervical externo cerrado.',
+    aceticAcidTest: 'normal' as 'normal' | 'acetoblanco_tenue' | 'acetoblanco_denso' | 'mosaico' | 'punteado',
+    schillerTest: 'positivo_caoba' as 'positivo_caoba' | 'negativo_yodonegativo' | 'no_realizado',
+    bethesdaPapClassification: 'Negativo para lesión intraepitelial o malignidad (NILM)',
+    biopsyTaken: false,
+    biopsyLocation: '',
+  });
+
+  // SOAP & Diagnóstico
+  const [chiefComplaint, setChiefComplaint] = useState('Control prenatal de rutina.');
+  const [soapSubjective, setSoapSubjective] = useState('');
+  const [soapObjective, setSoapObjective] = useState('');
+  const [soapAssessment, setSoapAssessment] = useState('');
+  const [soapPlan, setSoapPlan] = useState('');
+  const [selectedCie10, setSelectedCie10] = useState<{ code: string; description: string } | null>(null);
+  const [cie10Search, setCie10Search] = useState('');
+
+  // Récipe Médico
+  const [prescriptionMedications, setPrescriptionMedications] = useState('');
+  const [prescriptionInstructions, setPrescriptionInstructions] = useState('');
+  const [prescriptionLabOrders, setPrescriptionLabOrders] = useState<string[]>([]);
+  const [newLabOrderInput, setNewLabOrderInput] = useState('');
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Catálogo de Procedimientos & Presupuesto de la Sesión
+  const [catalogProcedures, setCatalogProcedures] = useState<GinecoProcedureDefinition[]>(GINECO_PROCEDURES_MASTER);
+  const [sessionProcedures, setSessionProcedures] = useState<Array<{
+    id: string;
+    code: string;
+    name: string;
+    price: number;
+    category: string;
+    stages?: any[];
+  }>>([]);
+  const [isSendingToCashier, setIsSendingToCashier] = useState(false);
+  const [isSavingEncounter, setIsSavingEncounter] = useState(false);
+
+  // Historial de Consultas & OTs
+  const [encountersHistory, setEncountersHistory] = useState<any[]>([]);
+  const [patientWorkOrders, setPatientWorkOrders] = useState<PatientGinecoWorkOrder[]>([]);
+  const [isLoadingWorkOrders, setIsLoadingWorkOrders] = useState(false);
+
+  const activePatient = useMemo(() => {
+    return patients.find((p) => p.id === selectedPatientId) || null;
+  }, [patients, selectedPatientId]);
+
+  const activeDoctor = useMemo(() => {
+    return doctors.find((d) => d.id === selectedDoctorId) || null;
+  }, [doctors, selectedDoctorId]);
+
+  // Cálculo de IMC Materno
+  const bmiInfo = useMemo(() => {
+    return calculateBMI(Number(vitals.weightKg || 0), Number(vitals.heightCm || 0));
+  }, [vitals.weightKg, vitals.heightCm]);
+
+  // Carga inicial de pacientes, médicos y catálogo
+  const loadInitialData = useCallback(async () => {
+    if (!currentTenant?.id || !actor) return;
+    setIsLoadingPatients(true);
+    try {
+      const [patientsRes, employeesRes, itemsRes] = await Promise.all([
+        getEntitiesAction(currentTenant.id, 'customer', 200, actor),
+        getEntitiesAction(currentTenant.id, 'employee', 100, actor),
+        getItemsAction(currentTenant.id, undefined, 200, actor),
+      ]);
+
+      if (patientsRes.success && patientsRes.entities) {
+        setPatients(patientsRes.entities);
+      }
+
+      if (employeesRes.success && employeesRes.entities) {
+        setDoctors(employeesRes.entities);
+        if (employeesRes.entities.length > 0 && !selectedDoctorId) {
+          setSelectedDoctorId(employeesRes.entities[0].id);
+        }
+      }
+
+      if (itemsRes.success && itemsRes.items) {
+        const merged = mergeTenantGinecoServices(itemsRes.items as any[]);
+        setCatalogProcedures(merged);
+      }
+    } catch (err) {
+      console.error('Error cargando datos de Ginecología:', err);
+    } finally {
+      setIsLoadingPatients(false);
+    }
+  }, [currentTenant?.id, actor, selectedDoctorId]);
+
+  useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Selección automática por URL (?patient=ID o ?client_id=ID)
+  useEffect(() => {
+    const urlPatientId = searchParams.get('patient') || searchParams.get('client_id');
+    if (urlPatientId && patients.length > 0) {
+      const found = patients.find((p) => p.id === urlPatientId);
+      if (found) {
+        setSelectedPatientId(found.id);
+      }
+    }
+  }, [searchParams, patients]);
+
+  // Carga de expediente al seleccionar paciente + Session Guard Draft Recovery
+  useEffect(() => {
+    if (!selectedPatientId || !currentTenant?.id || !actor) return;
+
+    // 1. Cargar expediente desde la base de datos
+    getGinecoPatientRecordAction(selectedPatientId, currentTenant.id, actor).then((res) => {
+      if (res.success && res.profile) {
+        setProfile(res.profile);
+      }
+      if (res.success && res.encounters) {
+        setEncountersHistory(res.encounters);
+      }
+    });
+
+    // 2. Cargar OTs de la paciente
+    setIsLoadingWorkOrders(true);
+    getPatientGinecoWorkOrdersAction(selectedPatientId, currentTenant.id, actor)
+      .then((res) => {
+        if (res.success && res.workOrders) {
+          setPatientWorkOrders(res.workOrders);
+        }
+      })
+      .finally(() => setIsLoadingWorkOrders(false));
+
+    // 3. Draft Recovery (recuperación de borrador local)
+    try {
+      const draftKey = `rendo_gineco_draft_${selectedPatientId}`;
+      const savedDraft = localStorage.getItem(draftKey);
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed.soapSubjective) setSoapSubjective(parsed.soapSubjective);
+        if (parsed.soapObjective) setSoapObjective(parsed.soapObjective);
+        if (parsed.soapAssessment) setSoapAssessment(parsed.soapAssessment);
+        if (parsed.soapPlan) setSoapPlan(parsed.soapPlan);
+        if (parsed.prescriptionMedications) setPrescriptionMedications(parsed.prescriptionMedications);
+        if (parsed.prescriptionInstructions) setPrescriptionInstructions(parsed.prescriptionInstructions);
+        if (parsed.sessionProcedures) setSessionProcedures(parsed.sessionProcedures);
+        toast({
+          variant: 'info',
+          title: 'Borrador Recuperado',
+          description: 'Se restableció el progreso previo de la consulta.',
+        });
+      }
+    } catch (e) {
+      console.warn('Error leyendo borrador local:', e);
+    }
+  }, [selectedPatientId, currentTenant?.id, actor, toast]);
+
+  // Auto-guardado de borrador en localStorage
+  useEffect(() => {
+    if (!selectedPatientId) return;
+    const draftKey = `rendo_gineco_draft_${selectedPatientId}`;
+    const payload = {
+      soapSubjective,
+      soapObjective,
+      soapAssessment,
+      soapPlan,
+      prescriptionMedications,
+      prescriptionInstructions,
+      sessionProcedures,
+      updatedAt: Date.now(),
+    };
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+    } catch (e) {
+      // Ignorar si quota excedida
+    }
+  }, [
+    selectedPatientId,
+    soapSubjective,
+    soapObjective,
+    soapAssessment,
+    soapPlan,
+    prescriptionMedications,
+    prescriptionInstructions,
+    sessionProcedures,
+  ]);
+
+  // Modificar fórmula obstétrica (incrementar / decrementar)
+  const adjustObstetricParam = (key: keyof GinecoObstetricProfile, delta: number) => {
+    setProfile((prev) => {
+      const current = Number(prev[key] || 0);
+      const next = Math.max(0, current + delta);
+      return { ...prev, [key]: next };
+    });
+  };
+
+  // Crear paciente rápida
+  const handleCreateFastPatient = async () => {
+    if (!newPatientName.trim() || !currentTenant?.id || !actor) {
+      toast({ variant: 'error', title: 'Error', description: 'El nombre es obligatorio.' });
+      return;
+    }
+    setIsSubmittingPatient(true);
+    try {
+      const res = await createEntityAction(
+        {
+          name: newPatientName.trim(),
+          type: 'customer',
+          tax_id: newPatientTaxId.trim() || undefined,
+          phone: newPatientPhone.trim() || undefined,
+          metadata: {
+            birth_date: newPatientBirthDate || undefined,
+            allergies: newPatientAllergies.trim() || undefined,
+            has_clinical_history: true,
+            has_history: true,
+          },
+        },
+        currentTenant.id,
+        actor
+      );
+
+      if (res.success && res.entity) {
+        setPatients((prev) => [res.entity, ...prev]);
+        setSelectedPatientId(res.entity.id);
+        setIsNewPatientModalOpen(false);
+        setNewPatientName('');
+        setNewPatientTaxId('');
+        setNewPatientPhone('');
+        setNewPatientBirthDate('');
+        setNewPatientAllergies('');
+        toast({ variant: 'success', title: 'Paciente Creada', description: 'Expediente ginecológico iniciado.' });
+      } else {
+        toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo crear.' });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error', description: err.message });
+    } finally {
+      setIsSubmittingPatient(false);
+    }
+  };
+
+  // Agregar procedimiento al presupuesto de la sesión
+  const handleAddProcedure = (proc: GinecoProcedureDefinition) => {
+    setSessionProcedures((prev) => [
+      ...prev,
+      {
+        id: proc.id,
+        code: proc.code,
+        name: proc.name,
+        price: proc.defaultPriceUSD,
+        category: proc.categoryLabel,
+        stages: proc.stages,
+      },
+    ]);
+    toast({
+      variant: 'info',
+      title: 'Procedimiento Agregado',
+      description: `${proc.name} agregado al presupuesto de hoy.`,
+    });
+  };
+
+  const handleRemoveProcedure = (index: number) => {
+    setSessionProcedures((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUpdateProcedurePrice = (index: number, newPrice: number) => {
+    setSessionProcedures((prev) => {
+      const copy = [...prev];
+      copy[index] = { ...copy[index], price: Math.max(0, newPrice) };
+      return copy;
+    });
+  };
+
+  const totalUSD = useMemo(() => {
+    return sessionProcedures.reduce((acc, p) => acc + (Number(p.price) || 0), 0);
+  }, [sessionProcedures]);
+
+  const totalVES = totalUSD * (exchangeRate || 1);
+
+  // Aplicar plantilla rápida de récipe
+  const handleApplyTemplate = (tmpl: (typeof GINECO_PRESCRIPTION_TEMPLATES)[0]) => {
+    setPrescriptionMedications(tmpl.medications);
+    setPrescriptionInstructions(tmpl.instructions);
+    if (tmpl.labOrders) {
+      setPrescriptionLabOrders(tmpl.labOrders);
+    }
+    toast({
+      variant: 'success',
+      title: 'Plantilla Aplicada',
+      description: `Se cargó la plantilla: ${tmpl.title}`,
+    });
+  };
+
+  // Agregar orden de paraclínico
+  const handleAddLabOrder = () => {
+    if (!newLabOrderInput.trim()) return;
+    setPrescriptionLabOrders((prev) => [...prev, newLabOrderInput.trim()]);
+    setNewLabOrderInput('');
+  };
+
+  const handleRemoveLabOrder = (index: number) => {
+    setPrescriptionLabOrders((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // Guardar consulta en historial
+  const handleSaveEncounter = async () => {
+    if (!selectedPatientId || !currentTenant?.id || !actor) {
+      toast({ variant: 'error', title: 'Paciente Requerida', description: 'Selecciona una paciente para continuar.' });
+      return;
+    }
+    setIsSavingEncounter(true);
+    try {
+      const res = await saveGinecoEncounterAction(
+        currentTenant.id,
+        {
+          patientId: selectedPatientId,
+          doctorId: selectedDoctorId || undefined,
+          doctorName: activeDoctor?.name || session?.userEmail || 'Ginecólogo/a',
+          encounterType: activeTab === 'obstetricia' ? 'prenatal' : 'ginecologia',
+          chiefComplaint,
+          profileUpdates: profile,
+          vitals,
+          obstetricExam: {
+            ...obstetricExam,
+            fumUsed: profile.fum || '',
+            gestationalWeeks: 0,
+            gestationalDays: 0,
+            fppDate: '',
+          },
+          gynecologicExam,
+          soap: {
+            subjective: soapSubjective,
+            objective: soapObjective,
+            assessment: soapAssessment,
+            cie10Code: selectedCie10?.code,
+            cie10Description: selectedCie10?.description,
+            plan: soapPlan,
+          },
+          prescription: {
+            medications: prescriptionMedications,
+            instructions: prescriptionInstructions,
+            labOrders: prescriptionLabOrders,
+          },
+          selectedProcedures: sessionProcedures,
+        },
+        actor
+      );
+
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Consulta Registrada',
+          description: 'Evolución clínica guardada exitosamente en el historial.',
+        });
+        // Limpiar borrador local tras guardado exitoso
+        try {
+          localStorage.removeItem(`rendo_gineco_draft_${selectedPatientId}`);
+        } catch (e) {}
+      } else {
+        toast({ variant: 'error', title: 'Error al Guardar', description: res.error || 'Ocurrió un error.' });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error', description: err.message });
+    } finally {
+      setIsSavingEncounter(false);
+    }
+  };
+
+  // Despachar orden a Caja POS
+  const handleSendToCashier = async () => {
+    if (!selectedPatientId || !currentTenant?.id || !actor) {
+      toast({ variant: 'error', title: 'Paciente Requerida', description: 'Selecciona una paciente para continuar.' });
+      return;
+    }
+    if (sessionProcedures.length === 0) {
+      toast({ variant: 'warning', title: 'Sin Procedimientos', description: 'Agrega al menos un procedimiento o consulta para cobrar.' });
+      return;
+    }
+    setIsSendingToCashier(true);
+    try {
+      const itemsToCharge = sessionProcedures.map((p) => ({
+        id: p.id,
+        code: p.code,
+        name: p.name,
+        cost: p.price,
+        category: p.category,
+        stages: p.stages,
+      }));
+
+      const res = await sendGinecoOrderToCashierAction(
+        selectedPatientId,
+        activePatient?.name || 'Paciente',
+        itemsToCharge,
+        totalUSD,
+        currentTenant.id,
+        actor,
+        {
+          doctorId: selectedDoctorId,
+          doctorName: activeDoctor?.name || 'Ginecólogo/a',
+        }
+      );
+
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Orden Despachada a Caja POS',
+          description: `Orden #${res.documentNumber} enviada a recepción para cobro ($${totalUSD.toFixed(2)} USD).`,
+        });
+        // Si tiene etapas, actualizar la lista de OTs en vivo
+        getPatientGinecoWorkOrdersAction(selectedPatientId, currentTenant.id, actor).then((otRes) => {
+          if (otRes.success && otRes.workOrders) {
+            setPatientWorkOrders(otRes.workOrders);
+          }
+        });
+      } else {
+        toast({ variant: 'error', title: 'Error al Despachar', description: res.error || 'No se pudo enviar la orden.' });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error', description: err.message });
+    } finally {
+      setIsSendingToCashier(false);
+    }
+  };
+
+  // Marcar etapa completada en OT
+  const handleToggleStep = async (documentId: string, stepId: string, currentCompleted: boolean) => {
+    if (!currentTenant?.id || !actor) return;
+    const nextCompleted = !currentCompleted;
+    setPatientWorkOrders((prev) =>
+      prev.map((order) => {
+        if (order.id !== documentId) return order;
+        return {
+          ...order,
+          steps: order.steps.map((stg) => (stg.id === stepId ? { ...stg, completed: nextCompleted } : stg)),
+        };
+      })
+    );
+
+    const res = await updateGinecoWorkOrderStepAction(documentId, stepId, nextCompleted, currentTenant.id, actor);
+    if (!res.success) {
+      toast({ variant: 'error', title: 'Error', description: 'No se pudo actualizar la etapa.' });
+    }
+  };
+
+  return (
+    <div className="min-h-screen pb-24 text-foreground max-w-7xl mx-auto px-4 sm:px-6 pt-4 space-y-5 animate-in fade-in duration-300">
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          CABECERA PRINCIPAL & SELECTOR DE PACIENTE / MÉDICO
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-600 text-white flex items-center justify-center font-black shadow-md shadow-pink-500/20 shrink-0">
+              <Baby size={26} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black text-foreground">
+                  Ginecología & Obstetricia
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20">
+                  Estación Clínica Especializada
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Control prenatal con gestograma, citología Bethesda, colposcopia y despacho a Caja POS
+              </p>
+            </div>
+          </div>
+
+          {/* Selectores de Paciente y Médico */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            {/* Selector de Paciente */}
+            <div className="relative min-w-[240px]">
+              <select
+                value={selectedPatientId}
+                onChange={(e) => setSelectedPatientId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-border bg-background text-sm font-bold text-foreground focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 outline-none transition-all appearance-none pr-8 cursor-pointer"
+              >
+                <option value="">-- Seleccionar Paciente --</option>
+                {patients.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} {p.tax_id ? `(${p.tax_id})` : ''}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <ChevronRight size={16} className="rotate-90" />
+              </div>
+            </div>
+
+            {/* Botón Nueva Paciente */}
+            <button
+              onClick={() => setIsNewPatientModalOpen(true)}
+              className="px-3 py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-border btn-haptic whitespace-nowrap"
+            >
+              <UserPlus size={15} className="text-pink-500" />
+              <span>+ Paciente</span>
+            </button>
+
+            {/* Selector de Médico Tratante */}
+            <div className="relative min-w-[200px]">
+              <select
+                value={selectedDoctorId}
+                onChange={(e) => setSelectedDoctorId(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-2xl border border-border bg-background text-xs font-bold text-foreground focus:ring-2 focus:ring-pink-500/30 focus:border-pink-500 outline-none transition-all appearance-none pr-8 cursor-pointer"
+              >
+                <option value="">-- Médico Tratante --</option>
+                {doctors.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    Dr(a). {d.name}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <ChevronRight size={16} className="rotate-90" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            CINTILLO GINECO-OBSTÉTRICO: FÓRMULA G-P-C-A + TRIAJE
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        {activePatient ? (
+          <div className="pt-3 border-t border-border/60 space-y-3">
+            {/* Fila Superior: Ficha y Fórmula Obstétrica G-P-C-A */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-pink-500/5 dark:bg-pink-500/10 border border-pink-500/20 p-3.5 rounded-2xl">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-pink-600 dark:text-pink-400 block">
+                  Paciente Activa en Consulta
+                </span>
+                <p className="text-base font-black text-foreground">{activePatient.name}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {activePatient.tax_id ? `ID: ${activePatient.tax_id} • ` : ''}
+                  Tel: {activePatient.phone || 'Sin teléfono'}
+                </p>
+              </div>
+
+              {/* Botonera de Fórmula Obstétrica G - P - C - A */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-black text-slate-600 dark:text-slate-300 mr-1">
+                  Fórmula Obstétrica:
+                </span>
+
+                {/* Gestas */}
+                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
+                  <span className="text-xs font-black text-pink-600 mr-1.5">G:</span>
+                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
+                    {profile.gestas}
+                  </span>
+                  <div className="flex flex-col ml-1.5">
+                    <button
+                      onClick={() => adjustObstetricParam('gestas', 1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => adjustObstetricParam('gestas', -1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+
+                {/* Partos */}
+                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
+                  <span className="text-xs font-black text-pink-600 mr-1.5">P:</span>
+                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
+                    {profile.partos}
+                  </span>
+                  <div className="flex flex-col ml-1.5">
+                    <button
+                      onClick={() => adjustObstetricParam('partos', 1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => adjustObstetricParam('partos', -1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cesáreas */}
+                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
+                  <span className="text-xs font-black text-pink-600 mr-1.5">C:</span>
+                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
+                    {profile.cesareas}
+                  </span>
+                  <div className="flex flex-col ml-1.5">
+                    <button
+                      onClick={() => adjustObstetricParam('cesareas', 1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => adjustObstetricParam('cesareas', -1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+
+                {/* Abortos */}
+                <div className="flex items-center bg-card border border-border rounded-xl px-2 py-1 shadow-xs">
+                  <span className="text-xs font-black text-pink-600 mr-1.5">A:</span>
+                  <span className="text-sm font-black text-foreground min-w-[16px] text-center">
+                    {profile.abortos}
+                  </span>
+                  <div className="flex flex-col ml-1.5">
+                    <button
+                      onClick={() => adjustObstetricParam('abortos', 1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▲
+                    </button>
+                    <button
+                      onClick={() => adjustObstetricParam('abortos', -1)}
+                      className="text-[10px] text-slate-400 hover:text-pink-600"
+                    >
+                      ▼
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Fila Inferior: Triaje y Signos Vitales Maternos */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {/* Presión Arterial */}
+              <div className="p-2.5 rounded-2xl bg-card border border-border">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Presión Arterial</span>
+                <input
+                  type="text"
+                  value={vitals.bloodPressure}
+                  onChange={(e) => setVitals((v) => ({ ...v, bloodPressure: e.target.value }))}
+                  placeholder="120/80"
+                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
+                />
+              </div>
+
+              {/* Frecuencia Cardíaca */}
+              <div className="p-2.5 rounded-2xl bg-card border border-border">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">FC Materna (lpm)</span>
+                <input
+                  type="number"
+                  value={vitals.heartRate}
+                  onChange={(e) => setVitals((v) => ({ ...v, heartRate: Number(e.target.value) }))}
+                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
+                />
+              </div>
+
+              {/* Peso Materno */}
+              <div className="p-2.5 rounded-2xl bg-card border border-border">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Peso (kg)</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={vitals.weightKg}
+                  onChange={(e) => setVitals((v) => ({ ...v, weightKg: Number(e.target.value) }))}
+                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
+                />
+              </div>
+
+              {/* Talla Materna */}
+              <div className="p-2.5 rounded-2xl bg-card border border-border">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">Talla (cm)</span>
+                <input
+                  type="number"
+                  value={vitals.heightCm}
+                  onChange={(e) => setVitals((v) => ({ ...v, heightCm: Number(e.target.value) }))}
+                  className="w-full text-sm font-black text-foreground bg-transparent outline-none mt-0.5"
+                />
+              </div>
+
+              {/* IMC Materno Calculado */}
+              <div className="p-2.5 rounded-2xl bg-card border border-border col-span-2 sm:col-span-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase block">IMC Calculado</span>
+                <p className="text-sm font-black text-foreground mt-0.5">
+                  {bmiInfo.bmi > 0 ? `${bmiInfo.bmi} kg/m²` : '—'}
+                </p>
+                <span className="text-[10px] font-bold" style={{ color: bmiInfo.color }}>
+                  {bmiInfo.category}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border/80 text-center text-xs text-slate-500">
+            Selecciona una paciente del listado o pulsa <strong className="text-foreground">+ Paciente</strong> para iniciar la historia clínica.
+          </div>
+        )}
+      </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          BARRA DE PESTAÑAS OPERATIVAS DE ATENCIÓN
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="flex border-b border-border bg-card rounded-2xl p-1.5 gap-1.5 overflow-x-auto shadow-xs">
+        <button
+          onClick={() => setActiveTab('obstetricia')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+            activeTab === 'obstetricia'
+              ? 'bg-pink-500 text-white shadow-sm'
+              : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Baby size={15} />
+          <span>1. Control Obstétrico (FUM & Gestograma)</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('ginecologia')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+            activeTab === 'ginecologia'
+              ? 'bg-pink-500 text-white shadow-sm'
+              : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Activity size={15} />
+          <span>2. Consulta Ginecológica & Citología</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('soap_recipe')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+            activeTab === 'soap_recipe'
+              ? 'bg-pink-500 text-white shadow-sm'
+              : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FileText size={15} />
+          <span>3. Evolución SOAP & Récipe</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('procedimientos')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+            activeTab === 'procedimientos'
+              ? 'bg-pink-500 text-white shadow-sm'
+              : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <DollarSign size={15} />
+          <span>4. Procedimientos & Caja POS</span>
+          {sessionProcedures.length > 0 && (
+            <span className="w-5 h-5 rounded-full bg-white text-pink-600 text-[10px] font-black flex items-center justify-center">
+              {sessionProcedures.length}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('historial')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+            activeTab === 'historial'
+              ? 'bg-pink-500 text-white shadow-sm'
+              : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <FolderOpen size={15} />
+          <span>5. Historial & Kanban OTs</span>
+        </button>
+      </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          PESTAÑA 1: CONTROL OBSTÉTRICO & GESTOGRAMA
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {activeTab === 'obstetricia' && (
+        <div className="space-y-5">
+          {/* Widget de Calculadora Obstétrica */}
+          <GestationalWheelWidget
+            fum={profile.fum || ''}
+            onFumChange={(newFum) => setProfile((p) => ({ ...p, fum: newFum }))}
+            uterineHeightCm={obstetricExam.uterineHeightCm}
+            fetalHeartRateBpm={obstetricExam.fetalHeartRateBpm}
+          />
+
+          {/* Formulario de Evaluación Obstétrica */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <h4 className="text-base font-black text-foreground flex items-center gap-2">
+              <Stethoscope size={18} className="text-pink-500" />
+              Exploración Obstétrica de la Sesión
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {/* Altura Uterina */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Altura Uterina (cm):</label>
+                <input
+                  type="number"
+                  value={obstetricExam.uterineHeightCm || ''}
+                  onChange={(e) =>
+                    setObstetricExam((prev) => ({ ...prev, uterineHeightCm: Number(e.target.value) }))
+                  }
+                  placeholder="Ej: 24"
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+                />
+              </div>
+
+              {/* FCF Doppler Fetal */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">FCF Doppler (lpm):</label>
+                <input
+                  type="number"
+                  value={obstetricExam.fetalHeartRateBpm || ''}
+                  onChange={(e) =>
+                    setObstetricExam((prev) => ({ ...prev, fetalHeartRateBpm: Number(e.target.value) }))
+                  }
+                  placeholder="Ej: 142"
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+                />
+              </div>
+
+              {/* Movimientos Fetales */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Movimientos Fetales:</label>
+                <select
+                  value={obstetricExam.fetalMovements}
+                  onChange={(e) =>
+                    setObstetricExam((prev) => ({ ...prev, fetalMovements: e.target.value as any }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
+                >
+                  <option value="presentes">Presentes y activos</option>
+                  <option value="disminuidos">Disminuidos</option>
+                  <option value="ausentes">Ausentes (Alerta)</option>
+                </select>
+              </div>
+
+              {/* Presentación Fetal */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Presentación Fetal:</label>
+                <select
+                  value={obstetricExam.presentation}
+                  onChange={(e) =>
+                    setObstetricExam((prev) => ({ ...prev, presentation: e.target.value as any }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
+                >
+                  <option value="cefalica">Cefálica</option>
+                  <option value="podalica">Podálica / Pelviana</option>
+                  <option value="transversa">Transversa</option>
+                </select>
+              </div>
+
+              {/* Edema Materno */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500">Edema de Miembros:</label>
+                <select
+                  value={obstetricExam.edema}
+                  onChange={(e) =>
+                    setObstetricExam((prev) => ({ ...prev, edema: e.target.value as any }))
+                  }
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
+                >
+                  <option value="ausente">Ausente</option>
+                  <option value="leve">Leve (+)</option>
+                  <option value="moderado">Moderado (++)</option>
+                  <option value="severo">Severo (+++) (Descartar Preeclampsia)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Hallazgos Ecográficos */}
+            <div className="space-y-1.5 pt-2">
+              <label className="text-xs font-bold text-slate-500">
+                Hallazgos Sonográficos / Ecografía en Consultorio:
+              </label>
+              <textarea
+                value={obstetricExam.ultrasoundFindings}
+                onChange={(e) =>
+                  setObstetricExam((prev) => ({ ...prev, ultrasoundFindings: e.target.value }))
+                }
+                rows={2}
+                placeholder="Feto único intrauterino en situación longitudinal, dorso anterior. Líquido amniótico normal (ILA 14cm). Placenta fúndica posterior Grado I."
+                className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          PESTAÑA 2: GINECOLOGÍA, CITOLOGÍA & COLPOSCOPIA
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {activeTab === 'ginecologia' && (
+        <div className="space-y-5">
+          {/* Antecedentes Ginecológicos */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <h4 className="text-base font-black text-foreground flex items-center gap-2">
+              <Activity size={18} className="text-pink-500" />
+              Antecedentes Ginecológicos & Reproductivos
+            </h4>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Menarquia (edad):</label>
+                <input
+                  type="number"
+                  value={profile.menarquia || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, menarquia: Number(e.target.value) }))}
+                  className="w-full px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Ritmo Menstrual:</label>
+                <input
+                  type="text"
+                  value={profile.ritmoMenstrual || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, ritmoMenstrual: e.target.value }))}
+                  placeholder="28 x 4"
+                  className="w-full px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Método Anticonceptivo:</label>
+                <input
+                  type="text"
+                  value={profile.metodoAnticonceptivo || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, metodoAnticonceptivo: e.target.value }))}
+                  placeholder="ACOs, DIU, Implante..."
+                  className="w-full px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Última Citología PAP:</label>
+                <input
+                  type="date"
+                  value={profile.ultimaCitologiaFecha || ''}
+                  onChange={(e) => setProfile((p) => ({ ...p, ultimaCitologiaFecha: e.target.value }))}
+                  className="w-full px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Exploración Colposcópica & Patología Cervical */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <h4 className="text-base font-black text-foreground flex items-center gap-2">
+              <Stethoscope size={18} className="text-pink-500" />
+              Especuloscopia, Test de Schiller & Colposcopia
+            </h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Test de Ácido Acético */}
+              <div className="space-y-1.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border">
+                <label className="text-xs font-black text-slate-700 dark:text-slate-300">
+                  Prueba de Ácido Acético al 3-5%:
+                </label>
+                <select
+                  value={gynecologicExam.aceticAcidTest}
+                  onChange={(e) =>
+                    setGynecologicExam((prev) => ({ ...prev, aceticAcidTest: e.target.value as any }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none cursor-pointer"
+                >
+                  <option value="normal">Normal (Sin epitelio acetoblanco)</option>
+                  <option value="acetoblanco_tenue">Epitelio acetoblanco tenue (Bajo grado / LSIL)</option>
+                  <option value="acetoblanco_denso">Epitelio acetoblanco denso opaco (Alto grado / HSIL)</option>
+                  <option value="mosaico">Mosaico vascular evidente</option>
+                  <option value="punteado">Punteado basófilo</option>
+                </select>
+              </div>
+
+              {/* Test de Schiller */}
+              <div className="space-y-1.5 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border">
+                <label className="text-xs font-black text-slate-700 dark:text-slate-300">
+                  Test de Schiller (Solución de Lugol):
+                </label>
+                <select
+                  value={gynecologicExam.schillerTest}
+                  onChange={(e) =>
+                    setGynecologicExam((prev) => ({ ...prev, schillerTest: e.target.value as any }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none cursor-pointer"
+                >
+                  <option value="positivo_caoba">Schiller Negativo / Caoba Normal (Capta yodo)</option>
+                  <option value="negativo_yodonegativo">
+                    Schiller Positivo / Zona Yodonegativa Mostaza (Sospecha)
+                  </option>
+                  <option value="no_realizado">No realizado en esta sesión</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Clasificación Bethesda */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-500">
+                Clasificación Citopatológica Bethesda (PAP):
+              </label>
+              <select
+                value={gynecologicExam.bethesdaPapClassification}
+                onChange={(e) =>
+                  setGynecologicExam((prev) => ({ ...prev, bethesdaPapClassification: e.target.value }))
+                }
+                className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none cursor-pointer"
+              >
+                <option value="Negativo para lesión intraepitelial o malignidad (NILM)">
+                  NILM — Negativo para lesión intraepitelial o malignidad
+                </option>
+                <option value="ASC-US — Células escamosas atípicas de significado indeterminado">
+                  ASC-US — Células escamosas atípicas de significado indeterminado
+                </option>
+                <option value="LSIL — Lesión intraepitelial escamosa de bajo grado (CIN I)">
+                  LSIL — Lesión intraepitelial de bajo grado (CIN I / VPH)
+                </option>
+                <option value="ASC-H — Células escamosas atípicas, no se descarta HSIL">
+                  ASC-H — Atipia escamosa, no se descarta alto grado
+                </option>
+                <option value="HSIL — Lesión intraepitelial escamosa de alto grado (CIN II / CIN III)">
+                  HSIL — Lesión intraepitelial de alto grado (CIN II / CIN III / CIS)
+                </option>
+                <option value="AGC — Células glandulares atípicas (Endocervicales / Endometriales)">
+                  AGC — Células glandulares atípicas
+                </option>
+              </select>
+            </div>
+
+            {/* Checkbox de Biopsia */}
+            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-pink-500/5 border border-pink-500/20">
+              <input
+                type="checkbox"
+                id="biopsyTaken"
+                checked={gynecologicExam.biopsyTaken}
+                onChange={(e) =>
+                  setGynecologicExam((prev) => ({ ...prev, biopsyTaken: e.target.checked }))
+                }
+                className="w-4 h-4 rounded text-pink-500 accent-pink-500 cursor-pointer"
+              />
+              <label htmlFor="biopsyTaken" className="text-xs font-bold text-foreground cursor-pointer">
+                Se tomó muestra de Biopsia Cervical / Endometrial dirigida en esta consulta
+              </label>
+              {gynecologicExam.biopsyTaken && (
+                <input
+                  type="text"
+                  placeholder="Localización: ej: hora 12 y hora 6"
+                  value={gynecologicExam.biopsyLocation}
+                  onChange={(e) =>
+                    setGynecologicExam((prev) => ({ ...prev, biopsyLocation: e.target.value }))
+                  }
+                  className="ml-auto px-3 py-1 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          PESTAÑA 3: EVOLUCIÓN SOAP, CIE-10 & RÉCIPE MÉDICO
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {activeTab === 'soap_recipe' && (
+        <div className="space-y-5">
+          {/* SOAP Médico */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <h4 className="text-base font-black text-foreground flex items-center gap-2">
+              <FileText size={18} className="text-pink-500" />
+              Evolución Clínica SOAP
+            </h4>
+
+            {/* Motivo de Consulta */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500">Motivo de Consulta Principal:</label>
+              <input
+                type="text"
+                value={chiefComplaint}
+                onChange={(e) => setChiefComplaint(e.target.value)}
+                placeholder="Ej: Control prenatal de 24 semanas / Flujo vaginal pruriginoso / Retraso menstrual..."
+                className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* S: Subjetivo */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-pink-600">S — Subjetivo (Anamnesis):</label>
+                <textarea
+                  value={soapSubjective}
+                  onChange={(e) => setSoapSubjective(e.target.value)}
+                  rows={3}
+                  placeholder="Paciente refiere movimientos fetales activos, sin pérdidas hemáticas ni transvaginales..."
+                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
+                />
+              </div>
+
+              {/* O: Objetivo */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-pink-600">O — Objetivo (Examen Físico):</label>
+                <textarea
+                  value={soapObjective}
+                  onChange={(e) => setSoapObjective(e.target.value)}
+                  rows={3}
+                  placeholder="Abdomen grávido, AU 24cm, FCF 142 lpm. Extremidades sin edema..."
+                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
+                />
+              </div>
+
+              {/* A: Análisis & Diagnóstico */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-pink-600">A — Análisis / Diagnóstico:</label>
+                <textarea
+                  value={soapAssessment}
+                  onChange={(e) => setSoapAssessment(e.target.value)}
+                  rows={3}
+                  placeholder="Embarazo de 24 sem por FUM en adecuada evolución. Eutrófica..."
+                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
+                />
+              </div>
+
+              {/* P: Plan Terapéutico */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-pink-600">P — Plan & Conducta:</label>
+                <textarea
+                  value={soapPlan}
+                  onChange={(e) => setSoapPlan(e.target.value)}
+                  rows={3}
+                  placeholder="Continuar hierro + ácido fólico. Solicitar test de O'Sullivan y control en 4 semanas..."
+                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 resize-none font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Buscador CIE-10 Gineco-Obstétrico */}
+            <div className="pt-2 border-t border-border/50 space-y-2">
+              <label className="text-xs font-bold text-slate-500 flex items-center gap-1.5">
+                <Search size={13} className="text-pink-500" />
+                <span>Codificación CIE-10 Gineco-Obstétrica:</span>
+              </label>
+
+              {selectedCie10 ? (
+                <div className="flex items-center justify-between p-3 rounded-2xl bg-pink-500/10 border border-pink-500/30">
+                  <div>
+                    <span className="font-mono font-black text-pink-600 text-sm">[{selectedCie10.code}]</span>{' '}
+                    <span className="font-bold text-foreground text-xs">{selectedCie10.description}</span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedCie10(null)}
+                    className="p-1 text-slate-400 hover:text-rose-500"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={cie10Search}
+                    onChange={(e) => setCie10Search(e.target.value)}
+                    placeholder="Buscar CIE-10 (ej: embarazo, vaginitis, mioma, preeclampsia)..."
+                    className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                  />
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
+                    {GINECO_CIE10_CATALOG.filter(
+                      (c) =>
+                        c.description.toLowerCase().includes(cie10Search.toLowerCase()) ||
+                        c.code.toLowerCase().includes(cie10Search.toLowerCase())
+                    ).map((c) => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => setSelectedCie10({ code: c.code, description: c.description })}
+                        className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-pink-500/10 hover:text-pink-600 hover:border-pink-500/30 text-[11px] font-bold border border-border text-foreground transition-all flex items-center gap-1.5 btn-haptic"
+                      >
+                        <span className="font-mono text-pink-500">[{c.code}]</span>
+                        <span className="truncate max-w-[220px]">{c.description}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Récipe Digital e Indicaciones */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/60 pb-3">
+              <div>
+                <h4 className="text-base font-black text-foreground flex items-center gap-2">
+                  <FileText size={18} className="text-pink-500" />
+                  Prescripción & Récipe Médico Digital
+                </h4>
+                <p className="text-xs text-slate-500">Plantillas rápidas e impresión oficial para la paciente</p>
+              </div>
+
+              {/* Botón Imprimir Récipe */}
+              <button
+                onClick={() => setIsPrintModalOpen(true)}
+                className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black transition-all flex items-center justify-center gap-2 shadow-xs btn-haptic whitespace-nowrap"
+              >
+                <Printer size={15} />
+                <span>Previsualizar / Imprimir Récipe</span>
+              </button>
+            </div>
+
+            {/* Atajos de Plantillas Clínicas */}
+            <div className="space-y-1.5">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                Plantillas Rápidas de Prescripción:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {GINECO_PRESCRIPTION_TEMPLATES.map((tmpl) => (
+                  <button
+                    key={tmpl.id}
+                    type="button"
+                    onClick={() => handleApplyTemplate(tmpl)}
+                    className="px-3 py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold transition-all border border-pink-500/20 btn-haptic flex items-center gap-1"
+                  >
+                    <Sparkles size={12} />
+                    <span>{tmpl.title}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Editores de Medicamentos e Indicaciones */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 dark:text-slate-300">
+                  Rp / Medicamentos (Fármaco, Concentración, Posología):
+                </label>
+                <textarea
+                  value={prescriptionMedications}
+                  onChange={(e) => setPrescriptionMedications(e.target.value)}
+                  rows={5}
+                  placeholder="1. Ácido Fólico 5 mg: 1 tab diaria en ayunas.&#10;2. Sulfato Ferroso 300 mg: 1 tab con jugo de naranja..."
+                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none font-mono focus:ring-2 focus:ring-pink-500/30 leading-relaxed"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-slate-700 dark:text-slate-300">
+                  Indicaciones, Dieta & Signos de Alarma:
+                </label>
+                <textarea
+                  value={prescriptionInstructions}
+                  onChange={(e) => setPrescriptionInstructions(e.target.value)}
+                  rows={5}
+                  placeholder="Tomar abundante líquido. Consultar ante sangrado genital, dolor cólico intenso o disminución de movimientos..."
+                  className="w-full p-3 rounded-2xl border border-border bg-background text-xs text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 leading-relaxed"
+                />
+              </div>
+            </div>
+
+            {/* Órdenes Paraclínicas / Ecografías */}
+            <div className="pt-2 border-t border-border/50 space-y-2">
+              <span className="text-xs font-black text-slate-700 dark:text-slate-300 block">
+                Órdenes de Exámenes de Laboratorio y Ecografías:
+              </span>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newLabOrderInput}
+                  onChange={(e) => setNewLabOrderInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddLabOrder()}
+                  placeholder="Ej: Curva de tolerancia a la glucosa / Ecografía morfológica / Urocultivo..."
+                  className="flex-1 px-3.5 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddLabOrder}
+                  className="px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-foreground border border-border btn-haptic"
+                >
+                  + Agregar
+                </button>
+              </div>
+
+              {prescriptionLabOrders.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {prescriptionLabOrders.map((lab, i) => (
+                    <span
+                      key={i}
+                      className="px-3 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-foreground border border-border flex items-center gap-1.5"
+                    >
+                      <span>{lab}</span>
+                      <button
+                        onClick={() => handleRemoveLabOrder(i)}
+                        className="text-slate-400 hover:text-rose-500"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          PESTAÑA 4: PROCEDIMIENTOS & DESPACHO A CAJA POS
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {activeTab === 'procedimientos' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {/* Columna Izquierda: Catálogo de Procedimientos Disponibles */}
+          <div className="lg:col-span-2 bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div>
+                <h4 className="text-base font-black text-foreground flex items-center gap-2">
+                  <Stethoscope size={18} className="text-pink-500" />
+                  Catálogo de Procedimientos Gineco-Obstétricos
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Precios sincronizados con el catálogo del negocio (editables en vivo)
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[500px] overflow-y-auto pr-1">
+              {catalogProcedures.map((proc) => (
+                <div
+                  key={proc.id}
+                  className="p-3.5 rounded-2xl border border-border/70 hover:border-pink-500/40 bg-card hover:bg-pink-500/5 transition-all space-y-2 flex flex-col justify-between"
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold text-pink-600 bg-pink-500/10 px-2 py-0.5 rounded-md">
+                        {proc.code}
+                      </span>
+                      <span className="text-sm font-black text-foreground">
+                        ${Number(proc.defaultPriceUSD).toFixed(2)}
+                      </span>
+                    </div>
+                    <p className="text-xs font-black text-foreground">{proc.name}</p>
+                    <p className="text-[10px] text-slate-500">{proc.categoryLabel} • {proc.estimatedDurationMin} min</p>
+                  </div>
+
+                  <button
+                    onClick={() => handleAddProcedure(proc)}
+                    className="w-full py-1.5 rounded-xl bg-pink-500/10 hover:bg-pink-500 text-pink-600 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic mt-1"
+                  >
+                    <Plus size={14} />
+                    <span>Agregar a Orden</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Columna Derecha: Presupuesto Activo & Despacho a Caja Mostrador */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4 flex flex-col justify-between">
+            <div className="space-y-3">
+              <div className="border-b border-border/60 pb-2">
+                <h4 className="text-base font-black text-foreground flex items-center gap-2">
+                  <DollarSign size={18} className="text-pink-500" />
+                  Presupuesto de la Sesión
+                </h4>
+                <p className="text-xs text-slate-500">Ítems que serán facturados en recepción</p>
+              </div>
+
+              {sessionProcedures.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 space-y-1.5">
+                  <DollarSign size={28} className="mx-auto text-slate-300 dark:text-slate-700" />
+                  <p className="text-xs font-bold text-foreground">Sin procedimientos seleccionados</p>
+                  <p className="text-[11px] text-slate-500">Agrega procedimientos del catálogo a la izquierda.</p>
+                </div>
+              ) : (
+                <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+                  {sessionProcedures.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-border space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-xs font-black text-foreground truncate">{item.name}</p>
+                        <button
+                          onClick={() => handleRemoveProcedure(idx)}
+                          className="text-slate-400 hover:text-rose-500 p-0.5"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-[10px] text-slate-500">{item.category}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-400 font-bold">$</span>
+                          <input
+                            type="number"
+                            value={item.price}
+                            onChange={(e) => handleUpdateProcedurePrice(idx, Number(e.target.value))}
+                            className="w-16 px-2 py-0.5 rounded-lg border border-border bg-background text-right font-black text-foreground text-xs"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Totalizador & Botonera de Envío a Caja */}
+            <div className="pt-3 border-t border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-500">Total a Cobrar:</span>
+                <div className="text-right">
+                  <p className="text-xl font-black text-foreground">${totalUSD.toFixed(2)} USD</p>
+                  <p className="text-xs font-mono font-bold text-pink-600">
+                    ≈ Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {/* Despachar a Caja POS */}
+                <button
+                  onClick={handleSendToCashier}
+                  disabled={isSendingToCashier || sessionProcedures.length === 0}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-black text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-pink-500/20 disabled:opacity-50 btn-haptic"
+                >
+                  <Send size={15} />
+                  <span>
+                    {isSendingToCashier ? 'Despachando a Caja...' : 'Despachar a Caja Mostrador'}
+                  </span>
+                </button>
+
+                {/* Guardar Consulta */}
+                <button
+                  onClick={handleSaveEncounter}
+                  disabled={isSavingEncounter || !selectedPatientId}
+                  className="w-full py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-foreground font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-border btn-haptic disabled:opacity-50"
+                >
+                  <Save size={14} className="text-pink-500" />
+                  <span>{isSavingEncounter ? 'Guardando...' : 'Guardar Consulta en Historial'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          PESTAÑA 5: HISTORIAL CLÍNICO & SEGUIMIENTO KANBAN
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {activeTab === 'historial' && (
+        <div className="space-y-5">
+          {/* Órdenes de Trabajo Activas (Kanban Gineco-Obstétrico) */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-border/60 pb-3">
+              <div>
+                <h4 className="text-base font-black text-foreground flex items-center gap-2">
+                  <Layers size={18} className="text-pink-500" />
+                  Seguimiento de Procedimientos & Etapas (Kanban)
+                </h4>
+                <p className="text-xs text-slate-500">
+                  Monitoreo de tratamientos multisesión (ej. DIU, crioterapia o ecografías seriadas)
+                </p>
+              </div>
+            </div>
+
+            {isLoadingWorkOrders ? (
+              <div className="py-8 text-center text-xs text-slate-500">Cargando etapas...</div>
+            ) : patientWorkOrders.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 space-y-1">
+                <CheckCircle2 size={24} className="mx-auto text-emerald-500/50" />
+                <p className="text-xs font-bold text-foreground">Sin procedimientos activos pendientes</p>
+                <p className="text-[11px] text-slate-500">
+                  Cuando despaches procedimientos con etapas multisesión, su checklist aparecerá aquí.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {patientWorkOrders.map((wo) => (
+                  <div key={wo.id} className="p-4 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono text-pink-600 bg-pink-500/10 px-2 py-0.5 rounded-md font-bold">
+                          {wo.documentNumber}
+                        </span>
+                        <h5 className="text-sm font-black text-foreground mt-1">{wo.title}</h5>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-black text-foreground">${wo.totalAmount.toFixed(2)} USD</span>
+                        <span className={`block text-[10px] font-bold ${wo.balanceDue > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                          {wo.balanceDue > 0 ? `Pendiente: $${wo.balanceDue.toFixed(2)}` : 'Saldado'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Checklist interactivo de etapas */}
+                    {wo.steps && wo.steps.length > 0 && (
+                      <div className="space-y-1.5 pt-2 border-t border-border/50">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                          Etapas del Procedimiento:
+                        </span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {wo.steps.map((stg) => (
+                            <button
+                              key={stg.id}
+                              type="button"
+                              onClick={() => handleToggleStep(wo.id, stg.id, stg.completed)}
+                              className={`p-2 rounded-xl border text-left text-xs font-bold transition-all flex items-center gap-2 btn-haptic ${
+                                stg.completed
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
+                                  : 'bg-card border-border hover:border-pink-500/40 text-foreground'
+                              }`}
+                            >
+                              {stg.completed ? (
+                                <CheckSquare size={16} className="text-emerald-500 shrink-0" />
+                              ) : (
+                                <Square size={16} className="text-slate-400 shrink-0" />
+                              )}
+                              <span className={stg.completed ? 'line-through opacity-80' : ''}>
+                                {stg.title}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Historial de Consultas Previas */}
+          <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+            <h4 className="text-base font-black text-foreground flex items-center gap-2">
+              <Clock size={18} className="text-pink-500" />
+              Bitácora de Consultas Ginecológicas Anteriores
+            </h4>
+
+            {encountersHistory.length === 0 ? (
+              <div className="text-center py-8 text-slate-400 space-y-1">
+                <FileText size={24} className="mx-auto text-slate-400/50" />
+                <p className="text-xs font-bold text-foreground">Sin consultas previas registradas</p>
+                <p className="text-[11px] text-slate-500">
+                  Las evoluciones clínicas guardadas se archivarán cronológicamente en esta sección.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
+                {encountersHistory.map((enc) => (
+                  <div
+                    key={enc.id}
+                    className="p-4 rounded-2xl border border-border bg-card space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-foreground">{enc.title}</span>
+                      <span className="text-[11px] font-mono text-slate-400">
+                        {new Date(enc.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 font-mono">
+                      {enc.content}
+                    </p>
+                    {enc.metadata?.doctorName && (
+                      <p className="text-[10px] text-slate-400">
+                        Atendido por: Dr(a). {enc.metadata.doctorName}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MODAL: CREAR PACIENTE RÁPIDA
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      {isNewPatientModalOpen && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="relative w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                <UserPlus size={18} className="text-pink-500" />
+                Nueva Paciente Ginecológica
+              </h3>
+              <button
+                onClick={() => setIsNewPatientModalOpen(false)}
+                className="text-slate-400 hover:text-foreground p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Nombre Completo *:</label>
+                <input
+                  type="text"
+                  value={newPatientName}
+                  onChange={(e) => setNewPatientName(e.target.value)}
+                  placeholder="Ej: María Valentina Gómez"
+                  className="w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">Cédula / Tax ID:</label>
+                  <input
+                    type="text"
+                    value={newPatientTaxId}
+                    onChange={(e) => setNewPatientTaxId(e.target.value)}
+                    placeholder="V-18234567"
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">Teléfono:</label>
+                  <input
+                    type="tel"
+                    value={newPatientPhone}
+                    onChange={(e) => setNewPatientPhone(e.target.value)}
+                    placeholder="+58 412..."
+                    className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Fecha de Nacimiento:</label>
+                <input
+                  type="date"
+                  value={newPatientBirthDate}
+                  onChange={(e) => setNewPatientBirthDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Alergias Conocidas:</label>
+                <input
+                  type="text"
+                  value={newPatientAllergies}
+                  onChange={(e) => setNewPatientAllergies(e.target.value)}
+                  placeholder="Ej: Penicilina, AINEs, Látex..."
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setIsNewPatientModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-foreground"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateFastPatient}
+                disabled={isSubmittingPatient}
+                className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black transition-all btn-haptic disabled:opacity-50"
+              >
+                {isSubmittingPatient ? 'Creando...' : 'Crear Paciente'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MODAL: IMPRESIÓN OFICIAL DEL RÉCIPE
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <GinecoPrescriptionPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        patientName={activePatient?.name || 'Paciente'}
+        patientTaxId={activePatient?.tax_id}
+        patientPhone={activePatient?.phone}
+        doctorName={activeDoctor?.name || 'Ginecólogo/a Tratante'}
+        doctorLicense={activeDoctor?.metadata?.license_number || activeDoctor?.metadata?.mpps}
+        gestationalWeeks={0}
+        cie10={selectedCie10 || undefined}
+        prescription={{
+          medications: prescriptionMedications,
+          instructions: prescriptionInstructions,
+          labOrders: prescriptionLabOrders,
+        }}
+        clinicName={currentTenant?.name || 'CENTRO GINECOLÓGICO & OBSTÉTRICO'}
+      />
+    </div>
+  );
+}

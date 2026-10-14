@@ -23,7 +23,8 @@ import {
   Stethoscope,
   HeartPulse,
   Scissors,
-  Dog
+  Dog,
+  Baby
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -137,6 +138,13 @@ export default function LauncherPage() {
       icon: <Stethoscope className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
+      id: 'ginecologia', 
+      name: 'Ginecología & Obstetricia', 
+      href: '/ginecologia',
+      gradient: 'from-pink-500 to-rose-600',
+      icon: <Baby className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
       id: 'clinica', 
       name: 'Clínica Médica', 
       href: '/clinica',
@@ -185,11 +193,14 @@ export default function LauncherPage() {
 
     // 1. Debe estar activo en la empresa
     const isClinica = app.id === 'clinica';
+    const isGineco = app.id === 'ginecologia';
     const isTenantActive = isClinica
       ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
-      : (app.id === 'inventario' || app.id === 'catalogo')
-        ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
-        : tenantModules.includes(app.id);
+      : isGineco
+        ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
+        : (app.id === 'inventario' || app.id === 'catalogo')
+          ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
+          : tenantModules.includes(app.id);
 
     if (!isTenantActive) return false;
 
@@ -197,6 +208,9 @@ export default function LauncherPage() {
     if (userAllowed) {
       if (isClinica) {
         return userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_'));
+      }
+      if (isGineco) {
+        return userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia');
       }
       if (app.id === 'inventario' || app.id === 'catalogo') {
         return userAllowed.includes('inventario') || userAllowed.includes('catalogo');

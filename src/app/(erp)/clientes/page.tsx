@@ -12,7 +12,7 @@ import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import { 
   Plus, Download, Users, DollarSign, Activity, Calendar, MessageSquare, 
   ShoppingBag, ArrowRight, Search, Filter, Sparkles, UserCheck, ShieldAlert,
-  Phone, Mail, Tag, Copy, Check, Stethoscope, FileText
+  Phone, Mail, Tag, Copy, Check, Stethoscope, FileText, Baby
 } from 'lucide-react';
 import { exportToCSV } from '@/lib/core/exportToCSV';
 import { useERPStore } from '@/store/useERPStore';
@@ -40,6 +40,10 @@ export default function ClientesPage() {
   const isDentalActive = isModuleActive(
     currentTenant?.active_modules || (currentTenant?.metadata as any)?.active_modules,
     'odontologia'
+  );
+  const isGinecoActive = isModuleActive(
+    currentTenant?.active_modules || (currentTenant?.metadata as any)?.active_modules,
+    'ginecologia'
   );
 
   // Estados Principales
@@ -671,6 +675,16 @@ export default function ClientesPage() {
                                 <Stethoscope size={13} />
                                 <span>Sillón</span>
                               </button>
+                            ) : isGinecoActive ? (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/ginecologia?client_id=${client.id}`)}
+                                className="px-2 py-1 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold transition-all flex items-center gap-1 border border-pink-500/20 btn-haptic"
+                                title="Abrir Consulta Gineco-Obstétrica"
+                              >
+                                <Baby size={13} />
+                                <span>Gineco</span>
+                              </button>
                             ) : (
                               <button
                                 type="button"
@@ -683,6 +697,17 @@ export default function ClientesPage() {
                               >
                                 <FileText size={13} />
                                 <span>Ficha</span>
+                              </button>
+                            )}
+                            {isDentalActive && isGinecoActive && (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/ginecologia?client_id=${client.id}`)}
+                                className="px-2 py-1 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold transition-all flex items-center gap-1 border border-pink-500/20 btn-haptic"
+                                title="Abrir Consulta Gineco-Obstétrica"
+                              >
+                                <Baby size={13} />
+                                <span>Gineco</span>
                               </button>
                             )}
                             <button
@@ -791,6 +816,16 @@ export default function ClientesPage() {
                                 title="Abrir Historia Clínica y Fotos en 1 clic"
                               >
                                 <Stethoscope size={13} />
+                              </button>
+                            )}
+                            {isGinecoActive && (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/ginecologia?client_id=${client.id}`)}
+                                className="p-1.5 rounded-lg border border-pink-500/20 text-pink-600 dark:text-pink-400 hover:bg-pink-500/10 transition-colors"
+                                title="Abrir Consulta Gineco-Obstétrica"
+                              >
+                                <Baby size={13} />
                               </button>
                             )}
                             <button

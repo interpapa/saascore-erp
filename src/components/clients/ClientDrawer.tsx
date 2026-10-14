@@ -5,7 +5,8 @@ import {
   X, Phone, Mail, MapPin, DollarSign, Edit3, Trash2, Calendar, 
   ShoppingBag, MessageSquare, Stethoscope, Image as ImageIcon, 
   Receipt, User, Sparkles, Tag, FileText, ExternalLink, Printer,
-  PlusCircle, CreditCard, ArrowUpRight, CheckCircle2, Maximize2, Minimize2
+  PlusCircle, CreditCard, ArrowUpRight, CheckCircle2, Maximize2, Minimize2,
+  Baby
 } from 'lucide-react';
 import { Entity } from '@/lib/api/entities';
 import { adjustCustomerDebtAction, recordClientPaymentAction, toggleEntityHistoryAction } from '@/app/actions/entities';
@@ -34,7 +35,7 @@ interface ClientDrawerProps {
   initialTab?: DrawerTab;
 }
 
-type DrawerTab = 'perfil' | 'registros' | 'archivos' | 'historial' | 'odontograma';
+type DrawerTab = 'perfil' | 'registros' | 'archivos' | 'historial' | 'odontograma' | 'ginecologia';
 
 export function ClientDrawer({ 
   client, 
@@ -59,6 +60,10 @@ export function ClientDrawer({
   const isDentalModuleActive = isModuleActive(
     currentTenant?.active_modules || (currentTenant?.metadata as { active_modules?: string[] })?.active_modules,
     'odontologia'
+  );
+  const isGinecoModuleActive = isModuleActive(
+    currentTenant?.active_modules || (currentTenant?.metadata as { active_modules?: string[] })?.active_modules,
+    'ginecologia'
   );
   const [dentalChart, setDentalChart] = useState<DentalChart | undefined>(undefined);
   const [isDentalLoading, setIsDentalLoading] = useState(false);
@@ -409,7 +414,7 @@ export function ClientDrawer({
           </div>
 
           {/* Acciones Rápidas Directas (1 Clic) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-4">
             {isHistoryEnabled ? (
               <button
                 type="button"
@@ -465,11 +470,26 @@ export function ClientDrawer({
               <ShoppingBag size={14} />
               <span>Cobrar</span>
             </button>
+
+            {isGinecoModuleActive && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  router.push(`/ginecologia?client_id=${client.id}`);
+                }}
+                className="px-2.5 py-2 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-pink-500/20 btn-haptic col-span-2 sm:col-span-1"
+                title="Abrir Estación Gineco-Obstétrica"
+              >
+                <Baby size={14} />
+                <span>Gineco</span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* Barra de Pestañas del Drawer (Adaptable a la demanda del cliente) */}
-        <div className="flex border-b border-border bg-slate-50/50 dark:bg-slate-900/40 px-4 text-xs font-bold shrink-0">
+        <div className="flex border-b border-border bg-slate-50/50 dark:bg-slate-900/40 px-4 text-xs font-bold shrink-0 overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab('perfil')}
@@ -538,6 +558,21 @@ export function ClientDrawer({
             >
               <span>🦷</span>
               <span>Odontograma</span>
+            </button>
+          )}
+
+          {isHistoryEnabled && isGinecoModuleActive && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('ginecologia')}
+              className={`py-3 px-3 border-b-2 transition-all flex items-center gap-1.5 ${
+                activeTab === 'ginecologia'
+                  ? 'border-pink-500 text-pink-600 dark:text-pink-400 font-black'
+                  : 'border-transparent text-slate-400 hover:text-foreground'
+              }`}
+            >
+              <Baby size={14} className="text-pink-500" />
+              <span>Ginecología</span>
             </button>
           )}
         </div>
@@ -786,6 +821,81 @@ export function ClientDrawer({
                   isCreatingKanban={isCreatingKanban}
                 />
               )}
+            </div>
+          )}
+
+          {activeTab === 'ginecologia' && isGinecoModuleActive && (
+            <div className="p-4 space-y-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-pink-500/10 to-rose-500/5 border border-pink-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-pink-500 text-white flex items-center justify-center font-black shadow-md shadow-pink-500/20">
+                    <Baby size={22} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-foreground">
+                      Historial Gineco-Obstétrico de {client.name}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Fórmula obstétrica, FUM, controles prenatales y citologías registradas
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    router.push(`/ginecologia?client_id=${client.id}`);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-sm btn-haptic whitespace-nowrap"
+                >
+                  <ExternalLink size={14} />
+                  <span>Abrir Estación Ginecológica</span>
+                </button>
+              </div>
+
+              {/* Resumen de Antecedentes y Fórmula Obstétrica */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-card border border-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Gestas (G)</span>
+                  <p className="text-xl font-black text-foreground">
+                    {(client.metadata as any)?.gineco_profile?.gestas ?? 0}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-card border border-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Partos (P)</span>
+                  <p className="text-xl font-black text-foreground">
+                    {(client.metadata as any)?.gineco_profile?.partos ?? 0}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-card border border-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Cesáreas (C)</span>
+                  <p className="text-xl font-black text-foreground">
+                    {(client.metadata as any)?.gineco_profile?.cesareas ?? 0}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-card border border-border">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase block">Abortos (A)</span>
+                  <p className="text-xl font-black text-foreground">
+                    {(client.metadata as any)?.gineco_profile?.abortos ?? 0}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-card border border-border space-y-1">
+                  <span className="text-slate-400 font-bold block">FUM (Fecha Última Regla):</span>
+                  <p className="font-mono font-black text-foreground">
+                    {(client.metadata as any)?.gineco_profile?.fum || (client.metadata as any)?.fum || 'No registrada'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-xl bg-card border border-border space-y-1">
+                  <span className="text-slate-400 font-bold block">Anticoncepción Activa:</span>
+                  <p className="font-bold text-foreground">
+                    {(client.metadata as any)?.gineco_profile?.metodoAnticonceptivo || 'Ninguno'}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
         </div>

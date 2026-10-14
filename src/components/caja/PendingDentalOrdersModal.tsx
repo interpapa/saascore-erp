@@ -27,7 +27,8 @@ export function PendingDentalOrdersModal({
       src === 'odontologia' ||
       (!src && d?.metadata?.payment_status === 'pending_cashier');
     const isClinica = src === 'clinica';
-    return isDental || isClinica || d?.metadata?.payment_status === 'pending_cashier';
+    const isGineco = src === 'ginecologia';
+    return isDental || isClinica || isGineco || d?.metadata?.payment_status === 'pending_cashier';
   });
 
   return (
@@ -77,15 +78,18 @@ export function PendingDentalOrdersModal({
               const meta = order.metadata || {};
               const items = meta.items || [];
               const isClinica = meta.source === 'clinica';
-              const specialtyBadge = isClinica
-                ? meta.specialty_name || 'Clínica Médica'
-                : meta.specialty_name || 'Odontología';
+              const isGineco = meta.source === 'ginecologia';
+              const specialtyBadge = isGineco
+                ? 'Ginecología & Obstetricia'
+                : isClinica
+                  ? meta.specialty_name || 'Clínica Médica'
+                  : meta.specialty_name || 'Odontología';
               
               const doctorName =
                 meta.doctor_name ||
                 meta.doctor?.name ||
                 meta.created_by_doctor ||
-                (isClinica ? 'Médico Especialista' : 'Odontólogo Tratante');
+                (isGineco ? 'Ginecólogo/a Tratante' : isClinica ? 'Médico Especialista' : 'Odontólogo Tratante');
               
               const patientName =
                 order.entity?.name || meta.patient_name || meta.title || 'Paciente';
@@ -97,9 +101,11 @@ export function PendingDentalOrdersModal({
                 <div
                   key={order.id}
                   className={`p-4 rounded-2xl border transition-all space-y-3 bg-card shadow-sm ${
-                    isClinica
-                      ? 'border-rose-500/30 hover:border-rose-500 bg-rose-500/5'
-                      : 'border-teal-500/30 hover:border-teal-500 bg-teal-500/5'
+                    isGineco
+                      ? 'border-pink-500/30 hover:border-pink-500 bg-pink-500/5'
+                      : isClinica
+                        ? 'border-rose-500/30 hover:border-rose-500 bg-rose-500/5'
+                        : 'border-teal-500/30 hover:border-teal-500 bg-teal-500/5'
                   }`}
                 >
                   {/* Fila 1: Odontólogo y Paciente destacados */}
@@ -109,12 +115,14 @@ export function PendingDentalOrdersModal({
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span
                           className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-lg border ${
-                            isClinica
-                              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                              : 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20'
+                            isGineco
+                              ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20'
+                              : isClinica
+                                ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
+                                : 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border-teal-500/20'
                           }`}
                         >
-                          👨‍⚕️ {isClinica ? 'Médico' : 'Odontólogo'}: <strong>{doctorName}</strong>
+                          👨‍⚕️ {isGineco ? 'Ginecólogo/a' : isClinica ? 'Médico' : 'Odontólogo'}: <strong>{doctorName}</strong>
                         </span>
 
                         <span className="text-[10px] font-mono text-slate-400 px-1">

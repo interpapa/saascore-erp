@@ -65,6 +65,7 @@ const ALL_MODULES = [
   { id: 'whatsapp', name: 'WhatsApp Inbox', features: [] },
   { id: 'kanban', name: 'Órdenes de Trabajo', features: [] },
   { id: 'odontologia', name: 'Odontología & Salud Dental', features: [] },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Módulo Dedicado)', features: [] },
   { id: 'clinica', name: 'Clínica Médica (Base)', features: [] },
   { id: 'med_general', name: 'Especialidad: Medicina General e Interna', features: [] },
   { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura', features: [] },

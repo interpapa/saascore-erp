@@ -20,6 +20,7 @@ export type ModuleId =
   | 'integraciones' 
   | 'estadisticas'
   | 'odontologia'
+  | 'ginecologia'
   | 'clinica'
   | 'med_general'
   | 'med_pediatria'
@@ -151,6 +152,13 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     description: 'Odontograma digital interactivo, ortodoncia con brackets, endodoncia, periodoncia y procesos Kanban dentales.',
     dependencies: ['clientes', 'calendario', 'kanban'],
   },
+  ginecologia: {
+    id: 'ginecologia',
+    name: 'Ginecología & Obstetricia',
+    category: 'operaciones',
+    description: 'Fórmula obstétrica G-P-C-A, gestograma en vivo por FUM, control prenatal, citología Bethesda, colposcopia y procedimientos gineco-obstétricos.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
   clinica: {
     id: 'clinica',
     name: 'Clínica Médica (Base)',
@@ -231,6 +239,7 @@ export const DEFAULT_ENABLED_MODULES: ModuleId[] = [
   'estadisticas',
   'franquicias',
   'odontologia',
+  'ginecologia',
   'clinica',
   'med_general',
   'med_pediatria',
@@ -256,6 +265,12 @@ export function isModuleActive(
       return DEFAULT_ENABLED_MODULES.includes('clinica') ||
         MEDICAL_SPECIALTY_MODULE_IDS.some(id => DEFAULT_ENABLED_MODULES.includes(id));
     }
+    if (moduleId === 'ginecologia') {
+      return DEFAULT_ENABLED_MODULES.includes('ginecologia') || DEFAULT_ENABLED_MODULES.includes('med_ginecologia');
+    }
+    if (moduleId === 'med_ginecologia') {
+      return DEFAULT_ENABLED_MODULES.includes('med_ginecologia') || DEFAULT_ENABLED_MODULES.includes('ginecologia');
+    }
     return DEFAULT_ENABLED_MODULES.includes(moduleId) || 
       (moduleId === 'inventario' && DEFAULT_ENABLED_MODULES.includes('catalogo')) ||
       (moduleId === 'catalogo' && DEFAULT_ENABLED_MODULES.includes('inventario'));
@@ -263,6 +278,12 @@ export function isModuleActive(
   if (moduleId === 'clinica') {
     return activeModules.includes('clinica') ||
       activeModules.some(m => m.startsWith('med_'));
+  }
+  if (moduleId === 'ginecologia') {
+    return activeModules.includes('ginecologia') || activeModules.includes('med_ginecologia');
+  }
+  if (moduleId === 'med_ginecologia') {
+    return activeModules.includes('med_ginecologia') || activeModules.includes('ginecologia');
   }
   return activeModules.includes(moduleId) || 
     (moduleId === 'inventario' && activeModules.includes('catalogo')) || 
@@ -328,6 +349,8 @@ export async function assertModuleEnabled(
 
     const isTargetEnabled = enabledList.includes(moduleId) || 
       (moduleId === 'clinica' && enabledList.some(m => m.startsWith('med_'))) ||
+      (moduleId === 'ginecologia' && enabledList.includes('med_ginecologia')) ||
+      (moduleId === 'med_ginecologia' && enabledList.includes('ginecologia')) ||
       (moduleId === 'inventario' && enabledList.includes('catalogo')) || 
       (moduleId === 'catalogo' && enabledList.includes('inventario'));
 

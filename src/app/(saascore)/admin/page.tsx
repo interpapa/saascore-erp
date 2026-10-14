@@ -60,6 +60,7 @@ const ALL_SYSTEM_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', desc: 'Gestión multisede y consolidación' },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología Especializada', category: 'salud', desc: 'Odontograma interactivo y sillón dental' },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Dedicado)', category: 'salud', desc: 'Módulo independiente en /ginecologia, FUM, gestograma, citología y caja' },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', desc: 'Estación médica, SOAP y récipe digital' },
   { id: 'med_general', name: 'Medicina General e Interna', category: 'salud', desc: 'Examen físico, triaje y PAM cardiovascular' },
   { id: 'med_pediatria', name: 'Pediatría y Puericultura', category: 'salud', desc: 'Dosis por kg, vacunas y curvas de crecimiento' },

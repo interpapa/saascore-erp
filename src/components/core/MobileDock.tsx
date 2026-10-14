@@ -24,6 +24,7 @@ import {
   HeartPulse,
   Scissors,
   Dog,
+  Baby,
   SlidersHorizontal,
   Check,
   X
@@ -100,6 +101,7 @@ export function MobileDock() {
     { id: 'caja', label: 'Caja POS', href: '/caja', icon: ShoppingCart },
     { id: 'calendario', label: 'Citas', href: '/calendario', icon: CalendarDays },
     { id: 'odontologia', label: 'Dental', href: '/odontologia', icon: Stethoscope },
+    { id: 'ginecologia', label: 'Gineco', href: '/ginecologia', icon: Baby },
     { id: 'clinica', label: 'Clínica', href: '/clinica', icon: HeartPulse },
     { id: 'barberia', label: 'Barbería', href: '/barberia', icon: Scissors },
     { id: 'grooming', label: 'Grooming', href: '/grooming', icon: Dog },
@@ -126,20 +128,25 @@ export function MobileDock() {
       if (item.id === 'config') return isSuper || isOwner || session?.role === 'manager';
 
       const isClinica = item.id === 'clinica';
+      const isGineco = item.id === 'ginecologia';
       const isModuleActiveInDock = item.id === 'inventario'
         ? (enabledModules.includes('inventario') || enabledModules.includes('catalogo'))
         : isClinica
           ? (enabledModules.includes('clinica') || enabledModules.some(m => m.startsWith('med_')))
-          : enabledModules.includes(item.id);
+          : isGineco
+            ? (enabledModules.includes('ginecologia') || enabledModules.includes('med_ginecologia'))
+            : enabledModules.includes(item.id);
 
       if (!isModuleActiveInDock) return false;
 
       if (userAllowed) {
         const isAllowed = isClinica
           ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_')))
-          : (item.id === 'inventario' || item.id === 'catalogo')
-            ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
-            : userAllowed.includes(item.id);
+          : isGineco
+            ? (userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia'))
+            : (item.id === 'inventario' || item.id === 'catalogo')
+              ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
+              : userAllowed.includes(item.id);
         if (!isAllowed) return false;
       } else if (!isSuper && !isOwner && session?.role) {
         if (!hasPermission(session.role, item.id)) return false;

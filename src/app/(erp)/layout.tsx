@@ -28,6 +28,7 @@ const routeToModuleId: Record<string, string> = {
   '/franquicias': 'franquicias',
   '/integraciones': 'integraciones',
   '/odontologia': 'odontologia',
+  '/ginecologia': 'ginecologia',
   '/clinica': 'clinica',
   '/barberia': 'barberia',
   '/grooming': 'grooming',
@@ -68,9 +69,11 @@ export default function ERPLayout({
     // A. Verificar si está activo en el tenant
     const isTenantActive = targetModule === 'clinica'
       ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
-      : (targetModule === 'inventario' || targetModule === 'catalogo')
-        ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
-        : tenantModules.includes(targetModule);
+      : targetModule === 'ginecologia'
+        ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
+        : (targetModule === 'inventario' || targetModule === 'catalogo')
+          ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
+          : tenantModules.includes(targetModule);
 
     if (!isTenantActive) {
       isModuleDisabled = true;
@@ -78,9 +81,11 @@ export default function ERPLayout({
       // B. Si el usuario tiene asignación manual de módulos desde Rendo Hub
       const isUserAllowed = targetModule === 'clinica'
         ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_')))
-        : (targetModule === 'inventario' || targetModule === 'catalogo')
-          ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
-          : userAllowed.includes(targetModule);
+        : targetModule === 'ginecologia'
+          ? (userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia'))
+          : (targetModule === 'inventario' || targetModule === 'catalogo')
+            ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
+            : userAllowed.includes(targetModule);
       if (!isUserAllowed) isModuleDisabled = true;
     } else if (!isSuper && !isOwner && session?.role) {
       // C. Si es un rol operativo sin lista manual, aplicar RBAC

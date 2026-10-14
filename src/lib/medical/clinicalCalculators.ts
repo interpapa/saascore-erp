@@ -308,8 +308,8 @@ export function calculateObstetricWheel(
     };
   }
 
-  const fur = new Date(furDateStr);
-  if (Number.isNaN(fur.getTime())) {
+  const [y, m, d] = furDateStr.split('-').map(Number);
+  if (!y || !m || !d || Number.isNaN(y) || Number.isNaN(m) || Number.isNaN(d)) {
     return {
       gestationalWeeks: 0,
       gestationalDays: 0,
@@ -322,7 +322,7 @@ export function calculateObstetricWheel(
   }
 
   const msPerDay = 1000 * 60 * 60 * 24;
-  const furUtc = Date.UTC(fur.getFullYear(), fur.getMonth(), fur.getDate());
+  const furUtc = Date.UTC(y, m - 1, d);
   const refUtc = Date.UTC(refDate.getFullYear(), refDate.getMonth(), refDate.getDate());
 
   const totalElapsedDays = Math.max(0, Math.floor((refUtc - furUtc) / msPerDay));
