@@ -31,11 +31,13 @@ import {
   Shield,
   HelpCircle,
   FolderOpen,
-  X
+  X,
+  BookOpen
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
+import { useViewModeStore } from '@/store/useViewModeStore';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { getItemsAction } from '@/app/actions/items';
 import { 
@@ -56,6 +58,7 @@ import {
 } from '@/lib/ginecologia/proceduresCatalog';
 import { GestationalWheelWidget } from '@/components/ginecologia/GestationalWheelWidget';
 import { GinecoPrescriptionPrintModal } from '@/components/ginecologia/GinecoPrescriptionPrintModal';
+import { GinecoClinicalGuideModal } from '@/components/ginecologia/GinecoClinicalGuideModal';
 import { calculateBMI } from '@/lib/medical/clinicalCalculators';
 
 type ActiveTab = 'obstetricia' | 'ginecologia' | 'soap_recipe' | 'procedimientos' | 'historial';
@@ -64,12 +67,14 @@ export default function GinecologiaPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { currentTenant, session } = useERPStore();
+  const { viewMode, toggleViewMode, isMobile } = useViewModeStore();
   const tenantMeta = (currentTenant?.metadata as Record<string, any>) || {};
   const exchangeRate = Number(tenantMeta.exchange_rate?.rate || tenantMeta.exchange_rate || 850.0);
   const actor = useActionActor();
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('obstetricia');
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Pacientes y Médicos
   const [patients, setPatients] = useState<any[]>([]);
@@ -626,6 +631,26 @@ export default function GinecologiaPage() {
                 <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20">
                   Estación Clínica Especializada
                 </span>
+                {/* Botón de Guía Clínica Didáctica */}
+                <button
+                  type="button"
+                  onClick={() => setIsGuideOpen(true)}
+                  className="px-2.5 py-1 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500/20 text-[11px] font-black flex items-center gap-1.5 transition-all btn-haptic"
+                  title="Abrir Guía Clínica y Flujos de Ginecología"
+                >
+                  <BookOpen size={13} />
+                  <span>¿Cómo funciona? (Guía)</span>
+                </button>
+                {/* Toggle de Modo de Vista Escritorio Pro / Express */}
+                <button
+                  type="button"
+                  onClick={toggleViewMode}
+                  className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-border text-[11px] font-bold transition-all btn-haptic"
+                  title="Alternar entre Vista Pro Panorámica y Vista Compacta"
+                >
+                  <Layers size={13} className="text-pink-500" />
+                  <span>{viewMode === 'pro' ? 'Modo Pro (Panorámico)' : 'Modo Express'}</span>
+                </button>
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Control prenatal con gestograma, citología Bethesda, colposcopia y despacho a Caja POS
@@ -946,50 +971,54 @@ export default function GinecologiaPage() {
       <div className="flex border-b border-border bg-card rounded-2xl p-1.5 gap-1.5 overflow-x-auto shadow-xs">
         <button
           onClick={() => setActiveTab('obstetricia')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+          className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap btn-haptic ${
             activeTab === 'obstetricia'
               ? 'bg-pink-500 text-white shadow-sm'
               : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
           <Baby size={15} />
-          <span>1. Control Obstétrico (FUM & Gestograma)</span>
+          <span className="sm:hidden">Obstetricia</span>
+          <span className="hidden sm:inline">1. Control Obstétrico (FUM & Gestograma)</span>
         </button>
 
         <button
           onClick={() => setActiveTab('ginecologia')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+          className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap btn-haptic ${
             activeTab === 'ginecologia'
               ? 'bg-pink-500 text-white shadow-sm'
               : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
           <Activity size={15} />
-          <span>2. Consulta Ginecológica & Citología</span>
+          <span className="sm:hidden">Citología</span>
+          <span className="hidden sm:inline">2. Consulta Ginecológica & Citología</span>
         </button>
 
         <button
           onClick={() => setActiveTab('soap_recipe')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+          className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap btn-haptic ${
             activeTab === 'soap_recipe'
               ? 'bg-pink-500 text-white shadow-sm'
               : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
           <FileText size={15} />
-          <span>3. Evolución Médica, Diagnóstico & Récipe</span>
+          <span className="sm:hidden">Evolución</span>
+          <span className="hidden sm:inline">3. Evolución Médica, Diagnóstico & Récipe</span>
         </button>
 
         <button
           onClick={() => setActiveTab('procedimientos')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+          className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap btn-haptic ${
             activeTab === 'procedimientos'
               ? 'bg-pink-500 text-white shadow-sm'
               : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
           <DollarSign size={15} />
-          <span>4. Procedimientos & Caja POS</span>
+          <span className="sm:hidden">Caja POS</span>
+          <span className="hidden sm:inline">4. Procedimientos & Caja POS</span>
           {sessionProcedures.length > 0 && (
             <span className="w-5 h-5 rounded-full bg-white text-pink-600 text-[10px] font-black flex items-center justify-center">
               {sessionProcedures.length}
@@ -999,16 +1028,24 @@ export default function GinecologiaPage() {
 
         <button
           onClick={() => setActiveTab('historial')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 whitespace-nowrap btn-haptic ${
+          className={`px-3 sm:px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 sm:gap-2 whitespace-nowrap btn-haptic ${
             activeTab === 'historial'
               ? 'bg-pink-500 text-white shadow-sm'
               : 'text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800'
           }`}
         >
           <FolderOpen size={15} />
-          <span>5. Historial & Kanban OTs</span>
+          <span className="sm:hidden">Historial</span>
+          <span className="hidden sm:inline">5. Historial & Kanban OTs</span>
         </button>
       </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          CONTENEDOR DE TRABAJO RESPONSIVO DUAL (PRO / EXPRESS)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className={viewMode === 'pro' ? 'grid grid-cols-1 lg:grid-cols-12 gap-5 items-start' : 'space-y-5'}>
+        {/* Columna Principal / Workspace de la Pestaña Activa */}
+        <div className={viewMode === 'pro' ? 'lg:col-span-8 space-y-5' : 'space-y-5'}>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           PESTAÑA 1: CONTROL OBSTÉTRICO & GESTOGRAMA
@@ -1893,6 +1930,273 @@ export default function GinecologiaPage() {
           </div>
         </div>
       )}
+        </div>
+
+        {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            PANEL DERECHO EN VIVO (ESCRITORIO PRO):
+            DESPACHO INMEDIATO A CAJA, RESUMEN & ÓRDENES
+            ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+        {viewMode === 'pro' && (
+          <aside className="hidden lg:block lg:col-span-4 lg:sticky lg:top-24 space-y-4">
+            <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+              {/* Resumen Paciente y Gestograma Rápido */}
+              <div className="border-b border-border/60 pb-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-pink-600 dark:text-pink-400">
+                    Estación en Vivo
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-pink-500/10 text-pink-600">
+                    {activeTab.toUpperCase()}
+                  </span>
+                </div>
+                <h3 className="text-base font-black text-foreground truncate mt-1">
+                  {activePatient ? activePatient.name : 'Sin Paciente Seleccionada'}
+                </h3>
+                {activePatient && (
+                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
+                    {profile.fum && (
+                      <span className="px-2 py-0.5 rounded-lg bg-pink-500/10 text-pink-600 font-mono text-[10px] font-bold">
+                        FUM: {profile.fum}
+                      </span>
+                    )}
+                    {vitals.bloodPressure && (
+                      <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">
+                        PA: {vitals.bloodPressure}
+                      </span>
+                    )}
+                    {bmiInfo.bmi > 0 && (
+                      <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-mono text-[10px]">
+                        IMC: {bmiInfo.bmi}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {activePatient?.metadata?.allergies && (
+                  <div className="mt-2 p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] font-bold text-rose-600 flex items-center gap-1.5">
+                    <AlertCircle size={13} className="shrink-0" />
+                    <span className="truncate">Alergias: {activePatient.metadata.allergies}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Selector Rápido de Procedimientos */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-500 flex items-center justify-between">
+                  <span>Agregar Procedimiento a la Sesión:</span>
+                  <span className="text-[10px] text-pink-600 font-black">+ Clic</span>
+                </label>
+                <select
+                  onChange={(e) => {
+                    const procId = e.target.value;
+                    if (!procId) return;
+                    const found = catalogProcedures.find((p) => p.id === procId);
+                    if (found) handleAddProcedure(found);
+                    e.target.value = '';
+                  }}
+                  defaultValue=""
+                  className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs font-bold text-foreground outline-none focus:ring-2 focus:ring-pink-500/30 cursor-pointer"
+                >
+                  <option value="">-- Seleccionar Procedimiento --</option>
+                  {catalogProcedures.map((proc) => (
+                    <option key={proc.id} value={proc.id}>
+                      {proc.name} (${proc.defaultPriceUSD} USD)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Lista de Procedimientos en el Presupuesto */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-foreground">
+                    Presupuesto Activo ({sessionProcedures.length})
+                  </span>
+                  {sessionProcedures.length > 0 && (
+                    <button
+                      onClick={() => setSessionProcedures([])}
+                      className="text-[10px] text-slate-400 hover:text-rose-500"
+                    >
+                      Vaciar
+                    </button>
+                  )}
+                </div>
+
+                {sessionProcedures.length === 0 ? (
+                  <div className="p-3 text-center rounded-2xl border border-dashed border-border/80 text-[11px] text-slate-400">
+                    No has agregado procedimientos a la sesión actual.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                    {sessionProcedures.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-border flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-foreground truncate">{item.name}</p>
+                          <span className="text-[10px] text-slate-400">{item.category}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="font-mono font-black text-foreground">${item.price}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveProcedure(idx)}
+                            className="text-slate-400 hover:text-rose-500 p-1"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Totalizador de Sesión */}
+              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-pink-500/10 to-rose-500/10 border border-pink-500/20 space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-600 dark:text-slate-300">
+                    Total a Facturar:
+                  </span>
+                  <span className="text-lg font-black text-pink-600 dark:text-pink-400">
+                    ${totalUSD.toFixed(2)} USD
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
+                  <span>Tasa oficial: Bs. {exchangeRate.toFixed(2)}</span>
+                  <span className="font-bold text-foreground">
+                    Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botones de Acción Inmediata */}
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={handleSendToCashier}
+                  disabled={isSendingToCashier || sessionProcedures.length === 0}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-black text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-pink-500/20 disabled:opacity-50 btn-haptic"
+                >
+                  <Send size={15} />
+                  <span>
+                    {isSendingToCashier ? 'Despachando...' : 'Despachar a Caja POS'}
+                  </span>
+                </button>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSaveEncounter}
+                    disabled={isSavingEncounter || !selectedPatientId}
+                    className="py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-foreground font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-border btn-haptic disabled:opacity-50"
+                  >
+                    <Save size={14} className="text-pink-500" />
+                    <span>Guardar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintModalOpen(true)}
+                    className="py-2.5 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-foreground font-bold text-xs transition-all flex items-center justify-center gap-1.5 border border-border btn-haptic"
+                  >
+                    <Printer size={14} className="text-pink-500" />
+                    <span>Récipe</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Tracker de OTs Activas (Kanban Rápido) */}
+              {patientWorkOrders.length > 0 && (
+                <div className="pt-3 border-t border-border/60 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-foreground flex items-center gap-1.5">
+                      <Layers size={13} className="text-pink-500" />
+                      Tratamientos en Curso ({patientWorkOrders.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('historial')}
+                      className="text-[10px] text-pink-600 hover:underline font-bold"
+                    >
+                      Ver todos
+                    </button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {patientWorkOrders.slice(0, 2).map((ot) => {
+                      const completedCount = ot.steps.filter((s) => s.completed).length;
+                      const progress = ot.steps.length > 0 ? (completedCount / ot.steps.length) * 100 : 0;
+                      return (
+                        <div key={ot.id} className="p-2 rounded-xl bg-card border border-border text-[11px] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-foreground truncate">{ot.title}</span>
+                            <span className="font-mono text-[10px] text-slate-400">
+                              {completedCount}/{ot.steps.length}
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                            <div className="bg-pink-500 h-full transition-all" style={{ width: `${progress}%` }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+      </div>
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          BARRA FLOTANTE DE ACCIÓN RÁPIDA (MÓVIL / TABLET)
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <div className="lg:hidden fixed bottom-20 inset-x-3 z-30 bg-card/95 backdrop-blur-md border border-border/80 shadow-2xl rounded-2xl p-2.5 flex items-center justify-between gap-2 animate-in slide-in-from-bottom duration-300">
+        <div className="min-w-0 mr-1">
+          <p className="text-[10px] text-slate-400 font-bold uppercase truncate">
+            {activePatient ? activePatient.name : 'Sin paciente'}
+          </p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-base font-black text-pink-600 dark:text-pink-400">
+              ${totalUSD.toFixed(2)}
+            </span>
+            <span className="text-[10px] text-slate-400 font-mono">USD</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsPrintModalOpen(true)}
+            className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-foreground border border-border text-xs font-bold"
+            title="Ver Récipe"
+          >
+            <Printer size={16} className="text-pink-500" />
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveEncounter}
+            disabled={isSavingEncounter || !selectedPatientId}
+            className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-foreground border border-border text-xs font-bold flex items-center gap-1 disabled:opacity-50"
+            title="Guardar Consulta"
+          >
+            <Save size={14} className="text-pink-500" />
+            <span className="hidden sm:inline">Guardar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSendToCashier}
+            disabled={isSendingToCashier || sessionProcedures.length === 0}
+            className="px-3 py-2 rounded-xl bg-gradient-to-r from-pink-500 to-rose-600 text-white text-xs font-black shadow-md shadow-pink-500/20 flex items-center gap-1.5 disabled:opacity-50 btn-haptic"
+            title="Despachar a Caja POS"
+          >
+            <Send size={14} />
+            <span>Cobrar</span>
+          </button>
+        </div>
+      </div>
 
       {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
           MODAL: CREAR PACIENTE RÁPIDA
@@ -2011,6 +2315,14 @@ export default function GinecologiaPage() {
           labOrders: prescriptionLabOrders,
         }}
         clinicName={currentTenant?.name || 'CENTRO GINECOLÓGICO & OBSTÉTRICO'}
+      />
+
+      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          MODAL DIDÁCTICO: GUÍA DE FLUJOS CLÍNICOS Y MANUAL
+          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+      <GinecoClinicalGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
       />
     </div>
   );
