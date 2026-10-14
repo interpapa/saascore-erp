@@ -70,6 +70,17 @@ const ALL_SYSTEM_MODULES = [
   { id: 'config', name: 'Ajustes Generales', category: 'servicios' }
 ];
 
+export const SYSTEM_OPERATIONAL_PERMISSIONS = [
+  { id: 'caja.discount', name: 'Descuentos & Precios Libres', description: 'Permite editar precios manualmente y aplicar descuentos al cobrar en Caja POS', category: 'Caja & Ventas' },
+  { id: 'caja.void', name: 'Anulación de Facturas / Tickets', description: 'Autorizado para anular comprobantes emitidos y devolver stock', category: 'Caja & Ventas' },
+  { id: 'inventario.adjust', name: 'Ajuste Físico de Stock', description: 'Permite hacer conteos, mermas y modificaciones directas de cantidades', category: 'Inventario' },
+  { id: 'inventario.costs', name: 'Visualización de Costos y Márgenes', description: 'Permite ver el costo de adquisición y la ganancia bruta de los productos', category: 'Inventario' },
+  { id: 'salud.clinical_records', name: 'Historias Médicas & Odontograma', description: 'Acceso para redactar evoluciones, diagnósticos y modificar arcada dental', category: 'Salud & Clínica' },
+  { id: 'salud.pricing', name: 'Edición de Aranceles Médicos', description: 'Permite fijar o alterar los precios base de procedimientos odontológicos/médicos', category: 'Salud & Clínica' },
+  { id: 'finanzas.reports', name: 'Reportes & Estadísticas Financieras', description: 'Acceso a balances contables, promedio de ventas y métricas globales', category: 'Administración' },
+  { id: 'equipo.manage', name: 'Gestión de Personal & Comisiones', description: 'Permite configurar especialistas, porcentajes de honorarios y nómina', category: 'Administración' },
+];
+
 export default function AdminUsersPage() {
   const { session, impersonateTenant } = useERPStore();
   const actor = useActionActor();
@@ -99,6 +110,7 @@ export default function AdminUsersPage() {
   const [editRole, setEditRole] = useState<UserRole>('owner');
   const [editTenantId, setEditTenantId] = useState('');
   const [editAllowedModules, setEditAllowedModules] = useState<string[]>([]);
+  const [editOperationalPermissions, setEditOperationalPermissions] = useState<string[]>([]);
   const [editIsBanned, setEditIsBanned] = useState(false);
   const [isSavingUser, setIsSavingUser] = useState(false);
 
@@ -166,6 +178,10 @@ export default function AdminUsersPage() {
     // Módulos iniciales del usuario
     const userModules = user.allowed_modules || user.memberships?.[0]?.tenant_modules || ALL_SYSTEM_MODULES.map(m => m.id);
     setEditAllowedModules(userModules);
+
+    // Permisos operativos iniciales del usuario
+    const userOps = user.operational_permissions || user.app_metadata?.operational_permissions || user.user_metadata?.operational_permissions || [];
+    setEditOperationalPermissions(userOps);
   };
 
   const handleToggleModuleForUser = (modId: string) => {
@@ -173,6 +189,14 @@ export default function AdminUsersPage() {
       setEditAllowedModules(editAllowedModules.filter(m => m !== modId));
     } else {
       setEditAllowedModules([...editAllowedModules, modId]);
+    }
+  };
+
+  const handleToggleOperationalPermission = (permId: string) => {
+    if (editOperationalPermissions.includes(permId)) {
+      setEditOperationalPermissions(editOperationalPermissions.filter(p => p !== permId));
+    } else {
+      setEditOperationalPermissions([...editOperationalPermissions, permId]);
     }
   };
 
@@ -196,6 +220,7 @@ export default function AdminUsersPage() {
       newRole: editRole,
       tenantId: editTenantId,
       allowedModules: editAllowedModules,
+      operationalPermissions: editOperationalPermissions,
       isBanned: editIsBanned
     }, activeActor);
 
@@ -821,6 +846,71 @@ export default function AdminUsersPage() {
                         <div className="shrink-0">
                           {hasMod ? (
                             <ToggleRight size={24} className="text-primary" />
+                          ) : (
+                            <ToggleLeft size={24} className="text-muted-foreground/40" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Zonas y Capacidades Operativas: Qué puede hacer dentro de cada módulo */}
+              <div className="pt-2 border-t border-border">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h4 className="font-bold text-foreground text-sm">Zonas y Capacidades Operativas (Permisos Granulares)</h4>
+                    <p className="text-xs text-muted-foreground">Configura manualmente a qué acciones y zonas específicas de cada módulo tiene permiso el empleado.</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditOperationalPermissions(SYSTEM_OPERATIONAL_PERMISSIONS.map(p => p.id))}
+                      className="text-xs text-primary font-bold hover:underline btn-haptic"
+                    >
+                      Todas
+                    </button>
+                    <span className="text-muted-foreground text-xs">•</span>
+                    <button
+                      type="button"
+                      onClick={() => setEditOperationalPermissions([])}
+                      className="text-xs text-muted-foreground hover:text-foreground font-bold btn-haptic"
+                    >
+                      Ninguna
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-72 overflow-y-auto pr-1">
+                  {SYSTEM_OPERATIONAL_PERMISSIONS.map((perm) => {
+                    const hasPerm = editOperationalPermissions.includes(perm.id);
+
+                    return (
+                      <div
+                        key={perm.id}
+                        onClick={() => handleToggleOperationalPermission(perm.id)}
+                        className={`flex items-start justify-between p-3 rounded-2xl border transition-all cursor-pointer btn-haptic ${
+                          hasPerm
+                            ? 'bg-teal-500/10 border-teal-500/40 text-foreground shadow-2xs'
+                            : 'bg-card border-border/80 text-muted-foreground opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-bold">{perm.name}</span>
+                            <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-muted text-muted-foreground font-medium uppercase">
+                              {perm.category}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground leading-tight mt-1">{perm.description}</p>
+                          <span className="text-[9px] font-mono font-bold text-teal-600 dark:text-teal-400 block mt-1">
+                            {perm.id}
+                          </span>
+                        </div>
+                        <div className="shrink-0 pt-0.5">
+                          {hasPerm ? (
+                            <ToggleRight size={24} className="text-teal-600 dark:text-teal-400" />
                           ) : (
                             <ToggleLeft size={24} className="text-muted-foreground/40" />
                           )}

@@ -10,6 +10,8 @@ import { useERPStore } from '@/store/useERPStore';
 import { Lock, LayoutGrid, Eye, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { MobileDock } from '@/components/core/MobileDock';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
+import { hasPermission } from '@/lib/rbac';
 
 const routeToModuleId: Record<string, string> = {
   '/caja': 'caja',
@@ -41,27 +43,52 @@ export default function ERPLayout({
   const pathname = usePathname();
   const router = useRouter();
   const currentTenant = useERPStore(s => s.currentTenant);
+  const session = useERPStore(s => s.session);
   const impersonatedTenant = useERPStore(s => s.impersonatedTenant);
   const stopImpersonation = useERPStore(s => s.stopImpersonation);
 
-  // Verificar si la ruta actual es un módulo inactivo
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'equipo', 'franquicias', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'config', 'admin'];
+  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+  const isOwner = session?.role === 'owner';
+
+  // 1. Módulos activos del tenant
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
-      : null;
-  const enabledModules: string[] = tenantModules || fallbackModules;
+      : ['caja', 'clientes', 'inventario', 'catalogo', 'calendario', 'estadisticas', 'config'];
+
+  const userAllowed = session?.allowed_modules && session.allowed_modules.length > 0 ? session.allowed_modules : null;
 
   // Buscamos si la ruta actual (o su prefijo) corresponde a un módulo del ERP
   const matchedRoute = Object.keys(routeToModuleId).find(route => pathname.startsWith(route));
   const targetModule = matchedRoute ? routeToModuleId[matchedRoute] : null;
-  const isModuleDisabled = targetModule
-    ? (!enabledModules.includes(targetModule) && 
-       !(targetModule === 'clinica' && enabledModules.some(m => m.startsWith('med_'))) &&
-       !(targetModule === 'inventario' && enabledModules.includes('catalogo')) && 
-       !(targetModule === 'catalogo' && enabledModules.includes('inventario')))
-    : false;
+
+  let isModuleDisabled = false;
+  if (targetModule) {
+    // A. Verificar si está activo en el tenant
+    const isTenantActive = targetModule === 'clinica'
+      ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
+      : (targetModule === 'inventario' || targetModule === 'catalogo')
+        ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
+        : tenantModules.includes(targetModule);
+
+    if (!isTenantActive) {
+      isModuleDisabled = true;
+    } else if (userAllowed) {
+      // B. Si el usuario tiene asignación manual de módulos desde Rendo Hub
+      const isUserAllowed = targetModule === 'clinica'
+        ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_')))
+        : (targetModule === 'inventario' || targetModule === 'catalogo')
+          ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
+          : userAllowed.includes(targetModule);
+      if (!isUserAllowed) isModuleDisabled = true;
+    } else if (!isSuper && !isOwner && session?.role) {
+      // C. Si es un rol operativo sin lista manual, aplicar RBAC
+      if (!hasPermission(session.role, targetModule)) {
+        isModuleDisabled = true;
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen text-foreground overflow-x-hidden selection:bg-primary/30 relative">

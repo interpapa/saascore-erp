@@ -29,6 +29,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useViewModeStore } from '@/store/useViewModeStore';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
+import { hasPermission } from '@/lib/rbac';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
@@ -165,23 +166,50 @@ export default function LauncherPage() {
     }
   ];
 
-  // Filtramos las aplicaciones según los módulos activos del negocio (estilo Odoo)
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin'];
+  // Filtramos las aplicaciones según los módulos activos del negocio y los permisos del empleado
+  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+  const isOwner = session?.role === 'owner';
+
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
-      : null;
-  const enabledModules: string[] = tenantModules || fallbackModules;
+      : ['caja', 'clientes', 'inventario', 'catalogo', 'calendario', 'estadisticas', 'config'];
+
+  const userAllowed = session?.allowed_modules && session.allowed_modules.length > 0 ? session.allowed_modules : null;
 
   const filteredApps = apps.filter((app) => {
-    if (app.id === 'admin') return session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
-    if (app.id === 'clinica') {
-      return enabledModules.includes('clinica') || enabledModules.some((m) => m.startsWith('med_'));
+    if (app.id === 'admin') return isSuper;
+    if (app.id === 'apps') return isSuper || isOwner;
+    if (app.id === 'config') return isSuper || isOwner || session?.role === 'manager';
+
+    // 1. Debe estar activo en la empresa
+    const isClinica = app.id === 'clinica';
+    const isTenantActive = isClinica
+      ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
+      : (app.id === 'inventario' || app.id === 'catalogo')
+        ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
+        : tenantModules.includes(app.id);
+
+    if (!isTenantActive) return false;
+
+    // 2. Si el usuario tiene lista manual de módulos permitidos (desde Rendo Hub), respetarla estrictamente
+    if (userAllowed) {
+      if (isClinica) {
+        return userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_'));
+      }
+      if (app.id === 'inventario' || app.id === 'catalogo') {
+        return userAllowed.includes('inventario') || userAllowed.includes('catalogo');
+      }
+      return userAllowed.includes(app.id);
     }
-    const isInventarioOrCatalogo = (app.id === 'inventario' || app.id === 'catalogo') &&
-      (enabledModules.includes('inventario') || enabledModules.includes('catalogo'));
-    return enabledModules.includes(app.id) || isInventarioOrCatalogo;
+
+    // 3. Si no tiene lista manual, pero es empleado (manager, technician, seller), aplicar RBAC
+    if (!isSuper && !isOwner && session?.role) {
+      return hasPermission(session.role, app.id);
+    }
+
+    return true;
   });
 
   // La precarga manual (prefetch) fue eliminada porque saturaba el CPU en modo desarrollo

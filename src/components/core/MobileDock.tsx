@@ -26,6 +26,8 @@ import {
   Dog
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
+import { hasPermission } from '@/lib/rbac';
+import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
 interface DockItem {
   id: string;
@@ -36,7 +38,11 @@ interface DockItem {
 
 export function MobileDock() {
   const pathname = usePathname();
-  const { currentTenant } = useERPStore();
+  const { currentTenant, session } = useERPStore();
+
+  const isSuper = session?.role === 'superadmin' || isSuperAdminEmail(session?.userEmail);
+  const isOwner = session?.role === 'owner';
+  const userAllowed = session?.allowed_modules && session.allowed_modules.length > 0 ? session.allowed_modules : null;
 
   // Módulos activos en el ERP
   const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'estadisticas', 'compras', 'contabilidad', 'calendario', 'whatsapp', 'kanban', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'equipo', 'franquicias', 'config', 'admin', 'apps'];
@@ -81,17 +87,39 @@ export function MobileDock() {
   // Filtramos la barra del Dock: 
   // 1. Siempre incluir 'dashboard'
   // 2. Incluir los IDs que estén en dockPreferences y también en enabledModules
+  // 3. Respetar estrictamente los módulos permitidos del empleado y su rol RBAC
   const activeItems = allItems.filter(item => {
     if (item.id === 'dashboard') return true;
+    if (item.id === 'admin') return isSuper;
+    if (item.id === 'apps') return isSuper || isOwner;
+    if (item.id === 'config') return isSuper || isOwner || session?.role === 'manager';
+
+    const isClinica = item.id === 'clinica';
     const isModuleActiveInDock = item.id === 'inventario'
       ? (enabledModules.includes('inventario') || enabledModules.includes('catalogo'))
-      : item.id === 'clinica'
+      : isClinica
         ? (enabledModules.includes('clinica') || enabledModules.some(m => m.startsWith('med_')))
         : enabledModules.includes(item.id);
+
+    if (!isModuleActiveInDock) return false;
+
+    // Si el usuario tiene lista manual de módulos permitidos (desde Rendo Hub)
+    if (userAllowed) {
+      const isAllowed = isClinica
+        ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_')))
+        : (item.id === 'inventario' || item.id === 'catalogo')
+          ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
+          : userAllowed.includes(item.id);
+      if (!isAllowed) return false;
+    } else if (!isSuper && !isOwner && session?.role) {
+      if (!hasPermission(session.role, item.id)) return false;
+    }
+
     const isItemInPreferences = item.id === 'inventario'
       ? (dockPreferences.includes('inventario') || dockPreferences.includes('catalogo'))
       : dockPreferences.includes(item.id);
-    return isItemInPreferences && isModuleActiveInDock;
+
+    return isItemInPreferences;
   });
 
   return (

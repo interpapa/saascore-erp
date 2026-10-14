@@ -641,7 +641,8 @@ export async function getUserTenant(userEmail: string, userId?: string) {
         const { data: listData } = await db.auth.admin.listUsers({ perPage: 1000 });
         authUser = listData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail.toLowerCase()) || null;
       }
-      const allowedModules = authUser?.app_metadata?.allowed_modules;
+      const allowedModules = authUser?.app_metadata?.allowed_modules || authUser?.user_metadata?.allowed_modules;
+      const operationalPermissions = authUser?.app_metadata?.operational_permissions || authUser?.user_metadata?.operational_permissions || [];
       if (Array.isArray(allowedModules) && allowedModules.length > 0) {
         const normalizedAllowed = [...allowedModules];
         if (normalizedAllowed.includes('inventario') && !normalizedAllowed.includes('catalogo')) {
@@ -655,6 +656,14 @@ export async function getUserTenant(userEmail: string, userId?: string) {
           (tenant.metadata as Record<string, unknown>).active_modules = normalizedAllowed;
         }
       }
+
+      return {
+        success: true,
+        tenant: sanitizeTenantPayload(tenant),
+        role: isSuperAdmin ? 'superadmin' : (membership.role as UserRole),
+        allowedModules: Array.isArray(allowedModules) ? allowedModules : undefined,
+        operationalPermissions: Array.isArray(operationalPermissions) ? operationalPermissions : [],
+      };
     } catch {
       // Continuar con active_modules del tenant si falla la consulta de Auth
     }
@@ -1143,7 +1152,8 @@ export async function getAllUsersGlobalAdminAction(
         primary_role: primaryRole,
         primary_tenant_id: primaryTenant?.tenant_id || null,
         primary_tenant_name: primaryTenant?.tenant_name || null,
-        allowed_modules: u.app_metadata?.allowed_modules || primaryTenant?.tenant_modules || null,
+        allowed_modules: u.app_metadata?.allowed_modules || u.user_metadata?.allowed_modules || primaryTenant?.tenant_modules || null,
+        operational_permissions: u.app_metadata?.operational_permissions || u.user_metadata?.operational_permissions || [],
         memberships
       };
     });
@@ -1164,6 +1174,7 @@ export async function updateUserRoleAndPermissionsAdminAction(
     newRole: UserRole;
     tenantId?: string;
     allowedModules?: string[];
+    operationalPermissions?: string[];
     isBanned?: boolean;
   },
   actor: ActionActor
@@ -1174,7 +1185,7 @@ export async function updateUserRoleAndPermissionsAdminAction(
       return { success: false, error: authCheck.error };
     }
 
-    const { userId, userEmail, newRole, tenantId, allowedModules, isBanned } = payload;
+    const { userId, userEmail, newRole, tenantId, allowedModules, operationalPermissions, isBanned } = payload;
     const cleanEmail = userEmail.trim().toLowerCase();
     const db = supabaseAdmin;
 
@@ -1183,10 +1194,13 @@ export async function updateUserRoleAndPermissionsAdminAction(
       app_metadata: {
         role: newRole,
         is_superadmin: newRole === 'superadmin',
-        allowed_modules: allowedModules || undefined
+        allowed_modules: allowedModules || undefined,
+        operational_permissions: operationalPermissions || undefined,
       },
       user_metadata: {
         role: newRole,
+        allowed_modules: allowedModules || undefined,
+        operational_permissions: operationalPermissions || undefined,
       }
     };
 

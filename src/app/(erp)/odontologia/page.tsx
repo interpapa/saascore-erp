@@ -126,9 +126,10 @@ export default function OdontologiaPage() {
   const [isLoadingChart, setIsLoadingChart] = useState(false);
   const [isSavingChart, setIsSavingChart] = useState(false);
 
-  // Pestaña activa del Panel Clínico Derecho
-  type ClinicalTab = 'presupuesto' | 'ortodoncia' | 'especialidades' | 'evolucion' | 'citas' | 'expediente';
-  const [activeTab, setActiveTab] = useState<ClinicalTab>('presupuesto');
+  // Estaciones Clínicas Panorámicas (Opción A: Flujo paso a paso)
+  type ClinicalStation = 'diagnostico' | 'especialidades' | 'evolucion' | 'expediente';
+  const [clinicalStation, setClinicalStation] = useState<ClinicalStation>('diagnostico');
+  const [specialtySubTab, setSpecialtySubTab] = useState<'ortodoncia' | 'endodoncia' | 'periodoncia'>('ortodoncia');
 
   // Evolución Médica de la Consulta de Hoy
   const [evolutionText, setEvolutionText] = useState('');
@@ -1669,674 +1670,753 @@ export default function OdontologiaPage() {
             />
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* COLUMNA IZQUIERDA: MOTOR DE ODONTOGRAMA (7 COLUMNAS EN LG) */}
-          <div className="lg:col-span-7 bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                <h3 className="text-sm font-black text-foreground uppercase tracking-wide">
-                  Odontograma Interactivo FDI
-                </h3>
+          <div className="space-y-6">
+            {/* STEPPER DE ESTACIONES CLÍNICAS (FLUJO PANORÁMICO PASO A PASO) */}
+            <div className="bg-card border border-border rounded-3xl p-2 sm:p-2.5 shadow-xs">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClinicalStation('diagnostico')}
+                  className={`py-3 px-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                    clinicalStation === 'diagnostico'
+                      ? 'bg-teal-500/10 border-teal-500/30 text-teal-600 dark:text-teal-400 shadow-xs'
+                      : 'border-transparent text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                    clinicalStation === 'diagnostico' ? 'bg-teal-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>
+                    1
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-xs font-black uppercase tracking-wide truncate block">Diagnóstico & Plan</span>
+                      {plannedTreatments.length > 0 && (
+                        <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-teal-600 text-white shrink-0">
+                          {plannedTreatments.length}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400 truncate block">Odontograma 360° + Presupuesto</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClinicalStation('especialidades')}
+                  className={`py-3 px-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                    clinicalStation === 'especialidades'
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400 shadow-xs'
+                      : 'border-transparent text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                    clinicalStation === 'especialidades' ? 'bg-amber-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>
+                    2
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black uppercase tracking-wide truncate block">Especialidades</span>
+                    <span className="text-[10px] text-slate-400 truncate block">Brackets, Endo & Perio</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClinicalStation('evolucion')}
+                  className={`py-3 px-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                    clinicalStation === 'evolucion'
+                      ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-xs'
+                      : 'border-transparent text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                    clinicalStation === 'evolucion' ? 'bg-cyan-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>
+                    3
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black uppercase tracking-wide truncate block">Evolución & Insumos</span>
+                    <span className="text-[10px] text-slate-400 truncate block">Nota SOAP + Fármacos</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClinicalStation('expediente')}
+                  className={`py-3 px-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                    clinicalStation === 'expediente'
+                      ? 'bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400 shadow-xs'
+                      : 'border-transparent text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${
+                    clinicalStation === 'expediente' ? 'bg-purple-600 text-white shadow-xs' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  }`}>
+                    4
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-black uppercase tracking-wide truncate block">Expediente & Citas</span>
+                    <span className="text-[10px] text-slate-400 truncate block">Rx, Documentos & Turnos</span>
+                  </div>
+                </button>
               </div>
-              <span className="text-[11px] font-mono font-bold text-slate-400">
-                Última mod: {currentChart?.lastUpdated ? new Date(currentChart.lastUpdated).toLocaleTimeString('es-VE') : 'Hoy'}
-              </span>
             </div>
 
-            {isLoadingChart ? (
-              <div className="py-24 text-center space-y-3">
-                <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-xs text-slate-500 font-bold">Cargando arco dental del paciente...</p>
-              </div>
-            ) : (
-              <Odontogram
-                entityId={selectedPatient.id}
-                entityName={selectedPatient.name}
-                initialChart={currentChart}
-                onSave={handleSaveChart}
-                onCreateKanban={handleCreateKanban}
-                isSaving={isSavingChart}
-                dentalCatalog={unifiedDentalCatalog}
-                onOpenCheckout={() => setIsCheckoutModalOpen(true)}
-                onOpenSchedule={(hint) => setIsScheduleModalOpen(true)}
-              />
-            )}
-          </div>
-
-          {/* COLUMNA DERECHA: PANEL CLÍNICO MULTI-PESTAÑA (5 COLUMNAS EN LG) */}
-          <div className="lg:col-span-5 bg-card border border-border rounded-3xl p-4 sm:p-5 shadow-xs space-y-4">
-            {/* Selector de Pestañas del Panel Derecho */}
-            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-border">
-              <button
-                type="button"
-                onClick={() => setActiveTab('presupuesto')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'presupuesto'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <ClipboardList size={14} className="text-teal-500" />
-                <span>Plan & Precios</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('ortodoncia')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'ortodoncia'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <Sparkles size={14} className="text-amber-500" />
-                <span>Brackets</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('especialidades')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'especialidades'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <Activity size={14} className="text-emerald-500" />
-                <span>Endo/Perio</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('evolucion')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'evolucion'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <FileText size={14} className="text-cyan-500" />
-                <span>Evolución</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('citas')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'citas'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <CalendarDays size={14} className="text-blue-500" />
-                <span>Citas</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveTab('expediente')}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-                  activeTab === 'expediente'
-                    ? 'bg-card text-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <Layers size={14} className="text-purple-500" />
-                <span>Rx & Docs</span>
-              </button>
-            </div>
-
-            {/* PESTAÑA 1: PRESUPUESTO & PROCEDIMIENTOS PLANIFICADOS */}
-            {activeTab === 'presupuesto' && (
-              <div className="space-y-4">
-                {/* Resumen Financiero Multimoneda */}
-                <div className="grid grid-cols-2 gap-3 p-3.5 rounded-2xl bg-linear-to-br from-teal-500/10 via-cyan-500/5 to-transparent border border-teal-500/20">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                      Total Presupuesto USD
-                    </span>
-                    <span className="text-xl font-black text-foreground font-mono">
-                      ${totalBudgetUSD.toFixed(2)}
-                    </span>
-                    <span className="text-[10px] text-teal-600 block font-semibold">
-                      {plannedTreatments.length} procedimientos activos
+            {/* ESTACIÓN 1: DIAGNÓSTICO & ODONTOGRAMA 360° */}
+            {clinicalStation === 'diagnostico' && (
+              <div className="space-y-6">
+                {/* 1.1 ODONTOGRAMA INTERACTIVO FDI */}
+                <div className="bg-card border border-border rounded-3xl p-4 sm:p-6 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between border-b border-border pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <h3 className="text-sm font-black text-foreground uppercase tracking-wide">
+                        Odontograma Interactivo FDI (Arco Dental Panorámico)
+                      </h3>
+                    </div>
+                    <span className="text-[11px] font-mono font-bold text-slate-400">
+                      Última mod: {currentChart?.lastUpdated ? new Date(currentChart.lastUpdated).toLocaleTimeString('es-VE') : 'Hoy'}
                     </span>
                   </div>
 
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-                      Equivalente Oficial BCV
-                    </span>
-                    <span className="text-xl font-black text-teal-600 dark:text-teal-400 font-mono">
-                      Bs. {totalBudgetVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-[10px] text-slate-400 block font-mono">
-                      Tasa: Bs. {currentExchangeRate.toFixed(2)}
-                    </span>
-                  </div>
+                  {isLoadingChart ? (
+                    <div className="py-24 text-center space-y-3">
+                      <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                      <p className="text-xs text-slate-500 font-bold">Cargando arco dental del paciente...</p>
+                    </div>
+                  ) : (
+                    <Odontogram
+                      entityId={selectedPatient.id}
+                      entityName={selectedPatient.name}
+                      initialChart={currentChart}
+                      onSave={handleSaveChart}
+                      onCreateKanban={handleCreateKanban}
+                      isSaving={isSavingChart}
+                      dentalCatalog={unifiedDentalCatalog}
+                      onOpenCheckout={() => setIsCheckoutModalOpen(true)}
+                      onOpenSchedule={(hint) => setIsScheduleModalOpen(true)}
+                    />
+                  )}
                 </div>
 
-                {/* Selector Rápido para Añadir Procedimiento General del Catálogo al Plan */}
-                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <Plus size={13} className="text-teal-500" />
-                      Agregar Procedimiento al Plan
-                    </span>
-                    <span className="text-[10px] text-slate-400">
+                {/* 1.2 PRESUPUESTO & PROCEDIMIENTOS PLANIFICADOS */}
+                <div className="bg-card border border-border rounded-3xl p-5 sm:p-6 shadow-xs space-y-5">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border pb-4">
+                    <div>
+                      <h3 className="text-sm font-black text-foreground uppercase tracking-wide flex items-center gap-2">
+                        <ClipboardList size={16} className="text-teal-500" />
+                        <span>Plan de Tratamiento & Presupuesto Panorámico</span>
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Costes calculados a partir de los hallazgos del odontograma y procedimientos asignados manualmente.
+                      </p>
+                    </div>
+
+                    {/* Resumen Financiero Multimoneda */}
+                    <div className="flex items-center gap-4 bg-slate-50 dark:bg-slate-900/40 px-4 py-2.5 rounded-2xl border border-border">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Total USD</span>
+                        <span className="text-lg font-black text-foreground font-mono leading-none">${totalBudgetUSD.toFixed(2)}</span>
+                      </div>
+                      <div className="h-8 w-px bg-border" />
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Oficial BCV</span>
+                        <span className="text-lg font-black text-teal-600 dark:text-teal-400 font-mono leading-none">
+                          Bs. {totalBudgetVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selector Rápido para Añadir Procedimiento General del Catálogo al Plan */}
+                  <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Plus size={15} className="text-teal-500" />
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                        Agregar al Plan:
+                      </span>
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <select
+                        value={selectedCatalogToAdd}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val) {
+                            handleAddProcedureToPlan(val);
+                            setSelectedCatalogToAdd('');
+                          }
+                        }}
+                        className="w-full bg-background border border-input rounded-xl px-3 py-2 text-xs text-foreground focus:outline-hidden font-medium"
+                      >
+                        <option value="">Seleccionar del catálogo (Limpieza, Blanqueamiento, Exodoncia, Resina, Corona...)</option>
+                        {unifiedDentalCatalog.map((proc) => (
+                          <option key={proc.id} value={proc.id}>
+                            {proc.name} — ${proc.defaultPriceUSD} USD ({proc.categoryLabel})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <span className="text-[11px] text-slate-400 shrink-0 self-center">
                       {unifiedDentalCatalog.length} disponibles
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedCatalogToAdd}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val) {
-                          handleAddProcedureToPlan(val);
-                          setSelectedCatalogToAdd('');
-                        }
-                      }}
-                      className="flex-1 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground focus:outline-hidden font-medium"
-                    >
-                      <option value="">Seleccionar del catálogo (Limpieza, Blanqueamiento, Exodoncia...)</option>
-                      {unifiedDentalCatalog.map((proc) => (
-                        <option key={proc.id} value={proc.id}>
-                          {proc.name} — ${proc.defaultPriceUSD} USD ({proc.categoryLabel})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
 
-                {/* Lista de Procedimientos Derivados del Odontograma y Plan */}
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                  {plannedTreatments.length === 0 ? (
-                    <div className="text-center py-10 text-slate-400 border border-dashed border-border rounded-2xl p-4">
-                      <p className="text-xs font-bold">Sin tratamientos activos planificados</p>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Marca caries, coronas o tratamientos en el odontograma o agrégalos desde el selector de arriba para sumarlos al presupuesto.
-                      </p>
-                    </div>
-                  ) : (
-                    plannedTreatments.map((t) => (
-                      <div
-                        key={t.id}
-                        className="p-3 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-3 hover:border-teal-500/40 transition-all"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-black text-xs shrink-0">
-                            #{t.toothNum}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-bold text-foreground leading-tight truncate">{t.procedureName}</p>
-                            <p className="text-[10px] text-slate-400 truncate">{t.category} {t.notes ? `· ${t.notes}` : ''}</p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
-                          {editingTreatmentId === t.id ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs font-bold text-slate-400">$</span>
-                              <input
-                                type="number"
-                                step="0.5"
-                                value={tempPriceInput}
-                                onChange={(e) => setTempPriceInput(e.target.value)}
-                                className="w-16 bg-background border border-teal-500 rounded-lg px-1.5 py-0.5 text-xs font-bold font-mono text-foreground text-right"
-                                autoFocus
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const num = parseFloat(tempPriceInput);
-                                  if (!isNaN(num) && num >= 0) {
-                                    handleUpdateTreatmentCost(t, num);
-                                  }
-                                  setEditingTreatmentId(null);
-                                }}
-                                className="p-1 rounded-md bg-teal-600 text-white hover:bg-teal-700"
-                                title="Guardar precio"
-                              >
-                                <Check size={12} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingTreatmentId(null)}
-                                className="p-1 rounded-md text-slate-400 hover:text-foreground"
-                              >
-                                <X size={12} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div
-                              className="text-right cursor-pointer group/price"
-                              onClick={() => {
-                                setEditingTreatmentId(t.id);
-                                setTempPriceInput(String(t.cost));
-                              }}
-                              title="Clic para editar precio del procedimiento"
-                            >
-                              <span className="text-xs font-black font-mono text-foreground block group-hover/price:text-teal-600 transition-colors">
-                                ${t.cost.toFixed(2)} ✏️
-                              </span>
-                              <span className="text-[10px] font-mono text-slate-400">
-                                Bs. {(t.cost * currentExchangeRate).toFixed(0)}
-                              </span>
-                            </div>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleRemovePlannedTreatment(t)}
-                            className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                            title="Quitar procedimiento del plan"
+                  {/* Grilla de Procedimientos Derivados del Odontograma y Plan */}
+                  <div className="space-y-2.5">
+                    {plannedTreatments.length === 0 ? (
+                      <div className="text-center py-12 text-slate-400 border border-dashed border-border rounded-2xl p-6">
+                        <p className="text-sm font-bold">Sin tratamientos activos planificados</p>
+                        <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                          Marca caries, coronas o tratamientos en el odontograma superior o agrégalos desde el selector para sumarlos al presupuesto y enviarlos a caja.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                        {plannedTreatments.map((t) => (
+                          <div
+                            key={t.id}
+                            className="p-3.5 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/40 flex items-center justify-between gap-3 hover:border-teal-500/40 transition-all"
                           >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-teal-500/10 text-teal-600 flex items-center justify-center font-black text-xs shrink-0">
+                                #{t.toothNum}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-foreground leading-tight truncate">{t.procedureName}</p>
+                                <p className="text-[10px] text-slate-400 truncate">{t.category} {t.notes ? `· ${t.notes}` : ''}</p>
+                              </div>
+                            </div>
 
-                {/* Acciones del Presupuesto: Despacho a Caja POS, Cobro en Sillón y Kanban */}
-                {plannedTreatments.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-border">
-                    {/* Botón Principal: Despachar a Caja POS */}
-                    <button
-                      type="button"
-                      disabled={isSendingToCashier}
-                      onClick={handleSendOrderToCashier}
-                      className="w-full py-2.5 px-4 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 text-white text-xs font-black hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 btn-haptic disabled:opacity-50"
-                    >
-                      <Send size={15} className={isSendingToCashier ? 'animate-bounce' : ''} />
-                      <span>
-                        {isSendingToCashier
-                          ? 'Despachando a Caja...'
-                          : `Despachar a Caja POS ($${totalBudgetUSD.toFixed(0)} USD)`}
-                      </span>
-                    </button>
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              {editingTreatmentId === t.id ? (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs font-bold text-slate-400">$</span>
+                                  <input
+                                    type="number"
+                                    step="0.5"
+                                    value={tempPriceInput}
+                                    onChange={(e) => setTempPriceInput(e.target.value)}
+                                    className="w-16 bg-background border border-teal-500 rounded-lg px-1.5 py-0.5 text-xs font-bold font-mono text-foreground text-right"
+                                    autoFocus
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const num = parseFloat(tempPriceInput);
+                                      if (!isNaN(num) && num >= 0) {
+                                        handleUpdateTreatmentCost(t, num);
+                                      }
+                                      setEditingTreatmentId(null);
+                                    }}
+                                    className="p-1 rounded-md bg-teal-600 text-white hover:bg-teal-700"
+                                    title="Guardar precio"
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingTreatmentId(null)}
+                                    className="p-1 rounded-md text-slate-400 hover:text-foreground"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div
+                                  className="text-right cursor-pointer group/price"
+                                  onClick={() => {
+                                    setEditingTreatmentId(t.id);
+                                    setTempPriceInput(String(t.cost));
+                                  }}
+                                  title="Clic para editar precio del procedimiento"
+                                >
+                                  <span className="text-xs font-black font-mono text-foreground block group-hover/price:text-teal-600 transition-colors">
+                                    ${t.cost.toFixed(2)} ✏️
+                                  </span>
+                                  <span className="text-[10px] font-mono text-slate-400">
+                                    Bs. {(t.cost * currentExchangeRate).toFixed(0)}
+                                  </span>
+                                </div>
+                              )}
 
-                    <div className="grid grid-cols-2 gap-2">
-                      {/* Botón Cobro Inmediato en Sillón */}
-                      <button
-                        type="button"
-                        onClick={() => setIsCheckoutModalOpen(true)}
-                        className="py-2 px-3 rounded-xl bg-slate-900 hover:bg-black dark:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic shadow-xs truncate"
-                      >
-                        <CreditCard size={13} />
-                        <span className="truncate">Cobrar en Sillón</span>
-                      </button>
-
-                      {/* Botón Kanban */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const plan: DentalTreatmentPlan = {
-                            id: `plan-${Date.now()}`,
-                            title: `Plan Odontológico — ${selectedPatient.name}`,
-                            teeth: Array.from(new Set(plannedTreatments.map((t) => t.toothNum))),
-                            procedures: plannedTreatments.map((p) => ({
-                              toothNumber: p.toothNum,
-                              conditionCode: p.code,
-                              procedure: p.procedureName,
-                              category: p.category,
-                              estimatedCost: p.cost,
-                              completed: p.completed,
-                              stages: p.stages,
-                              notes: p.notes,
-                            })),
-                            totalCost: totalBudgetUSD,
-                            createdAt: new Date().toISOString(),
-                          };
-                          handleCreateKanban(plan);
-                        }}
-                        className="py-2 px-3 rounded-xl border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/20 transition-all flex items-center justify-center gap-1.5 truncate"
-                      >
-                        <KanbanSquare size={13} />
-                        <span className="truncate">Enviar a Kanban</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* PESTAÑA ORTODONCIA & BRACKETS */}
-            {activeTab === 'ortodoncia' && selectedPatient && (
-              <div className="pt-2">
-                <OrthodonticsTracker patientId={selectedPatient.id} patientName={selectedPatient.name} />
-              </div>
-            )}
-
-            {/* PESTAÑA ESPECIALIDADES: ENDODONCIA Y PERIODONCIA */}
-            {activeTab === 'especialidades' && selectedPatient && (
-              <div className="pt-2 space-y-6">
-                <EndodonticsSheet patientId={selectedPatient.id} patientName={selectedPatient.name} />
-                <div className="border-t border-border pt-6">
-                  <PeriodonticsMiniChart patientId={selectedPatient.id} patientName={selectedPatient.name} />
-                </div>
-              </div>
-            )}
-
-            {/* PESTAÑA 2: NOTA DE EVOLUCIÓN CLÍNICA & CONSUMIBLES */}
-            {activeTab === 'evolucion' && (
-              <div className="space-y-4">
-                {/* Cuadro de Texto de Evolución */}
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-black text-foreground uppercase tracking-wider">
-                      Nota Clínica de la Consulta
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      Dr: {session?.userEmail || effectiveActor.email}
-                    </span>
-                  </div>
-                  <textarea
-                    rows={4}
-                    value={evolutionText}
-                    onChange={(e) => setEvolutionText(e.target.value)}
-                    placeholder="Describe el acto médico realizado hoy, anestesia, materiales, hallazgos y respuesta del paciente..."
-                    className="w-full bg-background border border-input rounded-2xl p-3 text-xs font-medium text-foreground focus:outline-hidden focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none shadow-xs"
-                  />
-                </div>
-
-                {/* Frases Rápidas Sugeridas */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    Textos rápidos frecuentes:
-                  </span>
-                  <div className="flex gap-1.5 flex-wrap">
-                    {QUICK_CLINICAL_NOTES.map((phrase, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setEvolutionText((prev) => (prev ? `${prev} ${phrase}` : phrase))}
-                        className="text-[10px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-teal-500/10 hover:text-teal-600 font-medium transition-colors text-left"
-                      >
-                        + {phrase.slice(0, 36)}...
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Insumos Especiales Consumidos (Descuentan Stock Físico) */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <Package size={14} className="text-teal-500" />
-                      Insumos Especiales Gastados
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setIsNewConsumableModalOpen(true)}
-                      className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
-                    >
-                      <Plus size={12} />
-                      <span>+ Nuevo Insumo</span>
-                    </button>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={selectedConsumableId}
-                      onChange={(e) => setSelectedConsumableId(e.target.value)}
-                      className="flex-1 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground focus:outline-hidden"
-                    >
-                      <option value="">Seleccionar insumo (Anestesia, suturas, etc)...</option>
-                      {availableConsumables.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name} (Stock: {item.stock_quantity ?? item.stock ?? 0})
-                        </option>
-                      ))}
-                    </select>
-
-                    <input
-                      type="number"
-                      min={1}
-                      value={consumableQty}
-                      onChange={(e) => setConsumableQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-14 bg-background border border-input rounded-xl px-2 py-1.5 text-xs font-bold text-center text-foreground"
-                    />
-
-                    <button
-                      type="button"
-                      onClick={handleAddConsumable}
-                      className="px-3 py-1.5 bg-teal-500 text-white text-xs font-bold rounded-xl hover:bg-teal-600 transition-colors shrink-0"
-                    >
-                      + Añadir
-                    </button>
-                  </div>
-
-                  {selectedConsumables.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      {selectedConsumables.map((c, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs bg-background p-2 rounded-xl border border-border">
-                          <span className="font-semibold text-foreground">{c.name}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-teal-600 font-bold">x{c.quantity}</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedConsumables((prev) => prev.filter((_, i) => i !== idx))}
-                              className="text-slate-400 hover:text-red-500"
-                            >
-                              <X size={13} />
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePlannedTreatment(t)}
+                                className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                                title="Quitar procedimiento del plan"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Récipe Farmacológico Opcional */}
-                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <Pill size={14} className="text-cyan-500" />
-                      Prescripción Farmacológica
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowPrescriptionForm(!showPrescriptionForm)}
-                      className="text-[11px] font-bold text-teal-600 hover:underline"
-                    >
-                      {showPrescriptionForm ? 'Ocultar' : '+ Recetar Medicamento'}
-                    </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {showPrescriptionForm && (
-                    <div className="space-y-2 pt-1 border-t border-border/50">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          value={newMedDrug}
-                          onChange={(e) => setNewMedDrug(e.target.value)}
-                          placeholder="Fármaco (Ej. Amoxicilina 500mg)"
-                          className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs"
-                        />
-                        <input
-                          type="text"
-                          value={newMedDosage}
-                          onChange={(e) => setNewMedDosage(e.target.value)}
-                          placeholder="Dosis (Ej. 1 cápsula)"
-                          className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs"
-                        />
+                  {/* Acciones del Presupuesto: Despacho a Caja POS, Cobro en Sillón y Kanban */}
+                  {plannedTreatments.length > 0 && (
+                    <div className="pt-3 border-t border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                      <div className="text-xs text-slate-500">
+                        <span className="font-bold text-foreground">{plannedTreatments.length}</span> tratamientos presupuestados por un total de{' '}
+                        <span className="font-bold text-teal-600 dark:text-teal-400 font-mono">${totalBudgetUSD.toFixed(2)} USD</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          value={newMedFreq}
-                          onChange={(e) => setNewMedFreq(e.target.value)}
-                          placeholder="Frecuencia (Ej. Cada 8 horas)"
-                          className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs"
-                        />
-                        <input
-                          type="text"
-                          value={newMedDuration}
-                          onChange={(e) => setNewMedDuration(e.target.value)}
-                          placeholder="Duración (Ej. Por 7 días)"
-                          className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs"
-                        />
-                      </div>
-                      <div className="flex justify-end">
+
+                      <div className="flex items-center gap-2 flex-wrap">
                         <button
                           type="button"
-                          onClick={handleAddPrescriptionMed}
-                          className="px-3 py-1 bg-cyan-600 text-white rounded-xl text-xs font-bold hover:bg-cyan-700"
+                          onClick={() => {
+                            const plan = {
+                              id: `plan-${Date.now()}`,
+                              title: `Plan Odontológico — ${selectedPatient.name}`,
+                              teeth: Array.from(new Set(plannedTreatments.map((t) => t.toothNum))),
+                              procedures: plannedTreatments.map((p) => ({
+                                toothNumber: p.toothNum,
+                                conditionCode: p.code,
+                                procedure: p.procedureName,
+                                category: p.category,
+                                estimatedCost: p.cost,
+                                completed: p.completed,
+                                stages: p.stages,
+                                notes: p.notes,
+                              })),
+                              totalCost: totalBudgetUSD,
+                              createdAt: new Date().toISOString(),
+                            };
+                            handleCreateKanban(plan);
+                          }}
+                          className="py-2.5 px-3.5 rounded-xl border border-teal-500/30 bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold hover:bg-teal-500/20 transition-all flex items-center gap-1.5"
                         >
-                          + Agregar al Récipe
+                          <KanbanSquare size={14} />
+                          <span>Enviar a Kanban</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setIsCheckoutModalOpen(true)}
+                          className="py-2.5 px-3.5 rounded-xl bg-slate-900 hover:bg-black dark:bg-slate-800 text-white text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic shadow-xs"
+                        >
+                          <CreditCard size={14} />
+                          <span>Cobrar en Sillón</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          disabled={isSendingToCashier}
+                          onClick={handleSendOrderToCashier}
+                          className="py-2.5 px-5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 text-white text-xs font-black hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md shadow-emerald-600/20 flex items-center gap-2 btn-haptic disabled:opacity-50"
+                        >
+                          <Send size={15} className={isSendingToCashier ? 'animate-bounce' : ''} />
+                          <span>
+                            {isSendingToCashier
+                              ? 'Despachando a Caja...'
+                              : `Despachar a Caja POS ($${totalBudgetUSD.toFixed(0)} USD)`}
+                          </span>
                         </button>
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
 
-                  {prescriptionMeds.length > 0 && (
-                    <div className="space-y-1.5 pt-1">
-                      {prescriptionMeds.map((m, idx) => (
-                        <div key={idx} className="flex items-center justify-between text-xs bg-background p-2 rounded-xl border border-border">
-                          <div>
-                            <p className="font-bold text-foreground">{m.drug}</p>
-                            <p className="text-[10px] text-slate-400">{m.dosage} · {m.frequency} ({m.duration})</p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setPrescriptionMeds((prev) => prev.filter((_, i) => i !== idx))}
-                            className="text-slate-400 hover:text-red-500"
-                          >
-                            <X size={13} />
-                          </button>
-                        </div>
-                      ))}
+            {/* ESTACIÓN 2: ESPECIALIDADES CLÍNICAS (ORTODONCIA, ENDODONCIA, PERIODONCIA) */}
+            {clinicalStation === 'especialidades' && (
+              <div className="bg-card border border-border rounded-3xl p-5 sm:p-6 shadow-xs space-y-6">
+                {/* Sub-selector de Especialidad */}
+                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl border border-border max-w-lg">
+                  <button
+                    type="button"
+                    onClick={() => setSpecialtySubTab('ortodoncia')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      specialtySubTab === 'ortodoncia'
+                        ? 'bg-card text-foreground shadow-xs'
+                        : 'text-slate-500 hover:text-foreground'
+                    }`}
+                  >
+                    <Sparkles size={14} className="text-amber-500" />
+                    <span>Ortodoncia / Brackets</span>
+                  </button>
 
-                      <button
-                        type="button"
-                        onClick={handleSendPrescriptionWhatsApp}
-                        className="w-full py-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 mt-2 border border-emerald-500/20"
-                      >
-                        <MessageSquare size={14} />
-                        <span>Enviar Récipe al WhatsApp del Paciente</span>
-                      </button>
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSpecialtySubTab('endodoncia')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      specialtySubTab === 'endodoncia'
+                        ? 'bg-card text-foreground shadow-xs'
+                        : 'text-slate-500 hover:text-foreground'
+                    }`}
+                  >
+                    <Activity size={14} className="text-emerald-500" />
+                    <span>Endodoncia</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSpecialtySubTab('periodoncia')}
+                    className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      specialtySubTab === 'periodoncia'
+                        ? 'bg-card text-foreground shadow-xs'
+                        : 'text-slate-500 hover:text-foreground'
+                    }`}
+                  >
+                    <Layers size={14} className="text-teal-500" />
+                    <span>Periodoncia</span>
+                  </button>
                 </div>
 
-                {/* Botón Guardar Evolución */}
-                <button
-                  type="button"
-                  onClick={handleSaveEvolution}
-                  disabled={isSavingEvolution}
-                  className="w-full py-2.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 btn-haptic disabled:opacity-50"
-                >
-                  <Save size={15} />
-                  <span>{isSavingEvolution ? 'Guardando...' : 'Guardar Evolución & Descontar Insumos'}</span>
-                </button>
+                {specialtySubTab === 'ortodoncia' && (
+                  <div className="animate-in fade-in duration-200">
+                    <OrthodonticsTracker patientId={selectedPatient.id} patientName={selectedPatient.name} />
+                  </div>
+                )}
 
-                {/* Historial Cronológico de Evoluciones Pasadas */}
-                {patientEvolutions.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-border">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                      Evoluciones Anteriores ({patientEvolutions.length}):
-                    </span>
-                    <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                      {patientEvolutions.map((evo) => (
-                        <div key={evo.id} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-border text-xs space-y-1">
-                          <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-                            <span>{new Date(evo.createdAt).toLocaleDateString('es-VE')}</span>
-                            <span>{evo.doctorName}</span>
-                          </div>
-                          <p className="text-foreground leading-relaxed">{evo.note}</p>
-                          {evo.extraConsumables && evo.extraConsumables.length > 0 && (
-                            <p className="text-[10px] text-teal-600 font-medium">
-                              Insumos: {evo.extraConsumables.map((c) => `${c.name} (x${c.quantity})`).join(', ')}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                {specialtySubTab === 'endodoncia' && (
+                  <div className="animate-in fade-in duration-200">
+                    <EndodonticsSheet patientId={selectedPatient.id} patientName={selectedPatient.name} />
+                  </div>
+                )}
+
+                {specialtySubTab === 'periodoncia' && (
+                  <div className="animate-in fade-in duration-200">
+                    <PeriodonticsMiniChart patientId={selectedPatient.id} patientName={selectedPatient.name} />
                   </div>
                 )}
               </div>
             )}
 
-            {/* PESTAÑA 3: CITAS DEL PACIENTE */}
-            {activeTab === 'citas' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-foreground uppercase tracking-wider">
-                    Historial de Turnos
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsScheduleModalOpen(true)}
-                    className="px-3 py-1 bg-primary text-primary-foreground text-xs font-bold rounded-xl hover:bg-primary/90 transition-all btn-haptic"
-                  >
-                    + Agendar Próxima Cita
-                  </button>
+            {/* ESTACIÓN 3: EVOLUCIÓN, CONSUMIBLES & RÉCIPE */}
+            {clinicalStation === 'evolucion' && (
+              <div className="bg-card border border-border rounded-3xl p-5 sm:p-6 shadow-xs space-y-6">
+                <div className="border-b border-border pb-4">
+                  <h3 className="text-sm font-black text-foreground uppercase tracking-wide flex items-center gap-2">
+                    <FileText size={16} className="text-cyan-500" />
+                    <span>Evolución Médica, Consumo de Insumos & Prescripción</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Registra el acto clínico del día, descuenta del inventario físico los consumibles descartables y prescribe el tratamiento farmacológico.
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  {todayAppointments.filter(
-                    (a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id
-                  ).length === 0 ? (
-                    <div className="text-center py-8 text-slate-400 border border-dashed border-border rounded-2xl p-4">
-                      <p className="text-xs font-bold">Sin cita registrada hoy</p>
-                      <p className="text-[11px] text-slate-500 mt-1">
-                        Puedes agendar el control de cicatrización o próxima fase del tratamiento dental.
-                      </p>
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  {/* Columna Izquierda: Nota Clínica + Frases Rápidas (7 cols) */}
+                  <div className="lg:col-span-7 space-y-4">
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-black text-foreground uppercase tracking-wider">
+                          Nota Clínica de la Consulta
+                        </label>
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          Dr: {session?.userEmail || effectiveActor.email}
+                        </span>
+                      </div>
+                      <textarea
+                        rows={5}
+                        value={evolutionText}
+                        onChange={(e) => setEvolutionText(e.target.value)}
+                        placeholder="Describe el acto médico realizado hoy, anestesia, materiales, hallazgos y respuesta del paciente..."
+                        className="w-full bg-background border border-input rounded-2xl p-3.5 text-xs font-medium text-foreground focus:outline-hidden focus:ring-2 focus:ring-teal-500/30 focus:border-teal-500 resize-none shadow-xs"
+                      />
                     </div>
-                  ) : (
-                    todayAppointments
-                      .filter((a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id)
-                      .map((a) => (
-                        <div key={a.id} className="p-3 rounded-2xl border border-teal-500/30 bg-teal-500/5 space-y-1">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-foreground">Turno de Hoy</span>
-                            <span className="text-xs font-mono font-bold text-teal-600">{a.start_time?.slice(11, 16)}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 dark:text-slate-300">{a.service_title || 'Consulta Odontológica'}</p>
-                          <span className="inline-block text-[10px] font-bold px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 uppercase">
-                            {a.status || 'Confirmada'}
-                          </span>
+
+                    {/* Frases Rápidas Sugeridas */}
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        Textos rápidos frecuentes (clic para insertar):
+                      </span>
+                      <div className="flex gap-2 flex-wrap">
+                        {QUICK_CLINICAL_NOTES.map((phrase, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setEvolutionText((prev) => (prev ? `${prev} ${phrase}` : phrase))}
+                            className="text-[11px] px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-teal-500/10 hover:text-teal-600 font-medium transition-colors text-left"
+                          >
+                            + {phrase.slice(0, 42)}...
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Historial Cronológico de Evoluciones Pasadas */}
+                    {patientEvolutions.length > 0 && (
+                      <div className="space-y-2.5 pt-4 border-t border-border">
+                        <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider block">
+                          Evoluciones Anteriores ({patientEvolutions.length}):
+                        </span>
+                        <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                          {patientEvolutions.map((evo) => (
+                            <div key={evo.id} className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/30 border border-border text-xs space-y-1.5">
+                              <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                                <span className="font-bold text-foreground">{new Date(evo.createdAt).toLocaleDateString('es-VE')}</span>
+                                <span>{evo.doctorName}</span>
+                              </div>
+                              <p className="text-foreground leading-relaxed">{evo.note}</p>
+                              {evo.extraConsumables && evo.extraConsumables.length > 0 && (
+                                <p className="text-[10px] text-teal-600 font-medium">
+                                  Insumos: {evo.extraConsumables.map((c) => `${c.name} (x${c.quantity})`).join(', ')}
+                                </p>
+                              )}
+                            </div>
+                          ))}
                         </div>
-                      ))
-                  )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Columna Derecha: Insumos + Récipe + Botón Guardar (5 cols) */}
+                  <div className="lg:col-span-5 space-y-5">
+                    {/* Insumos Especiales Consumidos */}
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Package size={14} className="text-teal-500" />
+                          Insumos Especiales Gastados
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsNewConsumableModalOpen(true)}
+                          className="text-[10px] font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
+                        >
+                          <Plus size={12} />
+                          <span>+ Nuevo Insumo</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={selectedConsumableId}
+                          onChange={(e) => setSelectedConsumableId(e.target.value)}
+                          className="flex-1 bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground focus:outline-hidden"
+                        >
+                          <option value="">Seleccionar insumo...</option>
+                          {availableConsumables.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {item.name} (Stock: {item.stock_quantity ?? item.stock ?? 0})
+                            </option>
+                          ))}
+                        </select>
+
+                        <input
+                          type="number"
+                          min={1}
+                          value={consumableQty}
+                          onChange={(e) => setConsumableQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          className="w-14 bg-background border border-input rounded-xl px-2 py-1.5 text-xs font-bold text-center text-foreground"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={handleAddConsumable}
+                          className="px-3 py-1.5 bg-teal-500 text-white text-xs font-bold rounded-xl hover:bg-teal-600 transition-colors shrink-0"
+                        >
+                          + Añadir
+                        </button>
+                      </div>
+
+                      {selectedConsumables.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {selectedConsumables.map((c, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs bg-background p-2 rounded-xl border border-border">
+                              <span className="font-semibold text-foreground truncate pr-2">{c.name}</span>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="font-mono text-teal-600 font-bold">x{c.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedConsumables((prev) => prev.filter((_, i) => i !== idx))}
+                                  className="text-slate-400 hover:text-red-500"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Récipe Farmacológico */}
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                          <Pill size={14} className="text-cyan-500" />
+                          Prescripción Farmacológica
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowPrescriptionForm(!showPrescriptionForm)}
+                          className="text-[11px] font-bold text-teal-600 hover:underline"
+                        >
+                          {showPrescriptionForm ? 'Ocultar' : '+ Recetar Fármaco'}
+                        </button>
+                      </div>
+
+                      {showPrescriptionForm && (
+                        <div className="space-y-2 pt-2 border-t border-border/50">
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={newMedDrug}
+                              onChange={(e) => setNewMedDrug(e.target.value)}
+                              placeholder="Fármaco (Ej. Amoxicilina 500mg)"
+                              className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground"
+                            />
+                            <input
+                              type="text"
+                              value={newMedDosage}
+                              onChange={(e) => setNewMedDosage(e.target.value)}
+                              placeholder="Dosis (Ej. 1 cápsula)"
+                              className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={newMedFreq}
+                              onChange={(e) => setNewMedFreq(e.target.value)}
+                              placeholder="Frecuencia (Ej. Cada 8 horas)"
+                              className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground"
+                            />
+                            <input
+                              type="text"
+                              value={newMedDuration}
+                              onChange={(e) => setNewMedDuration(e.target.value)}
+                              placeholder="Duración (Ej. Por 7 días)"
+                              className="bg-background border border-input rounded-xl px-2.5 py-1.5 text-xs text-foreground"
+                            />
+                          </div>
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={handleAddPrescriptionMed}
+                              className="px-3 py-1 bg-cyan-600 text-white rounded-xl text-xs font-bold hover:bg-cyan-700"
+                            >
+                              + Agregar al Récipe
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {prescriptionMeds.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          {prescriptionMeds.map((m, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-xs bg-background p-2 rounded-xl border border-border">
+                              <div className="min-w-0 pr-2">
+                                <p className="font-bold text-foreground truncate">{m.drug}</p>
+                                <p className="text-[10px] text-slate-400 truncate">{m.dosage} · {m.frequency} ({m.duration})</p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setPrescriptionMeds((prev) => prev.filter((_, i) => i !== idx))}
+                                className="text-slate-400 hover:text-red-500 shrink-0"
+                              >
+                                <X size={13} />
+                              </button>
+                            </div>
+                          ))}
+
+                          <button
+                            type="button"
+                            onClick={handleSendPrescriptionWhatsApp}
+                            className="w-full py-2 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 mt-2 border border-emerald-500/20"
+                          >
+                            <MessageSquare size={14} />
+                            <span>Enviar Récipe al WhatsApp del Paciente</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Botón Principal Guardar Evolución */}
+                    <button
+                      type="button"
+                      onClick={handleSaveEvolution}
+                      disabled={isSavingEvolution}
+                      className="w-full py-3 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 btn-haptic disabled:opacity-50"
+                    >
+                      <Save size={16} />
+                      <span>{isSavingEvolution ? 'Guardando...' : 'Guardar Evolución & Descontar Insumos'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* PESTAÑA 4: EXPEDIENTE, ARCHIVOS & RADIOGRAFÍAS */}
-            {activeTab === 'expediente' && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-2xl">
+            {/* ESTACIÓN 4: EXPEDIENTE, ARCHIVOS & RADIOGRAFÍAS */}
+            {clinicalStation === 'expediente' && (
+              <div className="bg-card border border-border rounded-3xl p-5 sm:p-6 shadow-xs space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-slate-50 dark:bg-slate-900/40 border border-border rounded-2xl">
                   <div>
-                    <h4 className="text-xs font-bold text-foreground">Ficha del Paciente & Antecedentes</h4>
-                    <p className="text-[10px] text-slate-400">
+                    <h4 className="text-sm font-bold text-foreground">Ficha del Paciente & Antecedentes Clínicos</h4>
+                    <p className="text-xs text-slate-400 mt-0.5">
                       {patientMeta.allergies ? `⚠️ Alertas: ${patientMeta.allergies}` : 'Sin antecedentes de riesgo reportados'}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsProfileModalOpen(true)}
-                    className="px-3 py-1.5 bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition-all border border-teal-500/20 flex items-center gap-1.5 btn-haptic"
-                  >
-                    <UserCheck size={14} />
-                    <span>Editar Ficha</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsScheduleModalOpen(true)}
+                      className="px-3.5 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl hover:bg-primary/90 transition-all btn-haptic flex items-center gap-1.5"
+                    >
+                      <CalendarDays size={14} />
+                      <span>+ Agendar Cita</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsProfileModalOpen(true)}
+                      className="px-3.5 py-2 bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 rounded-xl text-xs font-bold transition-all border border-teal-500/20 flex items-center gap-1.5 btn-haptic"
+                    >
+                      <UserCheck size={14} />
+                      <span>Editar Ficha</span>
+                    </button>
+                  </div>
                 </div>
 
-                <ClientRecordsTab 
-                  entityId={selectedPatient.id} 
-                  tenantId={tenantId} 
-                  actor={effectiveActor} 
-                  clientName={selectedPatient.name} 
+                {/* Citas de Hoy y Próximos Turnos */}
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border space-y-3">
+                  <span className="text-xs font-black text-foreground uppercase tracking-wider block">
+                    Turnos y Citas del Paciente
+                  </span>
+                  <div className="space-y-2">
+                    {todayAppointments.filter(
+                      (a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id
+                    ).length === 0 ? (
+                      <div className="text-center py-6 text-slate-400 border border-dashed border-border rounded-xl p-3">
+                        <p className="text-xs font-bold">Sin cita registrada para hoy</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Puedes agendar el control de cicatrización o próxima fase del tratamiento dental.
+                        </p>
+                      </div>
+                    ) : (
+                      todayAppointments
+                        .filter((a) => a.client_id === selectedPatient.id || a.entity_id === selectedPatient.id)
+                        .map((a) => (
+                          <div key={a.id} className="p-3 rounded-xl border border-teal-500/30 bg-teal-500/5 flex items-center justify-between gap-3">
+                            <div>
+                              <span className="text-xs font-bold text-foreground block">{a.service_title || 'Consulta Odontológica'}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">Turno de Hoy: {a.start_time?.slice(11, 16)}</span>
+                            </div>
+                            <span className="inline-block text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-600 uppercase">
+                              {a.status || 'Confirmada'}
+                            </span>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+
+                <ClientRecordsTab
+                  entityId={selectedPatient.id}
+                  tenantId={tenantId}
+                  actor={effectiveActor}
+                  clientName={selectedPatient.name}
                 />
               </div>
             )}
           </div>
-        </div>
       ))}
 
       {/* 5. DOCK INFERIOR FIJO: ACCIONES DE COBRO Y CIERRE DE CONSULTA (SOLO EN MODO PRO) */}

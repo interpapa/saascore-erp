@@ -17,6 +17,8 @@ export interface SessionData {
   tenantId: string;
   token?: string;
   expiresAt?: number;
+  allowed_modules?: string[];
+  operational_permissions?: string[];
 }
 
 export function isSessionExpired(session: SessionData | null): boolean {
