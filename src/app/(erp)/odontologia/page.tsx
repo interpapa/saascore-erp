@@ -62,13 +62,16 @@ import {
   DentalChart, 
   DentalTreatmentPlan, 
   DentalEvolutionEntry,
+  PatientDentalWorkOrder,
   getDentalOverviewAction, 
   saveDentalChartAction, 
   getDentalChartAction, 
   createTreatmentKanbanFromChartAction,
   saveDentalEvolutionAction,
   getDentalEvolutionsAction,
-  sendDentalOrderToCashierAction
+  sendDentalOrderToCashierAction,
+  getPatientDentalWorkOrdersAction,
+  updateDentalWorkOrderStepAction
 } from '@/app/actions/dental';
 import { getEntitiesAction, createEntityAction, updateEntityAction, ActionActor } from '@/app/actions/entities';
 import { getAppointmentsAction, updateAppointmentStatusAction } from '@/app/actions/appointments';
@@ -148,6 +151,13 @@ export default function OdontologiaPage() {
   const [newMedDuration, setNewMedDuration] = useState('');
   const [showPrescriptionForm, setShowPrescriptionForm] = useState(false);
 
+  // Órdenes de Trabajo (Kanban) y Laboratorio del Paciente
+  const [patientWorkOrders, setPatientWorkOrders] = useState<PatientDentalWorkOrder[]>([]);
+  const [isLoadingWorkOrders, setIsLoadingWorkOrders] = useState(false);
+
+  // Auto-guardado en Borrador (Draft Recovery & Session Guard)
+  const [draftRestoredNotice, setDraftRestoredNotice] = useState<{ time: string } | null>(null);
+
   // Alerta Médica Editable
   const [isEditingAllergies, setIsEditingAllergies] = useState(false);
   const [allergyInput, setAllergyInput] = useState('');
@@ -197,7 +207,7 @@ export default function OdontologiaPage() {
         setCustomers(loadedPatients);
         if (typeof window !== 'undefined') {
           const searchParams = new URLSearchParams(window.location.search);
-          const urlPatientId = searchParams.get('client_id') || searchParams.get('client');
+          const urlPatientId = searchParams.get('patient') || searchParams.get('client_id') || searchParams.get('client');
           if (urlPatientId) {
             const matchedPatient = loadedPatients.find((p: Entity) => p.id === urlPatientId);
             if (matchedPatient) {
@@ -284,19 +294,176 @@ export default function OdontologiaPage() {
     [tenantId, effectiveActor]
   );
 
+  // Sincronización continua de la URL con el paciente activo en sillón
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (selectedPatient?.id) {
+      url.searchParams.set('patient', selectedPatient.id);
+      url.searchParams.set('client_id', selectedPatient.id);
+    } else {
+      url.searchParams.delete('patient');
+      url.searchParams.delete('client_id');
+      url.searchParams.delete('client');
+    }
+    window.history.replaceState(null, '', url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : ''));
+  }, [selectedPatient?.id]);
+
+  // 3. CARGA DE ÓRDENES DE TRABAJO (KANBAN) DEL PACIENTE
+  const loadPatientWorkOrders = useCallback(
+    async (patientId: string) => {
+      if (!tenantId || !patientId) return;
+      try {
+        setIsLoadingWorkOrders(true);
+        const res = await getPatientDentalWorkOrdersAction(patientId, tenantId, effectiveActor);
+        if (res.success && res.workOrders) {
+          setPatientWorkOrders(res.workOrders);
+        } else {
+          setPatientWorkOrders([]);
+        }
+      } catch (err) {
+        console.error('[loadPatientWorkOrders]:', err);
+      } finally {
+        setIsLoadingWorkOrders(false);
+      }
+    },
+    [tenantId, effectiveActor]
+  );
+
+  // 4. RESTAURACIÓN DE BORRADOR DE SESIÓN (SESSION GUARD & DRAFT RECOVERY)
+  const getDraftKey = useCallback(
+    (patientId: string) => `rendo_dental_pro_draft_${tenantId}_${patientId}`,
+    [tenantId]
+  );
+
+  const loadPatientDraft = useCallback(
+    (patientId: string) => {
+      if (typeof window === 'undefined') return;
+      try {
+        const key = getDraftKey(patientId);
+        const raw = localStorage.getItem(key);
+        if (!raw) {
+          setDraftRestoredNotice(null);
+          return;
+        }
+        const parsed = JSON.parse(raw);
+        let restoredAny = false;
+
+        if (parsed.evolutionText && typeof parsed.evolutionText === 'string' && parsed.evolutionText.trim().length > 0) {
+          setEvolutionText(parsed.evolutionText);
+          restoredAny = true;
+        }
+        if (Array.isArray(parsed.selectedConsumables) && parsed.selectedConsumables.length > 0) {
+          setSelectedConsumables(parsed.selectedConsumables);
+          restoredAny = true;
+        }
+        if (Array.isArray(parsed.prescriptionMeds) && parsed.prescriptionMeds.length > 0) {
+          setPrescriptionMeds(parsed.prescriptionMeds);
+          restoredAny = true;
+        }
+
+        if (restoredAny) {
+          const timeStr = parsed.timestamp
+            ? new Date(parsed.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            : 'previa';
+          setDraftRestoredNotice({ time: timeStr });
+        } else {
+          setDraftRestoredNotice(null);
+        }
+      } catch (err) {
+        console.warn('Error al restaurar borrador dental:', err);
+      }
+    },
+    [getDraftKey]
+  );
+
+  // AUTO-GUARDADO PERIÓDICO DEL TRABAJO EN PROGRESO
+  useEffect(() => {
+    if (typeof window === 'undefined' || !selectedPatient?.id || !tenantId) return;
+
+    const key = getDraftKey(selectedPatient.id);
+    const hasDataToSave =
+      evolutionText.trim().length > 0 ||
+      selectedConsumables.length > 0 ||
+      prescriptionMeds.length > 0;
+
+    if (hasDataToSave) {
+      const payload = {
+        evolutionText,
+        selectedConsumables,
+        prescriptionMeds,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(key, JSON.stringify(payload));
+    }
+  }, [selectedPatient?.id, tenantId, evolutionText, selectedConsumables, prescriptionMeds, getDraftKey]);
+
+  // DESCARTAR BORRADOR ACTIVO
+  const handleDiscardDraft = () => {
+    if (typeof window === 'undefined' || !selectedPatient?.id) return;
+    const key = getDraftKey(selectedPatient.id);
+    localStorage.removeItem(key);
+    setEvolutionText('');
+    setSelectedConsumables([]);
+    setPrescriptionMeds([]);
+    setDraftRestoredNotice(null);
+    toast({
+      variant: 'info',
+      title: 'Borrador descartado',
+      description: 'Se limpiaron las notas y prescripciones pendientes de la consulta.',
+    });
+  };
+
+  // ACTUALIZAR ETAPA DE ORDEN DE TRABAJO (KANBAN)
+  const handleToggleWorkOrderStep = async (orderId: string, stepId: string, currentCompleted: boolean) => {
+    if (!tenantId || !effectiveActor || !selectedPatient) return;
+    try {
+      // Actualización optimista en UI
+      setPatientWorkOrders((prev) =>
+        prev.map((ord) => {
+          if (ord.id !== orderId) return ord;
+          const updatedSteps = ord.steps.map((s) =>
+            s.id === stepId ? { ...s, completed: !currentCompleted, completed_at: !currentCompleted ? new Date().toISOString() : null } : s
+          );
+          return { ...ord, steps: updatedSteps };
+        })
+      );
+
+      const res = await updateDentalWorkOrderStepAction(orderId, stepId, !currentCompleted, tenantId, effectiveActor);
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Etapa Actualizada',
+          description: 'Se registró el avance clínico en la orden de trabajo.',
+        });
+        loadPatientWorkOrders(selectedPatient.id);
+      } else {
+        toast({ variant: 'error', title: 'Error al actualizar', description: res.error });
+        loadPatientWorkOrders(selectedPatient.id);
+      }
+    } catch (err: unknown) {
+      toast({ variant: 'error', title: 'Error', description: (err as Error).message });
+      loadPatientWorkOrders(selectedPatient.id);
+    }
+  };
+
   useEffect(() => {
     if (selectedPatient?.id) {
       loadPatientChartAndEvolutions(selectedPatient.id);
+      loadPatientWorkOrders(selectedPatient.id);
+      loadPatientDraft(selectedPatient.id);
       const meta = (selectedPatient.metadata as any) || {};
       setAllergyInput(meta.allergies || meta.notes || '');
     } else {
       setCurrentChart(undefined);
       setPatientEvolutions([]);
+      setPatientWorkOrders([]);
+      setDraftRestoredNotice(null);
       setEvolutionText('');
       setSelectedConsumables([]);
       setPrescriptionMeds([]);
     }
-  }, [selectedPatient?.id, loadPatientChartAndEvolutions]);
+  }, [selectedPatient?.id, loadPatientChartAndEvolutions, loadPatientWorkOrders, loadPatientDraft]);
 
   // Catálogo unificado de tratamientos dentales
   const unifiedDentalCatalog = useMemo(() => {
@@ -679,6 +846,10 @@ export default function OdontologiaPage() {
         }
 
         // Liberar pantalla del odontólogo para atender al siguiente paciente
+        if (typeof window !== 'undefined' && selectedPatient?.id) {
+          localStorage.removeItem(getDraftKey(selectedPatient.id));
+          setDraftRestoredNotice(null);
+        }
         setSelectedPatient(null);
       } else {
         toast({
@@ -799,6 +970,10 @@ export default function OdontologiaPage() {
           title: 'Evolución Registrada',
           description: 'La nota clínica fue guardada y los insumos fueron descontados del inventario.',
         });
+        if (typeof window !== 'undefined' && selectedPatient?.id) {
+          localStorage.removeItem(getDraftKey(selectedPatient.id));
+          setDraftRestoredNotice(null);
+        }
         setEvolutionText('');
         setSelectedConsumables([]);
         setShowPrescriptionForm(false);
@@ -1000,6 +1175,7 @@ export default function OdontologiaPage() {
           title: 'Enviado a Kanban',
           description: `Orden de tratamiento creada con éxito en el tablero de trabajo.`,
         });
+        loadPatientWorkOrders(selectedPatient.id);
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error });
       }
@@ -1382,6 +1558,18 @@ export default function OdontologiaPage() {
                 <span>Ver / Editar Ficha</span>
               </button>
 
+              {patientWorkOrders.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setClinicalStation('expediente')}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20 text-xs font-bold transition-all border border-purple-500/30 btn-haptic shadow-2xs"
+                  title="Ver órdenes de trabajo y laboratorio de este paciente"
+                >
+                  <KanbanSquare size={14} />
+                  <span>{patientWorkOrders.length} {patientWorkOrders.length === 1 ? 'OT Activa' : 'OTs Activas'}</span>
+                </button>
+              )}
+
               {selectedPatient.phone && (
                 <a
                   href={`https://wa.me/${selectedPatient.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hola ${selectedPatient.name}, te escribimos de la clínica dental.`)}`}
@@ -1671,7 +1859,43 @@ export default function OdontologiaPage() {
             />
           </div>
         ) : (
-          <div className="space-y-6">
+          <>
+            <div className="space-y-6">
+            {/* Banner de Borrador Restaurado (Draft Recovery & Session Guard) */}
+            {draftRestoredNotice && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-200 animate-in fade-in">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center text-amber-600 shrink-0 font-bold text-sm">
+                    💾
+                  </div>
+                  <div>
+                    <p className="font-black text-foreground">
+                      Borrador de sesión recuperado automáticamente ({draftRestoredNotice.time})
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Se restauraron las notas clínicas, insumos y récipe que estabas editando previamente para {selectedPatient.name.split(' ')[0]}.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDraftRestoredNotice(null)}
+                    className="px-3 py-1.5 bg-card hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground font-bold rounded-xl border border-border shadow-2xs btn-haptic text-[11px]"
+                  >
+                    Conservar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDiscardDraft}
+                    className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-black rounded-xl border border-rose-500/20 transition-colors btn-haptic text-[11px]"
+                  >
+                    Descartar Borrador
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* STEPPER DE ESTACIONES CLÍNICAS (FLUJO CLÍNICO PASO A PASO) */}
             <div className="bg-card border border-border rounded-3xl p-2 sm:p-2.5 shadow-xs">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
@@ -2409,6 +2633,243 @@ export default function OdontologiaPage() {
                   </div>
                 </div>
 
+                {/* Órdenes de Trabajo (Kanban) & Fases de Laboratorio */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border shadow-xs space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">
+                        <KanbanSquare size={16} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-sm font-black text-foreground">
+                            Órdenes de Trabajo & Fases Clínicas (Kanban)
+                          </h4>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20">
+                            {patientWorkOrders.length} {patientWorkOrders.length === 1 ? 'activa' : 'activas'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400">
+                          Control de etapas de prótesis, ortodoncia, coronas y tratamientos multisesión
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const planToConvert: DentalTreatmentPlan = currentChart?.treatmentPlan || {
+                            id: `plan-${Date.now()}`,
+                            title: `Plan Odontológico — ${selectedPatient.name}`,
+                            teeth: [],
+                            procedures: plannedTreatments.map((t) => ({
+                              id: t.id,
+                              toothNumber: t.toothNum,
+                              conditionCode: t.code,
+                              procedure: t.procedureName,
+                              category: t.category,
+                              estimatedCost: t.cost,
+                              completed: t.completed,
+                              stages: t.stages,
+                            })),
+                            totalCost: totalBudgetUSD,
+                            createdAt: new Date().toISOString(),
+                          };
+                          handleCreateKanban(planToConvert);
+                        }}
+                        disabled={plannedTreatments.length === 0}
+                        className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-black transition-all shadow-xs disabled:opacity-40 flex items-center gap-1.5 btn-haptic"
+                      >
+                        <Plus size={14} />
+                        <span>+ Crear OT desde Plan</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => router.push('/kanban')}
+                        className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-foreground text-xs font-bold transition-all border border-border flex items-center gap-1 btn-haptic"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Ver Tablero Kanban</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {isLoadingWorkOrders ? (
+                    <div className="text-center py-6 text-slate-400">
+                      <RefreshCw size={18} className="animate-spin mx-auto mb-2 text-purple-500" />
+                      <p className="text-xs font-bold">Cargando etapas de trabajo...</p>
+                    </div>
+                  ) : patientWorkOrders.length === 0 ? (
+                    <div className="text-center py-6 border border-dashed border-border rounded-xl p-4 space-y-2">
+                      <p className="text-xs font-bold text-slate-500">
+                        No hay órdenes de trabajo activas para este paciente
+                      </p>
+                      <p className="text-[11px] text-slate-400 max-w-md mx-auto">
+                        Al crear una Orden de Trabajo desde el presupuesto activo, las etapas clínicas (impresión, prueba, colocación) aparecerán en el tablero Kanban y podrás ir marcando los avances en cada cita.
+                      </p>
+                      {plannedTreatments.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const planToConvert: DentalTreatmentPlan = currentChart?.treatmentPlan || {
+                              id: `plan-${Date.now()}`,
+                              title: `Plan Odontológico — ${selectedPatient.name}`,
+                              teeth: [],
+                              procedures: plannedTreatments.map((t) => ({
+                                id: t.id,
+                                toothNumber: t.toothNum,
+                                conditionCode: t.code,
+                                procedure: t.procedureName,
+                                category: t.category,
+                                estimatedCost: t.cost,
+                                completed: t.completed,
+                                stages: t.stages,
+                              })),
+                              totalCost: totalBudgetUSD,
+                              createdAt: new Date().toISOString(),
+                            };
+                            handleCreateKanban(planToConvert);
+                          }}
+                          className="mt-2 text-xs font-black text-purple-600 hover:underline"
+                        >
+                          Generar orden con {plannedTreatments.length} procedimientos →
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {patientWorkOrders.map((order) => {
+                        const totalSteps = order.steps.length;
+                        const completedSteps = order.steps.filter((s) => s.completed).length;
+                        const percent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+
+                        return (
+                          <div
+                            key={order.id}
+                            className="p-4 rounded-xl border border-border bg-slate-50/50 dark:bg-slate-900/30 space-y-3 shadow-2xs"
+                          >
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                                    {order.documentNumber}
+                                  </span>
+                                  <h5 className="text-xs font-black text-foreground">{order.title}</h5>
+                                  <span
+                                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                      order.status === 'concluido'
+                                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                        : order.status === 'en_proceso'
+                                        ? 'bg-blue-500/10 text-blue-600 border-blue-500/20'
+                                        : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                                    }`}
+                                  >
+                                    {order.status === 'concluido'
+                                      ? 'Concluido'
+                                      : order.status === 'en_proceso'
+                                      ? 'En Tratamiento'
+                                      : 'Presupuestado'}
+                                  </span>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-0.5">
+                                  Creado: {new Date(order.createdAt).toLocaleDateString()}
+                                  {order.notes ? ` · ${order.notes}` : ''}
+                                </p>
+                              </div>
+
+                              {/* Balance Financiero de la Orden */}
+                              <div className="flex items-center gap-2 text-xs font-mono shrink-0">
+                                <span className="px-2 py-1 rounded-lg bg-background border border-border text-slate-500">
+                                  Total: <strong>${order.totalAmount.toFixed(2)}</strong>
+                                </span>
+                                <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                                  Abonado: <strong>${order.paidAmount.toFixed(2)}</strong>
+                                </span>
+                                {order.balanceDue > 0 ? (
+                                  <span className="px-2 py-1 rounded-lg bg-red-500/10 text-red-600 border border-red-500/20">
+                                    Resta: <strong>${order.balanceDue.toFixed(2)}</strong>
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 font-bold">
+                                    Pagado
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Barra de Progreso de Etapas */}
+                            {totalSteps > 0 && (
+                              <div className="space-y-1.5">
+                                <div className="flex items-center justify-between text-[11px] font-bold">
+                                  <span className="text-slate-500">Progreso Clínico</span>
+                                  <span className="text-purple-600 dark:text-purple-400 font-mono">
+                                    {completedSteps}/{totalSteps} fases ({percent}%)
+                                  </span>
+                                </div>
+                                <div className="w-full h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
+                                  <div
+                                    className="h-full bg-linear-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-300"
+                                    style={{ width: `${percent}%` }}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Checklist interactivo de etapas */}
+                            {totalSteps > 0 ? (
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                {order.steps.map((step, sIdx) => (
+                                  <div
+                                    key={step.id || sIdx}
+                                    onClick={() => handleToggleWorkOrderStep(order.id, step.id, step.completed)}
+                                    className={`p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2.5 ${
+                                      step.completed
+                                        ? 'bg-emerald-500/5 border-emerald-500/30 text-slate-400 dark:text-slate-500'
+                                        : 'bg-card border-border hover:border-purple-500/40 text-foreground'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <div
+                                        className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 text-xs font-bold ${
+                                          step.completed
+                                            ? 'bg-emerald-500 text-white'
+                                            : 'border border-slate-300 dark:border-slate-600'
+                                        }`}
+                                      >
+                                        {step.completed && <Check size={12} />}
+                                      </div>
+                                      <span
+                                        className={`text-xs font-bold truncate ${
+                                          step.completed ? 'line-through text-slate-400 dark:text-slate-500' : ''
+                                        }`}
+                                      >
+                                        {step.title}
+                                      </span>
+                                    </div>
+                                    <span
+                                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md shrink-0 ${
+                                        step.completed
+                                          ? 'bg-emerald-500/10 text-emerald-600'
+                                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                      }`}
+                                    >
+                                      {step.completed ? 'Listo' : 'Pendiente'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">
+                                Esta orden no tiene fases desglosadas asignadas.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 <ClientRecordsTab
                   entityId={selectedPatient.id}
                   tenantId={tenantId}
@@ -2418,11 +2879,9 @@ export default function OdontologiaPage() {
               </div>
             )}
           </div>
-      ))}
 
-      {/* 5. DOCK INFERIOR FIJO: ACCIONES DE COBRO Y CIERRE DE CONSULTA (SOLO EN MODO PRO) */}
-      {selectedPatient && viewMode === 'pro' && (
-        <div className="fixed bottom-20 md:bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl py-2.5 sm:py-3 px-4 sm:px-8 animate-in slide-in-from-bottom duration-300">
+          {/* 5. DOCK INFERIOR FIJO: ACCIONES DE COBRO Y CIERRE DE CONSULTA (SOLO EN MODO PRO) */}
+          <div className="fixed bottom-20 md:bottom-0 left-0 right-0 z-30 bg-card/95 backdrop-blur-md border-t border-border shadow-2xl py-2.5 sm:py-3 px-4 sm:px-8 animate-in slide-in-from-bottom duration-300">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             {/* Resumen Clínico */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -2478,9 +2937,11 @@ export default function OdontologiaPage() {
             </div>
           </div>
         </div>
-      )}
-        </>
-      )}
+      </>
+    )
+  )}
+    </>
+  )}
 
       {/* 6. MODALES COMPLEMENTARIOS */}
 

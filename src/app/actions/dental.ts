@@ -928,4 +928,165 @@ export async function getPeriodonticRecordsAction(
   }
 }
 
+export interface DentalWorkOrderStep {
+  id: string;
+  title: string;
+  order: number;
+  completed: boolean;
+  completed_at?: string | null;
+}
+
+export interface PatientDentalWorkOrder {
+  id: string;
+  documentNumber: string;
+  title: string;
+  status: string;
+  totalAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+  steps: DentalWorkOrderStep[];
+  priority: string;
+  createdAt: string;
+  notes?: string;
+}
+
+/**
+ * Obtiene las órdenes de trabajo (Kanban) asociadas a un paciente específico.
+ */
+export async function getPatientDentalWorkOrdersAction(
+  patientId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; workOrders?: PatientDentalWorkOrder[]; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(patientId) || isTemporaryId(patientId)) return { success: true, workOrders: [] };
+
+    const { data: docs, error } = await supabaseAdmin
+      .from('documents')
+      .select('id, document_number, status, total_amount, metadata, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('entity_id', patientId)
+      .in('type', ['work_order', 'quotation'])
+      .order('created_at', { ascending: false });
+
+    if (error) return { success: false, error: error.message };
+
+    const orders: PatientDentalWorkOrder[] = [];
+    for (const d of docs || []) {
+      const meta = (d.metadata || {}) as Record<string, any>;
+      const isDental = 
+        meta.pipeline === 'dental' || 
+        meta.source === 'dental_chart' || 
+        meta.source === 'odontologia' || 
+        meta.source_module === 'odontologia' ||
+        meta.actual_type === 'work_order';
+
+      if (isDental) {
+        const steps: DentalWorkOrderStep[] = Array.isArray(meta.steps) ? meta.steps : [];
+        const totalAmount = Number(d.total_amount || meta.total_amount || 0);
+        const paidAmount = Number(meta.paid_amount || 0);
+        const balanceDue = Math.max(0, totalAmount - paidAmount);
+
+        orders.push({
+          id: d.id,
+          documentNumber: d.document_number,
+          title: (meta.title as string) || 'Tratamiento Dental',
+          status: d.status || 'pendiente',
+          totalAmount,
+          paidAmount,
+          balanceDue,
+          steps,
+          priority: (meta.priority as string) || 'medium',
+          createdAt: d.created_at,
+          notes: (meta.notes as string) || '',
+        });
+      }
+    }
+
+    return { success: true, workOrders: orders };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Actualiza el estado de una etapa / fase de una orden de trabajo (Kanban) dental.
+ */
+export async function updateDentalWorkOrderStepAction(
+  documentId: string,
+  stepId: string,
+  completed: boolean,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(documentId)) return { success: false, error: 'ID de orden no válido.' };
+
+    const { data: doc, error: fetchErr } = await supabaseAdmin
+      .from('documents')
+      .select('id, metadata, status')
+      .eq('id', documentId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (fetchErr || !doc) return { success: false, error: 'Orden de trabajo no encontrada.' };
+
+    const meta = (doc.metadata || {}) as Record<string, any>;
+    const steps: DentalWorkOrderStep[] = Array.isArray(meta.steps) ? [...meta.steps] : [];
+    const stepIdx = steps.findIndex((s) => s.id === stepId);
+
+    if (stepIdx === -1) return { success: false, error: 'Etapa no encontrada en la orden.' };
+
+    steps[stepIdx] = {
+      ...steps[stepIdx],
+      completed,
+      completed_at: completed ? new Date().toISOString() : null,
+    };
+
+    const allCompleted = steps.length > 0 && steps.every((s) => s.completed);
+    const newStatus = allCompleted ? 'concluido' : 'en_proceso';
+
+    const updatedMeta = {
+      ...meta,
+      steps,
+      last_step_updated_at: new Date().toISOString(),
+    };
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('documents')
+      .update({
+        metadata: updatedMeta,
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', documentId)
+      .eq('tenant_id', tenantId);
+
+    if (updateErr) return { success: false, error: updateErr.message };
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'dental_work_order.step_updated',
+      target_type: 'document',
+      target_id: documentId,
+      metadata: { stepId, completed, allCompleted },
+    });
+
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+
 

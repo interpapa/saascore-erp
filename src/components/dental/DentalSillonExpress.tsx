@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Stethoscope, 
   Send, 
@@ -106,6 +106,51 @@ export function DentalSillonExpress({
   // Nota de evolución clínica rápida
   const [clinicalNotes, setClinicalNotes] = useState('');
   const [isSendingToCashier, setIsSendingToCashier] = useState(false);
+
+  // Auto-guardado en borrador (Draft Recovery & Session Guard)
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftKey = `rendo_dental_express_draft_${patient.id}`;
+
+  // Restaurar borrador al montar o al cambiar de paciente
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        let restoredAny = false;
+        if (Array.isArray(parsed.sessionItems) && parsed.sessionItems.length > 0) {
+          setSessionItems(parsed.sessionItems);
+          restoredAny = true;
+        }
+        if (parsed.clinicalNotes && typeof parsed.clinicalNotes === 'string' && parsed.clinicalNotes.trim().length > 0) {
+          setClinicalNotes(parsed.clinicalNotes);
+          restoredAny = true;
+        }
+        if (restoredAny) {
+          setDraftRestored(true);
+        }
+      }
+    } catch (e) {
+      console.warn('Error reading express dental draft:', e);
+    }
+  }, [draftKey]);
+
+  // Persistir en borrador ante cualquier cambio
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      if (sessionItems.length > 0 || clinicalNotes.trim().length > 0) {
+        localStorage.setItem(draftKey, JSON.stringify({
+          sessionItems,
+          clinicalNotes,
+          timestamp: Date.now()
+        }));
+      }
+    } catch (e) {
+      console.warn('Error saving express dental draft:', e);
+    }
+  }, [sessionItems, clinicalNotes, draftKey]);
 
   // PROCEDIMIENTOS 100% DINÁMICOS BASADOS EN EL CATÁLOGO DE LA EMPRESA (0 Hardcoding)
   const dynamicProcedures = useMemo(() => {
@@ -230,6 +275,10 @@ export function DentalSillonExpress({
       await onSendToCashier(sessionItems, clinicalNotes);
       setSessionItems([]);
       setClinicalNotes('');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(draftKey);
+      }
+      setDraftRestored(false);
     } finally {
       setIsSendingToCashier(false);
     }
@@ -243,6 +292,32 @@ export function DentalSillonExpress({
 
   return (
     <div className="space-y-5 pb-40">
+      {/* Banner de Borrador Restaurado */}
+      {draftRestored && (
+        <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-3 flex items-center justify-between text-xs text-amber-700 dark:text-amber-300 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <span className="text-base">💾</span>
+            <span className="font-bold">
+              Borrador previo recuperado automáticamente para {patient.name.split(' ')[0]}.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSessionItems([]);
+              setClinicalNotes('');
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem(draftKey);
+              }
+              setDraftRestored(false);
+            }}
+            className="px-2.5 py-1 bg-card hover:bg-amber-500/20 text-rose-500 rounded-xl text-[11px] font-black border border-amber-500/30 transition-all btn-haptic"
+          >
+            Descartar Borrador
+          </button>
+        </div>
+      )}
+
       {/* 0. SELECCIÓN DE ODONTÓLOGO TRATANTE EN SILLÓN */}
       {doctors && doctors.length > 0 && (
         <div className="bg-card border border-border rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
