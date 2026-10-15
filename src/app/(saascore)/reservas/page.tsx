@@ -36,6 +36,7 @@ export default function ReservasPage() {
       <label className="block mb-2">Fecha:</label>
       <input
         type="date"
+        min={format(new Date(), 'yyyy-MM-dd')}
         value={date}
         onChange={e => setDate(e.target.value)}
         className="border p-2 mb-4"

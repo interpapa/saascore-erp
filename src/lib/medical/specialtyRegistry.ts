@@ -41,6 +41,8 @@ export interface MedicalSpecialtyConfig {
   description: string;
   color: string;
   badgeBg: string;
+  emoji: string;
+  photoUrl?: string;
   commonCie10: Array<{ code: string; description: string }>;
   prescriptionTemplates: Array<{
     id: string;
@@ -59,6 +61,7 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
     description: 'Atención primaria integral, triaje metabólico, riesgo cardiovascular, evaluación preoperatoria y urgencias ambulatorias.',
     color: '#0284c7',
     badgeBg: 'bg-sky-500/10 text-sky-600 border-sky-500/20',
+    emoji: '🩺',
     commonCie10: [
       { code: 'I10', description: 'Hipertensión esencial (primaria)' },
       { code: 'E11.9', description: 'Diabetes mellitus tipo 2 sin complicaciones' },
@@ -122,6 +125,7 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
     description: 'Control de niño sano, desarrollo psicomotor, inmunizaciones PAI, dosificación ponderal mg/kg y patología aguda infantil.',
     color: '#10b981',
     badgeBg: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
+    emoji: '👶',
     commonCie10: [
       { code: 'Z00.1', description: 'Control de salud de rutina del niño (Niño Sano)' },
       { code: 'J02.9', description: 'Faringitis aguda pediátrica, no especificada' },
@@ -168,6 +172,7 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
     description: 'Control prenatal, rueda obstétrica (FUR/FPP), colposcopia, pesquisa citológica Papanicolaou, ecografía pélvica y planificación.',
     color: '#ec4899',
     badgeBg: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
+    emoji: '🌸',
     commonCie10: [
       { code: 'Z34.9', description: 'Supervisión de embarazo normal, trimestre actual' },
       { code: 'Z01.4', description: 'Examen ginecológico anual de rutina (Citología / Papanicolaou)' },
@@ -220,6 +225,7 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
     description: 'Dermatoscopia digital, crioterapia, biopsias cutáneas, electrocauterización, acné severo, lesiones pigmentadas y dermoestética.',
     color: '#8b5cf6',
     badgeBg: 'bg-violet-500/10 text-violet-600 border-violet-500/20',
+    emoji: '✨',
     commonCie10: [
       { code: 'L70.0', description: 'Acné vulgar moderado a severo' },
       { code: 'L20.8', description: 'Dermatitis atópica / Eccema flexural' },
@@ -265,6 +271,7 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
     description: 'Fracturas, inmovilizaciones con yeso o fibra, infiltraciones intraarticulares, medicina deportiva y planes de fisioterapia.',
     color: '#f59e0b',
     badgeBg: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
+    emoji: '🦴',
     commonCie10: [
       { code: 'M54.5', description: 'Lumbago no especificado / Lumbociatalgia mecánica' },
       { code: 'S93.4', description: 'Esguince y torcedura del tobillo (Ligamento lateral)' },
@@ -312,6 +319,7 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
     description: 'Agudeza visual Snellen, refracción computarizada, tonometría ocular (PIO), biomicroscopía en lámpara de hendidura y fondo de ojo.',
     color: '#06b6d4',
     badgeBg: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/20',
+    emoji: '👁️',
     commonCie10: [
       { code: 'H52.1', description: 'Miopía / Astigmatismo miópico compuesto' },
       { code: 'H52.4', description: 'Presbicia' },

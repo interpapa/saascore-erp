@@ -33,15 +33,19 @@ import {
   X,
   Calendar,
   ClipboardList,
+  Smile,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   MedicalSpecialtyId,
   MedicalProcedureDefinition,
+  MedicalSpecialtyConfig,
   MEDICAL_SPECIALTIES_LIST,
   MEDICAL_SPECIALTIES_MAP,
   mergeTenantMedicalServices,
 } from '@/lib/medical/specialtyRegistry';
+import { updateTenantSettings } from '@/app/actions/tenant';
 import {
   calculateBMI,
   calculateMAP,
@@ -141,6 +145,78 @@ export default function ClinicaMultiEspecialidadPage() {
 
   const activeSpecialtyConfig =
     MEDICAL_SPECIALTIES_MAP[activeSpecialtyId] || MEDICAL_SPECIALTIES_MAP.med_general;
+
+  // Personalización de Especialidades (Emojis, Fotos y Nombres)
+  const [specialtyCustomizations, setSpecialtyCustomizations] = useState<Record<string, { emoji?: string; photoUrl?: string }>>({});
+  const [customizingSpec, setCustomizingSpec] = useState<MedicalSpecialtyConfig | null>(null);
+  const [editEmoji, setEditEmoji] = useState('');
+  const [editPhotoUrl, setEditPhotoUrl] = useState('');
+  const [isSavingCustomization, setIsSavingCustomization] = useState(false);
+
+  useEffect(() => {
+    const customs = (currentTenant?.metadata as any)?.specialty_customizations;
+    if (customs && typeof customs === 'object') {
+      setSpecialtyCustomizations(customs);
+    }
+  }, [currentTenant]);
+
+  const handleOpenCustomizeSpec = (spec: MedicalSpecialtyConfig) => {
+    setCustomizingSpec(spec);
+    const existing = specialtyCustomizations[spec.id];
+    setEditEmoji(existing?.emoji || spec.emoji || '🩺');
+    setEditPhotoUrl(existing?.photoUrl || '');
+  };
+
+  const handleSaveSpecialtyCustomization = async () => {
+    if (!customizingSpec || !tenantId || !currentTenant) return;
+    setIsSavingCustomization(true);
+    try {
+      const newCustoms = {
+        ...specialtyCustomizations,
+        [customizingSpec.id]: {
+          emoji: editEmoji.trim() || undefined,
+          photoUrl: editPhotoUrl.trim() || undefined,
+        },
+      };
+      setSpecialtyCustomizations(newCustoms);
+
+      const updatedMeta = {
+        ...((currentTenant.metadata || {}) as Record<string, any>),
+        specialty_customizations: newCustoms,
+      };
+
+      const res = await updateTenantSettings(
+        currentTenant.id,
+        currentTenant.name,
+        updatedMeta,
+        currentTenant.active_modules,
+        effectiveActor
+      );
+
+      if (res.success) {
+        useERPStore.getState().setCurrentTenant({
+          ...currentTenant,
+          metadata: updatedMeta,
+        });
+        toast({
+          title: 'Especialidad personalizada',
+          description: `Emoji / Foto actualizado para ${customizingSpec.name}.`,
+          variant: 'success',
+        });
+        setCustomizingSpec(null);
+      } else {
+        toast({
+          title: 'Error al guardar',
+          description: res.error || 'No fue posible guardar la personalización.',
+          variant: 'error',
+        });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'error' });
+    } finally {
+      setIsSavingCustomization(false);
+    }
+  };
 
   // 2. Estado de Pacientes, Médicos Tratantes y Catálogo de Servicios
   const [isLoading, setIsLoading] = useState(true);
@@ -805,23 +881,61 @@ export default function ClinicaMultiEspecialidadPage() {
           {enabledSpecialties.map((spec) => {
             const IconComp = SPECIALTY_ICON_MAP[spec.id] || Stethoscope;
             const isActive = activeSpecialtyId === spec.id;
+            const custom = specialtyCustomizations[spec.id];
+            const customPhoto = custom?.photoUrl;
+            const customEmoji = custom?.emoji || spec.emoji;
+
             return (
-              <button
+              <div
                 key={spec.id}
-                type="button"
-                onClick={() => setActiveSpecialtyId(spec.id)}
-                className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 border ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border cursor-pointer select-none ${
                   isActive
                     ? 'text-white shadow-sm border-transparent'
                     : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border-color)] hover:text-[var(--text-primary)]'
                 }`}
                 style={isActive ? { backgroundColor: spec.color } : undefined}
+                onClick={() => setActiveSpecialtyId(spec.id)}
               >
-                <IconComp className="w-4 h-4" />
+                {customPhoto ? (
+                  <img
+                    src={customPhoto}
+                    alt={spec.shortName}
+                    className="w-4 h-4 rounded-full object-cover shrink-0 border border-white/40"
+                  />
+                ) : customEmoji ? (
+                  <span className="text-sm leading-none shrink-0">{customEmoji}</span>
+                ) : (
+                  <IconComp className="w-4 h-4 shrink-0" />
+                )}
                 <span>{spec.shortName}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenCustomizeSpec(spec);
+                  }}
+                  title={`Editar emoji o foto para ${spec.name}`}
+                  className={`p-1 rounded-md transition-colors ${
+                    isActive
+                      ? 'hover:bg-white/20 text-white/80 hover:text-white'
+                      : 'hover:bg-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  <Edit3 className="w-3 h-3" />
+                </button>
+              </div>
             );
           })}
+
+          <button
+            type="button"
+            onClick={() => handleOpenCustomizeSpec(activeSpecialtyConfig)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 border border-dashed border-[var(--border-color)] hover:border-sky-500 text-[var(--text-secondary)] hover:text-sky-500 ml-auto"
+            title="Personalizar Emoji o Foto de la Especialidad"
+          >
+            <Smile className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Personalizar</span>
+          </button>
         </div>
       </div>
 
@@ -1691,6 +1805,152 @@ export default function ClinicaMultiEspecialidadPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE PERSONALIZACIÓN DE ESPECIALIDAD (EMOJI Y FOTO) */}
+      {customizingSpec && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-color)]">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold shadow-sm overflow-hidden"
+                  style={{ backgroundColor: `${customizingSpec.color}20`, color: customizingSpec.color }}
+                >
+                  {editPhotoUrl ? (
+                    <img
+                      src={editPhotoUrl}
+                      alt={customizingSpec.name}
+                      className="w-full h-full rounded-xl object-cover"
+                    />
+                  ) : (
+                    <span>{editEmoji || customizingSpec.emoji || '🩺'}</span>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-[var(--text-primary)]">
+                    Personalizar Especialidad
+                  </h3>
+                  <p className="text-xs text-[var(--text-secondary)]">
+                    {customizingSpec.name} ({customizingSpec.shortName})
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCustomizingSpec(null)}
+                className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-secondary)]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Selector rápido de emojis médicos */}
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1.5">
+                Seleccionar Emoji Rápido
+              </label>
+              <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
+                {['🩺', '👶', '🌸', '✨', '🦴', '👁️', '🔬', '💉', '💊', '🧠', '🫀', '🦷', '🧬', '🏥', '⚕️', '🩹', '🧪', '🚑', '🤰', '🤍'].map((emo) => (
+                  <button
+                    key={emo}
+                    type="button"
+                    onClick={() => setEditEmoji(emo)}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-base hover:scale-110 transition-transform ${
+                      editEmoji === emo
+                        ? 'bg-sky-500/20 border border-sky-500 shadow-sm'
+                        : 'hover:bg-[var(--bg-primary)]'
+                    }`}
+                  >
+                    {emo}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Input de Emoji Libre */}
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                Emoji Personalizado o Carácter
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={editEmoji}
+                  onChange={(e) => setEditEmoji(e.target.value)}
+                  placeholder="Ej: 🩺, 🌟"
+                  maxLength={4}
+                  className="w-20 text-center text-lg bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:border-sky-500"
+                />
+                <p className="text-[11px] text-[var(--text-secondary)]">
+                  Puedes escribir o pegar cualquier emoji desde tu teclado.
+                </p>
+              </div>
+            </div>
+
+            {/* Input de URL de Imagen/Foto */}
+            <div>
+              <label className="block text-xs font-bold text-[var(--text-secondary)] mb-1">
+                URL de Foto o Ícono (Opcional)
+              </label>
+              <div className="relative">
+                <ImageIcon className="w-4 h-4 text-[var(--text-secondary)] absolute left-3 top-3" />
+                <input
+                  type="url"
+                  value={editPhotoUrl}
+                  onChange={(e) => setEditPhotoUrl(e.target.value)}
+                  placeholder="https://ejemplo.com/icono-especialidad.png"
+                  className="w-full pl-9 pr-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border-color)] rounded-xl text-xs text-[var(--text-primary)] focus:outline-none focus:border-sky-500"
+                />
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-1">
+                Si especificas una URL de imagen válida, reemplazará al emoji en la barra de pestañas.
+              </p>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex items-center justify-between pt-3 border-t border-[var(--border-color)]">
+              <button
+                type="button"
+                onClick={() => {
+                  setEditEmoji(customizingSpec.emoji || '🩺');
+                  setEditPhotoUrl('');
+                }}
+                className="text-xs text-[var(--text-secondary)] hover:text-rose-500 font-bold transition-colors"
+              >
+                Restablecer por Defecto
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCustomizingSpec(null)}
+                  className="px-3.5 py-2 rounded-xl border border-[var(--border-color)] text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveSpecialtyCustomization}
+                  disabled={isSavingCustomization}
+                  className="px-4 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingCustomization ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Guardando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-3.5 h-3.5" />
+                      <span>Guardar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

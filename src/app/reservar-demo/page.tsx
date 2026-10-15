@@ -51,8 +51,8 @@ export default function ReservarDemo() {
   const [selectedDate, setSelectedDate] = useState(dates[0].fullDate);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   
-  const [customerName, setCustomerName] = useState('');
-  const [customerLastName, setCustomerLastName] = useState('');
+  const [customerFullName, setCustomerFullName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -63,8 +63,13 @@ export default function ReservarDemo() {
   };
 
   const handleConfirm = async () => {
-    if (!selectedTime || !customerName || !customerLastName) return;
+    const trimmedFull = customerFullName.trim();
+    if (!selectedTime || !trimmedFull) return;
     
+    const parts = trimmedFull.split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+
     setIsSubmitting(true);
     setErrorMessage('');
 
@@ -73,8 +78,9 @@ export default function ReservarDemo() {
       barberId: selectedBarber.id,
       date: selectedDate,
       time: selectedTime,
-      firstName: customerName,
-      lastName: customerLastName,
+      firstName: firstName,
+      lastName: lastName,
+      phone: customerPhone,
     });
 
     setIsSubmitting(false);
@@ -85,7 +91,7 @@ export default function ReservarDemo() {
     }
 
     // 2. Si es exitoso (pasó el Rate Limit y Zod), redirigimos a WhatsApp
-    const text = `¡Hola! Quiero confirmar mi reserva con ${selectedBarber.name} para el día ${selectedDate} a las ${selectedTime}. Mi nombre es ${customerName} ${customerLastName}.`;
+    const text = `¡Hola! Quiero confirmar mi reserva con ${selectedBarber.name} para el día ${selectedDate} a las ${selectedTime}. Mi nombre es ${trimmedFull}.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -200,20 +206,30 @@ export default function ReservarDemo() {
               <div className="px-5 pb-8">
                 <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3">3. Tus Datos</h3>
                 <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-3">
-                  <input 
-                    type="text" 
-                    placeholder="Tu Nombre" 
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Tu Apellido" 
-                    value={customerLastName}
-                    onChange={(e) => setCustomerLastName(e.target.value)}
-                    className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
-                  />
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Nombre y Apellido *
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder="Ej: Pedro Pérez" 
+                      value={customerFullName}
+                      onChange={(e) => setCustomerFullName(e.target.value)}
+                      className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
+                      Teléfono / WhatsApp (Opcional)
+                    </label>
+                    <input 
+                      type="tel" 
+                      placeholder="Ej: 04141234567" 
+                      value={customerPhone}
+                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      className="w-full bg-slate-50/50 rounded-xl px-4 py-3 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -226,11 +242,11 @@ export default function ReservarDemo() {
                 </div>
               )}
               <button
-                disabled={!selectedTime || !customerName || !customerLastName || isSubmitting}
+                disabled={!selectedTime || !customerFullName.trim() || isSubmitting}
                 onClick={handleConfirm}
                 className="w-full bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[color:var(--theme-btn)] disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
               >
-                {isSubmitting ? 'Verificando seguridad...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerLastName) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
+                {isSubmitting ? 'Verificando seguridad...' : !selectedTime ? 'Selecciona una hora' : !customerFullName.trim() ? 'Ingresa tus datos' : 'Confirmar Reserva'}
               </button>
             </div>
           </div>

@@ -136,6 +136,17 @@ export function AppointmentModal({
       if (isNaN(startDateTime.getTime())) {
         throw new Error('Fecha u hora inválida.');
       }
+
+      const now = new Date();
+      const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const selectedDateOnly = new Date(startDateTime.getFullYear(), startDateTime.getMonth(), startDateTime.getDate());
+      if (selectedDateOnly < todayDateOnly) {
+        throw new Error('No es posible agendar en una fecha que ya ha transcurrido.');
+      }
+      if (selectedDateOnly.getTime() === todayDateOnly.getTime() && startDateTime.getTime() < now.getTime() - 5 * 60000) {
+        throw new Error('El horario seleccionado para hoy ya ha transcurrido.');
+      }
+
       const startTimeISO = startDateTime.toISOString();
       const endTimeISO = new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString();
 
@@ -351,6 +362,7 @@ export function AppointmentModal({
               <input
                 type="date"
                 required
+                min={toYYYYMMDD(new Date())}
                 value={dateStr}
                 onChange={(e) => setDateStr(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"

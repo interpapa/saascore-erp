@@ -744,10 +744,23 @@ function filterConversations(list: Conversation[], filter?: WhatsAppFilterState)
   if (!filter) return list;
   return list.filter((c) => {
     if (filter.search) {
-      const q = filter.search.toLowerCase();
+      const q = filter.search.toLowerCase().trim();
       const nameMatch = c.client_name.toLowerCase().includes(q);
-      const phoneMatch = c.client_phone.includes(q);
-      const lastMsgMatch = c.last_message?.text.toLowerCase().includes(q);
+      const lastMsgMatch = c.last_message?.text ? c.last_message.text.toLowerCase().includes(q) : false;
+
+      // Búsqueda telefónica inteligente insensible a formatos (58, 0414, espacios, guiones)
+      const cleanQ = q.replace(/[^0-9]/g, '');
+      const cleanPhone = (c.client_phone || '').replace(/[^0-9]/g, '');
+      let phoneMatch = (c.client_phone || '').toLowerCase().includes(q);
+      if (!phoneMatch && cleanQ.length >= 3 && cleanPhone) {
+        phoneMatch = cleanPhone.includes(cleanQ) || cleanQ.includes(cleanPhone);
+        if (!phoneMatch) {
+          const withoutZero = cleanQ.startsWith('0') ? cleanQ.slice(1) : cleanQ;
+          const phoneWithout58 = cleanPhone.startsWith('58') ? cleanPhone.slice(2) : cleanPhone;
+          phoneMatch = phoneWithout58.includes(withoutZero) || cleanPhone.includes(withoutZero);
+        }
+      }
+
       if (!nameMatch && !phoneMatch && !lastMsgMatch) return false;
     }
     if (filter.tag_id && filter.tag_id !== 'all') {

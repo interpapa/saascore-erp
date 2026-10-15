@@ -17,7 +17,30 @@ const toLocalDateString = (d: Date): string => {
   return `${y}-${m}-${day}`;
 };
 
-const isSlotAvailable = (time24: string, durationMinutes: number = 30, booked: string[]): boolean => {
+const isSlotAvailable = (
+  time24: string, 
+  durationMinutes: number = 30, 
+  booked: string[],
+  selectedDateStr?: string
+): boolean => {
+  // 1. Validar que la fecha y la hora no hayan transcurrido
+  if (selectedDateStr) {
+    const now = new Date();
+    const todayStr = toLocalDateString(now);
+    if (selectedDateStr < todayStr) {
+      return false; // Días del pasado bloqueados
+    }
+    if (selectedDateStr === todayStr) {
+      const [h, m] = time24.split(':').map(Number);
+      const slotMins = h * 60 + m;
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      // Bloquear si el horario ya pasó (con margen de cortesía de 5 min)
+      if (slotMins <= currentMins + 5) {
+        return false;
+      }
+    }
+  }
+
   const [h, m] = time24.split(':').map(Number);
   const startMins = h * 60 + m;
   const segments = Math.max(1, Math.ceil(durationMinutes / 15));
@@ -296,18 +319,21 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
   const [isLoadingTimes, setIsLoadingTimes] = useState(false);
   
-  const [customerName, setCustomerName] = useState('');
-  const [customerLastName, setCustomerLastName] = useState('');
+  const [customerFullName, setCustomerFullName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   
   // Auto-completar datos guardados del cliente para evitar que los vuelva a escribir
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const savedFull = localStorage.getItem('rendo_client_fullname');
       const savedFirst = localStorage.getItem('rendo_client_firstname');
       const savedLast = localStorage.getItem('rendo_client_lastname');
       const savedPhone = localStorage.getItem('rendo_client_phone');
-      if (savedFirst) setCustomerName(savedFirst);
-      if (savedLast) setCustomerLastName(savedLast);
+      if (savedFull) {
+        setCustomerFullName(savedFull);
+      } else if (savedFirst || savedLast) {
+        setCustomerFullName([savedFirst, savedLast].filter(Boolean).join(' '));
+      }
       if (savedPhone) setCustomerPhone(savedPhone);
     }
   }, []);
@@ -373,11 +399,17 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   };
 
   const handleConfirm = async () => {
-    if (!selectedTime || !customerName || !customerPhone || !selectedBarber) {
-      setErrorMessage('Por favor, completa todos los campos (Nombre y Teléfono).');
+    const trimmedFull = customerFullName.trim();
+    if (!selectedTime || !trimmedFull || !customerPhone || !selectedBarber) {
+      setErrorMessage('Por favor, completa todos los campos (Nombre completo y Teléfono).');
       return;
     }
     
+    // Separar en Nombre y Apellido de forma limpia para persistencia
+    const parts = trimmedFull.split(/\s+/);
+    const firstName = parts[0] || '';
+    const lastName = parts.slice(1).join(' ') || '';
+
     setIsSubmitting(true);
     setErrorMessage('');
 
@@ -388,8 +420,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         barberName: selectedBarber.name,
         date: selectedDate,
         time: selectedTime,
-        firstName: customerName,
-        lastName: customerLastName,
+        firstName: firstName,
+        lastName: lastName,
         phone: customerPhone,
         durationMinutes: selectedService?.durationMinutes || 60,
         timezoneOffset: clientTzOffset,
@@ -406,8 +438,9 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
 
       // Guardar datos en localStorage para que el cliente no tenga que escribirlos en futuras reservas
       if (typeof window !== 'undefined') {
-        localStorage.setItem('rendo_client_firstname', customerName);
-        localStorage.setItem('rendo_client_lastname', customerLastName);
+        localStorage.setItem('rendo_client_fullname', trimmedFull);
+        localStorage.setItem('rendo_client_firstname', firstName);
+        localStorage.setItem('rendo_client_lastname', lastName);
         localStorage.setItem('rendo_client_phone', customerPhone);
       }
 
@@ -745,7 +778,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                     {allTimes.map((time, i) => {
                       const isSelected = selectedTime === time.value24;
-                      const isAvailable = isSlotAvailable(time.value24, slotInterval, bookedTimes);
+                      const isAvailable = isSlotAvailable(time.value24, slotInterval, bookedTimes, selectedDate);
                       
                       return (
                         <button
@@ -772,29 +805,32 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                     <User size={14} /> 3. Tus Datos
                   </h3>
                   <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Nombre y Apellido *
+                      </label>
                       <input 
                         type="text" 
-                        placeholder="Tu Nombre" 
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
+                        required
+                        placeholder="Ej: María Gómez" 
+                        value={customerFullName}
+                        onChange={(e) => setCustomerFullName(e.target.value)}
                         className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                        Teléfono / WhatsApp *
+                      </label>
                       <input 
-                        type="text" 
-                        placeholder="Tu Apellido" 
-                        value={customerLastName}
-                        onChange={(e) => setCustomerLastName(e.target.value)}
-                        className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-bg)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
+                        type="tel" 
+                        required
+                        placeholder="Ej: 04141234567 o +584141234567" 
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
                       />
                     </div>
-                    <input 
-                      type="tel" 
-                      placeholder="Teléfono / WhatsApp (Ej: 04141234567)" 
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
-                    />
                   </div>
 
                 </section>

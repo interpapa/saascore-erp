@@ -1,8 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
-import { X, Send, User, AlertTriangle, MessageCircle, Phone, ExternalLink, UserPlus } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { X, Send, User, AlertTriangle, MessageCircle, Phone, ExternalLink, UserPlus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Entity } from '@/lib/api/entities';
 
@@ -25,6 +25,20 @@ export function WhatsAppModal({ isOpen, onClose, onSend, clients, initialClientI
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<Entity | null>(null);
+  const [clientSearchText, setClientSearchText] = useState('');
+
+  // Clientes filtrados por nombre o teléfono insensible a formatos
+  const filteredClients = useMemo(() => {
+    const q = clientSearchText.trim().toLowerCase();
+    if (!q) return clients;
+    const cleanQ = q.replace(/[^0-9]/g, '');
+    return clients.filter(c => {
+      const matchName = c.name.toLowerCase().includes(q);
+      const cleanP = (c.phone || '').replace(/[^0-9]/g, '');
+      const matchPhone = (c.phone || '').toLowerCase().includes(q) || (cleanQ.length >= 3 && cleanP.includes(cleanQ));
+      return matchName || matchPhone;
+    });
+  }, [clients, clientSearchText]);
 
   // Free number fields
   const [freePhone, setFreePhone] = useState('');
@@ -192,18 +206,42 @@ export function WhatsAppModal({ isOpen, onClose, onSend, clients, initialClientI
           )}
 
           {tab === 'client' ? (
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                <User size={13} className="text-slate-400" />
-                Seleccionar Cliente *
+            <div className="space-y-2">
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <User size={13} className="text-slate-400" />
+                  Seleccionar Cliente *
+                </span>
+                {selectedClient && selectedClient.phone && (
+                  <span className="text-[11px] font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                    {selectedClient.phone}
+                  </span>
+                )}
               </label>
+
+              {/* Buscador Rápido de Contacto */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o número (Ej: 0414 o Carlos)..."
+                  value={clientSearchText}
+                  onChange={(e) => setClientSearchText(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-900 border border-input rounded-xl text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
+                />
+              </div>
+
               <select
-                defaultValue={selectedClient?.id || initialClientId || ''}
+                value={selectedClient?.id || initialClientId || ''}
                 onChange={(e) => setSelectedClient(clients.find(c => c.id === e.target.value) || null)}
                 className="w-full bg-background border border-input rounded-xl px-3.5 py-2.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
               >
-                <option value="">Selecciona un cliente del directorio...</option>
-                {clients.map(c => (
+                <option value="">
+                  {filteredClients.length > 0 
+                    ? `-- Selecciona un cliente (${filteredClients.length} disponibles) --`
+                    : '-- No se encontraron clientes con esa búsqueda --'}
+                </option>
+                {filteredClients.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.phone ? `(${c.phone})` : '(Sin teléfono)'}
                   </option>
