@@ -27,6 +27,7 @@ import { useRouter } from 'next/navigation';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
+import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 
 type TabType = 'clients' | 'audit';
 
@@ -653,9 +654,10 @@ export default function ClientesPage() {
                           <>
                             {client.phone && (
                               <a
-                                href={`https://wa.me/${client.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                                href={getPrimaryWhatsAppUrl(
+                                  client.phone,
                                   `Hola ${client.name}, te escribimos para ponernos en contacto.`
-                                )}`}
+                                )}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="px-2 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all flex items-center gap-1 border border-emerald-500/20 btn-haptic"

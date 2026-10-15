@@ -33,7 +33,11 @@ function isMissingTableError(error: any): boolean {
  * Sanitizes phone numbers to standard WhatsApp format (international, digits only).
  */
 export async function sanitizeWhatsAppPhone(phone: string, defaultCountry = '58'): Promise<string> {
-  let clean = String(phone || '').replace(/[^0-9]/g, '');
+  const rawStr = String(phone || '').trim();
+  if (!rawStr) return '';
+  // Si contiene múltiples números separados por /, ,, ;, o, y, tomar el número primario
+  const firstToken = rawStr.split(/[\/,;]|\s+o\s+|\s+y\s+/i)[0]?.trim() || rawStr;
+  let clean = firstToken.replace(/[^0-9]/g, '');
   if (!clean) return '';
   if (clean.startsWith('0')) {
     clean = defaultCountry + clean.slice(1);

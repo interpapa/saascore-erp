@@ -18,6 +18,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Appointment, AppointmentStatus } from '@/types/calendario';
+import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 
 interface DailyTimelineExpressProps {
   appointments: Appointment[];
@@ -158,11 +159,13 @@ export function DailyTimelineExpress({
             const endTimeFormatted = appt.end_time?.slice(11, 16);
             const statusConfig = statusStyles[appt.status] || { label: appt.status, color: 'bg-slate-100 text-slate-600' };
             const clientPhone = (appt as any).client_phone || (appt as any).client?.phone;
+            const apptColor = (appt.metadata?.color as string) || '#6366f1';
 
             return (
               <div
                 key={appt.id}
                 className="bg-card border border-border rounded-2xl p-4 shadow-xs space-y-3 transition-all hover:border-teal-500/40"
+                style={{ borderLeftColor: apptColor, borderLeftWidth: '4px' }}
               >
                 {/* Cabecera de la Cita */}
                 <div className="flex items-start justify-between gap-3">
@@ -204,9 +207,10 @@ export function DailyTimelineExpress({
                   {/* Botón WhatsApp Recordatorio */}
                   {clientPhone ? (
                     <a
-                      href={`https://wa.me/${clientPhone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
+                      href={getPrimaryWhatsAppUrl(
+                        clientPhone,
                         `Hola ${appt.client_name}, te recordamos tu cita hoy a las ${timeFormatted} para ${appt.service_name || appt.title || 'tu consulta'}. ¡Te esperamos!`
-                      )}`}
+                      )}
                       target="_blank"
                       rel="noreferrer"
                       className="py-2 px-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-bold text-center flex items-center justify-center gap-1.5 transition-all btn-haptic"

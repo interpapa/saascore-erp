@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { EmployeeScheduleEditor, defaultWorkingHours, WorkingHours } from './EmployeeScheduleEditor';
 import { ImageUpload } from '@/components/core/ImageUpload';
+import { parsePhoneNumbers, getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 
 interface EmployeeDirectoryTabProps {
   employees: Entity[];
@@ -454,23 +455,29 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       {isBookable ? 'Disponible Reservas' : 'No en Reservas'}
                     </span>
 
-                    {/* Badges de Módulos Especializados */}
-                    {Boolean(meta.is_barber || meta.barber_config?.is_active || meta.module === 'barberia' || ((meta.modules as string[]) || []).includes('barberia')) && (
+                    {/* Badges de Módulos Especializados (Solo si el módulo está activo en la empresa) */}
+                    {isBarberiaActive && Boolean(meta.is_barber || meta.barber_config?.is_active || meta.module === 'barberia' || ((meta.modules as string[]) || []).includes('barberia')) && (
                       <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1">
                         <span>💈 Barbero</span>
                         <span className="opacity-75">({Number(meta.barber_config?.commission_percent ?? meta.commission_percent ?? 50)}%)</span>
                       </span>
                     )}
-                    {Boolean(meta.is_dentist || meta.is_doctor || meta.dentist_config?.is_active || meta.module === 'odontologia' || ((meta.modules as string[]) || []).includes('odontologia')) && (
+                    {isOdontologiaActive && Boolean(meta.is_dentist || meta.dentist_config?.is_active || meta.module === 'odontologia' || ((meta.modules as string[]) || []).includes('odontologia')) && (
                       <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30 flex items-center gap-1">
                         <span>🦷 Odontólogo</span>
                         <span className="opacity-75">({Number(meta.dentist_config?.commission_percent ?? meta.commission_percent ?? 45)}%)</span>
                       </span>
                     )}
-                    {Boolean(meta.is_groomer || meta.groomer_config?.is_active || meta.module === 'grooming' || ((meta.modules as string[]) || []).includes('grooming')) && (
+                    {isGroomingActive && Boolean(meta.is_groomer || meta.groomer_config?.is_active || meta.module === 'grooming' || ((meta.modules as string[]) || []).includes('grooming')) && (
                       <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                         <span>🐕 Groomer</span>
                         <span className="opacity-75">({Number(meta.groomer_config?.commission_percent ?? meta.commission_percent ?? 45)}%)</span>
+                      </span>
+                    )}
+                    {(isClinicaActive || isGinecologiaActive) && Boolean(meta.is_doctor || meta.doctor_config?.is_active || meta.module === 'clinica' || ((meta.modules as string[]) || []).includes('clinica')) && (
+                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 flex items-center gap-1">
+                        <span>🩺 Médico / Especialista</span>
+                        <span className="opacity-75">({Number(meta.doctor_config?.commission_percent ?? meta.commission_percent ?? 50)}%)</span>
                       </span>
                     )}
                   </div>
@@ -493,12 +500,28 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       <span className="truncate">{emp.email}</span>
                     </div>
                   )}
-                  {emp.phone && (
-                    <div className="flex items-center gap-2">
-                      <span className="w-[13px] text-center text-[10px] font-black text-slate-400">📞</span>
-                      <span className="truncate">{emp.phone}</span>
-                    </div>
-                  )}
+                  {emp.phone && (() => {
+                    const parsed = parsePhoneNumbers(emp.phone);
+                    return (
+                      <div className="flex items-center gap-2">
+                        <span className="w-[13px] text-center text-[10px] font-black text-slate-400">📞</span>
+                        <span className="truncate" title={parsed.displayFormatted || emp.phone}>
+                          {parsed.displayFormatted || emp.phone}
+                        </span>
+                        {parsed.primary && (
+                          <a
+                            href={getPrimaryWhatsAppUrl(emp.phone)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 hover:underline ml-auto shrink-0 flex items-center gap-0.5"
+                            title={parsed.hasMultiple ? `Escribir al primario (${parsed.primary})` : 'Abrir WhatsApp'}
+                          >
+                            <span>WhatsApp</span>
+                          </a>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {meta.is_resource ? (
                     <div className="flex items-center justify-between pt-1">
                       <span className="text-[11px] text-slate-400 font-medium">Nómina:</span>

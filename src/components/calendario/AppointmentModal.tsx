@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign, FileText, Check } from 'lucide-react';
 import { CreateAppointmentInput, Employee, Service, AppointmentStatus } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
+import { AGENDA_20_COLORS, DEFAULT_AGENDA_COLOR } from '@/lib/calendario/calendarColors';
 
 export interface AppointmentModalProps {
   isOpen: boolean;
@@ -51,6 +52,7 @@ export function AppointmentModal({
   const [formError, setFormError] = useState<string | null>(null);
   const [isGroupClass, setIsGroupClass] = useState(false);
   const [customClientName, setCustomClientName] = useState('');
+  const [color, setColor] = useState(DEFAULT_AGENDA_COLOR);
 
   useEffect(() => {
     if (isOpen) {
@@ -70,9 +72,20 @@ export function AppointmentModal({
       setStatus('scheduled');
       setPrice(0);
       setNotes('');
+      setColor(DEFAULT_AGENDA_COLOR);
       setFormError(null);
     }
   }, [isOpen, initialDate, initialTime, initialClientId]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isSubmitting) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isSubmitting, onClose]);
 
   if (!isOpen) return null;
 
@@ -150,20 +163,18 @@ export function AppointmentModal({
       const startTimeISO = startDateTime.toISOString();
       const endTimeISO = new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString();
 
-      let appointmentMetadata: Record<string, unknown> = {};
+      let appointmentMetadata: Record<string, unknown> = {
+        color: color || DEFAULT_AGENDA_COLOR,
+      };
       if (type === 'block') {
-        appointmentMetadata = { is_block: true };
+        appointmentMetadata.is_block = true;
       } else if (isGroupClass) {
         const s = services.find((srv) => srv.id === serviceId);
-        appointmentMetadata = {
-          is_group_class: true,
-          max_capacity: s?.metadata?.max_capacity || 10,
-          attendees: []
-        };
+        appointmentMetadata.is_group_class = true;
+        appointmentMetadata.max_capacity = s?.metadata?.max_capacity || 10;
+        appointmentMetadata.attendees = [];
       } else if (customClientName.trim()) {
-        appointmentMetadata = {
-          client_name: customClientName.trim()
-        };
+        appointmentMetadata.client_name = customClientName.trim();
       }
 
       await onSave({
@@ -189,11 +200,15 @@ export function AppointmentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div 
+      className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      onClick={() => { if (!isSubmitting) onClose(); }}
+    >
       <div
         className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className={`border-b border-border p-5 sm:p-6 flex items-center justify-between ${type === 'block' ? 'bg-red-50/50 dark:bg-red-900/20' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
@@ -442,6 +457,36 @@ export function AppointmentModal({
               </div>
             </div>
           )}
+
+          {/* Paleta Protegida de 20 Colores para la Agenda */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                Color de Identificación en Agenda
+              </label>
+              <span className="text-[10px] text-slate-400">
+                20 tonos protegidos (no chocan con estados)
+              </span>
+            </div>
+            <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div className="grid grid-cols-10 gap-1.5 justify-items-center">
+                {AGENDA_20_COLORS.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setColor(c.hex)}
+                    title={c.name}
+                    className={`w-6 h-6 rounded-full transition-transform hover:scale-125 flex items-center justify-center shadow-xs cursor-pointer ${
+                      color === c.hex ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  >
+                    {color === c.hex && <Check size={12} className="text-white drop-shadow-sm" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
 
           {/* Notes */}
           <div>

@@ -292,13 +292,13 @@ export function CalendarGrid({
                       ) : (
                         dayAppts.map((appt) => {
                           const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
-                          const empColor = (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#3b82f6';
+                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#6366f1';
                           return (
                             <div
                               key={appt.id}
                               onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
                               className={`p-2.5 rounded-xl border-l-4 flex flex-col gap-1 transition-all hover:scale-[1.02] ${cfg.bg}`}
-                              style={{ borderLeftColor: empColor }}
+                              style={{ borderLeftColor: apptColor }}
                             >
                               <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.client_name || appt.title}</span>
                               <div className="flex items-center gap-1 text-[10px] opacity-80 font-medium">
@@ -379,9 +379,9 @@ export function CalendarGrid({
                     <div className="hidden sm:flex flex-col gap-0.5">
                         {dayAppts.slice(0, 4).map((appt) => {
                           const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
-                          const empColor = (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#3b82f6';
+                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#6366f1';
                           return (
-                            <div key={appt.id} onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }} className={`text-[9px] font-bold p-1 rounded-md border-l-4 truncate ${cfg.bg}`} style={{ borderLeftColor: empColor }}>
+                            <div key={appt.id} onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }} className={`text-[9px] font-bold p-1 rounded-md border-l-4 truncate ${cfg.bg}`} style={{ borderLeftColor: apptColor }}>
                                {formatTime(appt.start_time)} {appt.client_name || appt.title}
                             </div>
                           );
