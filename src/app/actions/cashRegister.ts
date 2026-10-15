@@ -718,7 +718,7 @@ export async function closeCashSessionAction(
 
           await supabaseAdmin.from('documents').insert([{
             tenant_id: tenantId,
-            entity_id: tenantId,
+            entity_id: null,
             type: 'invoice',
             status: 'invoiced',
             document_number: `JE-ARQ-${sessionId.slice(-6)}`,
@@ -842,7 +842,7 @@ export async function voidSaleAction(
               const currentStock = Number(item.stock ?? item.stock_quantity ?? item.quantity ?? 0);
               const restoredStock = currentStock + qty;
 
-              let updateResult = await supabaseAdmin
+              const updateResult = await supabaseAdmin
                 .from('items')
                 .update({ stock: restoredStock })
                 .eq('id', item.id)

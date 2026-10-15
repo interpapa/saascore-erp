@@ -33,7 +33,7 @@ function isMissingTableError(error: any): boolean {
  * Sanitizes phone numbers to standard WhatsApp format (international, digits only).
  */
 export async function sanitizeWhatsAppPhone(phone: string, defaultCountry = '58'): Promise<string> {
-  let clean = phone.replace(/[^0-9]/g, '');
+  let clean = String(phone || '').replace(/[^0-9]/g, '');
   if (!clean) return '';
   if (clean.startsWith('0')) {
     clean = defaultCountry + clean.slice(1);
@@ -359,7 +359,7 @@ export async function sendMessageAction(
       const candidateId = input.client_id || input.conversation_id;
       const safeEntityId = (candidateId && isValidUUID(candidateId) && !isTemporaryId(candidateId)) ? candidateId : null;
 
-      let { data: newDoc, error: docErr } = await supabaseAdmin
+      const { data: newDoc, error: docErr } = await supabaseAdmin
         .from('documents')
         .insert([{
           tenant_id: tenantId,

@@ -1,10 +1,41 @@
-﻿'use client';
+'use client';
 
 import { Sparkles, X, Send } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export const AICopilot = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [input, setInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<Array<{ sender: 'ai' | 'user'; text: string }>>([
+    {
+      sender: 'ai',
+      text: 'Hola, soy tu copiloto de Inteligencia Artificial. Puedo analizar facturas, detectar fugas de inventario y predecir la demanda del próximo mes. ¿En qué te ayudo hoy?',
+    },
+  ]);
+
+  const handleSend = () => {
+    const q = input.trim();
+    if (!q) return;
+    setChatMessages((prev) => [
+      ...prev,
+      { sender: 'user', text: q },
+      {
+        sender: 'ai',
+        text: `He recibido tu consulta: "${q}". Estoy analizando los indicadores y sincronizando los módulos activos de tu empresa para asistirte.`,
+      },
+    ]);
+    setInput('');
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   return (
     <>
@@ -51,33 +82,54 @@ export const AICopilot = () => {
         </div>
 
         {/* Chat Area */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-background">
-          <div className="bg-card border border-border p-4 rounded-2xl rounded-tl-sm shadow-sm text-sm text-foreground max-w-[85%] leading-relaxed">
-            Hola, soy tu copiloto de Inteligencia Artificial. Puedo analizar facturas, detectar fugas de inventario y predecir la demanda del próximo mes. ¿En qué te ayudo hoy?
-          </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-background">
+          {chatMessages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`p-4 rounded-2xl shadow-sm text-sm leading-relaxed max-w-[88%] ${
+                msg.sender === 'user'
+                  ? 'ml-auto bg-indigo-600 text-white rounded-tr-sm'
+                  : 'bg-card border border-border text-foreground rounded-tl-sm'
+              }`}
+            >
+              {msg.text}
+            </div>
+          ))}
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-border bg-card flex items-center px-4 h-16 shrink-0">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+          className="border-t border-border bg-card flex items-center px-4 h-16 shrink-0"
+        >
           <div className="relative w-full">
             <input
               type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
               placeholder="Pregúntale a tus datos..."
               className="w-full bg-background border border-border rounded-full py-2.5 pl-4 pr-12 text-sm text-foreground placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
-            <button className="absolute right-1 top-1 w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center hover:bg-indigo-700 transition-colors">
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="absolute right-1 top-1 w-8 h-8 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-full flex items-center justify-center transition-colors"
+            >
               <Send size={14} className="-ml-0.5" />
             </button>
           </div>
-        </div>
+        </form>
 
       </div>
 
-      {/* Overlay Oscuro (Móvil) */}
+      {/* Overlay Oscuro Global */}
       {isOpen && (
         <div
           onClick={() => setIsOpen(false)}
-          className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 sm:hidden animate-in fade-in"
+          className="fixed inset-0 bg-black/40 backdrop-blur-xs z-40 animate-in fade-in"
         />
       )}
     </>

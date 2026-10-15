@@ -12,7 +12,15 @@ export async function convertUoMAction(
   fromCode: string,
   toCode: string
 ) {
-  return convertUoM(quantity, fromCode, toCode);
+  try {
+    const qty = Number(quantity);
+    if (!Number.isFinite(qty)) {
+      return { success: false, convertedQuantity: 0, baseQuantity: 0, error: 'Cantidad inválida para conversión de unidad.' };
+    }
+    return convertUoM(qty, fromCode, toCode);
+  } catch (err: any) {
+    return { success: false, convertedQuantity: 0, baseQuantity: 0, error: err.message };
+  }
 }
 
 export async function processInventoryReceiptAction(
@@ -73,5 +81,12 @@ export async function processInventoryReceiptAction(
 }
 
 export async function getFEFOPickingOrderAction(lots: InventoryLot[]) {
-  return { success: true, sortedLots: sortLotsByFEFO(lots) };
+  try {
+    if (!Array.isArray(lots)) {
+      return { success: true, sortedLots: [] };
+    }
+    return { success: true, sortedLots: sortLotsByFEFO(lots) };
+  } catch (err: any) {
+    return { success: false, sortedLots: [], error: err.message };
+  }
 }

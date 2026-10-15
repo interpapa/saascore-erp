@@ -125,7 +125,7 @@ export async function saveDentalChartAction(
           tenant_id: tenantId,
           record_type: 'dental_chart',
           title: 'Odontograma',
-          content: 'Odontograma digital del paciente.',
+          body: 'Odontograma digital del paciente.',
           metadata: chartData,
         })
         .select('id')
@@ -498,7 +498,7 @@ export async function saveDentalEvolutionAction(
         entity_id: patientId,
         record_type: 'dental_evolution',
         title: `Evolución Dental — ${new Date().toLocaleDateString('es-VE')}`,
-        notes: payload.note,
+        body: payload.note,
         metadata: evolutionData,
       })
       .select('id')
@@ -522,7 +522,7 @@ export async function saveDentalEvolutionAction(
           if (currentItem) {
             const currentQty = Number(currentItem.stock ?? currentItem.stock_quantity ?? currentItem.quantity ?? 0);
             const newQty = Math.max(0, currentQty - item.quantity);
-            let updateResult = await supabaseAdmin
+            const updateResult = await supabaseAdmin
               .from('items')
               .update({ stock: newQty })
               .eq('id', item.itemId)
@@ -746,7 +746,7 @@ export async function saveOrthodonticCaseAction(
           tenant_id: tenantId,
           record_type: 'dental_orthodontics',
           title: 'Expediente de Ortodoncia & Brackets',
-          content: `Caso de ortodoncia: Técnica ${orthoCase.technique}.`,
+          body: `Caso de ortodoncia: Técnica ${orthoCase.technique}.`,
           metadata: orthoCase as any,
         })
         .select('id')
@@ -816,7 +816,7 @@ export async function saveEndodonticRecordAction(
         tenant_id: tenantId,
         record_type: 'dental_endodontics',
         title: `Endodoncia Pieza ${record.toothNumber}`,
-        content: `Conductometría y biomecánica en pieza ${record.toothNumber}`,
+        body: `Conductometría y biomecánica en pieza ${record.toothNumber}`,
         metadata: record as any,
       })
       .select('id')
@@ -884,7 +884,7 @@ export async function savePeriodonticRecordAction(
         tenant_id: tenantId,
         record_type: 'dental_periodontics',
         title: `Control Periodontal ${new Date(record.date).toLocaleDateString()}`,
-        content: `BOP: ${record.bleedingOnProbingPercent}%, Bolsas >=4mm: ${record.deepPocketsCount}`,
+        body: `BOP: ${record.bleedingOnProbingPercent}%, Bolsas >=4mm: ${record.deepPocketsCount}`,
         metadata: record as any,
       })
       .select('id')

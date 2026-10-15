@@ -191,17 +191,17 @@ export async function getGinecoPatientRecordAction(
     // 2. Obtener consultas ginecológicas previas desde entity_records
     const { data: records, error: rErr } = await supabaseAdmin
       .from('entity_records')
-      .select('id, record_type, title, content, metadata, created_at')
+      .select('id, record_type, title, body, metadata, created_at')
       .eq('entity_id', patientId)
       .eq('tenant_id', tenantId)
       .in('record_type', ['gineco_encounter', 'clinical_encounter'])
       .order('created_at', { ascending: false })
       .limit(30);
 
-    const encounters = (records || []).map((r) => ({
+    const encounters = (records || []).map((r: any) => ({
       id: r.id,
       title: r.title,
-      content: r.content,
+      content: r.body || r.content || '',
       createdAt: r.created_at,
       metadata: r.metadata,
     }));
@@ -308,7 +308,7 @@ export async function saveGinecoEncounterAction(
         entity_id: patientId,
         record_type: 'gineco_encounter',
         title: `${titleType} — ${new Date().toLocaleDateString()}`,
-        content: payload.soap.assessment || payload.chiefComplaint || 'Consulta Gineco-Obstétrica',
+        body: payload.soap.assessment || payload.chiefComplaint || 'Consulta Gineco-Obstétrica',
         metadata: {
           ...payload,
           doctorName: payload.doctorName,

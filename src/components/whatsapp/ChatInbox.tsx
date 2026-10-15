@@ -30,6 +30,7 @@ import { MessageHistory } from './MessageHistory';
 import { CustomerTagBadge } from './CustomerTagBadge';
 import { EmptyState } from '@/components/core/EmptyState';
 import { Button } from '@/components/ui/Button';
+import Link from 'next/link';
 
 interface ChatInboxProps {
   conversation: Conversation | null;
@@ -607,20 +608,20 @@ export function ChatInbox({
           <div className="mt-5 space-y-2">
             <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Acciones Directas</div>
             <div className="grid grid-cols-2 gap-2">
-              <a
+              <Link
                 href={conversation.client_id ? `/calendario?client=${conversation.client_id}` : '/calendario'}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-foreground rounded-xl text-xs font-bold transition-colors text-center"
               >
                 <Calendar size={13} />
                 <span>Cita</span>
-              </a>
-              <a
+              </Link>
+              <Link
                 href={conversation.client_id ? `/caja?client=${conversation.client_id}` : '/caja'}
                 className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors text-center shadow-xs"
               >
                 <DollarSign size={13} />
                 <span>Venta POS</span>
-              </a>
+              </Link>
             </div>
           </div>
 

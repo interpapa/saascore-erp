@@ -172,9 +172,9 @@ export async function getJournalEntriesAction(
         const docRate = Number(doc.metadata?.exchange_rate || 0);
         const isDocInVES = doc.metadata?.currency === 'VES' || doc.currency === 'VES' || (doc.metadata?.is_in_ves === true);
 
-        let rawSubtotal = Number(doc.subtotal_amount || doc.total_amount || 0);
-        let rawTax = Number(doc.tax_amount || 0);
-        let rawTotal = Number(doc.total_amount || rawSubtotal + rawTax);
+        const rawSubtotal = Number(doc.subtotal_amount || doc.total_amount || 0);
+        const rawTax = Number(doc.tax_amount || 0);
+        const rawTotal = Number(doc.total_amount || rawSubtotal + rawTax);
 
         if (rawTotal === 0 && (!doc.metadata?.journal_lines || doc.metadata.journal_lines.length === 0)) return;
 

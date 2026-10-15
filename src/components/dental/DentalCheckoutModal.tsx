@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   DollarSign,
@@ -101,6 +101,31 @@ export function DentalCheckoutModal({
 
   const remainingBalanceUSD = Math.max(0, finalTreatmentTotalUSD - amountToChargeUSD);
   const amountToChargeVES = amountToChargeUSD * exchangeRate;
+
+  // Reseteo atómico de estado al abrir el modal para un paciente
+  useEffect(() => {
+    if (isOpen) {
+      setSelectedIndices(plannedTreatments.map((_, idx) => idx));
+      setBillingMode('full');
+      setPartialAmountUSD('');
+      setPaymentMethod('cash_usd');
+      setReferenceNumber('');
+      setDiscountPercent(0);
+      setIsProcessing(false);
+      setCompletedDoc(null);
+    }
+  }, [isOpen, patient?.id]);
+
+  // Soporte de cierre con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isProcessing) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isProcessing, onClose]);
 
   if (!isOpen) return null;
 
@@ -242,8 +267,14 @@ export function DentalCheckoutModal({
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-card border border-border rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col">
+    <div 
+      className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={() => { if (!isProcessing) onClose(); }}
+    >
+      <div 
+        className="bg-card border border-border rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 max-h-[92vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Cabecera */}
         <div className="p-5 border-b border-border bg-linear-to-r from-teal-500/10 via-cyan-500/10 to-transparent flex items-center justify-between">
           <div className="flex items-center gap-3">

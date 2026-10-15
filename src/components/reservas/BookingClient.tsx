@@ -456,7 +456,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         .replace(/{{profesional}}/g, assignedName)
         .replace(/{{fecha}}/g, selectedDate)
         .replace(/{{hora}}/g, readableTime || '')
-        .replace(/{{cliente}}/g, `${customerName} ${customerLastName}`.trim())
+        .replace(/{{cliente}}/g, customerFullName.trim())
         .replace(/{{servicio}}/g, selectedService?.name || 'Servicio')
         .replace(/{{recurso}}/g, resourceName);
 
@@ -848,11 +848,11 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                     </div>
                   )}
                   <button
-                    disabled={!selectedTime || !customerName || !customerPhone || isSubmitting || !!successMessage}
+                    disabled={!selectedTime || !customerFullName || !customerPhone || isSubmitting || !!successMessage}
                     onClick={handleConfirm}
                     className="w-full sm:w-auto sm:min-w-[280px] bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[color:var(--theme-btn)] disabled:opacity-70 py-4 px-8 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
                   >
-                    {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerPhone) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
+                    {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerFullName || !customerPhone) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
                   </button>
                 </section>
               </div>
@@ -871,11 +871,11 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                 </div>
               )}
               <button
-                disabled={!selectedTime || !customerName || !customerPhone || isSubmitting || !!successMessage}
+                disabled={!selectedTime || !customerFullName || !customerPhone || isSubmitting || !!successMessage}
                 onClick={handleConfirm}
                 className="w-full bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[color:var(--theme-btn)] disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
               >
-                {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerName || !customerPhone) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
+                {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerFullName || !customerPhone) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
               </button>
             </div>
           </div>

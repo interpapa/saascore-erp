@@ -98,6 +98,7 @@ export async function getAppointmentsAction(
         const { data: entities } = await supabaseAdmin
           .from('entities')
           .select('id, name, phone, email')
+          .eq('tenant_id', tenantId)
           .in('id', allEntityIds);
         if (entities) {
           entities.forEach((e) => {
@@ -111,6 +112,7 @@ export async function getAppointmentsAction(
         const { data: items } = await supabaseAdmin
           .from('items')
           .select('id, name, base_price')
+          .eq('tenant_id', tenantId)
           .in('id', serviceIds);
         if (items) {
           items.forEach((i) => {
@@ -274,7 +276,6 @@ export async function createAppointmentAction(
         status: payload.status || 'scheduled',
         notes: payload.notes || null,
         price: payload.price || 0,
-        location: payload.location || null,
       }])
       .select()
       .single();

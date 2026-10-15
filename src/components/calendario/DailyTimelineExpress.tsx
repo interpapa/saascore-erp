@@ -63,7 +63,18 @@ export function DailyTimelineExpress({
   const day = String(currentDate.getDate()).padStart(2, '0');
   const dateStr = `${year}-${month}-${day}`;
   const dayAppointments = appointments
-    .filter((a) => a.start_time.startsWith(dateStr))
+    .filter((a) => {
+      try {
+        const d = new Date(a.start_time);
+        if (!isNaN(d.getTime())) {
+          const aYear = d.getFullYear();
+          const aMonth = String(d.getMonth() + 1).padStart(2, '0');
+          const aDay = String(d.getDate()).padStart(2, '0');
+          return `${aYear}-${aMonth}-${aDay}` === dateStr;
+        }
+      } catch {}
+      return a.start_time.startsWith(dateStr);
+    })
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
 
   // Estados visuales

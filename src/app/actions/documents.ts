@@ -359,7 +359,7 @@ export async function updateDocumentStatusAction(
     }
 
     let targetStatus = status;
-    let targetMetadata = { ...(currentDoc.metadata || {}) };
+    const targetMetadata = { ...(currentDoc.metadata || {}) };
 
     if (status === 'paid') {
       const isAlreadyPaid = currentDoc.status === 'paid' || currentDoc.status === 'completed' || targetMetadata.payment_status === 'paid';

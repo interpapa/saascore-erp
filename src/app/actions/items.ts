@@ -421,7 +421,7 @@ export async function adjustItemStockAction(
     }
 
     // 1. Obtener item actual por id sin asumir columnas específicas para evitar error 42703
-    let { data: item, error: findError } = await supabaseAdmin
+    const { data: item, error: findError } = await supabaseAdmin
       .from('items')
       .select('*')
       .eq('id', id)
@@ -447,7 +447,7 @@ export async function adjustItemStockAction(
     const newStock = Math.max(0, currentStock + quantityDelta);
 
     // 2. Actualizar stock con fallback resiliente entre columnas
-    let updateResult = await supabaseAdmin
+    const updateResult = await supabaseAdmin
       .from('items')
       .update({ stock: newStock })
       .eq('id', id)

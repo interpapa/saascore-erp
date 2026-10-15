@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
@@ -46,18 +46,39 @@ export function WhatsAppModal({ isOpen, onClose, onSend, clients, initialClientI
   const [message, setMessage] = useState('');
   const [openDirectly, setOpenDirectly] = useState(true);
 
-  // Initialize selected client
+  // Initialize selected client and reset state
   useEffect(() => {
-    if (isOpen && initialClientId) {
-      const client = clients.find(c => c.id === initialClientId);
-      if (client) {
-        setSelectedClient(client);
-        setTab('client');
+    if (isOpen) {
+      setError(null);
+      setClientSearchText('');
+      if (initialClientId) {
+        const client = clients.find(c => c.id === initialClientId);
+        if (client) {
+          setSelectedClient(client);
+          setTab('client');
+        }
+      } else if (clients.length === 0) {
+        setTab('free');
       }
-    } else if (isOpen && clients.length === 0) {
-      setTab('free');
+    } else {
+      setMessage('');
+      setFreePhone('');
+      setFreeName('');
+      setError(null);
+      setClientSearchText('');
     }
   }, [initialClientId, clients, isOpen]);
+
+  // Cierre accesible con tecla Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isLoading) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isLoading, onClose]);
 
   if (!isOpen) return null;
 

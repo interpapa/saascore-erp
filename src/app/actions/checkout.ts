@@ -282,10 +282,11 @@ export async function processSecureCheckout(
     if (paymentBreakdown && paymentBreakdown.length > 0) {
       let breakdownSum = new Decimal(0);
       for (const p of paymentBreakdown) {
-        if (p.amount < 0) {
-          return { success: false, error: 'Los importes en el desglose de pago no pueden ser negativos.' };
+        const amt = Number(p.amount);
+        if (!Number.isFinite(amt) || amt < 0) {
+          return { success: false, error: 'Los importes en el desglose de pago deben ser numéricos y no negativos.' };
         }
-        breakdownSum = breakdownSum.plus(new Decimal(p.amount));
+        breakdownSum = breakdownSum.plus(new Decimal(amt));
       }
       if (breakdownSum.minus(taxResult.total).abs().greaterThan(0.02)) {
         return { 
@@ -423,8 +424,15 @@ export async function processSecureCheckout(
       }
     }
 
-    // Líneas de la factura
-    const linesToInsert = documentLines.map(line => ({ ...line, document_id: newDoc.id }));
+    // Líneas de la factura (sanitizadas para las columnas físicas de document_lines)
+    const linesToInsert = documentLines.map(line => ({
+      document_id: newDoc.id,
+      item_id: line.item_id,
+      description: line.description,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      tax_amount: line.tax_amount || 0,
+    }));
     const { error: linesError } = await supabaseAdmin.from('document_lines').insert(linesToInsert);
 
     if (linesError) {
@@ -434,7 +442,7 @@ export async function processSecureCheckout(
         linesError.message?.includes('schema cache');
 
       if (!isMissingTable) {
-        await supabaseAdmin.from('documents').delete().eq('id', newDoc.id);
+        await supabaseAdmin.from('documents').delete().eq('id', newDoc.id).eq('tenant_id', tenantId);
         throw new Error('Fallo al guardar líneas, factura anulada por seguridad: ' + linesError.message);
       } else {
         console.warn('Nota: Tabla document_lines no disponible; líneas guardadas en documents.metadata.cart_lines');
@@ -489,7 +497,7 @@ export async function processSecureCheckout(
           const oldItem = dbItems.find(i => i.id === success.itemId);
           if (oldItem) {
             const field = oldItem.stock !== undefined ? 'stock' : 'stock_quantity';
-            const { data: currentData } = await supabaseAdmin.from('items').select(field).eq('id', success.itemId).single();
+            const { data: currentData } = await supabaseAdmin.from('items').select(field).eq('id', success.itemId).eq('tenant_id', tenantId).single();
             if (currentData) {
                const rawData = currentData as Record<string, any>;
                const val = rawData.stock !== undefined ? rawData.stock : rawData.stock_quantity;
@@ -499,7 +507,7 @@ export async function processSecureCheckout(
           }
         }
         // Destruir la factura huérfana
-        await supabaseAdmin.from('documents').delete().eq('id', newDoc.id);
+        await supabaseAdmin.from('documents').delete().eq('id', newDoc.id).eq('tenant_id', tenantId);
         throw new Error(`Venta cancelada (Inventario Revertido): ${failReason}`);
       } else {
         // Anotar éxito para posible rollback futuro

@@ -70,10 +70,10 @@ function buildCrumbs(pathname: string, searchParams?: URLSearchParams): Crumb[] 
   // Build up crumbs segment by segment
   let accumulated = '';
   for (const segment of segments) {
-    if (segment === 'dashboard') continue; // Already added as root
     accumulated += `/${segment}`;
     const label = ROUTE_LABELS[segment] ?? segment; // Fallback: raw segment
-    crumbs.push({ label, href: accumulated });
+    const href = accumulated === '/admin/tenant' ? '/admin' : accumulated;
+    crumbs.push({ label, href });
   }
 
   if (searchParams) {

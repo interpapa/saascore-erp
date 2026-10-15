@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { X, Printer, Share2, Plus, Check, MessageSquare, Zap } from 'lucide-react';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
@@ -52,6 +52,23 @@ export function ReceiptModal({ isOpen, onClose, saleData }: ReceiptModalProps) {
   const [customPhone, setCustomPhone] = useState('');
   const [showPhoneInput, setShowPhoneInput] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setCustomPhone('');
+      setShowPhoneInput(false);
+    }
+  }, [isOpen, saleData?.documentNumber]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen || !saleData) return null;
 

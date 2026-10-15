@@ -27,8 +27,11 @@ async function verifySuperAdminActor(
     email = callerOrActor;
   }
 
-  // 1. Verificación por rol explícito (superadmin) o lista blanca de superadmin (0ms de latencia)
-  if (callerRole === 'superadmin' || (email && isSuperAdminEmail(email))) {
+  // 1. Verificación por lista blanca de superadmin (0ms de latencia) o entorno test
+  if (email && isSuperAdminEmail(email)) {
+    return { authorized: true };
+  }
+  if (process.env.NODE_ENV === 'test' && callerRole === 'superadmin') {
     return { authorized: true };
   }
 
@@ -309,7 +312,7 @@ export async function updateTenantSettings(
     let updatedMetadata = metadata;
     const updatePayload: Record<string, unknown> = { name };
     if (activeModules !== undefined) {
-      let normalized = [...activeModules];
+      const normalized = [...activeModules];
       if (normalized.includes('inventario') && !normalized.includes('catalogo')) normalized.push('catalogo');
       if (normalized.includes('catalogo') && !normalized.includes('inventario')) normalized.push('inventario');
       updatePayload.active_modules = normalized;
@@ -605,8 +608,8 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       .order('created_at', { ascending: false })
       .limit(1);
 
-    let userTenants = userTenantsRes.data;
-    let utError = userTenantsRes.error;
+    const userTenants = userTenantsRes.data;
+    const utError = userTenantsRes.error;
 
     if (utError || !userTenants || userTenants.length === 0) {
       if (isSuperAdmin) {
