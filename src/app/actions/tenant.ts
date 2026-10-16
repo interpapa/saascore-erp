@@ -10,6 +10,7 @@ import { validateUserTenantAccess, isSuperAdminEmail, isSuperAdminAuthUser, SUPE
 import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 import { getResolvedSupabaseUrl, getResolvedAnonKey } from '@/lib/supabaseConfig';
 import { cookies } from 'next/headers';
+import { normalizeHexColor } from '@/lib/theme/colorUtils';
 
 async function verifySuperAdminActor(
   callerOrActor?: ActionActor | string | null,
@@ -385,16 +386,11 @@ export async function updateTenantMetadataAction(
     if (fetchError) throw new Error('Error fetching tenant: ' + fetchError.message);
     const currentMeta = (tenant?.metadata as any) || {};
     const newMeta = { ...currentMeta, ...metadataUpdates };
-    // Validate colors if present
+    // Validate and safely normalize colors if present
     if (newMeta.public_theme) {
       const { bgColor, btnColor } = newMeta.public_theme;
-      const hexRegex = /^#[0-9A-Fa-f]{6}$/;
-      if (bgColor && !hexRegex.test(bgColor)) {
-        throw new Error('bgColor must be a valid hex color');
-      }
-      if (btnColor && !hexRegex.test(btnColor)) {
-        throw new Error('btnColor must be a valid hex color');
-      }
+      newMeta.public_theme.bgColor = normalizeHexColor(bgColor, '#ffffff');
+      newMeta.public_theme.btnColor = normalizeHexColor(btnColor, '#0B3B24');
     }
     const { data: updated, error: updateError } = await db
       .from('tenants')

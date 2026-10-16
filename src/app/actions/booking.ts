@@ -7,6 +7,7 @@ import { assertModuleEnabled } from '@/lib/core/kernel/moduleRegistry';
 import { eventBus } from '@/lib/core/events/eventBus';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { ActionActor } from './entities';
+import { normalizeHexColor } from '@/lib/theme/colorUtils';
 
 const bookingSchema = z.object({
   tenantId: z.string().uuid('ID de empresa inválido'),
@@ -490,9 +491,13 @@ export async function updateBookingConfigAction(tenantId: string, settings: any,
     }
     
     if (publicTheme) {
+      const cleanBg = normalizeHexColor(publicTheme.bgColor, '#ffffff');
+      const cleanBtn = normalizeHexColor(publicTheme.btnColor, '#0B3B24');
       newMetadata.public_theme = {
         ...(tenant.metadata?.public_theme || {}),
         ...publicTheme,
+        bgColor: cleanBg,
+        btnColor: cleanBtn,
         logoUrl: bookingSettings.logoUrl || publicTheme.logoUrl || newMetadata.logo_url
       };
     }

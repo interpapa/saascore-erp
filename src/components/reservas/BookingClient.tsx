@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Scissors, Clock, Calendar, User, Users, ChevronRight } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
+import { normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
@@ -157,12 +158,19 @@ const GENERATE_TIMES = (
 };
 
 export default function BookingClient({ tenant, employees, theme }: { tenant: Tenant, employees: Employee[], theme?: { bgColor: string; btnColor: string } }) {
-  // Theme handling
-  const defaultTheme = { bgColor: "#ffffff", btnColor: "#0B3B24" };
-  const appliedTheme = theme ?? defaultTheme;
+  // Theme handling con protección total anti-invisibilidad y contraste WCAG
+  const defaultTheme = { bgColor: "#f8fafc", btnColor: "#0B3B24" };
+  const appliedBg = normalizeHexColor(theme?.bgColor, defaultTheme.bgColor);
+  const appliedBtn = normalizeHexColor(theme?.btnColor, defaultTheme.btnColor);
+  const btnTextColor = getContrastTextColor(appliedBtn);
+  const bgTextColor = getContrastTextColor(appliedBg);
+
   const rootStyle = {
-    "--theme-bg": appliedTheme.bgColor,
-    "--theme-btn": appliedTheme.btnColor,
+    "--theme-bg": appliedBg,
+    "--theme-bg-text": bgTextColor,
+    "--theme-btn": appliedBtn,
+    "--theme-btn-text": btnTextColor,
+    backgroundColor: appliedBg,
   } as React.CSSProperties;
 
   const rawConfiguredPhone = tenant.metadata?.booking_settings?.whatsappNumber 
@@ -500,13 +508,16 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   };
 
   return (
-          <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 font-sans text-slate-800" style={rootStyle}>
+    <div className="min-h-screen font-sans text-slate-800 transition-colors" style={rootStyle}>
       
       {/* ===== STEP 1: Seleccionar Servicio ===== */}
       {step === 1 && (
         <div className="min-h-screen flex flex-col">
           {/* Hero Banner */}
-          <div className="bg-[color:var(--theme-btn)] px-6 py-10 md:px-12 md:py-14 lg:py-16">
+          <div 
+            className="px-6 py-10 md:px-12 md:py-14 lg:py-16 transition-colors shadow-xs"
+            style={{ backgroundColor: appliedBtn, color: btnTextColor }}
+          >
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center gap-5 md:gap-7">
               {settings.logoUrl && (
                 <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-white p-2.5 shadow-md flex items-center justify-center shrink-0 border border-white/20">
@@ -519,10 +530,10 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                 </div>
               )}
               <div>
-                <h1 className="text-white text-3xl md:text-5xl font-black mb-2 tracking-tight">
+                <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
                   {settings.headerTitle}
                 </h1>
-                <p className="text-white/85 text-sm md:text-lg max-w-xl font-medium leading-relaxed">
+                <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
                   {settings.headerSubtitle}
                 </p>
               </div>
@@ -540,11 +551,11 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                   <button
                     key={idx}
                     onClick={() => handleServiceSelect(service)}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-slate-400 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
                   >
                     <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
                       <div>
-                        <h2 className="text-xl md:text-2xl font-black text-[color:var(--theme-btn)]">{service.name}</h2>
+                        <h2 className="text-xl md:text-2xl font-black" style={{ color: appliedBtn }}>{service.name}</h2>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-sm">
                          <Scissors size={20} className="text-slate-400" />
@@ -580,8 +591,15 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       {step === 2 && (
         <div className="min-h-screen flex flex-col">
           {/* Hero Banner */}
-          <div className="bg-[color:var(--theme-btn)] px-6 py-10 md:px-12 md:py-14 lg:py-16 relative">
-            <button onClick={() => setStep(1)} className="absolute top-6 left-6 p-2.5 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
+          <div 
+            className="px-6 py-10 md:px-12 md:py-14 lg:py-16 relative transition-colors shadow-xs"
+            style={{ backgroundColor: appliedBtn, color: btnTextColor }}
+          >
+            <button 
+              onClick={() => setStep(1)} 
+              className="absolute top-6 left-6 p-2.5 rounded-full transition-colors border border-white/20"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
+            >
               <ArrowLeft size={20} />
             </button>
             <div className="max-w-5xl mx-auto mt-4 flex items-center gap-4">
@@ -596,13 +614,13 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                 </div>
               )}
               <div>
-                <span className="text-[11px] font-bold text-white/70 uppercase tracking-widest block mb-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-widest block mb-0.5 opacity-80" style={{ color: btnTextColor }}>
                   {settings.headerTitle}
                 </span>
-                <h1 className="text-white text-2xl md:text-4xl font-black mb-1 tracking-tight">
+                <h1 className="text-2xl md:text-4xl font-black mb-1 tracking-tight" style={{ color: btnTextColor }}>
                   {selectedService?.name || 'Profesional'}
                 </h1>
-                <p className="text-emerald-100/80 text-xs md:text-sm max-w-lg">
+                <p className="text-xs md:text-sm max-w-lg opacity-85" style={{ color: btnTextColor }}>
                   ¿Con qué especialista te gustaría agendar tu cita?
                 </p>
               </div>
@@ -732,9 +750,16 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       {step === 3 && (
         <div className="min-h-screen flex flex-col lg:flex-row">
           {/* Sidebar / Top Bar */}
-          <div className="bg-[color:var(--theme-btn)] px-6 py-8 lg:w-80 lg:min-h-screen lg:py-12 lg:px-8 shrink-0">
+          <div 
+            className="px-6 py-8 lg:w-80 lg:min-h-screen lg:py-12 lg:px-8 shrink-0 transition-colors shadow-sm"
+            style={{ backgroundColor: appliedBtn, color: btnTextColor }}
+          >
             <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-6">
-              <button onClick={() => setStep(2)} className="p-2.5 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
+              <button 
+                onClick={() => setStep(2)} 
+                className="p-2.5 rounded-full transition-colors border border-white/20"
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
+              >
                 <ArrowLeft size={20} />
               </button>
               
@@ -746,17 +771,17 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                     className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-md shrink-0" 
                   />
                 ) : (
-                  <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/20 flex items-center justify-center text-white font-black text-xl border-2 border-white/30 shadow-md shrink-0">
+                  <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/20 flex items-center justify-center font-black text-xl border-2 border-white/30 shadow-md shrink-0" style={{ color: btnTextColor }}>
                     {selectedBarber?.name ? selectedBarber.name.slice(0, 2).toUpperCase() : <Users size={24} />}
                   </div>
                 )}
-                <div className="text-white min-w-0 flex-1">
-                  <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider block mb-0.5">
+                <div className="min-w-0 flex-1" style={{ color: btnTextColor }}>
+                  <span className="text-[10px] font-bold uppercase tracking-wider block mb-0.5 opacity-80">
                     {settings.headerTitle}
                   </span>
                   <h2 className="text-xl lg:text-2xl font-black leading-tight truncate">{selectedBarber?.name}</h2>
-                  <p className="text-xs lg:text-sm text-emerald-200 font-medium truncate">{selectedBarber?.role || 'Profesional'}</p>
-                  <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-xs font-bold">
+                  <p className="text-xs lg:text-sm font-medium truncate opacity-85">{selectedBarber?.role || 'Profesional'}</p>
+                  <div className="mt-2 inline-flex items-center gap-1.5 bg-black/15 dark:bg-white/15 px-3 py-1 rounded-full text-xs font-bold">
                     <Scissors size={12} /> {selectedService?.name}
                   </div>
                 </div>
@@ -765,28 +790,28 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
             
             {/* Summary panel — visible only on desktop sidebar */}
             <div className="hidden lg:block mt-10 space-y-4">
-              <div className="bg-white/10 rounded-xl p-4">
-                <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">Fecha seleccionada</p>
-                <p className="text-white font-bold">{selectedDate || '—'}</p>
+              <div className="bg-black/10 dark:bg-white/10 rounded-xl p-4 border border-white/10">
+                <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-75">Fecha seleccionada</p>
+                <p className="font-bold">{selectedDate || '—'}</p>
               </div>
               {selectedTime && (
-                <div className="bg-white/10 rounded-xl p-4">
-                  <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">Hora seleccionada</p>
-                  <p className="text-white font-bold">
+                <div className="bg-black/10 dark:bg-white/10 rounded-xl p-4 border border-white/10">
+                  <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-75">Hora seleccionada</p>
+                  <p className="font-bold">
                     {allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime}
                   </p>
                 </div>
               )}
               {settings.showPrices && selectedBarberPrice !== undefined && selectedBarberPrice > 0 && (
-                <div className="bg-white/10 rounded-xl p-4">
-                  <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">Tarifa estimada</p>
-                  <p className="text-white font-bold text-lg">${selectedBarberPrice}</p>
+                <div className="bg-black/10 dark:bg-white/10 rounded-xl p-4 border border-white/10">
+                  <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-75">Tarifa estimada</p>
+                  <p className="font-bold text-lg">${selectedBarberPrice}</p>
                 </div>
               )}
               {settings.showPrices && (!selectedBarberPrice || selectedBarberPrice <= 0) && (
-                <div className="bg-white/10 rounded-xl p-4">
-                  <p className="text-emerald-300 text-xs font-bold uppercase tracking-wider mb-1">Tarifa</p>
-                  <p className="text-white/90 text-sm font-medium">{settings.noPriceLabel || 'A convenir'}</p>
+                <div className="bg-black/10 dark:bg-white/10 rounded-xl p-4 border border-white/10">
+                  <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-75">Tarifa</p>
+                  <p className="text-sm font-medium opacity-90">{settings.noPriceLabel || 'A convenir'}</p>
                 </div>
               )}
             </div>
@@ -811,12 +836,13 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                           onClick={() => { setSelectedDate(d.fullDate); setSelectedTime(null); }}
                           className={`shrink-0 w-[4.5rem] h-20 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
                             isSelected 
-                              ? 'bg-[color:var(--theme-btn)] border-[color:var(--theme-btn)] text-white shadow-md scale-105' 
-                              : 'bg-white border-slate-100 text-slate-500 hover:border-[color:var(--theme-btn)]/30'
+                              ? 'shadow-md scale-105' 
+                              : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'
                           }`}
+                          style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
                         >
-                          <span className={`text-[10px] font-bold ${isSelected ? 'text-emerald-300' : 'text-slate-400'}`}>{d.dayName}</span>
-                          <span className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-[color:var(--theme-btn)]'}`}>{d.dayNum}</span>
+                          <span className={`text-[10px] font-bold ${isSelected ? 'opacity-90' : 'text-slate-400'}`} style={isSelected ? { color: btnTextColor } : {}}>{d.dayName}</span>
+                          <span className="text-2xl font-black" style={isSelected ? { color: btnTextColor } : { color: appliedBtn }}>{d.dayNum}</span>
                         </button>
                       )
                     })}
@@ -840,10 +866,12 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                           onClick={() => setSelectedTime(time.value24)}
                           className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
                             !isAvailable 
-                              ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through'                                : isSelected 
-                                  ? 'bg-[color:var(--theme-btn)] text-white shadow-md scale-105 border-[color:var(--theme-btn)]'
-                                  : 'bg-white border-slate-100 text-slate-700 hover:border-[color:var(--theme-btn)]/30 shadow-sm'
+                              ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
+                              : isSelected 
+                                ? 'shadow-md scale-105'
+                                : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300 shadow-sm'
                           }`}
+                          style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
                         >
                           {time.label12}
                         </button>
@@ -868,7 +896,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                         placeholder="Ej: María Gómez" 
                         value={customerFullName}
                         onChange={(e) => setCustomerFullName(e.target.value)}
-                        className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
+                        className="w-full bg-slate-50 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:ring-2 focus:ring-slate-300 transition-all"
                       />
                     </div>
                     <div>
@@ -881,7 +909,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                         placeholder="Ej: 04141234567 o +584141234567" 
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
-                        className="w-full bg-slate-50/50 rounded-xl px-4 py-3.5 text-base font-medium text-[color:var(--theme-btn)] border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-[color:var(--theme-btn)] focus:ring-1 focus:ring-[color:var(--theme-btn)] transition-all"
+                        className="w-full bg-slate-50 rounded-xl px-4 py-3.5 text-base font-semibold text-slate-900 border border-slate-200 outline-none placeholder:text-slate-400 focus:bg-white focus:border-slate-400 focus:ring-2 focus:ring-slate-300 transition-all"
                       />
                     </div>
                   </div>
@@ -903,7 +931,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                   <button
                     disabled={!selectedTime || !customerFullName || !customerPhone || isSubmitting || !!successMessage}
                     onClick={handleConfirm}
-                    className="w-full sm:w-auto sm:min-w-[280px] bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[color:var(--theme-btn)] disabled:opacity-70 py-4 px-8 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
+                    className="w-full sm:w-auto sm:min-w-[280px] disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-70 py-4 px-8 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-md hover:scale-[1.01] active:scale-[0.99]"
+                    style={selectedTime && customerFullName && customerPhone ? { backgroundColor: appliedBtn, color: btnTextColor } : {}}
                   >
                     {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerFullName || !customerPhone) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
                   </button>
@@ -912,7 +941,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
             </div>
 
             {/* Sticky bottom bar — Mobile only */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-100 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] z-20">
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] z-20">
               {errorMessage && (
                 <div className="mb-3 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 text-center">
                   {errorMessage}
@@ -926,7 +955,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
               <button
                 disabled={!selectedTime || !customerFullName || !customerPhone || isSubmitting || !!successMessage}
                 onClick={handleConfirm}
-                className="w-full bg-[#D4C3A3] hover:bg-[#c2af8e] disabled:bg-slate-200 disabled:text-slate-400 text-[color:var(--theme-btn)] disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-sm"
+                className="w-full disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-70 py-4 rounded-2xl font-black text-lg transition-all flex justify-center items-center gap-2 shadow-md active:scale-[0.99]"
+                style={selectedTime && customerFullName && customerPhone ? { backgroundColor: appliedBtn, color: btnTextColor } : {}}
               >
                 {isSubmitting ? 'Procesando...' : !selectedTime ? 'Selecciona una hora' : (!customerFullName || !customerPhone) ? 'Ingresa tus datos' : 'Confirmar Reserva'}
               </button>

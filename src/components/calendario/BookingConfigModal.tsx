@@ -5,7 +5,8 @@ import { updateBookingConfigAction } from '@/app/actions/booking';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
-import { Palette, MessageCircle, Clock, Save, X, DollarSign, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Palette, MessageCircle, Clock, Save, X, DollarSign, Image as ImageIcon, Sparkles, Check } from 'lucide-react';
+import { PRESET_PUBLIC_THEMES, normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
 
 export function BookingConfigModal({ 
   isOpen, 
@@ -81,8 +82,8 @@ export function BookingConfigModal({
       headerTitle: settings.headerTitle.trim(),
       headerSubtitle: settings.headerSubtitle.trim(),
       publicTheme: {
-        bgColor: settings.themeBg,
-        btnColor: settings.themeBtn,
+        bgColor: normalizeHexColor(settings.themeBg, '#ffffff'),
+        btnColor: normalizeHexColor(settings.themeBtn, '#0B3B24'),
         logoUrl: settings.logoUrl.trim()
       }
     };
@@ -211,18 +212,59 @@ export function BookingConfigModal({
 
           {/* Apariencia / Tema */}
           <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
-            <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 text-sm">
-              <Palette className="w-4 h-4 text-emerald-600" />
-              Colores de la Página Pública
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 text-sm">
+                <Palette className="w-4 h-4 text-emerald-600" />
+                Colores y Tema de la Página Pública
+              </h3>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                Contraste WCAG 2.1 Auto
+              </span>
+            </div>
+
+            {/* Paletas Prediseñadas */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
+                Paletas Recomendadas (1 Clic)
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {PRESET_PUBLIC_THEMES.map((preset) => {
+                  const isSelected = 
+                    normalizeHexColor(settings.themeBg).toLowerCase() === preset.bgColor.toLowerCase() &&
+                    normalizeHexColor(settings.themeBtn).toLowerCase() === preset.btnColor.toLowerCase();
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => setSettings({ ...settings, themeBg: preset.bgColor, themeBtn: preset.btnColor })}
+                      className={`flex items-center gap-2 p-2 rounded-xl text-left border text-xs transition-all ${
+                        isSelected 
+                          ? 'border-emerald-600 ring-2 ring-emerald-500/20 bg-white dark:bg-slate-800 shadow-xs' 
+                          : 'border-slate-200 dark:border-slate-700 bg-white/70 dark:bg-slate-800/60 hover:border-slate-300'
+                      }`}
+                    >
+                      <span 
+                        className="w-4 h-4 rounded-full shrink-0 border border-black/10 shadow-xs" 
+                        style={{ backgroundColor: preset.btnColor }} 
+                      />
+                      <span className="truncate font-medium text-slate-700 dark:text-slate-200 text-[11px]">
+                        {preset.name}
+                      </span>
+                      {isSelected && <Check className="w-3 h-3 text-emerald-600 ml-auto shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Selectores Hex Personalizados */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Color de Fondo</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Color de Fondo</label>
                 <div className="flex items-center gap-3">
                   <input 
                     type="color" 
-                    value={settings.themeBg}
+                    value={normalizeHexColor(settings.themeBg, '#ffffff')}
                     onChange={e => setSettings({...settings, themeBg: e.target.value})}
                     className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
                   />
@@ -231,16 +273,17 @@ export function BookingConfigModal({
                     value={settings.themeBg}
                     onChange={e => setSettings({...settings, themeBg: e.target.value})}
                     className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 dark:text-slate-200"
+                    placeholder="#ffffff"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">Color de Botones / Acentos</label>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">Color de Botones / Acentos</label>
                 <div className="flex items-center gap-3">
                   <input 
                     type="color" 
-                    value={settings.themeBtn}
+                    value={normalizeHexColor(settings.themeBtn, '#0B3B24')}
                     onChange={e => setSettings({...settings, themeBtn: e.target.value})}
                     className="w-10 h-10 rounded-xl border border-slate-200 dark:border-slate-700 cursor-pointer bg-transparent"
                   />
@@ -249,10 +292,59 @@ export function BookingConfigModal({
                     value={settings.themeBtn}
                     onChange={e => setSettings({...settings, themeBtn: e.target.value})}
                     className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-slate-800 dark:text-slate-200"
+                    placeholder="#0B3B24"
                   />
                 </div>
               </div>
             </div>
+
+            {/* Vista Previa en Vivo con Protección de Contraste */}
+            {(() => {
+              const previewBg = normalizeHexColor(settings.themeBg, '#ffffff');
+              const previewBtn = normalizeHexColor(settings.themeBtn, '#0B3B24');
+              const btnTextColor = getContrastTextColor(previewBtn);
+              const bgTextColor = getContrastTextColor(previewBg);
+              return (
+                <div 
+                  className="p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-700 space-y-2.5 transition-colors shadow-xs"
+                  style={{ backgroundColor: previewBg }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span 
+                      className="text-[10px] font-black tracking-wider uppercase opacity-75"
+                      style={{ color: bgTextColor }}
+                    >
+                      Vista Previa en Vivo
+                    </span>
+                    <span 
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                      style={{ backgroundColor: previewBtn, color: btnTextColor }}
+                    >
+                      Paso 1 de 3
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 pt-1">
+                    <div>
+                      <h4 className="text-xs font-black truncate max-w-[200px]" style={{ color: bgTextColor }}>
+                        {settings.headerTitle || tenant?.name || 'Mi Negocio'}
+                      </h4>
+                      <p className="text-[10px] opacity-70 truncate max-w-[220px]" style={{ color: bgTextColor }}>
+                        {settings.headerSubtitle || 'Reserva tu cita en pocos pasos'}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs shrink-0 transition-transform pointer-events-none"
+                      style={{ backgroundColor: previewBtn, color: btnTextColor }}
+                    >
+                      Confirmar Cita →
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Contacto WhatsApp */}

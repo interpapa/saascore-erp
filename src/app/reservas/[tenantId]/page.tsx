@@ -4,6 +4,8 @@ import BookingClient from '@/components/reservas/BookingClient';
 
 export const dynamic = 'force-dynamic';
 
+import { normalizeHexColor } from '@/lib/theme/colorUtils';
+
 export default async function ReservasPublicPage({ params }: { params: Promise<{ tenantId: string }> | { tenantId: string } }) {
   // Await params for Next.js 15+ compatibility
   const resolvedParams = await params;
@@ -59,10 +61,10 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
       metadata: e.metadata
     }));
 
-    const publicTheme = tenant.metadata?.public_theme || {};
+  const publicTheme = tenant.metadata?.public_theme || {};
   const theme = {
-    bgColor: publicTheme.bgColor ?? "#ffffff",
-    btnColor: publicTheme.btnColor ?? "#0B3B24",
+    bgColor: normalizeHexColor(publicTheme.bgColor, "#f8fafc"),
+    btnColor: normalizeHexColor(publicTheme.btnColor, "#0B3B24"),
   };
   return <BookingClient tenant={tenant} employees={employees} theme={theme} />;
 }
