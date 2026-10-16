@@ -93,6 +93,21 @@ export function AppointmentModal({
   // Handle service selection change
   const handleServiceChange = (id: string) => {
     setServiceId(id);
+
+    // Si es un procedimiento particular configurado en la ficha del colaborador
+    if (id.startsWith('emp-svc-')) {
+      const svcName = id.replace('emp-svc-', '');
+      const emp = employees.find(e => e.id === employeeId);
+      const empSvcs = (emp?.metadata as any)?.services as Array<{ name: string; durationMinutes?: number; price?: number }> | undefined;
+      const match = empSvcs?.find(s => s.name === svcName);
+      if (match) {
+        setTitle(match.name);
+        setDurationMinutes(Number(match.durationMinutes) || 45);
+        setPrice(Number(match.price) || 0);
+      }
+      return;
+    }
+
     const s = services.find((srv) => srv.id === id);
     if (s) {
       if (!title || title === s.name) setTitle(s.name);
@@ -254,27 +269,47 @@ export function AppointmentModal({
           )}
 
           {/* Service Selector (Hidden for Block) */}
-          {type !== 'block' && (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Briefcase size={14} className="text-slate-400" /> Servicio
-              </label>
-              <select
-                value={serviceId}
-                onChange={(e) => handleServiceChange(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-              >
-                <option value="">
-                  {services.length > 0 ? '-- Seleccionar Servicio del Catálogo (Opcional) --' : '-- Sin Catálogo (Define título y precio abajo) --'}
-                </option>
-                {services.map((srv) => (
-                  <option key={srv.id} value={srv.id}>
-                    {srv.name} (${srv.price} • {srv.duration_minutes || 60} min)
+          {type !== 'block' && (() => {
+            const selectedEmp = employees.find(e => e.id === employeeId);
+            const employeeParticularServices = ((selectedEmp?.metadata as any)?.services || []) as Array<{ id?: string; name: string; durationMinutes?: number; price?: number }>;
+
+            return (
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                  <Briefcase size={14} className="text-slate-400" /> Procedimiento / Servicio
+                </label>
+                <select
+                  value={serviceId}
+                  onChange={(e) => handleServiceChange(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-medium"
+                >
+                  <option value="">
+                    {employeeParticularServices.length > 0 || services.length > 0
+                      ? '-- Seleccionar Procedimiento (O escribe el título abajo) --'
+                      : '-- Personalizado (Escribe el título y duración abajo) --'}
                   </option>
-                ))}
-              </select>
-            </div>
-          )}
+                  {employeeParticularServices.length > 0 && (
+                    <optgroup label={`Procedimientos de ${selectedEmp?.name || 'Profesional'}`}>
+                      {employeeParticularServices.map((ps, idx) => (
+                        <option key={`emp-svc-${idx}`} value={`emp-svc-${ps.name}`}>
+                          {ps.name} {ps.price !== undefined && ps.price > 0 ? `($${ps.price})` : ''} ({ps.durationMinutes || 45} min)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {services.length > 0 && (
+                    <optgroup label="Servicios del Catálogo">
+                      {services.map((srv) => (
+                        <option key={srv.id} value={srv.id}>
+                          {srv.name} (${srv.price} • {srv.duration_minutes || 60} min)
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Title Input */}
           <div>

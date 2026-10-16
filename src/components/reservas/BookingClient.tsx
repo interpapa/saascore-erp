@@ -225,27 +225,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       const generalName = (emp.metadata?.general_service_name?.trim() || emp.role || 'Servicio General').trim();
       const generalPrice = emp.metadata?.general_service_price !== undefined ? Number(emp.metadata?.general_service_price) : undefined;
 
-      // 1. Servicio General (si está habilitado o si no tiene particulares configurados)
-      if (isGeneralEnabled || !svcs || svcs.length === 0) {
-        const key = generalName.toLowerCase();
-        if (!allServices.has(key)) {
-          allServices.set(key, {
-            name: generalName,
-            durationMinutes: defaultSlot,
-            prices: [],
-            hasFrom: false,
-            hasHidden: false,
-            basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
-          });
-        }
-        const entry = allServices.get(key)!;
-        if (generalPrice && generalPrice > 0) {
-          entry.prices.push(generalPrice);
-          if (!entry.basePrice) entry.basePrice = generalPrice;
-        }
-      }
-
-      // 2. Servicios Particulares o Especializados
+      // 1. Servicios Particulares o Especializados creados por el negocio en "Funciones y Servicios"
       if (svcs && svcs.length > 0) {
         svcs.forEach(s => {
           if (!s.name || !s.name.trim()) return;
@@ -270,47 +250,29 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         });
       }
 
-      // 3. Especialidades y ramas profesionales asignadas (ej. Cardiología, Pediatría, Ginecología, Ortodoncia)
-      const primaryRoleTitle = emp.metadata?.role_title?.trim();
-      const docSpecialty = emp.metadata?.doctor_config?.specialty?.trim();
-      const docRole = emp.metadata?.doctor_config?.role?.trim();
-      
-      // Sanitización: si docSpecialty quedó con 'Control Prenatal & Colposcopia' por residuo anterior
-      // pero el médico es Cardiólogo u otra especialidad, descartar ese residuo sucio
-      const isResidualPrenatal = 
-        docSpecialty?.toLowerCase().includes('control prenatal') && 
-        primaryRoleTitle && 
-        !primaryRoleTitle.toLowerCase().includes('gineco') && 
-        !primaryRoleTitle.toLowerCase().includes('obstetr') &&
-        !primaryRoleTitle.toLowerCase().includes('prenatal');
-
-      const cleanDocSpecialty = isResidualPrenatal ? undefined : docSpecialty;
-
-      const specBranch = 
-        cleanDocSpecialty || 
-        (primaryRoleTitle && primaryRoleTitle !== 'Especialista' && primaryRoleTitle !== 'Espacio / Recurso' && primaryRoleTitle !== 'Colaborador' ? primaryRoleTitle : undefined) ||
-        docRole ||
-        emp.metadata?.specialty?.trim() || 
-        emp.metadata?.dentist_config?.specialty?.trim() ||
-        emp.metadata?.barber_config?.specialty?.trim() ||
-        emp.metadata?.groomer_config?.specialty?.trim();
-
-      if (specBranch && isGeneralEnabled) {
-        const specKey = specBranch.toLowerCase();
-        if (!allServices.has(specKey)) {
-          allServices.set(specKey, {
-            name: specBranch,
-            durationMinutes: defaultSlot,
-            prices: [],
-            hasFrom: false,
-            hasHidden: false,
-            basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
-          });
-        }
-        const entry = allServices.get(specKey)!;
-        if (generalPrice && generalPrice > 0) {
-          entry.prices.push(generalPrice);
-          if (!entry.basePrice) entry.basePrice = generalPrice;
+      // 2. Servicio General (solo si está habilitado y tiene nombre propio configurado por el usuario, o si no tiene particulares)
+      if (isGeneralEnabled) {
+        const hasCustomGeneralName = Boolean(emp.metadata?.general_service_name?.trim());
+        const shouldIncludeGeneral = hasCustomGeneralName || (!svcs || svcs.length === 0);
+        
+        if (shouldIncludeGeneral) {
+          const generalName = emp.metadata?.general_service_name?.trim() || (emp.name ? `Consulta con ${emp.name}` : 'Consulta General');
+          const key = generalName.toLowerCase();
+          if (!allServices.has(key)) {
+            allServices.set(key, {
+              name: generalName,
+              durationMinutes: defaultSlot,
+              prices: [],
+              hasFrom: false,
+              hasHidden: false,
+              basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
+            });
+          }
+          const entry = allServices.get(key)!;
+          if (generalPrice && generalPrice > 0) {
+            entry.prices.push(generalPrice);
+            if (!entry.basePrice) entry.basePrice = generalPrice;
+          }
         }
       }
     });

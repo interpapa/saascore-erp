@@ -91,21 +91,21 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     services: [] as { id: string; name: string; durationMinutes: number; price?: number; priceDisplay?: 'visible' | 'from' | 'hidden' }[],
     // Configuración para Barbería
     isBarber: false,
-    barberRole: 'Master Barber',
-    barberSpecialty: 'Degradados & Barba',
+    barberRole: '',
+    barberSpecialty: '',
     barberCommission: 50,
     barberAvatar: '✂️',
     // Configuración para Odontología
     isDentist: false,
-    dentistRole: 'Ortodoncista',
-    dentistSpecialty: 'Ortodoncia & Brackets',
+    dentistRole: '',
+    dentistSpecialty: '',
     dentistLicense: '',
     dentistCommission: 45,
     dentistAvatar: '🦷',
     // Configuración para Grooming
     isGroomer: false,
-    groomerRole: 'Groomer Senior',
-    groomerSpecialty: 'Corte a Tijera & Baño',
+    groomerRole: '',
+    groomerSpecialty: '',
     groomerCommission: 45,
     groomerAvatar: '🐩',
     // Configuración para Ginecología / Médicos / Especialistas Clínicos
@@ -157,23 +157,23 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
 
       // Barbería
       isBarber,
-      barberRole: meta.barber_config?.role || (isBarber ? (meta.role || 'Master Barber') : 'Master Barber'),
-      barberSpecialty: meta.barber_config?.specialty || (isBarber ? (meta.specialty || 'Degradados & Barba') : 'Degradados & Barba'),
+      barberRole: meta.barber_config?.role || (meta.role !== 'Especialista' ? meta.role : '') || '',
+      barberSpecialty: meta.barber_config?.specialty || meta.specialty || '',
       barberCommission: Number(meta.barber_config?.commission_percent ?? meta.commission_percent ?? 50),
       barberAvatar: meta.barber_config?.avatar || (isBarber ? (meta.avatar || '✂️') : '✂️'),
 
       // Odontología
       isDentist,
-      dentistRole: meta.dentist_config?.role || (isDentist ? (meta.role || 'Ortodoncista') : 'Ortodoncista'),
-      dentistSpecialty: meta.dentist_config?.specialty || (isDentist ? (meta.specialty || 'Ortodoncia & Brackets') : 'Ortodoncia & Brackets'),
+      dentistRole: meta.dentist_config?.role || (meta.role !== 'Especialista' ? meta.role : '') || '',
+      dentistSpecialty: meta.dentist_config?.specialty || meta.specialty || '',
       dentistLicense: meta.dentist_config?.license_number || meta.licenseNumber || meta.license_number || '',
       dentistCommission: Number(meta.dentist_config?.commission_percent ?? meta.commission_percent ?? 45),
       dentistAvatar: meta.dentist_config?.avatar || (isDentist ? (meta.avatar || '🦷') : '🦷'),
 
       // Grooming
       isGroomer,
-      groomerRole: meta.groomer_config?.role || (isGroomer ? (meta.role || 'Groomer Senior') : 'Groomer Senior'),
-      groomerSpecialty: meta.groomer_config?.specialty || (isGroomer ? (meta.specialty || 'Corte a Tijera & Baño') : 'Corte a Tijera & Baño'),
+      groomerRole: meta.groomer_config?.role || (meta.role !== 'Especialista' ? meta.role : '') || '',
+      groomerSpecialty: meta.groomer_config?.specialty || meta.specialty || '',
       groomerCommission: Number(meta.groomer_config?.commission_percent ?? meta.commission_percent ?? 45),
       groomerAvatar: meta.groomer_config?.avatar || (isGroomer ? (meta.avatar || '🐩') : '🐩'),
 
