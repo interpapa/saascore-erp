@@ -16,9 +16,7 @@ import {
   Maximize2, 
   Minimize2, 
   RotateCw,
-  Move,
-  Sparkles,
-  HelpCircle
+  Move
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/core/ToastProvider';
@@ -52,8 +50,9 @@ export function ImageUpload({
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const [bgStyle, setBgStyle] = useState<'blur' | 'dark' | 'white'>('blur');
 
-  // Drag interactivo (Mouse y Touch)
+  // Drag interactivo con refs para máxima estabilidad y rendimiento a 60fps
   const [isDragging, setIsDragging] = useState(false);
+  const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ 
     x: number; 
     y: number; 
@@ -72,6 +71,7 @@ export function ImageUpload({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
   const imageElementRef = useRef<HTMLImageElement | null>(null);
+  const loadedSrcRef = useRef<string | null>(null);
   const { toast } = useToast();
 
   // Redibujado del canvas en tiempo real con soporte de rotación, escalado inteligente y blur background
@@ -142,14 +142,23 @@ export function ImageUpload({
     ctx.restore();
   }, [zoom, offsetX, offsetY, rotation, fitMode, bgStyle]);
 
-  // Inicializar estado cuando se carga una imagen nueva
+  // Cargar imagen en memoria SÓLO cuando cambia rawImageSrc o al abrir el modal por primera vez
   useEffect(() => {
-    if (!rawImageSrc || !isCropModalOpen) return;
+    if (!rawImageSrc || !isCropModalOpen) {
+      loadedSrcRef.current = null;
+      return;
+    }
+
+    // Si ya cargamos esta misma fuente de imagen en memoria, no reinicializar coordenadas
+    if (loadedSrcRef.current === rawImageSrc && imageElementRef.current) {
+      return;
+    }
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       imageElementRef.current = img;
+      loadedSrcRef.current = rawImageSrc;
 
       // Detección automática de aspecto:
       // Si es muy vertical (móvil retrato 9:16 o 3:4), se inicia en cover con un zoom balanceado
@@ -168,17 +177,68 @@ export function ImageUpload({
       }
       setOffsetX(0);
       setRotation(0);
-      renderCanvas();
     };
     img.src = rawImageSrc;
-  }, [rawImageSrc, isCropModalOpen, renderCanvas]);
+  }, [rawImageSrc, isCropModalOpen]);
 
-  // Re-renderizado continuo al cambiar cualquier parámetro
+  // Re-renderizado reactivo en el canvas cada vez que cambien las transformaciones
   useEffect(() => {
-    if (isCropModalOpen) {
+    if (isCropModalOpen && imageElementRef.current) {
       renderCanvas();
     }
   }, [isCropModalOpen, renderCanvas]);
+
+  // Listeners globales para Drag interactivo libre y suave (Mouse y Touch)
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const factor = 512 / (dragStartRef.current.viewportWidth || 288);
+      const deltaX = (e.clientX - dragStartRef.current.x) * factor;
+      const deltaY = (e.clientY - dragStartRef.current.y) * factor;
+
+      setOffsetX(Math.round(dragStartRef.current.initialOffsetX + deltaX));
+      setOffsetY(Math.round(dragStartRef.current.initialOffsetY + deltaY));
+    };
+
+    const handleWindowMouseUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+      }
+    };
+
+    const handleWindowTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current || e.touches.length !== 1) return;
+      const touch = e.touches[0];
+      const factor = 512 / (dragStartRef.current.viewportWidth || 288);
+      const deltaX = (touch.clientX - dragStartRef.current.x) * factor;
+      const deltaY = (touch.clientY - dragStartRef.current.y) * factor;
+
+      setOffsetX(Math.round(dragStartRef.current.initialOffsetX + deltaX));
+      setOffsetY(Math.round(dragStartRef.current.initialOffsetY + deltaY));
+    };
+
+    const handleWindowTouchEnd = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false;
+        setIsDragging(false);
+      }
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    window.addEventListener('touchmove', handleWindowTouchMove, { passive: true });
+    window.addEventListener('touchend', handleWindowTouchEnd);
+    window.addEventListener('touchcancel', handleWindowTouchEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+      window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+      window.removeEventListener('touchcancel', handleWindowTouchEnd);
+    };
+  }, []);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -205,6 +265,7 @@ export function ImageUpload({
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
+        loadedSrcRef.current = null; // Reiniciar referencia para cargar la nueva imagen limpia
         setRawImageSrc(reader.result);
         setIsCropModalOpen(true);
       }
@@ -275,9 +336,10 @@ export function ImageUpload({
     setOffsetY(0);
   };
 
-  // Drag interactivo con mouse
+  // Inicio de Drag con Mouse
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
+    isDraggingRef.current = true;
     setIsDragging(true);
     const vpWidth = viewportRef.current?.clientWidth || 288;
     dragStartRef.current = {
@@ -289,35 +351,11 @@ export function ImageUpload({
     };
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!isDragging) return;
-    const factor = 512 / (dragStartRef.current.viewportWidth || 288);
-    const deltaX = (e.clientX - dragStartRef.current.x) * factor;
-    const deltaY = (e.clientY - dragStartRef.current.y) * factor;
-
-    setOffsetX(Math.round(dragStartRef.current.initialOffsetX + deltaX));
-    setOffsetY(Math.round(dragStartRef.current.initialOffsetY + deltaY));
-  }, [isDragging]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  useEffect(() => {
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
-
-  // Touch Drag para pantallas táctiles de móviles y tablets
+  // Inicio de Drag con Touch en Móviles
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
+      isDraggingRef.current = true;
       setIsDragging(true);
       const vpWidth = viewportRef.current?.clientWidth || 288;
       dragStartRef.current = {
@@ -330,17 +368,6 @@ export function ImageUpload({
     }
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || e.touches.length !== 1) return;
-    const touch = e.touches[0];
-    const factor = 512 / (dragStartRef.current.viewportWidth || 288);
-    const deltaX = (touch.clientX - dragStartRef.current.x) * factor;
-    const deltaY = (touch.clientY - dragStartRef.current.y) * factor;
-
-    setOffsetX(Math.round(dragStartRef.current.initialOffsetX + deltaX));
-    setOffsetY(Math.round(dragStartRef.current.initialOffsetY + deltaY));
-  };
-
   // Zoom interactivo con rueda del mouse
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -348,7 +375,7 @@ export function ImageUpload({
     setZoom(prev => Math.min(3.5, Math.max(0.4, Number((prev + zoomDelta).toFixed(2)))));
   };
 
-  // Guardar y subir a Supabase Storage con compresión WebP/JPEG de alta calidad
+  // Guardar y subir a Supabase Storage con compresión de alta calidad
   const handleCropAndSave = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -383,6 +410,7 @@ export function ImageUpload({
       onChange(data.publicUrl);
       setIsCropModalOpen(false);
       setRawImageSrc(null);
+      loadedSrcRef.current = null;
       toast({ 
         variant: 'success', 
         title: 'Foto actualizada con éxito', 
@@ -448,6 +476,7 @@ export function ImageUpload({
           <button
             type="button"
             onClick={() => {
+              loadedSrcRef.current = null;
               setRawImageSrc(value);
               setIsCropModalOpen(true);
             }}
@@ -529,11 +558,9 @@ export function ImageUpload({
               <div className="flex flex-col items-center bg-slate-950 p-5 rounded-3xl border border-slate-800 select-none relative">
                 <div 
                   ref={viewportRef}
-                  className="relative w-64 h-64 sm:w-72 sm:h-72 overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing group select-none rounded-2xl"
+                  className="relative w-64 h-64 sm:w-72 sm:h-72 overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing group select-none rounded-2xl touch-none"
                   onMouseDown={handleMouseDown}
                   onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={() => setIsDragging(false)}
                   onWheel={handleWheel}
                   title="Arrastra para mover la imagen · Usa la rueda del mouse o el slider para zoom"
                 >
