@@ -4,13 +4,51 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, Scissors, Clock, Calendar, User, Users, ChevronRight } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Clock, 
+  Calendar, 
+  User, 
+  Users, 
+  ChevronRight, 
+  Briefcase, 
+  Sparkles, 
+  HeartPulse, 
+  Baby, 
+  Stethoscope, 
+  Dog, 
+  Scissors, 
+  Tag 
+} from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
 import { normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
 import { matchesEmployeeService, detectClinicalDomain, getEmployeePrimaryDomain } from '@/lib/services/serviceMatching';
 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
+
+const getServiceIcon = (serviceName: string) => {
+  const norm = (serviceName || '').toLowerCase();
+  if (norm.includes('cardio') || norm.includes('corazon') || norm.includes('ecg') || norm.includes('tension')) {
+    return <HeartPulse size={20} className="text-rose-500" />;
+  }
+  if (norm.includes('gineco') || norm.includes('ginelco') || norm.includes('obstetr') || norm.includes('prenatal') || norm.includes('embarazo')) {
+    return <Baby size={20} className="text-pink-500" />;
+  }
+  if (norm.includes('odont') || norm.includes('dent') || norm.includes('bracket') || norm.includes('muela')) {
+    return <Sparkles size={20} className="text-teal-500" />;
+  }
+  if (norm.includes('medic') || norm.includes('doctor') || norm.includes('salud') || norm.includes('clinica') || norm.includes('consulta') || norm.includes('evaluacion')) {
+    return <Stethoscope size={20} className="text-blue-500" />;
+  }
+  if (norm.includes('groom') || norm.includes('canin') || norm.includes('mascot') || norm.includes('perro') || norm.includes('gato')) {
+    return <Dog size={20} className="text-emerald-500" />;
+  }
+  if (norm.includes('barber') || norm.includes('fade') || norm.includes('barba') || norm.includes('afeitado')) {
+    return <Scissors size={20} className="text-amber-500" />;
+  }
+  return <ChevronRight size={20} className="text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform" />;
+};
 
 const toLocalDateString = (d: Date): string => {
   const y = d.getFullYear();
@@ -250,17 +288,38 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         });
       }
 
-      // 2. Servicio General (solo si está habilitado y tiene nombre propio configurado por el usuario, o si no tiene particulares)
+      // 2. Rama / Especialidad o Servicio General del Colaborador
       if (isGeneralEnabled) {
-        const hasCustomGeneralName = Boolean(emp.metadata?.general_service_name?.trim());
-        const shouldIncludeGeneral = hasCustomGeneralName || (!svcs || svcs.length === 0);
-        
-        if (shouldIncludeGeneral) {
-          const generalName = emp.metadata?.general_service_name?.trim() || (emp.name ? `Consulta con ${emp.name}` : 'Consulta General');
-          const key = generalName.toLowerCase();
+        const customGeneralName = emp.metadata?.general_service_name?.trim();
+        const roleTitle = (emp.metadata?.role_title || emp.role || '').trim();
+        const docRole = (emp.metadata?.doctor_config?.role || emp.metadata?.doctor_config?.specialty || '').trim();
+        const dentistRole = (emp.metadata?.dentist_config?.role || '').trim();
+        const barberRole = (emp.metadata?.barber_config?.role || '').trim();
+        const groomerRole = (emp.metadata?.groomer_config?.role || '').trim();
+
+        // Determinar el nombre de la rama oficial
+        let branchName = '';
+        if (customGeneralName) {
+          branchName = customGeneralName;
+        } else if (roleTitle && roleTitle !== 'Espacio / Recurso' && roleTitle !== 'Especialista') {
+          branchName = roleTitle;
+        } else if (docRole) {
+          branchName = docRole;
+        } else if (dentistRole) {
+          branchName = dentistRole;
+        } else if (barberRole) {
+          branchName = barberRole;
+        } else if (groomerRole) {
+          branchName = groomerRole;
+        } else if (!svcs || svcs.length === 0) {
+          branchName = 'Atención General';
+        }
+
+        if (branchName) {
+          const key = branchName.toLowerCase();
           if (!allServices.has(key)) {
             allServices.set(key, {
-              name: generalName,
+              name: branchName,
               durationMinutes: defaultSlot,
               prices: [],
               hasFrom: false,
@@ -301,6 +360,15 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       };
     });
   }, [employees, settings.showPrices, settings.noPriceLabel]);
+
+  // Si todos los colaboradores hacen lo mismo o solo existe 1 rama en la empresa,
+  // no hace falta preguntarle al cliente qué quiere: se preselecciona la rama y se va directo al Paso 2
+  useEffect(() => {
+    if (uniqueServices.length === 1 && !selectedService && step === 1) {
+      setSelectedService(uniqueServices[0]);
+      setStep(2);
+    }
+  }, [uniqueServices, selectedService, step]);
 
   // Filter employees based on selected service (Memoized)
   const filteredEmployees = useMemo(() => {
@@ -575,8 +643,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                       <div>
                         <h2 className="text-xl md:text-2xl font-black" style={{ color: appliedBtn }}>{service.name}</h2>
                       </div>
-                      <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-sm">
-                         <Scissors size={20} className="text-slate-400" />
+                      <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-sm shrink-0">
+                         {getServiceIcon(service.name)}
                       </div>
                     </div>
                     <div className="p-4 flex items-center justify-between w-full bg-white">
@@ -613,13 +681,19 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
             className="px-6 py-10 md:px-12 md:py-14 lg:py-16 relative transition-colors shadow-xs"
             style={{ backgroundColor: appliedBtn, color: btnTextColor }}
           >
-            <button 
-              onClick={() => setStep(1)} 
-              className="absolute top-6 left-6 p-2.5 rounded-full transition-colors border border-white/20"
-              style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
-            >
-              <ArrowLeft size={20} />
-            </button>
+            {uniqueServices.length > 1 && (
+              <button 
+                onClick={() => {
+                  setSelectedService(null);
+                  setStep(1);
+                }} 
+                className="absolute top-6 left-6 p-2.5 rounded-full transition-colors border border-white/20"
+                style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
+                title="Volver a los servicios"
+              >
+                <ArrowLeft size={20} />
+              </button>
+            )}
             <div className="max-w-5xl mx-auto mt-4 flex items-center gap-4">
               {settings.logoUrl && (
                 <div className="w-12 h-12 rounded-xl bg-white p-1.5 shadow-sm hidden sm:flex items-center justify-center shrink-0">
@@ -724,7 +798,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                       <div className="p-4 flex items-center justify-between w-full bg-slate-50/60 mt-auto">
                         <div className="flex items-center gap-2.5 text-slate-500">
                           <div className="flex items-center gap-1.5 text-xs font-semibold">
-                            <Scissors size={14} />
+                            <Briefcase size={14} className="text-slate-400" />
                             <span>{barber.role || 'Profesional'}</span>
                           </div>
                           {(() => {
@@ -800,7 +874,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                   <h2 className="text-xl lg:text-2xl font-black leading-tight truncate">{selectedBarber?.name}</h2>
                   <p className="text-xs lg:text-sm font-medium truncate opacity-85">{selectedBarber?.role || 'Profesional'}</p>
                   <div className="mt-2 inline-flex items-center gap-1.5 bg-black/15 dark:bg-white/15 px-3 py-1 rounded-full text-xs font-bold">
-                    <Scissors size={12} /> {selectedService?.name}
+                    <Sparkles size={12} /> {selectedService?.name}
                   </div>
                 </div>
               </div>

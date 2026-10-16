@@ -94,6 +94,18 @@ export function AppointmentModal({
   const handleServiceChange = (id: string) => {
     setServiceId(id);
 
+    // Si es la rama o consulta general del colaborador
+    if (id.startsWith('emp-branch-')) {
+      const branchTitle = id.replace('emp-branch-', '');
+      const emp = employees.find(e => e.id === employeeId);
+      const prc = Number((emp?.metadata as any)?.general_service_price) || 0;
+      const dur = Number((emp?.metadata as any)?.default_slot_minutes || (emp?.metadata as any)?.general_slot_minutes) || 60;
+      setTitle(branchTitle);
+      setDurationMinutes(dur);
+      setPrice(prc);
+      return;
+    }
+
     // Si es un procedimiento particular configurado en la ficha del colaborador
     if (id.startsWith('emp-svc-')) {
       const svcName = id.replace('emp-svc-', '');
@@ -272,6 +284,9 @@ export function AppointmentModal({
           {type !== 'block' && (() => {
             const selectedEmp = employees.find(e => e.id === employeeId);
             const employeeParticularServices = ((selectedEmp?.metadata as any)?.services || []) as Array<{ id?: string; name: string; durationMinutes?: number; price?: number }>;
+            const empRoleTitle = ((selectedEmp?.metadata as any)?.role_title || selectedEmp?.role || '').trim();
+            const empGeneralName = ((selectedEmp?.metadata as any)?.general_service_name || '').trim();
+            const branchName = empGeneralName || (empRoleTitle && empRoleTitle !== 'Espacio / Recurso' && empRoleTitle !== 'Especialista' ? empRoleTitle : '');
 
             return (
               <div>
@@ -284,12 +299,17 @@ export function AppointmentModal({
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-medium"
                 >
                   <option value="">
-                    {employeeParticularServices.length > 0 || services.length > 0
+                    {employeeParticularServices.length > 0 || branchName || services.length > 0
                       ? '-- Seleccionar Procedimiento (O escribe el título abajo) --'
                       : '-- Personalizado (Escribe el título y duración abajo) --'}
                   </option>
-                  {employeeParticularServices.length > 0 && (
-                    <optgroup label={`Procedimientos de ${selectedEmp?.name || 'Profesional'}`}>
+                  {(employeeParticularServices.length > 0 || branchName) && (
+                    <optgroup label={`Procedimientos y Rama de ${selectedEmp?.name || 'Profesional'}`}>
+                      {branchName && !employeeParticularServices.some(ps => ps.name.toLowerCase() === branchName.toLowerCase()) && (
+                        <option value={`emp-branch-${branchName}`}>
+                          {branchName} {Number((selectedEmp?.metadata as any)?.general_service_price) > 0 ? `($${(selectedEmp?.metadata as any)?.general_service_price})` : ''} ({Number((selectedEmp?.metadata as any)?.default_slot_minutes || 60)} min)
+                        </option>
+                      )}
                       {employeeParticularServices.map((ps, idx) => (
                         <option key={`emp-svc-${idx}`} value={`emp-svc-${ps.name}`}>
                           {ps.name} {ps.price !== undefined && ps.price > 0 ? `($${ps.price})` : ''} ({ps.durationMinutes || 45} min)

@@ -16,7 +16,7 @@ import {
   X, 
   Trash2, 
   Clock, 
-  Scissors, 
+  Tag, 
   FileText, 
   AlertTriangle,
   Sparkles,
@@ -929,7 +929,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                     : 'border-transparent text-slate-500 hover:text-foreground'
                 }`}
               >
-                <Scissors size={14} />
+                <Briefcase size={14} />
                 3. Funciones & Servicios
               </button>
 
