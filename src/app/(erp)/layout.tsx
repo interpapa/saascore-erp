@@ -32,6 +32,8 @@ const routeToModuleId: Record<string, string> = {
   '/clinica': 'clinica',
   '/barberia': 'barberia',
   '/grooming': 'grooming',
+  '/suscripciones': 'suscripciones',
+  '/produccion': 'produccion',
   '/apps': 'apps'
 };
 

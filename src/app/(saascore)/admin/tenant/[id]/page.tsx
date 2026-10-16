@@ -57,6 +57,8 @@ const ALL_MODULES = [
   { id: 'compras', name: 'Compras AP', category: 'comercial', features: [] },
   { id: 'contabilidad', name: 'Contabilidad y Finanzas', category: 'comercial', features: [] },
   { id: 'estadisticas', name: 'Estadísticas & Reportes', category: 'comercial', features: [] },
+  { id: 'suscripciones', name: 'Suscripciones & Membresías', category: 'comercial', features: [] },
+  { id: 'produccion', name: 'Producción & Recetas (MRP)', category: 'operaciones', features: [] },
   // Operaciones & CRM
   { 
     id: 'calendario', 

@@ -37,6 +37,8 @@ export const PERMISSION_ALIASES: Record<string, Permission> = {
   catalogo: 'inventario',
   compras: 'inventario',
   configuracion: 'config',
+  suscripciones: 'crm',
+  produccion: 'inventario',
 };
 
 export const hasPermission = (userRole: UserRole, requiredPermission: string): boolean => {

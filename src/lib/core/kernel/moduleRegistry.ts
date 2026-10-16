@@ -30,6 +30,8 @@ export type ModuleId =
   | 'med_oftalmologia'
   | 'barberia'
   | 'grooming'
+  | 'suscripciones'
+  | 'produccion'
   | 'config' 
   | 'admin';
 
@@ -221,6 +223,20 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     category: 'operaciones',
     description: 'Ficha de mascotas, razas, tipos de manto, control de temperamento, inspección de nudos/parásitos y pipeline de baño/corte.',
     dependencies: ['clientes', 'caja'],
+  },
+  suscripciones: {
+    id: 'suscripciones',
+    name: 'Suscripciones & Membresías',
+    category: 'comercial',
+    description: 'Gestión de planes recurrentes, cuotas, membresías de academia/club, cortes de cobro y recordatorios.',
+    dependencies: ['clientes', 'caja'],
+  },
+  produccion: {
+    id: 'produccion',
+    name: 'Producción & Recetas (MRP)',
+    category: 'operaciones',
+    description: 'Formulación y listas de materiales (BOM), escandallos, cálculo de costo unitario y transformación automática de inventario.',
+    dependencies: ['inventario'],
   },
 };
 

@@ -24,7 +24,9 @@ import {
   HeartPulse,
   Scissors,
   Dog,
-  Baby
+  Baby,
+  CreditCard,
+  Factory
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -150,6 +152,20 @@ export default function LauncherPage() {
       href: '/clinica',
       gradient: 'from-rose-500 to-red-600',
       icon: <HeartPulse className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
+      id: 'suscripciones', 
+      name: 'Suscripciones', 
+      href: '/suscripciones',
+      gradient: 'from-violet-600 to-indigo-700',
+      icon: <CreditCard className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
+      id: 'produccion', 
+      name: 'Producción & Recetas', 
+      href: '/produccion',
+      gradient: 'from-amber-500 to-orange-600',
+      icon: <Factory className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
       id: 'config', 

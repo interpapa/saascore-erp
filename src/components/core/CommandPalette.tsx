@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle, Stethoscope, HeartPulse, Scissors, Dog, Baby } from 'lucide-react';
+import { Search, X, Users, Box, ShoppingCart, Scale, Settings, ArrowRight, BarChart3, CalendarDays, MessageCircle, Stethoscope, HeartPulse, Scissors, Dog, Baby, CreditCard, Factory } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface CommandItem {
@@ -27,7 +27,9 @@ const COMMAND_ITEMS: CommandItem[] = [
   { id: '12', title: 'Odontología — Odontograma y Brackets', category: 'módulo', href: '/odontologia', icon: Stethoscope },
   { id: '13', title: 'Ginecología — Gestograma y Ficha Obstétrica', category: 'módulo', href: '/ginecologia', icon: Baby },
   { id: '14', title: 'Clínica Médica — Historia Clínica y Especialidades', category: 'módulo', href: '/clinica', icon: HeartPulse },
-  { id: '15', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
+  { id: '15', title: 'Suscripciones — Membresías, Cuotas y Cortes', category: 'módulo', href: '/suscripciones', icon: CreditCard },
+  { id: '16', title: 'Producción — Recetas, Escandallos y Fabricación MRP', category: 'módulo', href: '/produccion', icon: Factory },
+  { id: '17', title: 'Ajustes — Configuración General', category: 'módulo', href: '/configuracion', icon: Settings },
 ];
 
 export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {

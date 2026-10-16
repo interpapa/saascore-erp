@@ -52,7 +52,9 @@ const ALL_SYSTEM_MODULES = [
   { id: 'compras', name: 'Compras & Proveedores', category: 'comercial', desc: 'Órdenes de compra y cuentas por pagar' },
   { id: 'contabilidad', name: 'Contabilidad NIIF', category: 'comercial', desc: 'Asientos contables, libro mayor y balances' },
   { id: 'estadisticas', name: 'Reportes & Estadísticas', category: 'comercial', desc: 'Métricas financieras y analítica de ventas' },
+  { id: 'suscripciones', name: 'Suscripciones & Membresías', category: 'comercial', desc: 'Planes recurrentes, academias, cortes y cobros' },
   // Operaciones & CRM
+  { id: 'produccion', name: 'Producción & Recetas (MRP)', category: 'operaciones', desc: 'Fórmulas, escandallos y transformación de stock' },
   { id: 'calendario', name: 'Citas & Reservas', category: 'operaciones', desc: 'Agenda de turnos y sincronización de citas' },
   { id: 'whatsapp', name: 'WhatsApp CRM', category: 'operaciones', desc: 'Mensajería integrada y recordatorios' },
   { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones', desc: 'Flujos operativos y tracking de servicios' },
