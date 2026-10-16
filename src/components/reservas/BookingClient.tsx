@@ -27,25 +27,37 @@ import { matchesEmployeeService, detectClinicalDomain, getEmployeePrimaryDomain 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
 
-const getServiceIcon = (serviceName: string) => {
+const getServiceIcon = (serviceName: string, customIcon?: string) => {
+  if (customIcon) {
+    return <span className="text-2xl select-none leading-none">{customIcon}</span>;
+  }
   const norm = (serviceName || '').toLowerCase();
   if (norm.includes('cardio') || norm.includes('corazon') || norm.includes('ecg') || norm.includes('tension')) {
-    return <HeartPulse size={20} className="text-rose-500" />;
+    return <span className="text-2xl select-none leading-none">🫀</span>;
   }
   if (norm.includes('gineco') || norm.includes('ginelco') || norm.includes('obstetr') || norm.includes('prenatal') || norm.includes('embarazo')) {
-    return <Baby size={20} className="text-pink-500" />;
+    return <span className="text-2xl select-none leading-none">👶</span>;
   }
   if (norm.includes('odont') || norm.includes('dent') || norm.includes('bracket') || norm.includes('muela')) {
-    return <Sparkles size={20} className="text-teal-500" />;
+    return <span className="text-2xl select-none leading-none">🦷</span>;
   }
-  if (norm.includes('medic') || norm.includes('doctor') || norm.includes('salud') || norm.includes('clinica') || norm.includes('consulta') || norm.includes('evaluacion')) {
-    return <Stethoscope size={20} className="text-blue-500" />;
+  if (norm.includes('oftalmo') || norm.includes('optomet') || norm.includes('ojo')) {
+    return <span className="text-2xl select-none leading-none">👁️</span>;
+  }
+  if (norm.includes('trauma') || norm.includes('fisioterap') || norm.includes('hueso') || norm.includes('rehabilitac')) {
+    return <span className="text-2xl select-none leading-none">🦴</span>;
   }
   if (norm.includes('groom') || norm.includes('canin') || norm.includes('mascot') || norm.includes('perro') || norm.includes('gato')) {
-    return <Dog size={20} className="text-emerald-500" />;
+    return <span className="text-2xl select-none leading-none">🐩</span>;
   }
   if (norm.includes('barber') || norm.includes('fade') || norm.includes('barba') || norm.includes('afeitado')) {
-    return <Scissors size={20} className="text-amber-500" />;
+    return <span className="text-2xl select-none leading-none">💈</span>;
+  }
+  if (norm.includes('estil') || norm.includes('peluqu') || norm.includes('corte') || norm.includes('belleza')) {
+    return <span className="text-2xl select-none leading-none">✂️</span>;
+  }
+  if (norm.includes('medic') || norm.includes('doctor') || norm.includes('salud') || norm.includes('clinica') || norm.includes('consulta') || norm.includes('evaluacion')) {
+    return <span className="text-2xl select-none leading-none">🩺</span>;
   }
   return <ChevronRight size={20} className="text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform" />;
 };
@@ -239,9 +251,32 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   const resourceName = settings.resourceName;
 
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean} | null>(null);
+  const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean, icon?: string} | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   const [selectedBarberPrice, setSelectedBarberPrice] = useState<number | undefined>(undefined);
+
+  // Mapa de puestos configurados en la empresa con sus íconos elegidos
+  const configuredRolesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const rawRoles = (tenant?.metadata as any)?.company_roles;
+    if (Array.isArray(rawRoles)) {
+      rawRoles.forEach((item: any) => {
+        if (!item) return;
+        if (typeof item === 'string') {
+          const trimmed = item.trim();
+          const emojiMatch = trimmed.match(/^(\p{Extended_Pictographic}+)\s*(.+)$/u);
+          if (emojiMatch) {
+            map.set(emojiMatch[2].trim().toLowerCase(), emojiMatch[1]);
+          }
+        } else if (typeof item === 'object' && item.name) {
+          if (item.icon) {
+            map.set(item.name.trim().toLowerCase(), item.icon);
+          }
+        }
+      });
+    }
+    return map;
+  }, [tenant?.metadata]);
 
   // Extract unique services from all employees (Memoized)
   const uniqueServices = useMemo(() => {
@@ -351,15 +386,26 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           }
         }
       }
+
+      const nameLower = s.name.trim().toLowerCase();
+      let icon = configuredRolesMap.get(nameLower);
+      if (!icon) {
+        const emojiMatch = s.name.trim().match(/^(\p{Extended_Pictographic}+)\s*(.+)$/u);
+        if (emojiMatch) {
+          icon = emojiMatch[1];
+        }
+      }
+
       return {
         name: s.name,
         durationMinutes: s.durationMinutes,
         basePrice: s.basePrice,
         priceText: priceText,
         isCustomPrice: s.hasHidden || s.prices.length === 0,
+        icon,
       };
     });
-  }, [employees, settings.showPrices, settings.noPriceLabel]);
+  }, [employees, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
 
   // Si todos los colaboradores hacen lo mismo o solo existe 1 rama en la empresa,
   // no hace falta preguntarle al cliente qué quiere: se preselecciona la rama y se va directo al Paso 2
@@ -644,7 +690,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                         <h2 className="text-xl md:text-2xl font-black" style={{ color: appliedBtn }}>{service.name}</h2>
                       </div>
                       <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-sm shrink-0">
-                         {getServiceIcon(service.name)}
+                         {getServiceIcon(service.name, service.icon)}
                       </div>
                     </div>
                     <div className="p-4 flex items-center justify-between w-full bg-white">
@@ -709,8 +755,9 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                 <span className="text-[11px] font-bold uppercase tracking-widest block mb-0.5 opacity-80" style={{ color: btnTextColor }}>
                   {settings.headerTitle}
                 </span>
-                <h1 className="text-2xl md:text-4xl font-black mb-1 tracking-tight" style={{ color: btnTextColor }}>
-                  {selectedService?.name || 'Profesional'}
+                <h1 className="text-2xl md:text-4xl font-black mb-1 tracking-tight flex items-center gap-2.5" style={{ color: btnTextColor }}>
+                  {selectedService?.icon && <span className="text-2xl md:text-3xl select-none leading-none">{selectedService.icon}</span>}
+                  <span>{selectedService?.name || 'Profesional'}</span>
                 </h1>
                 <p className="text-xs md:text-sm max-w-lg opacity-85" style={{ color: btnTextColor }}>
                   ¿Con qué especialista te gustaría agendar tu cita?
@@ -782,9 +829,16 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                           </div>
                         )}
                         <div className="text-center sm:text-left flex-1 min-w-0">
-                          <span className="inline-block text-[11px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
-                            {barber.role || 'Especialista'}
-                          </span>
+                          {(() => {
+                            const empRoleTitle = (barber.metadata?.role_title || barber.role || 'Especialista').trim();
+                            const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
+                            return (
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                                {empRoleIcon && <span className="select-none">{empRoleIcon}</span>}
+                                <span>{barber.role || 'Especialista'}</span>
+                              </span>
+                            );
+                          })()}
                           <h2 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors truncate">
                             {barber.name}
                           </h2>
@@ -872,9 +926,19 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                     {settings.headerTitle}
                   </span>
                   <h2 className="text-xl lg:text-2xl font-black leading-tight truncate">{selectedBarber?.name}</h2>
-                  <p className="text-xs lg:text-sm font-medium truncate opacity-85">{selectedBarber?.role || 'Profesional'}</p>
+                  {(() => {
+                    const empRoleTitle = (selectedBarber?.metadata?.role_title || selectedBarber?.role || 'Profesional').trim();
+                    const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
+                    return (
+                      <p className="text-xs lg:text-sm font-medium truncate opacity-85 flex items-center gap-1.5">
+                        {empRoleIcon && <span className="select-none">{empRoleIcon}</span>}
+                        <span>{selectedBarber?.role || 'Profesional'}</span>
+                      </p>
+                    );
+                  })()}
                   <div className="mt-2 inline-flex items-center gap-1.5 bg-black/15 dark:bg-white/15 px-3 py-1 rounded-full text-xs font-bold">
-                    <Sparkles size={12} /> {selectedService?.name}
+                    {selectedService?.icon ? <span className="select-none">{selectedService.icon}</span> : <Sparkles size={12} />} 
+                    <span>{selectedService?.name}</span>
                   </div>
                 </div>
               </div>

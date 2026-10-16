@@ -121,20 +121,65 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   
   const [form, setForm] = useState(defaultForm);
 
-  // Catálogo Centralizado de Puestos / Roles de la Empresa
-  const [companyRoles, setCompanyRoles] = useState<string[]>([]);
+  // Catálogo Centralizado de Puestos / Roles de la Empresa con Íconos Personalizables
+  const [companyRoles, setCompanyRoles] = useState<Array<{ name: string; icon: string }>>([]);
   const [isCreatingRoleInline, setIsCreatingRoleInline] = useState(false);
   const [inlineRoleName, setInlineRoleName] = useState('');
+  const [inlineRoleIcon, setInlineRoleIcon] = useState('💼');
+  const [isPickerOpenInline, setIsPickerOpenInline] = useState(false);
+
   const [isManageRolesOpen, setIsManageRolesOpen] = useState(false);
   const [manageNewRoleInput, setManageNewRoleInput] = useState('');
+  const [manageNewRoleIcon, setManageNewRoleIcon] = useState('💼');
+  const [isManagePickerOpen, setIsManagePickerOpen] = useState(false);
+  const [editingRoleIconFor, setEditingRoleIconFor] = useState<string | null>(null);
+
   const [isSavingRolesToBackend, setIsSavingRolesToBackend] = useState(false);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
 
+  // Paleta de Íconos / Emojis Universales para cualquier industria
+  const ROLE_ICONS_LIST = [
+    // Salud & Clínica
+    '🩺', '🫀', '👶', '🦷', '👁️', '🦴', '🔬', '💉', '💊',
+    // Belleza & Cuidado
+    '💈', '✂️', '🧖', '💅', '💄', '🧴',
+    // Servicios Profesionales & Oficina
+    '💼', '⚖️', '📊', '💻', '🏢', '📋', '📞',
+    // Deporte & Bienestar
+    '🏋️', '🧘', '🥋', '🎾', '⚽', '🏊',
+    // Mascotas
+    '🐩', '🐕', '🐈', '🐾',
+    // Técnicos & Oficios
+    '🔧', '🚗', '⚡', '🔨', '🛡️',
+    // Creativo & Docente
+    '🎨', '📸', '🎓', '🎵',
+    // Gastronomía & General
+    '☕', '🍳', '🍕', '🍸', '⭐', '✨'
+  ];
+
+  const inferDefaultIcon = (name: string): string => {
+    const norm = name.toLowerCase();
+    if (norm.includes('cardio') || norm.includes('corazon')) return '🫀';
+    if (norm.includes('gineco') || norm.includes('obstetr') || norm.includes('prenatal') || norm.includes('pediatr')) return '👶';
+    if (norm.includes('odont') || norm.includes('dent') || norm.includes('bracket') || norm.includes('muela')) return '🦷';
+    if (norm.includes('medic') || norm.includes('doctor') || norm.includes('salud') || norm.includes('clinica')) return '🩺';
+    if (norm.includes('oftalmo') || norm.includes('optomet')) return '👁️';
+    if (norm.includes('trauma') || norm.includes('fisioterap') || norm.includes('rehabilitac')) return '🦴';
+    if (norm.includes('barber') || norm.includes('fade')) return '💈';
+    if (norm.includes('estil') || norm.includes('peluqu') || norm.includes('corte')) return '✂️';
+    if (norm.includes('groom') || norm.includes('canin') || norm.includes('mascot')) return '🐩';
+    if (norm.includes('spa') || norm.includes('masaj')) return '🧖';
+    if (norm.includes('abogad') || norm.includes('legal') || norm.includes('jurid')) return '⚖️';
+    if (norm.includes('contad') || norm.includes('finanz')) return '📊';
+    if (norm.includes('entrenad') || norm.includes('fitness') || norm.includes('gym')) return '🏋️';
+    if (norm.includes('mecanic') || norm.includes('taller')) return '🔧';
+    if (norm.includes('chef') || norm.includes('cocin')) return '🍳';
+    return '💼';
+  };
+
   // Sincronización reactiva del catálogo de puestos
   useEffect(() => {
-    const rawTenantRoles: string[] = Array.isArray((currentTenant?.metadata as any)?.company_roles)
-      ? (currentTenant?.metadata as any).company_roles
-      : [];
+    const rawTenantRoles = (currentTenant?.metadata as any)?.company_roles;
 
     const rawEmployeeRoles: string[] = employees
       .map(e => (e.metadata as any)?.role_title)
@@ -150,25 +195,46 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       'Recepcionista'
     ];
 
-    const set = new Set<string>();
-    const list: string[] = [];
-    const addRole = (r: string) => {
-      const trimmed = (r || '').trim();
-      if (!trimmed || trimmed === 'Espacio / Recurso') return;
-      const lower = trimmed.toLowerCase();
-      if (!set.has(lower)) {
-        set.add(lower);
-        list.push(trimmed);
+    const map = new Map<string, { name: string; icon: string }>();
+
+    const parseAndAdd = (item: any) => {
+      if (!item) return;
+      let name = '';
+      let icon = '';
+
+      if (typeof item === 'string') {
+        const trimmed = item.trim();
+        if (!trimmed || trimmed === 'Espacio / Recurso') return;
+        const emojiMatch = trimmed.match(/^(\p{Extended_Pictographic}+)\s*(.+)$/u);
+        if (emojiMatch) {
+          icon = emojiMatch[1];
+          name = emojiMatch[2].trim();
+        } else {
+          name = trimmed;
+          icon = inferDefaultIcon(trimmed);
+        }
+      } else if (typeof item === 'object') {
+        name = (item.name || '').trim();
+        icon = item.icon || inferDefaultIcon(name);
+      }
+
+      if (!name) return;
+      const lower = name.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, { name, icon: icon || '💼' });
       }
     };
 
-    rawTenantRoles.forEach(addRole);
-    rawEmployeeRoles.forEach(addRole);
-    if (list.length === 0) {
-      defaultSuggestedRoles.forEach(addRole);
+    if (Array.isArray(rawTenantRoles)) {
+      rawTenantRoles.forEach(parseAndAdd);
+    }
+    rawEmployeeRoles.forEach(parseAndAdd);
+
+    if (map.size === 0) {
+      defaultSuggestedRoles.forEach(parseAndAdd);
     }
 
-    setCompanyRoles(list);
+    setCompanyRoles(Array.from(map.values()));
   }, [currentTenant?.metadata, employees, isClinicaActive, isOdontologiaActive, isBarberiaActive, isGroomingActive]);
 
   /**
@@ -232,54 +298,89 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   };
 
   /**
-   * Guarda un nuevo puesto en el catálogo persistido de la empresa
+   * Guarda o actualiza un puesto con su ícono en el catálogo persistido de la empresa
    */
-  const handleSaveNewCompanyRole = async (newRoleText: string) => {
+  const handleSaveNewCompanyRole = async (newRoleText: string, iconText?: string) => {
     const trimmed = newRoleText.trim();
     if (!trimmed) {
       toast({ variant: 'error', title: 'Nombre Requerido', description: 'Por favor escribe el nombre del puesto.' });
       return;
     }
 
-    const exists = companyRoles.some(r => r.toLowerCase() === trimmed.toLowerCase());
-    const updatedRoles = exists ? companyRoles : [...companyRoles, trimmed];
+    const icon = iconText || inferDefaultIcon(trimmed);
+    const lower = trimmed.toLowerCase();
+    const existingIndex = companyRoles.findIndex(r => r.name.toLowerCase() === lower);
 
-    if (!exists) {
-      setCompanyRoles(updatedRoles);
-      setIsSavingRolesToBackend(true);
-      try {
-        const res = await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
-        if (res.success) {
-          toast({ variant: 'success', title: 'Puesto Creado', description: `El puesto "${trimmed}" fue registrado en la empresa.` });
-          if (currentTenant) {
-            useERPStore.getState().setCurrentTenant({
-              ...currentTenant,
-              metadata: {
-                ...(currentTenant.metadata || {}),
-                company_roles: updatedRoles
-              }
-            });
-          }
-        } else {
-          toast({ variant: 'error', title: 'Error al persistir', description: res.error || 'No se pudo guardar el puesto en el servidor.' });
+    let updatedRoles: Array<{ name: string; icon: string }>;
+    if (existingIndex >= 0) {
+      updatedRoles = [...companyRoles];
+      updatedRoles[existingIndex] = { ...updatedRoles[existingIndex], icon };
+    } else {
+      updatedRoles = [...companyRoles, { name: trimmed, icon }];
+    }
+
+    setCompanyRoles(updatedRoles);
+    setIsSavingRolesToBackend(true);
+    try {
+      const res = await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
+      if (res.success) {
+        toast({ variant: 'success', title: 'Puesto Guardado', description: `${icon} ${trimmed} configurado en la empresa.` });
+        if (currentTenant) {
+          useERPStore.getState().setCurrentTenant({
+            ...currentTenant,
+            metadata: {
+              ...(currentTenant.metadata || {}),
+              company_roles: updatedRoles
+            }
+          });
         }
-      } catch (e: any) {
-        toast({ variant: 'error', title: 'Error de red', description: e.message });
-      } finally {
-        setIsSavingRolesToBackend(false);
+      } else {
+        toast({ variant: 'error', title: 'Error al persistir', description: res.error || 'No se pudo guardar el puesto en el servidor.' });
       }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Error de red', description: e.message });
+    } finally {
+      setIsSavingRolesToBackend(false);
     }
 
     applyRoleSelection(trimmed);
     setInlineRoleName('');
+    setInlineRoleIcon('💼');
     setIsCreatingRoleInline(false);
+    setIsPickerOpenInline(false);
+  };
+
+  /**
+   * Cambia el ícono de un puesto existente
+   */
+  const handleUpdateRoleIcon = async (roleName: string, newIcon: string) => {
+    const updatedRoles = companyRoles.map(r => 
+      r.name.toLowerCase() === roleName.toLowerCase() ? { ...r, icon: newIcon } : r
+    );
+    setCompanyRoles(updatedRoles);
+    setEditingRoleIconFor(null);
+    try {
+      await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
+      toast({ variant: 'success', title: 'Ícono Actualizado', description: `Se asignó ${newIcon} a ${roleName}.` });
+      if (currentTenant) {
+        useERPStore.getState().setCurrentTenant({
+          ...currentTenant,
+          metadata: {
+            ...(currentTenant.metadata || {}),
+            company_roles: updatedRoles
+          }
+        });
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Error', description: e.message });
+    }
   };
 
   /**
    * Elimina un puesto del catálogo de la empresa
    */
   const handleDeleteCompanyRole = async (roleToDelete: string) => {
-    const updatedRoles = companyRoles.filter(r => r.toLowerCase() !== roleToDelete.toLowerCase());
+    const updatedRoles = companyRoles.filter(r => r.name.toLowerCase() !== roleToDelete.toLowerCase());
     setCompanyRoles(updatedRoles);
     setIsSavingRolesToBackend(true);
     try {
@@ -654,23 +755,24 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             const count = employees.filter((e) => {
               const meta = (e.metadata || {}) as Record<string, any>;
               const title = (meta.role_title as string) || (meta.is_resource ? 'Espacio / Recurso' : 'Especialista');
-              return title.trim().toLowerCase() === role.trim().toLowerCase();
+              return title.trim().toLowerCase() === role.name.trim().toLowerCase();
             }).length;
-            if (count === 0 && selectedRoleFilter !== role) return null;
+            if (count === 0 && selectedRoleFilter !== role.name) return null;
             return (
               <button
-                key={role}
+                key={role.name}
                 type="button"
-                onClick={() => setSelectedRoleFilter(role)}
+                onClick={() => setSelectedRoleFilter(role.name)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 ${
-                  selectedRoleFilter === role
+                  selectedRoleFilter === role.name
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
                     : 'bg-card text-slate-600 dark:text-slate-300 border-border hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
               >
-                <span>{role}</span>
+                <span className="select-none">{role.icon}</span>
+                <span>{role.name}</span>
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                  selectedRoleFilter === role ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                  selectedRoleFilter === role.name ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
                 }`}>
                   {count}
                 </span>
@@ -708,6 +810,9 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             const isBookable = meta.bookable !== false;
             const salary = Number(meta.base_salary || meta.salary || 0);
             const freq = (meta.payment_frequency as string) || 'quincenal';
+            const roleTitle = (meta.role_title as string) || (meta.is_resource ? 'Espacio / Recurso' : 'Especialista');
+            const matchedRole = companyRoles.find(r => r.name.toLowerCase() === roleTitle.trim().toLowerCase());
+            const roleIcon = matchedRole ? matchedRole.icon : inferDefaultIcon(roleTitle);
             
             return (
               <div 
@@ -770,8 +875,8 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                     {emp.name}
                   </h3>
                   <p className="text-slate-500 dark:text-slate-400 text-xs flex items-center gap-1.5 mt-0.5">
-                    <Briefcase size={13} className="text-indigo-500" />
-                    {(meta.role_title as string) || (meta.is_resource ? 'Espacio / Recurso' : 'Especialista')}
+                    <span className="text-sm select-none">{roleIcon}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300">{roleTitle}</span>
                   </p>
                 </div>
 
@@ -1064,65 +1169,129 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                           </div>
 
                           {isCreatingRoleInline ? (
-                            <div className="flex items-center gap-2 animate-in fade-in">
-                              <input
-                                type="text"
-                                autoFocus
-                                value={inlineRoleName}
-                                onChange={(e) => setInlineRoleName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    handleSaveNewCompanyRole(inlineRoleName);
-                                  } else if (e.key === 'Escape') {
+                            <div className="space-y-2 animate-in fade-in">
+                              <div className="flex items-center gap-2">
+                                {/* Selector de Ícono Inline */}
+                                <div className="relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => setIsPickerOpenInline(!isPickerOpenInline)}
+                                    className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-lg hover:scale-105 active:scale-95 transition-all select-none shadow-2xs"
+                                    title="Elegir ícono / emoji para este puesto"
+                                  >
+                                    {inlineRoleIcon}
+                                  </button>
+
+                                  {isPickerOpenInline && (
+                                    <div className="absolute top-11 left-0 z-50 bg-card border border-border rounded-2xl p-2.5 shadow-2xl w-60 animate-in fade-in zoom-in-95">
+                                      <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-border">
+                                        <span className="text-[10px] font-black text-foreground">Seleccionar Ícono</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setIsPickerOpenInline(false)}
+                                          className="text-slate-400 hover:text-foreground text-xs"
+                                        >
+                                          ✕
+                                        </button>
+                                      </div>
+                                      <div className="grid grid-cols-6 gap-1 max-h-40 overflow-y-auto p-0.5">
+                                        {ROLE_ICONS_LIST.map((ic) => (
+                                          <button
+                                            key={ic}
+                                            type="button"
+                                            onClick={() => {
+                                              setInlineRoleIcon(ic);
+                                              setIsPickerOpenInline(false);
+                                            }}
+                                            className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors ${
+                                              inlineRoleIcon === ic ? 'bg-indigo-100 dark:bg-indigo-900 border border-indigo-400' : ''
+                                            }`}
+                                          >
+                                            {ic}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <input
+                                  type="text"
+                                  autoFocus
+                                  value={inlineRoleName}
+                                  onChange={(e) => {
+                                    setInlineRoleName(e.target.value);
+                                    if (inlineRoleIcon === '💼') {
+                                      setInlineRoleIcon(inferDefaultIcon(e.target.value));
+                                    }
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveNewCompanyRole(inlineRoleName, inlineRoleIcon);
+                                    } else if (e.key === 'Escape') {
+                                      setIsCreatingRoleInline(false);
+                                      setIsPickerOpenInline(false);
+                                    }
+                                  }}
+                                  placeholder="Escribe el nuevo puesto (Ej. Cardiólogo Intervencionista, Barbero Master...)"
+                                  className="flex-1 bg-background border border-indigo-500/50 rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveNewCompanyRole(inlineRoleName, inlineRoleIcon)}
+                                  disabled={isSavingRolesToBackend || !inlineRoleName.trim()}
+                                  className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 shrink-0"
+                                >
+                                  <Check size={13} />
+                                  Guardar y Asignar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
                                     setIsCreatingRoleInline(false);
-                                  }
-                                }}
-                                placeholder="Escribe el nuevo puesto (Ej. Cardiólogo Intervencionista, Barbero Master...)"
-                                className="flex-1 bg-background border border-indigo-500/50 rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => handleSaveNewCompanyRole(inlineRoleName)}
-                                disabled={isSavingRolesToBackend || !inlineRoleName.trim()}
-                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 shrink-0"
-                              >
-                                <Check size={13} />
-                                Guardar y Asignar
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsCreatingRoleInline(false);
-                                  setInlineRoleName('');
-                                }}
-                                className="px-2.5 py-2 text-slate-500 hover:text-foreground rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-800"
-                              >
-                                Cancelar
-                              </button>
+                                    setInlineRoleName('');
+                                    setInlineRoleIcon('💼');
+                                    setIsPickerOpenInline(false);
+                                  }}
+                                  className="px-2.5 py-2 text-slate-500 hover:text-foreground rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-800"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
                             </div>
                           ) : (
-                            <div className="relative">
-                              <select
-                                value={form.roleTitle}
-                                onChange={(e) => {
-                                  if (e.target.value === '__NEW__') {
-                                    setIsCreatingRoleInline(true);
-                                  } else {
-                                    applyRoleSelection(e.target.value);
-                                  }
-                                }}
-                                className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
-                              >
-                                <option value="">-- Seleccionar puesto registrado --</option>
-                                {form.roleTitle && !companyRoles.some(r => r.toLowerCase() === form.roleTitle.toLowerCase()) && (
-                                  <option value={form.roleTitle}>{form.roleTitle} (Actual)</option>
-                                )}
-                                {companyRoles.map((role) => (
-                                  <option key={role} value={role}>{role}</option>
-                                ))}
-                                <option value="__NEW__" className="font-bold text-indigo-600">+ Crear nuevo puesto...</option>
-                              </select>
+                            <div className="flex items-center gap-2">
+                              {form.roleTitle && (
+                                <div 
+                                  className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-lg select-none shrink-0"
+                                  title="Ícono del puesto"
+                                >
+                                  {companyRoles.find(r => r.name.toLowerCase() === form.roleTitle.toLowerCase())?.icon || inferDefaultIcon(form.roleTitle)}
+                                </div>
+                              )}
+                              <div className="relative flex-1">
+                                <select
+                                  value={form.roleTitle}
+                                  onChange={(e) => {
+                                    if (e.target.value === '__NEW__') {
+                                      setIsCreatingRoleInline(true);
+                                    } else {
+                                      applyRoleSelection(e.target.value);
+                                    }
+                                  }}
+                                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                                >
+                                  <option value="">-- Seleccionar puesto registrado --</option>
+                                  {form.roleTitle && !companyRoles.some(r => r.name.toLowerCase() === form.roleTitle.toLowerCase()) && (
+                                    <option value={form.roleTitle}>{inferDefaultIcon(form.roleTitle)} {form.roleTitle} (Actual)</option>
+                                  )}
+                                  {companyRoles.map((role) => (
+                                    <option key={role.name} value={role.name}>{role.icon} {role.name}</option>
+                                  ))}
+                                  <option value="__NEW__" className="font-bold text-indigo-600">+ Crear nuevo puesto con ícono...</option>
+                                </select>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -2000,38 +2169,91 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
               </button>
             </div>
 
-            {/* Input para agregar nuevo puesto */}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={manageNewRoleInput}
-                onChange={(e) => setManageNewRoleInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (manageNewRoleInput.trim()) {
-                      handleSaveNewCompanyRole(manageNewRoleInput);
-                      setManageNewRoleInput('');
+            {/* Input para agregar nuevo puesto con selector de ícono */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 relative">
+                {/* Selector de Emoji para nuevo puesto */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsManagePickerOpen(!isManagePickerOpen)}
+                    className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-lg hover:scale-105 active:scale-95 transition-all select-none shadow-2xs"
+                    title="Elegir ícono / emoji para el puesto"
+                  >
+                    {manageNewRoleIcon}
+                  </button>
+
+                  {isManagePickerOpen && (
+                    <div className="absolute top-12 left-0 z-[120] bg-card border border-border rounded-2xl p-3 shadow-2xl w-64 animate-in fade-in zoom-in-95">
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-border">
+                        <span className="text-[11px] font-black text-foreground">Elige un Ícono</span>
+                        <button
+                          type="button"
+                          onClick={() => setIsManagePickerOpen(false)}
+                          className="text-slate-400 hover:text-foreground text-xs"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1">
+                        {ROLE_ICONS_LIST.map((ic) => (
+                          <button
+                            key={ic}
+                            type="button"
+                            onClick={() => {
+                              setManageNewRoleIcon(ic);
+                              setIsManagePickerOpen(false);
+                            }}
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center text-base hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors ${
+                              manageNewRoleIcon === ic ? 'bg-indigo-100 dark:bg-indigo-900 border border-indigo-400' : ''
+                            }`}
+                          >
+                            {ic}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <input
+                  type="text"
+                  value={manageNewRoleInput}
+                  onChange={(e) => {
+                    setManageNewRoleInput(e.target.value);
+                    if (manageNewRoleIcon === '💼') {
+                      setManageNewRoleIcon(inferDefaultIcon(e.target.value));
                     }
-                  }
-                }}
-                placeholder="Escribe un nuevo puesto (Ej. Dermatólogo, Barbero Senior...)"
-                className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
-              />
-              <Button
-                type="button"
-                onClick={() => {
-                  if (manageNewRoleInput.trim()) {
-                    handleSaveNewCompanyRole(manageNewRoleInput);
-                    setManageNewRoleInput('');
-                  }
-                }}
-                disabled={!manageNewRoleInput.trim() || isSavingRolesToBackend}
-                className="text-xs font-bold shrink-0"
-              >
-                <Plus size={14} className="mr-1" />
-                Agregar
-              </Button>
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (manageNewRoleInput.trim()) {
+                        handleSaveNewCompanyRole(manageNewRoleInput, manageNewRoleIcon);
+                        setManageNewRoleInput('');
+                        setManageNewRoleIcon('💼');
+                      }
+                    }
+                  }}
+                  placeholder="Escribe un nuevo puesto (Ej. Dermatólogo, Barbero Senior...)"
+                  className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                />
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (manageNewRoleInput.trim()) {
+                      handleSaveNewCompanyRole(manageNewRoleInput, manageNewRoleIcon);
+                      setManageNewRoleInput('');
+                      setManageNewRoleIcon('💼');
+                    }
+                  }}
+                  disabled={!manageNewRoleInput.trim() || isSavingRolesToBackend}
+                  className="text-xs font-bold shrink-0"
+                >
+                  <Plus size={14} className="mr-1" />
+                  Agregar
+                </Button>
+              </div>
             </div>
 
             {/* Lista de puestos registrados */}
@@ -2044,20 +2266,60 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 companyRoles.map((role) => {
                   const assignedCount = employees.filter(e => {
                     const t = ((e.metadata as any)?.role_title || '').trim().toLowerCase();
-                    return t === role.toLowerCase();
+                    return t === role.name.toLowerCase();
                   }).length;
+
+                  const isEditingThisIcon = editingRoleIconFor === role.name;
 
                   return (
                     <div
-                      key={role}
-                      className="flex items-center justify-between p-3 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/30 hover:border-indigo-500/30 transition-all"
+                      key={role.name}
+                      className="flex items-center justify-between p-3 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/30 hover:border-indigo-500/30 transition-all relative"
                     >
                       <div className="flex items-center gap-2.5">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold text-xs">
-                          💼
+                        {/* Botón de ícono interactivo para cambiar emoji con 1 clic */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setEditingRoleIconFor(isEditingThisIcon ? null : role.name)}
+                            title="Haz clic para cambiar el ícono de este puesto"
+                            className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-border hover:border-indigo-400 text-indigo-600 flex items-center justify-center font-bold text-base hover:scale-110 active:scale-95 transition-all shadow-2xs cursor-pointer select-none"
+                          >
+                            {role.icon}
+                          </button>
+
+                          {isEditingThisIcon && (
+                            <div className="absolute top-11 left-0 z-[125] bg-card border border-border rounded-2xl p-3 shadow-2xl w-64 animate-in fade-in zoom-in-95">
+                              <div className="flex items-center justify-between pb-2 mb-2 border-b border-border">
+                                <span className="text-[11px] font-black text-foreground">Cambiar ícono de {role.name}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingRoleIconFor(null)}
+                                  className="text-slate-400 hover:text-foreground text-xs"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                              <div className="grid grid-cols-6 gap-1.5 max-h-48 overflow-y-auto p-1">
+                                {ROLE_ICONS_LIST.map((ic) => (
+                                  <button
+                                    key={ic}
+                                    type="button"
+                                    onClick={() => handleUpdateRoleIcon(role.name, ic)}
+                                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-base hover:bg-indigo-50 dark:hover:bg-indigo-950/50 transition-colors ${
+                                      role.icon === ic ? 'bg-indigo-100 dark:bg-indigo-900 border border-indigo-400' : ''
+                                    }`}
+                                  >
+                                    {ic}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
+
                         <div>
-                          <span className="text-xs font-bold text-foreground block">{role}</span>
+                          <span className="text-xs font-bold text-foreground block">{role.name}</span>
                           <span className="text-[10px] text-slate-400">
                             {assignedCount === 1 ? '1 colaborador asignado' : `${assignedCount} colaboradores asignados`}
                           </span>
@@ -2067,7 +2329,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
-                          onClick={() => handleDeleteCompanyRole(role)}
+                          onClick={() => handleDeleteCompanyRole(role.name)}
                           disabled={isSavingRolesToBackend}
                           title={assignedCount > 0 ? `Atención: Hay ${assignedCount} empleado(s) con este puesto` : 'Eliminar puesto'}
                           className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"

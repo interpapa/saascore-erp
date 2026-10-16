@@ -411,9 +411,11 @@ export async function updateTenantMetadataAction(
  * Actualiza el catálogo centralizado de puestos / cargos de la empresa (company_roles)
  * persistido en tenants.metadata.company_roles con validación de seguridad multi-tenant.
  */
+export type CompanyRoleInput = string | { name: string; icon?: string };
+
 export async function updateCompanyRolesAction(
   tenantId: string,
-  roles: string[],
+  roles: CompanyRoleInput[],
   actor: ActionActor
 ) {
   try {
@@ -433,17 +435,34 @@ export async function updateCompanyRolesAction(
 
     const currentMeta = (tenant?.metadata as any) || {};
 
-    // Normalizar lista de puestos: eliminar duplicados insensibles a mayúsculas/minúsculas y espacios en blanco
+    // Normalizar lista de puestos a objetos canónicos { name: string, icon: string }
     const seen = new Set<string>();
-    const cleanedRoles: string[] = [];
+    const cleanedRoles: Array<{ name: string; icon: string }> = [];
 
     for (const r of roles) {
-      const trimmed = (r || '').trim();
-      if (!trimmed) continue;
-      const lower = trimmed.toLowerCase();
+      let name = '';
+      let icon = '💼';
+
+      if (typeof r === 'string') {
+        const trimmed = (r || '').trim();
+        if (!trimmed) continue;
+        const emojiMatch = trimmed.match(/^(\p{Extended_Pictographic}+)\s*(.+)$/u);
+        if (emojiMatch) {
+          icon = emojiMatch[1];
+          name = emojiMatch[2].trim();
+        } else {
+          name = trimmed;
+        }
+      } else if (typeof r === 'object' && r !== null) {
+        name = (r.name || '').trim();
+        icon = (r.icon || '💼').trim();
+      }
+
+      if (!name) continue;
+      const lower = name.toLowerCase();
       if (!seen.has(lower)) {
         seen.add(lower);
-        cleanedRoles.push(trimmed);
+        cleanedRoles.push({ name, icon });
       }
     }
 
