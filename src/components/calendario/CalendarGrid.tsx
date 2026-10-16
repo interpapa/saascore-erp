@@ -155,7 +155,7 @@ export function CalendarGrid({
              {/* Columnas de Empleados */}
              <div className="flex flex-1">
                {activeEmployees.map(emp => {
-                  const empAppts = dayAppts.filter(a => a.employee_id === emp.id);
+                  const empAppts = dayAppts.filter(a => a.employee_id === emp.id || (!a.employee_id && a.metadata?.is_block));
                   
                   return (
                     <div key={emp.id} className="flex-1 min-w-[150px] border-r border-border relative">
@@ -170,27 +170,37 @@ export function CalendarGrid({
                       
                       {/* Citas Superpuestas */}
                       {empAppts.map(appt => {
-                         const startD = new Date(appt.start_time);
-                         const endD = appt.end_time ? new Date(appt.end_time) : new Date(startD.getTime() + 45*60000);
-                         
-                         const startMins = startD.getHours() * 60 + startD.getMinutes();
-                         const endMins = endD.getHours() * 60 + endD.getMinutes();
-                         
-                         const topMins = startMins - (8 * 60);
-                         const durationMins = endMins - startMins;
-                         
+                         const isBlock = !!appt.metadata?.is_block;
+                         const isAllDay = !!appt.metadata?.all_day;
+
                          // 1 slot = 30 mins = h-16 (64px) -> 1 min = 64/30 px = 2.133px
                          const pixelsPerMin = 64 / 30;
-                         const topPx = topMins * pixelsPerMin;
-                         // Mínimo visual de 15 mins
-                         const heightPx = Math.max(15, durationMins) * pixelsPerMin;
+                         let topPx: number;
+                         let heightPx: number;
 
-                         // Ignorar citas antes de las 8am
-                         if (topMins < 0) return null;
+                         if (isAllDay) {
+                           topPx = 0;
+                           // 13 horas (8:00 a 21:00) = 780 mins
+                           heightPx = 780 * pixelsPerMin;
+                         } else {
+                           const startD = new Date(appt.start_time);
+                           const endD = appt.end_time ? new Date(appt.end_time) : new Date(startD.getTime() + 45*60000);
+                           
+                           const startMins = startD.getHours() * 60 + startD.getMinutes();
+                           const endMins = endD.getHours() * 60 + endD.getMinutes();
+                           
+                           const topMins = startMins - (8 * 60);
+                           const durationMins = endMins - startMins;
+                           
+                           topPx = topMins * pixelsPerMin;
+                           heightPx = Math.max(15, durationMins) * pixelsPerMin;
+
+                           if (topMins < 0) return null;
+                         }
 
                          const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || visual.color || '#6366f1';
-                         const cardBorderColor = visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor);
+                         const cardBorderColor = isBlock ? '#f43f5e' : (visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor));
 
                          return (
                            <div 
@@ -200,22 +210,33 @@ export function CalendarGrid({
                              style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: cardBorderColor }}
                            >
                              <div className="flex items-center justify-between gap-1">
-                               <span className="text-xs font-black leading-tight truncate">{appt.client_name || appt.title}</span>
+                               <span className="text-xs font-black leading-tight truncate">
+                                 {isBlock ? `🔒 ${appt.title}` : (appt.client_name || appt.title)}
+                               </span>
                                {visual.isPendingPayment && (
                                  <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200 shrink-0">
                                    Pago Pend.
                                  </span>
                                )}
+                               {isBlock && isAllDay && (
+                                 <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-rose-500/25 text-rose-900 dark:text-rose-200 shrink-0">
+                                   Día Completo
+                                 </span>
+                               )}
                              </div>
                              {heightPx >= 50 && (
-                               <span className="text-[10px] font-medium leading-tight truncate opacity-80">{appt.service_name || appt.title}</span>
+                               <span className="text-[10px] font-medium leading-tight truncate opacity-80">
+                                 {isBlock ? String(appt.metadata?.block_type || 'Mantenimiento') : (appt.service_name || appt.title)}
+                               </span>
                              )}
                              <div className="mt-auto flex items-center justify-between">
-                                <span className="text-[10px] font-bold opacity-75">{formatTime(appt.start_time)}</span>
+                                <span className="text-[10px] font-bold opacity-75">
+                                  {isAllDay ? 'Jornada Completa' : formatTime(appt.start_time)}
+                                </span>
                                 <div className={`w-2 h-2 rounded-full ${visual.dot}`} />
                              </div>
                            </div>
-                         )
+                         );
                       })}
                     </div>
                   )
@@ -312,7 +333,7 @@ export function CalendarGrid({
                               style={{ borderLeftColor: cardBorderColor }}
                             >
                               <div className="flex items-center justify-between gap-1">
-                                <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.client_name || appt.title}</span>
+                                <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.metadata?.is_block ? `🔒 ${appt.title}` : (appt.client_name || appt.title)}</span>
                                 {visual.isPendingPayment && (
                                   <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200 shrink-0">
                                     Pend.
@@ -406,7 +427,7 @@ export function CalendarGrid({
                               className={`text-[9px] font-bold p-1 rounded-md border-l-4 truncate ${visual.bg}`} 
                               style={{ borderLeftColor: cardBorderColor }}
                             >
-                               {visual.isPendingPayment ? '🟡 ' : ''}{formatTime(appt.start_time)} {appt.client_name || appt.title}
+                               {appt.metadata?.is_block ? '🔒 ' : ''}{visual.isPendingPayment ? '🟡 ' : ''}{formatTime(appt.start_time)} {appt.client_name || appt.title}
                             </div>
                           );
                        })}

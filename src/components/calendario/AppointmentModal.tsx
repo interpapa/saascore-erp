@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign, FileText, Check } from 'lucide-react';
-import { CreateAppointmentInput, Employee, Service, AppointmentStatus } from '@/types/calendario';
+import { 
+  X, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign, 
+  FileText, Check, Lock, CalendarRange, Building, Palmtree, Coffee, 
+  Wrench, ShieldAlert, Sparkles, CheckCircle2 
+} from 'lucide-react';
+import { CreateAppointmentInput, BlockInput, Employee, Service, AppointmentStatus } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
 import { AGENDA_20_COLORS, DEFAULT_AGENDA_COLOR } from '@/lib/calendario/calendarColors';
 import { matchesEmployeeService } from '@/lib/services/serviceMatching';
@@ -12,6 +16,7 @@ export interface AppointmentModalProps {
   type?: 'appointment' | 'block';
   onClose: () => void;
   onSave: (input: CreateAppointmentInput) => Promise<void>;
+  onSaveBlock?: (input: BlockInput) => Promise<void>;
   employees: Employee[];
   services: Service[];
   clients: Entity[];
@@ -19,6 +24,17 @@ export interface AppointmentModalProps {
   initialTime?: string | null;
   initialClientId?: string | null;
 }
+
+export const BLOCK_PRESETS = [
+  { label: 'Mantenimiento General', icon: '🔧', color: '#f43f5e' },
+  { label: 'Feriado / Festivo', icon: '🎉', color: '#8b5cf6' },
+  { label: 'Vacaciones', icon: '🏖️', color: '#0284c7' },
+  { label: 'Almuerzo / Pausa', icon: '🍽️', color: '#f59e0b' },
+  { label: 'Permiso Médico', icon: '🩺', color: '#10b981' },
+  { label: 'Capacitación', icon: '📚', color: '#6366f1' },
+  { label: 'Remodelación / Obra', icon: '🏗️', color: '#d946ef' },
+  { label: 'Cierre Temporal', icon: '🔒', color: '#ef4444' },
+];
 
 function toYYYYMMDD(d: Date): string {
   const y = d.getFullYear();
@@ -32,6 +48,7 @@ export function AppointmentModal({
   type = 'appointment',
   onClose,
   onSave,
+  onSaveBlock,
   employees,
   services,
   clients,
@@ -55,16 +72,20 @@ export function AppointmentModal({
   const [customClientName, setCustomClientName] = useState('');
   const [color, setColor] = useState(DEFAULT_AGENDA_COLOR);
 
+  // Estados dedicados para Bloqueo / Mantenimiento
+  const [blockMode, setBlockMode] = useState<'hours' | 'full_day' | 'multi_day'>('full_day');
+  const [blockScope, setBlockScope] = useState<'all' | 'employee'>('all');
+  const [blockReasonType, setBlockReasonType] = useState('Mantenimiento General');
+  const [blockStartDate, setBlockStartDate] = useState(toYYYYMMDD(new Date()));
+  const [blockEndDate, setBlockEndDate] = useState(toYYYYMMDD(new Date()));
+
   useEffect(() => {
     if (isOpen) {
       const d = initialDate || new Date();
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDateStr(toYYYYMMDD(d));
-       
+      const dateFormatted = toYYYYMMDD(d);
+      setDateStr(dateFormatted);
       setTimeStr(initialTime || '09:00');
-       
-      setTitle('');
-       
+      
       setServiceId('');
       setClientId(initialClientId || '');
       setCustomClientName('');
@@ -73,10 +94,24 @@ export function AppointmentModal({
       setStatus('scheduled');
       setPrice(0);
       setNotes('');
-      setColor(DEFAULT_AGENDA_COLOR);
       setFormError(null);
+
+      // Inicialización para bloqueos
+      setBlockMode('full_day');
+      setBlockScope('all');
+      setBlockReasonType('Mantenimiento General');
+      setBlockStartDate(dateFormatted);
+      setBlockEndDate(dateFormatted);
+
+      if (type === 'block') {
+        setTitle('Mantenimiento General');
+        setColor('#f43f5e');
+      } else {
+        setTitle('');
+        setColor(DEFAULT_AGENDA_COLOR);
+      }
     }
-  }, [isOpen, initialDate, initialTime, initialClientId]);
+  }, [isOpen, initialDate, initialTime, initialClientId, type]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -184,6 +219,63 @@ export function AppointmentModal({
     e.preventDefault();
     setFormError(null);
 
+    if (type === 'block') {
+      try {
+        setIsSubmitting(true);
+        if (blockMode === 'multi_day') {
+          if (!blockStartDate || !blockEndDate) {
+            throw new Error('Debes indicar fecha inicial y fecha final.');
+          }
+          if (blockStartDate > blockEndDate) {
+            throw new Error('La fecha inicial no puede ser posterior a la fecha final.');
+          }
+        }
+
+        const blockPayload: BlockInput = {
+          title: title.trim() || blockReasonType,
+          reasonType: blockReasonType,
+          scope: blockScope,
+          employeeId: blockScope === 'employee' ? (employeeId || null) : null,
+          mode: blockMode,
+          date: dateStr,
+          startTime: timeStr,
+          durationMinutes,
+          startDate: blockStartDate,
+          endDate: blockEndDate,
+          notes: notes.trim() || undefined,
+          color: color || '#f43f5e',
+        };
+
+        if (onSaveBlock) {
+          await onSaveBlock(blockPayload);
+        } else {
+          const startDateTime = new Date(`${dateStr}T${timeStr}:00`);
+          await onSave({
+            title: blockPayload.title,
+            employee_id: blockPayload.employeeId || null,
+            start_time: startDateTime.toISOString(),
+            end_time: new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString(),
+            duration_minutes: durationMinutes,
+            status: 'scheduled',
+            price: 0,
+            notes: notes || null,
+            metadata: {
+              is_block: true,
+              block_type: blockReasonType,
+              color: color || '#f43f5e',
+            },
+          });
+        }
+
+        onClose();
+      } catch (err: unknown) {
+        setFormError((err as Error).message || 'Error al procesar el bloqueo.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
     const apptTitle = title.trim() || (serviceId ? services.find((s) => s.id === serviceId)?.name || 'Cita de Servicio' : 'Cita de Servicio');
 
     try {
@@ -210,9 +302,7 @@ export function AppointmentModal({
       let appointmentMetadata: Record<string, unknown> = {
         color: color || DEFAULT_AGENDA_COLOR,
       };
-      if (type === 'block') {
-        appointmentMetadata.is_block = true;
-      } else if (isGroupClass) {
+      if (isGroupClass) {
         const s = services.find((srv) => srv.id === serviceId);
         appointmentMetadata.is_group_class = true;
         appointmentMetadata.max_capacity = s?.metadata?.max_capacity || 10;
@@ -243,6 +333,18 @@ export function AppointmentModal({
     }
   };
 
+  // Cálculo de días para bloqueos multi-día
+  const calculateDaysDiff = () => {
+    if (!blockStartDate || !blockEndDate) return 1;
+    const start = new Date(blockStartDate);
+    const end = new Date(blockEndDate);
+    const diffTime = end.getTime() - start.getTime();
+    if (diffTime < 0) return 0;
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  };
+
+  const daysCount = calculateDaysDiff();
+
   return (
     <div 
       className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
@@ -255,14 +357,23 @@ export function AppointmentModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`border-b border-border p-5 sm:p-6 flex items-center justify-between ${type === 'block' ? 'bg-red-50/50 dark:bg-red-900/20' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
-          <div>
-            <h3 className={`text-xl font-black tracking-tight ${type === 'block' ? 'text-red-700 dark:text-red-400' : 'text-foreground'}`}>
-              {type === 'block' ? 'Bloquear Horario' : 'Agendar Cita / Turno'}
-            </h3>
-            <p className="text-xs text-slate-500 font-medium">
-              {type === 'block' ? 'Reserva tiempo de inactividad, almuerzo o pausas' : 'Asigne servicio, profesional y horario'}
-            </p>
+        <div className={`border-b border-border p-5 sm:p-6 flex items-center justify-between ${type === 'block' ? 'bg-rose-50/70 dark:bg-rose-950/30' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
+          <div className="flex items-center gap-3">
+            {type === 'block' && (
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/20 shadow-xs">
+                <Lock size={20} />
+              </div>
+            )}
+            <div>
+              <h3 className={`text-xl font-black tracking-tight ${type === 'block' ? 'text-rose-700 dark:text-rose-400' : 'text-foreground'}`}>
+                {type === 'block' ? 'Bloqueo / Mantenimiento' : 'Agendar Cita / Turno'}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {type === 'block' 
+                  ? 'Inhabilita horarios, pausas o días completos' 
+                  : 'Asigne servicio, profesional y horario'}
+              </p>
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -280,262 +391,532 @@ export function AppointmentModal({
             </div>
           )}
 
-          {/* Service Selector (Hidden for Block) */}
-          {type !== 'block' && (() => {
-            const selectedEmp = employees.find(e => e.id === employeeId);
-            const employeeParticularServices = ((selectedEmp?.metadata as any)?.services || []) as Array<{ id?: string; name: string; durationMinutes?: number; price?: number }>;
-            const empRoleTitle = ((selectedEmp?.metadata as any)?.role_title || selectedEmp?.role || '').trim();
-            const empGeneralName = ((selectedEmp?.metadata as any)?.general_service_name || '').trim();
-            const branchName = empGeneralName || (empRoleTitle && empRoleTitle !== 'Espacio / Recurso' && empRoleTitle !== 'Especialista' ? empRoleTitle : '');
-
-            return (
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                  <Briefcase size={14} className="text-slate-400" /> Procedimiento / Servicio
+          {/* ======================================================== */}
+          {/* VISTA ESPECÍFICA DE BLOQUEO / MANTENIMIENTO               */}
+          {/* ======================================================== */}
+          {type === 'block' ? (
+            <>
+              {/* 1. Selector de Modo: Horas vs Día Completo vs Varios Días */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Tipo de Bloqueo
                 </label>
-                <select
-                  value={serviceId}
-                  onChange={(e) => handleServiceChange(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-medium"
-                >
-                  <option value="">
-                    {employeeParticularServices.length > 0 || branchName || services.length > 0
-                      ? '-- Seleccionar Procedimiento (O escribe el título abajo) --'
-                      : '-- Personalizado (Escribe el título y duración abajo) --'}
-                  </option>
-                  {(employeeParticularServices.length > 0 || branchName) && (
-                    <optgroup label={`Procedimientos y Rama de ${selectedEmp?.name || 'Profesional'}`}>
-                      {branchName && !employeeParticularServices.some(ps => ps.name.toLowerCase() === branchName.toLowerCase()) && (
-                        <option value={`emp-branch-${branchName}`}>
-                          {branchName} {Number((selectedEmp?.metadata as any)?.general_service_price) > 0 ? `($${(selectedEmp?.metadata as any)?.general_service_price})` : ''} ({Number((selectedEmp?.metadata as any)?.default_slot_minutes || 60)} min)
-                        </option>
-                      )}
-                      {employeeParticularServices.map((ps, idx) => (
-                        <option key={`emp-svc-${idx}`} value={`emp-svc-${ps.name}`}>
-                          {ps.name} {ps.price !== undefined && ps.price > 0 ? `($${ps.price})` : ''} ({ps.durationMinutes || 45} min)
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                  {services.length > 0 && (
-                    <optgroup label="Servicios del Catálogo">
-                      {services.map((srv) => (
-                        <option key={srv.id} value={srv.id}>
-                          {srv.name} (${srv.price} • {srv.duration_minutes || 60} min)
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-            );
-          })()}
-
-          {/* Title Input */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              {type === 'block' ? 'Motivo del Bloqueo *' : 'Título de la Cita *'}
-            </label>
-            <input
-              type="text"
-              required
-              placeholder={type === 'block' ? 'Ej: Mantenimiento, Almuerzo, Vacaciones' : 'Ej: Corte de Cabello + Barba'}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-            />
-          </div>
-
-          {/* Academy / Group Class Toggle (Hidden for Block) */}
-          {type !== 'block' && (
-            <div className="flex items-center gap-3 p-3 bg-fuchsia-50 dark:bg-fuchsia-900/20 rounded-xl border border-fuchsia-100 dark:border-fuchsia-800">
-              <input 
-                type="checkbox" 
-                checked={isGroupClass} 
-                onChange={(e) => setIsGroupClass(e.target.checked)} 
-                id="isGroupClass"
-                className="w-4 h-4 text-fuchsia-600 rounded border-fuchsia-300 focus:ring-fuchsia-500 cursor-pointer"
-              />
-              <div className="flex-1">
-                <label htmlFor="isGroupClass" className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 cursor-pointer">
-                  Habilitar Modo Academia (Clase Grupal)
-                </label>
-                <p className="text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
-                  Al activar esto, no seleccionarás un cliente ahora. Podrás inscribir a múltiples alumnos desde los detalles de la clase.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Client & Employee Row */}
-          <div className={`grid grid-cols-1 gap-4 ${type === 'block' ? '' : 'sm:grid-cols-2'}`}>
-            {/* Client (Hidden if Group Class or Block) */}
-            {type !== 'block' && (
-              <div className={isGroupClass ? 'opacity-50 pointer-events-none' : ''}>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5">
-                    <User size={14} className="text-slate-400" /> Cliente
-                  </span>
-                  {clients.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (clientId === 'manual') {
-                          setClientId('');
-                          setCustomClientName('');
-                        } else {
-                          setClientId('manual');
-                        }
-                      }}
-                      className="text-[11px] text-primary hover:underline font-bold"
-                    >
-                      {clientId === 'manual' ? 'Elegir del directorio' : 'Escribir manual'}
-                    </button>
-                  )}
-                </label>
-                {clients.length > 0 && clientId !== 'manual' ? (
-                  <select
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    disabled={isGroupClass}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setBlockMode('hours')}
+                    className={`py-2 px-1 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                      blockMode === 'hours'
+                        ? 'bg-card text-foreground shadow-xs'
+                        : 'text-slate-500 hover:text-foreground'
+                    }`}
                   >
-                    <option value="">{isGroupClass ? 'Múltiples alumnos (Modo Academia)' : '-- Seleccionar Cliente del Directorio --'}</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    placeholder="Escribe el nombre del cliente o teléfono..."
-                    value={customClientName}
-                    onChange={(e) => setCustomClientName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-                  />
+                    <Clock size={13} /> Por Horas
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBlockMode('full_day')}
+                    className={`py-2 px-1 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                      blockMode === 'full_day'
+                        ? 'bg-card text-foreground shadow-xs'
+                        : 'text-slate-500 hover:text-foreground'
+                    }`}
+                  >
+                    <CalendarIcon size={13} /> 1 Día
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBlockMode('multi_day')}
+                    className={`py-2 px-1 text-xs font-black rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                      blockMode === 'multi_day'
+                        ? 'bg-card text-foreground shadow-xs'
+                        : 'text-slate-500 hover:text-foreground'
+                    }`}
+                  >
+                    <CalendarRange size={13} /> Varios Días
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Chips Rápidos de Motivo / Preset */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>Motivo Frecuente</span>
+                  <span className="text-[10px] text-slate-400">1 clic para preconfigurar</span>
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {BLOCK_PRESETS.map((preset) => {
+                    const isSelected = blockReasonType === preset.label;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => {
+                          setBlockReasonType(preset.label);
+                          if (!title || BLOCK_PRESETS.some(p => p.label === title)) {
+                            setTitle(preset.label);
+                          }
+                          setColor(preset.color);
+                        }}
+                        className={`text-xs px-2.5 py-1.5 rounded-xl border font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/40 shadow-xs ring-1 ring-rose-500/30'
+                            : 'bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span>{preset.icon}</span>
+                        <span>{preset.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Alcance del Bloqueo (Toda la Empresa vs Profesional Específico) */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  ¿A quién afecta este bloqueo?
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBlockScope('all');
+                      setEmployeeId('');
+                    }}
+                    className={`p-3 rounded-2xl border text-left transition-all ${
+                      blockScope === 'all'
+                        ? 'bg-rose-500/10 border-rose-500/40 text-rose-800 dark:text-rose-300 ring-1 ring-rose-500/30'
+                        : 'bg-card border-border text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-black text-xs">
+                      <Building size={14} className="text-rose-500" />
+                      Toda la Empresa
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Cierra agenda y reservas online para todos los especialistas.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBlockScope('employee')}
+                    className={`p-3 rounded-2xl border text-left transition-all ${
+                      blockScope === 'employee'
+                        ? 'bg-rose-500/10 border-rose-500/40 text-rose-800 dark:text-rose-300 ring-1 ring-rose-500/30'
+                        : 'bg-card border-border text-slate-600 dark:text-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 font-black text-xs">
+                      <User size={14} className="text-rose-500" />
+                      Profesional Específico
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Inhabilita solo al especialista seleccionado.
+                    </p>
+                  </button>
+                </div>
+
+                {/* Selector de empleado condicional */}
+                {blockScope === 'employee' && (
+                  <div className="pt-1.5 animate-in fade-in duration-150">
+                    <select
+                      value={employeeId}
+                      onChange={(e) => handleEmployeeChange(e.target.value)}
+                      required
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 font-medium"
+                    >
+                      <option value="">-- Seleccionar Profesional a Bloquear * --</option>
+                      {employees.map((emp) => {
+                        const spec = 
+                          (emp.metadata as any)?.doctor_config?.specialty || 
+                          (emp.metadata as any)?.specialty || 
+                          (emp.metadata as any)?.role_title || 
+                          emp.role;
+                        return (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.name} {spec ? `· ${spec}` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 )}
               </div>
-            )}
 
-            {/* Employee */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <User size={14} className="text-slate-400" /> Profesional / Empleado
-              </label>
-              <select
-                value={employeeId}
-                onChange={(e) => handleEmployeeChange(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-              >
-                <option value="">-- Sin Asignar --</option>
-                {employees.map((emp) => {
-                  const spec = 
-                    (emp.metadata as any)?.doctor_config?.specialty || 
-                    (emp.metadata as any)?.specialty || 
-                    (emp.metadata as any)?.dentist_config?.specialty ||
-                    (emp.metadata as any)?.role_title ||
-                    (emp.role !== 'Empleado' ? emp.role : '');
-                  return (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.name} {spec ? `· ${spec}` : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            </div>
-          </div>
+              {/* 4. Fechas y Horarios según Modo */}
+              {blockMode === 'multi_day' ? (
+                <div className="space-y-2 p-3.5 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                        <CalendarIcon size={12} className="text-rose-500" /> Desde (Fecha Inicio) *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={blockStartDate}
+                        onChange={(e) => setBlockStartDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-card border border-border text-xs sm:text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                        <CalendarIcon size={12} className="text-rose-500" /> Hasta (Fecha Fin) *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        min={blockStartDate}
+                        value={blockEndDate}
+                        onChange={(e) => setBlockEndDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-card border border-border text-xs sm:text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs font-semibold text-rose-700 dark:text-rose-300 pt-1">
+                    <ShieldAlert size={14} className="shrink-0" />
+                    <span>
+                      {daysCount > 0 
+                        ? `Se inhabilitarán ${daysCount} día(s) completo(s) consecutivos en agenda.` 
+                        : 'Fecha inválida.'}
+                    </span>
+                  </div>
+                </div>
+              ) : blockMode === 'full_day' ? (
+                <div className="space-y-2 p-3.5 bg-rose-500/5 border border-rose-500/20 rounded-2xl">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                      <CalendarIcon size={13} className="text-rose-500" /> Fecha del Día Completo *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={dateStr}
+                      onChange={(e) => setDateStr(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-card border border-border text-sm font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                    />
+                  </div>
+                  <p className="text-[11px] text-rose-700 dark:text-rose-300 font-medium">
+                    ⚡ Se bloqueará toda la jornada de 00:00 a 23:59. Nadie podrá reservar este día.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                      <CalendarIcon size={13} className="text-slate-400" /> Fecha *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={dateStr}
+                      onChange={(e) => setDateStr(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                      <Clock size={13} className="text-slate-400" /> Hora Inicio *
+                    </label>
+                    <input
+                      type="time"
+                      required
+                      value={timeStr}
+                      onChange={(e) => setTimeStr(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Duración
+                    </label>
+                    <select
+                      value={durationMinutes}
+                      onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                      className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    >
+                      <option value={30}>30 min</option>
+                      <option value={45}>45 min</option>
+                      <option value={60}>1 hora (60 min)</option>
+                      <option value={90}>1.5 horas</option>
+                      <option value={120}>2 horas</option>
+                      <option value={180}>3 horas</option>
+                      <option value={240}>4 horas (Medio día)</option>
+                      <option value={480}>8 horas (Jornada)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
 
-          {/* Date, Time & Duration Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Date */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <CalendarIcon size={14} className="text-slate-400" /> Fecha
-              </label>
-              <input
-                type="date"
-                required
-                min={toYYYYMMDD(new Date())}
-                value={dateStr}
-                onChange={(e) => setDateStr(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-
-            {/* Time */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
-                <Clock size={14} className="text-slate-400" /> Hora
-              </label>
-              <input
-                type="time"
-                required
-                value={timeStr}
-                onChange={(e) => setTimeStr(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-            </div>
-
-            {/* Duration */}
-            <div>
-              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                Duración (min)
-              </label>
-              <select
-                value={durationMinutes}
-                onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-              >
-                <option value={15}>15 min</option>
-                <option value={30}>30 min</option>
-                <option value={45}>45 min</option>
-                <option value={60}>1 hora (60 min)</option>
-                <option value={90}>1.5 horas (90 min)</option>
-                <option value={120}>2 horas (120 min)</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Status & Price Row (Hidden for Block) */}
-          {type !== 'block' && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Status */}
+              {/* 5. Título o Detalle del Bloqueo */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Estado Inicial
-                </label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as AppointmentStatus)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                >
-                  <option value="scheduled">Programada</option>
-                  <option value="confirmed">Confirmada</option>
-                  <option value="in_progress">En Curso</option>
-                  <option value="completed">Completada</option>
-                </select>
-              </div>
-
-              {/* Price */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
-                  <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-slate-400" /> Precio / Monto ($)</span>
-                  <span className="text-[10px] text-slate-400 font-normal">Editable / Libre</span>
+                  Título Visible en la Agenda *
                 </label>
                 <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={price === 0 ? '' : price}
-                  onChange={(e) => setPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
-                  placeholder="0.00 (Precio libre)"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold"
+                  type="text"
+                  required
+                  placeholder="Ej: Mantenimiento Técnico, Feriado Nacional, Almuerzo"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500/30 font-semibold"
                 />
-                <p className="text-[10px] text-slate-400 mt-1">Puedes ajustarlo para tratamientos específicos o dejarlo en $0 para valorarlo en caja.</p>
               </div>
-            </div>
+            </>
+          ) : (
+            /* ======================================================== */
+            /* VISTA NORMAL DE AGENDAR CITA / TURNO                     */
+            /* ======================================================== */
+            <>
+              {/* Service Selector */}
+              {(() => {
+                const selectedEmp = employees.find(e => e.id === employeeId);
+                const employeeParticularServices = ((selectedEmp?.metadata as any)?.services || []) as Array<{ id?: string; name: string; durationMinutes?: number; price?: number }>;
+                const empRoleTitle = ((selectedEmp?.metadata as any)?.role_title || selectedEmp?.role || '').trim();
+                const empGeneralName = ((selectedEmp?.metadata as any)?.general_service_name || '').trim();
+                const branchName = empGeneralName || (empRoleTitle && empRoleTitle !== 'Espacio / Recurso' && empRoleTitle !== 'Especialista' ? empRoleTitle : '');
+
+                return (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                      <Briefcase size={14} className="text-slate-400" /> Procedimiento / Servicio
+                    </label>
+                    <select
+                      value={serviceId}
+                      onChange={(e) => handleServiceChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all font-medium"
+                    >
+                      <option value="">
+                        {employeeParticularServices.length > 0 || branchName || services.length > 0
+                          ? '-- Seleccionar Procedimiento (O escribe el título abajo) --'
+                          : '-- Personalizado (Escribe el título y duración abajo) --'}
+                      </option>
+                      {(employeeParticularServices.length > 0 || branchName) && (
+                        <optgroup label={`Procedimientos y Rama de ${selectedEmp?.name || 'Profesional'}`}>
+                          {branchName && !employeeParticularServices.some(ps => ps.name.toLowerCase() === branchName.toLowerCase()) && (
+                            <option value={`emp-branch-${branchName}`}>
+                              {branchName} {Number((selectedEmp?.metadata as any)?.general_service_price) > 0 ? `($${(selectedEmp?.metadata as any)?.general_service_price})` : ''} ({Number((selectedEmp?.metadata as any)?.default_slot_minutes || 60)} min)
+                            </option>
+                          )}
+                          {employeeParticularServices.map((ps, idx) => (
+                            <option key={`emp-svc-${idx}`} value={`emp-svc-${ps.name}`}>
+                              {ps.name} {ps.price !== undefined && ps.price > 0 ? `($${ps.price})` : ''} ({ps.durationMinutes || 45} min)
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {services.length > 0 && (
+                        <optgroup label="Servicios del Catálogo">
+                          {services.map((srv) => (
+                            <option key={srv.id} value={srv.id}>
+                              {srv.name} (${srv.price} • {srv.duration_minutes || 60} min)
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
+                );
+              })()}
+
+              {/* Title Input */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Título de la Cita *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Corte de Cabello + Barba"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                />
+              </div>
+
+              {/* Academy / Group Class Toggle */}
+              <div className="flex items-center gap-3 p-3 bg-fuchsia-50 dark:bg-fuchsia-900/20 rounded-xl border border-fuchsia-100 dark:border-fuchsia-800">
+                <input 
+                  type="checkbox" 
+                  checked={isGroupClass} 
+                  onChange={(e) => setIsGroupClass(e.target.checked)} 
+                  id="isGroupClass"
+                  className="w-4 h-4 text-fuchsia-600 rounded border-fuchsia-300 focus:ring-fuchsia-500 cursor-pointer"
+                />
+                <div className="flex-1">
+                  <label htmlFor="isGroupClass" className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 cursor-pointer">
+                    Habilitar Modo Academia (Clase Grupal)
+                  </label>
+                  <p className="text-[10px] text-fuchsia-700 dark:text-fuchsia-400">
+                    Al activar esto, no seleccionarás un cliente ahora. Podrás inscribir a múltiples alumnos desde los detalles de la clase.
+                  </p>
+                </div>
+              </div>
+
+              {/* Client & Employee Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Client */}
+                <div className={isGroupClass ? 'opacity-50 pointer-events-none' : ''}>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <User size={14} className="text-slate-400" /> Cliente
+                    </span>
+                    {clients.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (clientId === 'manual') {
+                            setClientId('');
+                            setCustomClientName('');
+                          } else {
+                            setClientId('manual');
+                          }
+                        }}
+                        className="text-[11px] text-primary hover:underline font-bold"
+                      >
+                        {clientId === 'manual' ? 'Elegir del directorio' : 'Escribir manual'}
+                      </button>
+                    )}
+                  </label>
+                  {clients.length > 0 && clientId !== 'manual' ? (
+                    <select
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      disabled={isGroupClass}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      <option value="">{isGroupClass ? 'Múltiples alumnos (Modo Academia)' : '-- Seleccionar Cliente del Directorio --'}</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      placeholder="Escribe el nombre del cliente o teléfono..."
+                      value={customClientName}
+                      onChange={(e) => setCustomClientName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                    />
+                  )}
+                </div>
+
+                {/* Employee */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <User size={14} className="text-slate-400" /> Profesional / Empleado
+                  </label>
+                  <select
+                    value={employeeId}
+                    onChange={(e) => handleEmployeeChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  >
+                    <option value="">-- Sin Asignar --</option>
+                    {employees.map((emp) => {
+                      const spec = 
+                        (emp.metadata as any)?.doctor_config?.specialty || 
+                        (emp.metadata as any)?.specialty || 
+                        (emp.metadata as any)?.dentist_config?.specialty ||
+                        (emp.metadata as any)?.role_title ||
+                        (emp.role !== 'Empleado' ? emp.role : '');
+                      return (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.name} {spec ? `· ${spec}` : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+
+              {/* Date, Time & Duration Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <CalendarIcon size={14} className="text-slate-400" /> Fecha
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    min={toYYYYMMDD(new Date())}
+                    value={dateStr}
+                    onChange={(e) => setDateStr(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
+                    <Clock size={14} className="text-slate-400" /> Hora
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={timeStr}
+                    onChange={(e) => setTimeStr(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Duración (min)
+                  </label>
+                  <select
+                    value={durationMinutes}
+                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    <option value={15}>15 min</option>
+                    <option value={30}>30 min</option>
+                    <option value={45}>45 min</option>
+                    <option value={60}>1 hora (60 min)</option>
+                    <option value={90}>1.5 horas (90 min)</option>
+                    <option value={120}>2 horas (120 min)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Status & Price Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Estado Inicial
+                  </label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as AppointmentStatus)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  >
+                    <option value="scheduled">Programada</option>
+                    <option value="confirmed">Confirmada</option>
+                    <option value="in_progress">En Curso</option>
+                    <option value="completed">Completada</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5"><DollarSign size={14} className="text-slate-400" /> Precio / Monto ($)</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Editable / Libre</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={price === 0 ? '' : price}
+                    onChange={(e) => setPrice(e.target.value === '' ? 0 : Math.max(0, Number(e.target.value)))}
+                    placeholder="0.00 (Precio libre)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-bold"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">Puedes ajustarlo para tratamientos específicos o dejarlo en $0 para valorarlo en caja.</p>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Paleta Protegida de 20 Colores para la Agenda */}
@@ -574,8 +955,8 @@ export function AppointmentModal({
               <FileText size={14} className="text-slate-400" /> Observaciones / Notas
             </label>
             <textarea
-              rows={3}
-              placeholder="Detalles adicionales o solicitudes del cliente..."
+              rows={2}
+              placeholder={type === 'block' ? 'Detalles del motivo del bloqueo...' : 'Detalles adicionales o solicitudes del cliente...'}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
@@ -594,14 +975,22 @@ export function AppointmentModal({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm btn-haptic disabled:opacity-50"
+              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 shadow-sm btn-haptic disabled:opacity-50 ${
+                type === 'block'
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+              }`}
             >
               {isSubmitting ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : type === 'block' ? (
+                <Lock size={15} />
               ) : (
                 <Check size={16} />
               )}
-              {type === 'block' ? 'Confirmar Bloqueo' : 'Guardar Cita'}
+              {type === 'block' 
+                ? (blockMode === 'multi_day' ? `Bloquear ${daysCount} Día(s)` : 'Confirmar Bloqueo')
+                : 'Guardar Cita'}
             </button>
           </div>
         </form>

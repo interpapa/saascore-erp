@@ -16,6 +16,8 @@ import { useActionActor } from '@/hooks/useActionActor';
 import {
   getAppointmentsAction,
   createAppointmentAction,
+  createAppointmentBlockAction,
+  deleteAppointmentAction,
   updateAppointmentStatusAction,
 } from '@/app/actions/appointments';
 import { getEntitiesAction } from '@/app/actions/entities';
@@ -26,6 +28,7 @@ import {
   AppointmentFilterState,
   AppointmentStatus,
   CreateAppointmentInput,
+  BlockInput,
   Employee,
   Service,
 } from '@/types/calendario';
@@ -187,6 +190,73 @@ export default function CalendarioPage() {
   }, [currentTenant?.id, fetchData]);
 
   // Handler for Create Appointment with Optimistic UI Update
+  
+  // Handler for Blocking Agenda / Maintenance
+  const handleSaveBlock = async (input: BlockInput) => {
+    if (!currentTenant) {
+      toast({ variant: 'error', title: 'Sin empresa activa' });
+      return;
+    }
+    if (!actor) {
+      toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado.' });
+      return;
+    }
+
+    try {
+      const res = await createAppointmentBlockAction(currentTenant.id, input, actor);
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Bloqueo registrado',
+          description: `Se aplicó el bloqueo (${input.title}) en la agenda exitosamente.`,
+        });
+        fetchData();
+      } else {
+        toast({
+          variant: 'error',
+          title: 'Error al bloquear',
+          description: res.error || 'No se pudo aplicar el bloqueo.',
+        });
+      }
+    } catch (err: unknown) {
+      toast({
+        variant: 'error',
+        title: 'Error inesperado',
+        description: (err as Error).message || 'Error al procesar el bloqueo.',
+      });
+    }
+  };
+
+  // Handler for Deleting / Unlocking Appointment
+  const handleDeleteAppointment = async (id: string) => {
+    if (!currentTenant || !actor) return;
+    try {
+      const res = await deleteAppointmentAction(id, currentTenant.id, actor);
+      if (res.success) {
+        setAppointments((prev) => prev.filter((a) => a.id !== id));
+        setIsDetailsModalOpen(false);
+        setSelectedAppointment(null);
+        toast({
+          variant: 'success',
+          title: 'Horario liberado',
+          description: 'El horario o cita ha sido desbloqueado y eliminado correctamente.',
+        });
+      } else {
+        toast({
+          variant: 'error',
+          title: 'Error al eliminar',
+          description: res.error || 'No se pudo eliminar el registro.',
+        });
+      }
+    } catch (err: unknown) {
+      toast({
+        variant: 'error',
+        title: 'Error inesperado',
+        description: (err as Error).message || 'Error al eliminar el registro.',
+      });
+    }
+  };
+
   const handleCreateAppointment = async (input: CreateAppointmentInput) => {
     if (!currentTenant) {
       toast({ variant: 'error', title: 'Sin empresa activa' });
@@ -410,6 +480,11 @@ export default function CalendarioPage() {
             currentDate={currentDate}
             onDateChange={setCurrentDate}
             isDentalActive={isDentalActive}
+            onOpenBlockModal={() => {
+              setSelectedDateForCreate(currentDate);
+              setCreateModalType('block');
+              setIsCreateModalOpen(true);
+            }}
           />
         </div>
       ) : (
@@ -461,6 +536,7 @@ export default function CalendarioPage() {
           setSelectedDateForCreate(null);
         }}
         onSave={handleCreateAppointment}
+        onSaveBlock={handleSaveBlock}
         employees={bookableEmployees}
         services={services}
         clients={clients}
@@ -480,6 +556,7 @@ export default function CalendarioPage() {
         clients={clients}
         employees={bookableEmployees}
         onUpdateMetadata={handleUpdateMetadata}
+        onDeleteAppointment={handleDeleteAppointment}
       />
 
       {/* NEW: Booking Settings Modal */}

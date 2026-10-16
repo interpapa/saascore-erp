@@ -58,6 +58,20 @@ export function getAppointmentVisualStatus(
   status: string,
   metadata?: Record<string, any> | null
 ) {
+  // 0. Bloqueo de Agenda / Mantenimiento
+  if (metadata?.is_block) {
+    return {
+      isPendingPayment: false,
+      isPaid: false,
+      isBlock: true,
+      label: metadata?.block_type ? `Bloqueo (${metadata.block_type})` : 'Bloqueo / Mantenimiento',
+      bg: 'bg-rose-500/15 text-rose-900 dark:text-rose-200 border-rose-500/40',
+      dot: 'bg-rose-500',
+      tagBg: 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/40',
+      color: '#f43f5e',
+    };
+  }
+
   const paymentStatus = metadata?.payment_status;
 
   // 1. Pago Pendiente -> AMARILLO / ÁMBAR

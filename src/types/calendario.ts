@@ -103,3 +103,19 @@ export interface CreateAppointmentInput {
 export interface UpdateAppointmentInput extends Partial<CreateAppointmentInput> {
   id: string;
 }
+
+export interface BlockInput {
+  title: string;
+  reasonType: string;
+  scope: 'all' | 'employee';
+  employeeId?: string | null;
+  mode: 'hours' | 'full_day' | 'multi_day';
+  date?: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  durationMinutes?: number;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
+  notes?: string;
+  color?: string;
+}

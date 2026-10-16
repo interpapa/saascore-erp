@@ -16,7 +16,12 @@ import {
   Check,
   Users,
   MessageCircle,
-  Edit2
+  Edit2,
+  Lock,
+  Unlock,
+  Trash2,
+  Building,
+  ShieldAlert
 } from 'lucide-react';
 import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
@@ -38,6 +43,7 @@ export interface AppointmentDetailsModalProps {
   clients?: Entity[];
   employees?: Employee[];
   onUpdateMetadata?: (id: string, metadata: Record<string, any>) => Promise<void>;
+  onDeleteAppointment?: (id: string) => Promise<void>;
 }
 
 const STATUS_CONFIG: Record<
@@ -104,8 +110,10 @@ export function AppointmentDetailsModal({
   clients = [],
   employees = [],
   onUpdateMetadata,
+  onDeleteAppointment,
 }: AppointmentDetailsModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [selectedClientToAdd, setSelectedClientToAdd] = useState('');
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [editedPrice, setEditedPrice] = useState<number>(appointment?.price || 0);
@@ -123,6 +131,25 @@ export function AppointmentDetailsModal({
       setIsEditingPrice(false);
     }
   }, [appointment]);
+
+  const handleDelete = async () => {
+    if (!appointment || !onDeleteAppointment) return;
+    const isBlock = appointment.metadata?.is_block === true;
+    const confirmMsg = isBlock
+      ? '¿Estás seguro de que deseas desbloquear y liberar este horario en la agenda?'
+      : '¿Estás seguro de que deseas eliminar esta cita y liberar el turno?';
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      setIsDeleting(true);
+      await onDeleteAppointment(appointment.id);
+      onClose();
+    } catch (err: any) {
+      alert(err.message || 'Error al eliminar el registro.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleSavePrice = async () => {
     if (!appointment || !currentTenant?.id || !actor) return;
@@ -242,6 +269,127 @@ export function AppointmentDetailsModal({
       setIsUpdating(false);
     }
   };
+
+  // ==========================================================
+  // RENDER: VISTA DEDICADA DE BLOQUEO / MANTENIMIENTO
+  // ==========================================================
+  if (appointment.metadata?.is_block) {
+    const isAllDay = appointment.metadata?.all_day === true;
+    const blockReason = String(appointment.metadata?.block_type || appointment.title || 'Mantenimiento');
+    const isEmpScope = !!appointment.employee_name && appointment.employee_name !== 'Sin Asignar';
+
+    return (
+      <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+        <div
+          className="bg-card border border-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200"
+          role="dialog"
+          aria-modal="true"
+        >
+          {/* Header */}
+          <div className="border-b border-border p-5 bg-rose-50/70 dark:bg-rose-950/30 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/30">
+                <Lock size={20} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-rose-700 dark:text-rose-400 tracking-tight">
+                  Horario Inhabilitado
+                </h3>
+                <span className="text-[10px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-500/30 inline-block">
+                  {blockReason}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-foreground hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-5 sm:p-6 space-y-4">
+            <div className="bg-slate-50 dark:bg-slate-900/60 border border-border p-4 rounded-2xl space-y-3">
+              <h4 className="text-base font-black text-foreground">{appointment.title}</h4>
+
+              <div className="space-y-2 text-xs">
+                {/* Fechas / Horario */}
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <CalendarIcon size={14} className="text-rose-500 shrink-0" />
+                  <span className="font-semibold">
+                    {isAllDay
+                      ? `Jornada Completa · ${formatDateTime(appointment.start_time).split(',')[0] || formatDateTime(appointment.start_time)}`
+                      : `${formatDateTime(appointment.start_time)} ${appointment.end_time ? `hasta ${formatTimeOnly(appointment.end_time)}` : ''}`}
+                  </span>
+                </div>
+
+                {/* Alcance */}
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  {isEmpScope ? (
+                    <>
+                      <User size={14} className="text-rose-500 shrink-0" />
+                      <span>Profesional afectado: <strong className="text-foreground">{appointment.employee_name}</strong></span>
+                    </>
+                  ) : (
+                    <>
+                      <Building size={14} className="text-rose-500 shrink-0" />
+                      <span>Alcance: <strong className="text-foreground">Toda la Empresa (Todos los especialistas)</strong></span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {appointment.notes && (
+                <div className="pt-2 border-t border-border/60 text-xs">
+                  <p className="font-bold text-slate-500 mb-1 flex items-center gap-1">
+                    <FileText size={12} /> Notas del Bloqueo:
+                  </p>
+                  <p className="text-slate-700 dark:text-slate-300 leading-relaxed bg-white dark:bg-slate-950 p-2.5 rounded-xl border border-border">
+                    {appointment.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-start gap-2.5 text-xs text-rose-800 dark:text-rose-300">
+              <ShieldAlert size={16} className="shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+              <span>
+                Este horario no admite reservas del portal público ni citas internas de ningún canal mientras permanezca bloqueado.
+              </span>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-2 flex flex-col gap-2">
+              {onDeleteAppointment && (
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDelete}
+                  className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-xs btn-haptic disabled:opacity-50 cursor-pointer"
+                >
+                  {isDeleting ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Unlock size={16} />
+                  )}
+                  <span>Desbloquear y Liberar Horario</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl text-xs font-bold text-slate-500 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
@@ -627,16 +775,32 @@ export function AppointmentDetailsModal({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between pt-3 border-t border-border">
-            <button
-              type="button"
-              onClick={handleSendAppointmentWhatsApp}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center gap-1.5 cursor-pointer"
-              title="Enviar recordatorio de cita vía WhatsApp"
-            >
-              <MessageCircle size={15} />
-              <span>Recordatorio WhatsApp</span>
-            </button>
+          <div className="flex items-center justify-between pt-3 border-t border-border gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSendAppointmentWhatsApp}
+                className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Enviar recordatorio de cita vía WhatsApp"
+              >
+                <MessageCircle size={15} />
+                <span className="hidden sm:inline">Recordatorio WhatsApp</span>
+                <span className="sm:hidden">WhatsApp</span>
+              </button>
+
+              {onDeleteAppointment && (
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleDelete}
+                  className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  title="Eliminar cita y liberar horario"
+                >
+                  <Trash2 size={14} />
+                  <span className="hidden sm:inline">Eliminar</span>
+                </button>
+              )}
+            </div>
 
             <button
               onClick={onClose}

@@ -23,6 +23,7 @@ import {
   Appointment,
   AppointmentFilterState,
   AppointmentStatus,
+  BlockInput,
   CreateAppointmentInput,
   Employee,
   Service
@@ -978,6 +979,221 @@ export async function deleteAppointmentAction(
   } catch (err: any) {
     console.error('[deleteAppointmentAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Crea bloqueos de agenda (por horas, día completo o múltiples días completos).
+ * Si es para toda la empresa, employee_id se guarda como null para bloquear todo el negocio.
+ */
+export async function createAppointmentBlockAction(
+  tenantId: string,
+  payload: BlockInput,
+  actor: ActionActor
+): Promise<{ success: boolean; appointments?: Appointment[]; count?: number; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
+    }
+
+    if (!tenantId) throw new Error('ID de empresa requerido.');
+    if (!payload.title?.trim()) throw new Error('El motivo del bloqueo es obligatorio.');
+
+    const safeEmployeeId = payload.scope === 'employee' ? sanitizeUUID(payload.employeeId) || null : null;
+    const blockColor = payload.color || '#f43f5e';
+    const reasonType = payload.reasonType || 'Mantenimiento';
+
+    // Determinar la lista de registros a insertar
+    const recordsToInsert: any[] = [];
+
+    if (payload.mode === 'multi_day') {
+      const startStr = payload.startDate || payload.date;
+      const endStr = payload.endDate || payload.date;
+      if (!startStr || !endStr) {
+        throw new Error('Debe especificar fecha de inicio y fin para el rango de bloqueo.');
+      }
+
+      const startD = new Date(`${startStr}T00:00:00`);
+      const endD = new Date(`${endStr}T00:00:00`);
+      if (isNaN(startD.getTime()) || isNaN(endD.getTime())) {
+        throw new Error('Rango de fechas inválido.');
+      }
+      if (endD.getTime() < startD.getTime()) {
+        throw new Error('La fecha de fin no puede ser anterior a la fecha de inicio.');
+      }
+
+      // Máximo 90 días por seguridad
+      const diffDays = Math.round((endD.getTime() - startD.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+      if (diffDays > 90) {
+        throw new Error('El rango máximo de bloqueo continuo es de 90 días.');
+      }
+
+      let currentCursor = new Date(startD);
+      while (currentCursor <= endD) {
+        const y = currentCursor.getFullYear();
+        const m = String(currentCursor.getMonth() + 1).padStart(2, '0');
+        const d = String(currentCursor.getDate()).padStart(2, '0');
+        const dayStr = `${y}-${m}-${d}`;
+
+        recordsToInsert.push({
+          tenant_id: tenantId,
+          title: payload.title.trim(),
+          description: payload.notes || `Bloqueo de día completo: ${reasonType}`,
+          client_id: null,
+          service_id: null,
+          employee_id: safeEmployeeId,
+          start_time: `${dayStr}T00:00:00.000Z`,
+          end_time: `${dayStr}T23:59:59.000Z`,
+          status: 'confirmed' as AppointmentStatus,
+          notes: payload.notes || null,
+          price: 0,
+          metadata: {
+            is_block: true,
+            all_day: true,
+            block_mode: 'multi_day',
+            block_type: reasonType,
+            range_start: startStr,
+            range_end: endStr,
+            scope: payload.scope,
+            color: blockColor,
+          }
+        });
+
+        currentCursor.setDate(currentCursor.getDate() + 1);
+      }
+    } else if (payload.mode === 'full_day') {
+      const dayStr = payload.date;
+      if (!dayStr) throw new Error('Debe seleccionar la fecha para el día completo.');
+
+      recordsToInsert.push({
+        tenant_id: tenantId,
+        title: payload.title.trim(),
+        description: payload.notes || `Bloqueo de día completo: ${reasonType}`,
+        client_id: null,
+        service_id: null,
+        employee_id: safeEmployeeId,
+        start_time: `${dayStr}T00:00:00.000Z`,
+        end_time: `${dayStr}T23:59:59.000Z`,
+        status: 'confirmed' as AppointmentStatus,
+        notes: payload.notes || null,
+        price: 0,
+        metadata: {
+          is_block: true,
+          all_day: true,
+          block_mode: 'full_day',
+          block_type: reasonType,
+          scope: payload.scope,
+          color: blockColor,
+        }
+      });
+    } else {
+      // mode === 'hours'
+      const dayStr = payload.date || new Date().toISOString().split('T')[0];
+      const startHour = payload.startTime || '09:00';
+      const duration = Number(payload.durationMinutes) || 60;
+
+      const startDateTime = new Date(`${dayStr}T${startHour}:00`);
+      if (isNaN(startDateTime.getTime())) {
+        throw new Error('Fecha u hora de bloqueo inválida.');
+      }
+      const endDateTime = payload.endTime 
+        ? new Date(`${dayStr}T${payload.endTime}:00`)
+        : new Date(startDateTime.getTime() + duration * 60000);
+
+      recordsToInsert.push({
+        tenant_id: tenantId,
+        title: payload.title.trim(),
+        description: payload.notes || `Bloqueo por horas: ${reasonType}`,
+        client_id: null,
+        service_id: null,
+        employee_id: safeEmployeeId,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        status: 'confirmed' as AppointmentStatus,
+        notes: payload.notes || null,
+        price: 0,
+        metadata: {
+          is_block: true,
+          all_day: false,
+          block_mode: 'hours',
+          block_type: reasonType,
+          duration_minutes: duration,
+          scope: payload.scope,
+          color: blockColor,
+        }
+      });
+    }
+
+    // Inserción en batch en appointments
+    const { data: createdAppts, error } = await supabaseAdmin
+      .from('appointments')
+      .insert(recordsToInsert)
+      .select();
+
+    if (!error && createdAppts) {
+      await writeAuditLog({
+        tenant_id: tenantId,
+        actor_email: actor.email,
+        actor_role: actor.role,
+        action: 'entity.created',
+        target_type: 'appointment_block',
+        target_id: createdAppts[0]?.id || tenantId,
+        metadata: {
+          action: 'calendar_block_created',
+          mode: payload.mode,
+          reasonType,
+          scope: payload.scope,
+          count: createdAppts.length,
+        },
+      });
+
+      safeRevalidate('/calendario', tenantId);
+      return { success: true, appointments: createdAppts, count: createdAppts.length };
+    }
+
+    // Fallback: Si appointments falla por esquema, insertar en documents
+    if (error) {
+      console.warn('[createAppointmentBlockAction] Fallback a documents:', error.message);
+      const docsToInsert = recordsToInsert.map((rec, idx) => ({
+        tenant_id: tenantId,
+        entity_id: safeEmployeeId,
+        type: 'work_order',
+        status: 'draft',
+        document_number: `BLK-${Date.now().toString().slice(-6)}-${idx + 1}`,
+        subtotal_amount: 0,
+        tax_amount: 0,
+        total_amount: 0,
+        notes: rec.notes || rec.title,
+        metadata: {
+          title: rec.title,
+          description: rec.description,
+          issue_date: rec.start_time,
+          due_date: rec.end_time,
+          ...rec.metadata,
+        }
+      }));
+
+      const { data: createdDocs, error: docErr } = await supabaseAdmin
+        .from('documents')
+        .insert(docsToInsert)
+        .select();
+
+      if (docErr) throw new Error(docErr.message || 'Error al guardar bloqueo.');
+
+      safeRevalidate('/calendario', tenantId);
+      return { success: true, count: createdDocs?.length || recordsToInsert.length };
+    }
+
+    return { success: true, count: recordsToInsert.length };
+  } catch (err: unknown) {
+    console.error('[createAppointmentBlockAction Error]:', err);
+    return { success: false, error: (err as Error).message || 'Error al procesar el bloqueo.' };
   }
 }
 

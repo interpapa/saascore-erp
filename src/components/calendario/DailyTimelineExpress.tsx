@@ -14,6 +14,7 @@ import {
   ChevronLeft, 
   ChevronRight,
   Plus,
+  Lock,
   Play,
   UserCheck
 } from 'lucide-react';
@@ -29,6 +30,7 @@ interface DailyTimelineExpressProps {
   currentDate: Date;
   onDateChange: (date: Date) => void;
   isDentalActive?: boolean;
+  onOpenBlockModal?: () => void;
 }
 
 export function DailyTimelineExpress({
@@ -39,6 +41,7 @@ export function DailyTimelineExpress({
   currentDate,
   onDateChange,
   isDentalActive = false,
+  onOpenBlockModal,
 }: DailyTimelineExpressProps) {
   const router = useRouter();
 
@@ -124,6 +127,16 @@ export function DailyTimelineExpress({
           >
             <ChevronRight size={16} />
           </button>
+          {onOpenBlockModal && (
+            <button
+              type="button"
+              onClick={onOpenBlockModal}
+              className="p-2 rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 font-black hover:bg-rose-500/20 transition-all btn-haptic shadow-xs"
+              title="Bloquear Horario / Mantenimiento"
+            >
+              <Lock size={16} />
+            </button>
+          )}
           <button
             type="button"
             onClick={onOpenCreateModal}
@@ -162,6 +175,60 @@ export function DailyTimelineExpress({
             const clientPhone = (appt as any).client_phone || (appt as any).client?.phone;
             const apptColor = (appt.metadata?.color as string) || visual.color || '#6366f1';
             const cardBorderColor = visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor);
+
+            if (appt.metadata?.is_block) {
+              const isAllDay = appt.metadata?.all_day === true;
+              return (
+                <div
+                  key={appt.id}
+                  className="border border-rose-500/40 bg-rose-50/50 dark:bg-rose-950/20 rounded-2xl p-4 shadow-xs space-y-3 transition-all"
+                  style={{ borderLeftColor: '#f43f5e', borderLeftWidth: '5px' }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2.5 rounded-xl border border-rose-500/30 bg-rose-500/15 text-rose-600 dark:text-rose-400 text-center shrink-0">
+                        <Lock size={16} className="mx-auto mb-0.5" />
+                        <span className="text-[10px] font-black font-mono block">
+                          {isAllDay ? 'TODO EL DÍA' : timeFormatted}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 
+                            onClick={() => onSelectAppointment(appt)}
+                            className="text-sm font-black text-rose-700 dark:text-rose-300 hover:underline cursor-pointer transition-colors"
+                          >
+                            🔒 {appt.title}
+                          </h4>
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-800 dark:text-rose-200 border border-rose-500/30">
+                            {String(appt.metadata?.block_type || 'Mantenimiento')}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                          {appt.employee_name 
+                            ? `Especialista: ${appt.employee_name}` 
+                            : 'Toda la Empresa (Cierre General de Agenda)'}
+                        </p>
+                        {appt.notes && (
+                          <p className="text-[11px] text-slate-400 italic mt-0.5">"{appt.notes}"</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-rose-200/60 dark:border-rose-900/40">
+                    <button
+                      type="button"
+                      onClick={() => onSelectAppointment(appt)}
+                      className="w-full py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black flex items-center justify-center gap-2 transition-all btn-haptic shadow-xs cursor-pointer"
+                    >
+                      <Lock size={13} />
+                      <span>Administrar / Desbloquear Horario</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
 
             return (
               <div
