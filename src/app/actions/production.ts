@@ -11,6 +11,7 @@ import {
   ProductionOrder, 
   SimulateStockResult 
 } from '@/types/production';
+import { convertUoM } from '@/lib/core/inventory/uomEngine';
 
 function safeRevalidate(tenantId?: string) {
   try {
@@ -22,6 +23,36 @@ function safeRevalidate(tenantId?: string) {
       revalidatePath(`/produccion`);
     }
   } catch {}
+}
+
+/**
+ * Normaliza y compara unidades de medida entre inventario y la receta.
+ * Soporta g <-> kg, ml <-> l, unit <-> pza con precisión matemática.
+ */
+function resolveStockAndConversion(
+  item: any,
+  requiredQty: number,
+  recipeUnit: string
+): { stockInRecipeUnit: number; neededInItemUnit: number; effectiveUnit: string } {
+  const rawStock = Number(item.stock_quantity ?? item.stock ?? 0);
+  const itemUnit = (item.metadata?.unit || item.unit || recipeUnit).toString().toUpperCase();
+  const normRecipeUnit = recipeUnit.toString().toUpperCase();
+
+  // Si son la misma unidad
+  if (itemUnit === normRecipeUnit || (itemUnit === 'PZA' && normRecipeUnit === 'UNIT') || (itemUnit === 'UNIT' && normRecipeUnit === 'PZA')) {
+    return { stockInRecipeUnit: rawStock, neededInItemUnit: requiredQty, effectiveUnit: recipeUnit };
+  }
+
+  // Intentar conversión con UoM Engine
+  const conv = convertUoM(rawStock, itemUnit, normRecipeUnit);
+  if (conv.success) {
+    const stockInRecipeUnit = conv.convertedQuantity;
+    const convNeeded = convertUoM(requiredQty, normRecipeUnit, itemUnit);
+    const neededInItemUnit = convNeeded.success ? convNeeded.convertedQuantity : requiredQty;
+    return { stockInRecipeUnit, neededInItemUnit, effectiveUnit: normRecipeUnit };
+  }
+
+  return { stockInRecipeUnit: rawStock, neededInItemUnit: requiredQty, effectiveUnit: recipeUnit };
 }
 
 const DEFAULT_RECIPES: Recipe[] = [
@@ -405,14 +436,20 @@ export async function simulateProductionStockAction(
     let canProduce = true;
     let maxBatches = 999999;
     const ingredientsStatus = [];
+    const wasteMultiplier = 1 + (Number(recipe.waste_percentage || 0) / 100);
 
     for (const ing of recipe.ingredients) {
-      const needed = Number(ing.quantity) * batches;
+      const baseNeeded = Number(ing.quantity) * batches;
+      const needed = Math.round(baseNeeded * wasteMultiplier * 1000) / 1000;
       
       // Buscar el ítem en la base de datos
       const matchedItem = itemsMap.get(ing.raw_material_id) || itemsMap.get(ing.raw_material_name.toLowerCase().trim());
-      const available = matchedItem ? Number(matchedItem.stock_quantity ?? matchedItem.stock ?? 0) : 0;
-      const missing = Math.max(0, needed - available);
+      const { stockInRecipeUnit } = matchedItem
+        ? resolveStockAndConversion(matchedItem, needed, ing.unit)
+        : { stockInRecipeUnit: 0 };
+
+      const available = Math.round(stockInRecipeUnit * 1000) / 1000;
+      const missing = Math.max(0, Math.round((needed - available) * 1000) / 1000);
       const hasEnough = available >= needed;
 
       if (!hasEnough) {
@@ -420,7 +457,7 @@ export async function simulateProductionStockAction(
       }
 
       if (ing.quantity > 0) {
-        const possibleBatchesWithThis = Math.floor(available / ing.quantity);
+        const possibleBatchesWithThis = Math.floor(available / (ing.quantity * wasteMultiplier));
         if (possibleBatchesWithThis < maxBatches) {
           maxBatches = Math.max(0, possibleBatchesWithThis);
         }
@@ -495,31 +532,36 @@ export async function executeProductionOrderAction(
       if (it.name) itemsMap.set(it.name.toLowerCase().trim(), it);
     });
 
-    // 1. Validar disponibilidad de insumos
+    const wasteMultiplier = 1 + (Number(recipe.waste_percentage || 0) / 100);
+
+    // 1. Validar disponibilidad de insumos (con conversión de UoM y merma)
     for (const ing of recipe.ingredients) {
-      const needed = Number(ing.quantity) * batches;
+      const neededInRecipeUnit = Number(ing.quantity) * batches * wasteMultiplier;
       const matched = itemsMap.get(ing.raw_material_id) || itemsMap.get(ing.raw_material_name.toLowerCase().trim());
-      const currentStock = matched ? Number(matched.stock_quantity ?? matched.stock ?? 0) : 0;
+      const { stockInRecipeUnit } = matched
+        ? resolveStockAndConversion(matched, neededInRecipeUnit, ing.unit)
+        : { stockInRecipeUnit: 0 };
 
       // Si el ítem existe en inventario pero el stock no alcanza
-      if (matched && currentStock < needed) {
+      if (matched && stockInRecipeUnit < neededInRecipeUnit) {
         return {
           success: false,
-          error: `Stock insuficiente de "${ing.raw_material_name}". Se requieren ${needed} ${ing.unit} y solo hay ${currentStock} ${ing.unit} disponibles.`
+          error: `Stock insuficiente de "${ing.raw_material_name}". Se requieren ${Math.round(neededInRecipeUnit * 1000) / 1000} ${ing.unit} (incluye merma) y solo hay ${Math.round(stockInRecipeUnit * 1000) / 1000} ${ing.unit} disponibles.`
         };
       }
     }
 
-    // 2. Descontar materias primas en items
+    // 2. Descontar materias primas en items en su unidad de medida nativa
     const consumedMaterials = [];
 
     for (const ing of recipe.ingredients) {
-      const needed = Number(ing.quantity) * batches;
+      const neededInRecipeUnit = Number(ing.quantity) * batches * wasteMultiplier;
       const matched = itemsMap.get(ing.raw_material_id) || itemsMap.get(ing.raw_material_name.toLowerCase().trim());
 
       if (matched) {
+        const { neededInItemUnit } = resolveStockAndConversion(matched, neededInRecipeUnit, ing.unit);
         const currentStock = Number(matched.stock_quantity ?? matched.stock ?? 0);
-        const newStock = Math.max(0, currentStock - needed);
+        const newStock = Math.max(0, Math.round((currentStock - neededInItemUnit) * 1000) / 1000);
 
         // Actualizar stock con fallback
         let updateRes = await supabaseAdmin
@@ -538,17 +580,28 @@ export async function executeProductionOrderAction(
       consumedMaterials.push({
         id: ing.raw_material_id,
         name: ing.raw_material_name,
-        quantity: needed,
+        quantity: Math.round(neededInRecipeUnit * 1000) / 1000,
         unit: ing.unit,
         unit_cost: ing.unit_cost,
-        total_cost: Math.round(ing.unit_cost * needed * 100) / 100
+        total_cost: Math.round(ing.unit_cost * neededInRecipeUnit * 100) / 100
       });
     }
 
-    // 3. Incrementar stock del producto terminado
+    // 3. Trazabilidad de Lote y Fecha de Vencimiento
+    const now = new Date();
+    const dateStamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    const lotNumber = `LOT-${dateStamp}-${randomSuffix}`;
+    let expiryDate: string | undefined = undefined;
+    if (recipe.shelf_life_days && recipe.shelf_life_days > 0) {
+      const exp = new Date(now.getTime() + recipe.shelf_life_days * 86400000);
+      expiryDate = exp.toISOString().slice(0, 10);
+    }
+
+    // 4. Incrementar stock del producto terminado
     const totalUnitsProduced = recipe.batch_yield * batches;
-    const totalProductionCost = Math.round(recipe.total_batch_cost * batches * 100) / 100;
-    const unitCost = recipe.unit_production_cost;
+    const totalProductionCost = Math.round(recipe.total_batch_cost * batches * wasteMultiplier * 100) / 100;
+    const unitCost = Math.round((totalProductionCost / totalUnitsProduced) * 1000) / 1000;
 
     let finishedItemId = recipe.finished_product_id;
     let matchedFinished = itemsMap.get(recipe.finished_product_id) || itemsMap.get(recipe.finished_product_name.toLowerCase().trim());
@@ -562,7 +615,7 @@ export async function executeProductionOrderAction(
         .from('items')
         .update({
           stock_quantity: newStock,
-          cost: unitCost // Actualizar costo promedio / unitario de producción
+          cost: unitCost // Actualizar costo unitario de producción
         })
         .eq('id', matchedFinished.id);
 
@@ -592,7 +645,9 @@ export async function executeProductionOrderAction(
             is_manufactured: true,
             recipe_id: recipe.id,
             recipe_name: recipe.name,
-            yield_unit: recipe.yield_unit
+            yield_unit: recipe.yield_unit,
+            lot_number: lotNumber,
+            expiry_date: expiryDate
           }
         })
         .select('id')
@@ -603,7 +658,7 @@ export async function executeProductionOrderAction(
       }
     }
 
-    // 4. Registrar la orden de producción en documents
+    // 5. Registrar la orden de producción en documents con metadata completa
     const orderNumber = `PROD-${Date.now().toString().slice(-6)}`;
     const producedAt = new Date().toISOString();
 
@@ -631,7 +686,10 @@ export async function executeProductionOrderAction(
           materials_consumed: consumedMaterials,
           extra_costs: recipe.extra_costs,
           operator_name: payload.operatorName || actor.email,
-          produced_at: producedAt
+          produced_at: producedAt,
+          lot_number: lotNumber,
+          expiry_date: expiryDate,
+          waste_percentage: recipe.waste_percentage || 0
         }
       })
       .select()
@@ -639,7 +697,7 @@ export async function executeProductionOrderAction(
 
     if (orderErr) throw orderErr;
 
-    // 5. Auditar la fabricación
+    // 6. Auditar la fabricación
     await writeAuditLog({
       tenant_id: tenantId,
       actor_email: actor.email,
@@ -652,7 +710,8 @@ export async function executeProductionOrderAction(
         recipe_name: recipe.name,
         batches,
         units_produced: totalUnitsProduced,
-        total_cost: totalProductionCost
+        total_cost: totalProductionCost,
+        lot_number: lotNumber
       }
     });
 
@@ -671,6 +730,8 @@ export async function executeProductionOrderAction(
       total_cost: totalProductionCost,
       unit_cost: unitCost,
       status: 'completed',
+      lot_number: lotNumber,
+      expiry_date: expiryDate,
       materials_consumed: consumedMaterials,
       produced_at: producedAt,
       operator_name: payload.operatorName || actor.email,
@@ -720,6 +781,8 @@ export async function getProductionOrdersAction(
         total_cost: Number(d.total_amount) || Number(meta.total_cost) || 0,
         unit_cost: Number(meta.unit_cost) || 0,
         status: (d.status as any) || 'completed',
+        lot_number: meta.lot_number || null,
+        expiry_date: meta.expiry_date || null,
         materials_consumed: meta.materials_consumed || [],
         produced_at: meta.produced_at || d.created_at,
         operator_name: meta.operator_name || 'Operador',

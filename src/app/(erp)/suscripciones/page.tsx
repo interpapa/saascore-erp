@@ -28,7 +28,8 @@ import {
   Sliders, 
   User, 
   Phone, 
-  AlertTriangle 
+  AlertTriangle,
+  Snowflake 
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -42,7 +43,9 @@ import {
   createSubscriptionAction, 
   recordSubscriptionPaymentAction, 
   updateSubscriptionStatusAction, 
-  changeSubscriptionPlanAction 
+  changeSubscriptionPlanAction,
+  recordSessionCheckInAction,
+  freezeSubscriptionAction
 } from '@/app/actions/subscriptions';
 import { 
   Subscription, 
@@ -94,6 +97,12 @@ export default function SuscripcionesPage() {
 
   const [selectedSubForChangePlan, setSelectedSubForChangePlan] = useState<Subscription | null>(null);
   const [targetPlanId, setTargetPlanId] = useState<string>('');
+
+  // Congelamiento de membresía
+  const [isFreezeModalOpen, setIsFreezeModalOpen] = useState<boolean>(false);
+  const [selectedSubForFreeze, setSelectedSubForFreeze] = useState<Subscription | null>(null);
+  const [freezeDays, setFreezeDays] = useState<number>(15);
+  const [freezeReason, setFreezeReason] = useState<string>('Vacaciones / Viaje');
 
   // Formulario nueva suscripción
   const [newSubClientId, setNewSubClientId] = useState<string>('');
@@ -278,6 +287,63 @@ export default function SuscripcionesPage() {
       }
     } catch {
       showToast('Ocurrió un error', 'error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Check-in rápido de sesión en 1 toque
+  const handleSessionCheckIn = async (sub: Subscription) => {
+    if (!currentTenant?.id) return;
+    const safeActor: ActionActor = actor || { email: 'admin@rendo.com', role: 'owner' };
+    setProcessing(true);
+    try {
+      const res = await recordSessionCheckInAction(sub.id, currentTenant.id, safeActor);
+      if (res.success) {
+        showToast(`¡Asistencia registrada! (${res.sessions_used} / ${res.max_sessions || '∞'})`, 'success');
+        loadData();
+      } else {
+        showToast(res.error || 'No se pudo registrar la asistencia', 'error');
+      }
+    } catch {
+      showToast('Error de red al registrar asistencia', 'error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  // Abrir modal de congelamiento
+  const handleOpenFreeze = (sub: Subscription) => {
+    setSelectedSubForFreeze(sub);
+    setFreezeDays(15);
+    setFreezeReason('Vacaciones / Viaje');
+    setIsFreezeModalOpen(true);
+  };
+
+  // Confirmar congelamiento de membresía
+  const handleConfirmFreeze = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSubForFreeze || !currentTenant?.id) return;
+    const safeActor: ActionActor = actor || { email: 'admin@rendo.com', role: 'owner' };
+    setProcessing(true);
+    try {
+      const res = await freezeSubscriptionAction(
+        selectedSubForFreeze.id,
+        freezeDays,
+        freezeReason,
+        currentTenant.id,
+        safeActor
+      );
+      if (res.success) {
+        showToast(`Membresía congelada. Nueva fecha de corte: ${res.newBillingDate || 'actualizada'}`, 'success');
+        setIsFreezeModalOpen(false);
+        setSelectedSubForFreeze(null);
+        loadData();
+      } else {
+        showToast(res.error || 'Error al congelar la membresía', 'error');
+      }
+    } catch {
+      showToast('Ocurrió un error al congelar la membresía', 'error');
     } finally {
       setProcessing(false);
     }
@@ -613,6 +679,7 @@ export default function SuscripcionesPage() {
                     <tr>
                       <th className="py-3 px-4">Suscriptor</th>
                       <th className="py-3 px-4">Plan & Frecuencia</th>
+                      <th className="py-3 px-4">Sesiones / Asistencia</th>
                       <th className="py-3 px-4">Importe</th>
                       <th className="py-3 px-4">Próximo Corte</th>
                       <th className="py-3 px-4">Estado</th>
@@ -647,6 +714,56 @@ export default function SuscripcionesPage() {
                           <td className="py-3.5 px-4">
                             <div className="font-medium text-slate-700 dark:text-slate-200">{sub.plan_name}</div>
                             <div className="text-[10px] text-slate-400 capitalize">{FREQUENCY_LABELS[sub.frequency] || sub.frequency}</div>
+                          </td>
+
+                          {/* Columna de Sesiones y Asistencia en 1 Toque */}
+                          <td className="py-3.5 px-4">
+                            {sub.max_sessions_per_cycle ? (
+                              <div className="space-y-1.5 min-w-[125px]">
+                                <div className="flex items-center justify-between text-[11px] font-bold">
+                                  <span className="text-slate-700 dark:text-slate-300">
+                                    {sub.sessions_used || 0} / {sub.max_sessions_per_cycle}
+                                  </span>
+                                  {(sub.sessions_used || 0) >= sub.max_sessions_per_cycle ? (
+                                    <span className="text-[9px] font-black uppercase text-rose-600 dark:text-rose-400 bg-rose-500/10 px-1.5 py-0.2 rounded">
+                                      Agotadas
+                                    </span>
+                                  ) : (
+                                    <span className="text-[9px] text-slate-400">
+                                      {sub.max_sessions_per_cycle - (sub.sessions_used || 0)} disp.
+                                    </span>
+                                  )}
+                                </div>
+                                {/* Barra de Progreso */}
+                                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all duration-300 ${
+                                      (sub.sessions_used || 0) >= sub.max_sessions_per_cycle
+                                        ? 'bg-rose-500'
+                                        : 'bg-indigo-500'
+                                    }`}
+                                    style={{
+                                      width: `${Math.min(100, Math.round(((sub.sessions_used || 0) / sub.max_sessions_per_cycle) * 100))}%`
+                                    }}
+                                  />
+                                </div>
+                                {/* Botón Rápido Check-in */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleSessionCheckIn(sub)}
+                                  disabled={processing || (sub.sessions_used || 0) >= sub.max_sessions_per_cycle || sub.status === 'paused' || sub.status === 'cancelled'}
+                                  className="w-full mt-1 inline-flex items-center justify-center gap-1 py-1 px-2 rounded-lg bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-[10px] font-bold transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                  title="Registrar asistencia y descontar sesión en 1 toque"
+                                >
+                                  <Check className="w-3 h-3" />
+                                  <span>+ Check-in</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400">
+                                <span>Ilimitado</span>
+                              </span>
+                            )}
                           </td>
 
                           <td className="py-3.5 px-4">
@@ -712,6 +829,18 @@ export default function SuscripcionesPage() {
                                   title="Enviar recordatorio WhatsApp"
                                 >
                                   <Send className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+
+                              {/* Congelar Membresía (Freeze) */}
+                              {isActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenFreeze(sub)}
+                                  className="p-1.5 rounded-lg bg-blue-500/10 text-blue-600 hover:bg-blue-500 hover:text-white transition"
+                                  title="Congelar membresía temporalmente (posterga fecha de cobro)"
+                                >
+                                  <Snowflake className="w-3.5 h-3.5" />
                                 </button>
                               )}
 
@@ -1282,6 +1411,113 @@ export default function SuscripcionesPage() {
                 >
                   {processing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                   <span>Guardar Plan</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── MODAL: CONGELAR MEMBRESÍA (FREEZE) ────────────────────────────── */}
+      {isFreezeModalOpen && selectedSubForFreeze && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <Snowflake className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base">Congelar Membresía</h3>
+                  <p className="text-xs text-slate-400">Pausa temporal y postergación de cobro</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFreezeModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmFreeze} className="mt-4 space-y-4">
+              <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl space-y-1">
+                <div className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {selectedSubForFreeze.client_name}
+                </div>
+                <div className="text-[11px] text-slate-500">
+                  Plan: {selectedSubForFreeze.plan_name} • Corte actual: <span className="font-bold text-foreground">{selectedSubForFreeze.next_billing_date}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Días de Congelamiento *
+                </label>
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  {[7, 15, 30].map(days => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => setFreezeDays(days)}
+                      className={`py-2 px-3 rounded-xl text-xs font-bold transition border ${
+                        freezeDays === days
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                          : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {days} Días
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="180"
+                  required
+                  value={freezeDays}
+                  onChange={e => setFreezeDays(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="Días personalizados"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Motivo de Congelamiento
+                </label>
+                <select
+                  value={freezeReason}
+                  onChange={e => setFreezeReason(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none mb-2"
+                >
+                  <option value="Vacaciones / Viaje">Vacaciones / Viaje</option>
+                  <option value="Incapacidad Médica / Lesión">Incapacidad Médica / Lesión</option>
+                  <option value="Motivos Laborales">Motivos Laborales</option>
+                  <option value="Solicitud Especial del Cliente">Solicitud Especial del Cliente</option>
+                </select>
+              </div>
+
+              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 rounded-xl text-[11px] text-blue-800 dark:text-blue-300">
+                💡 La próxima fecha de cobro se postergará automáticamente <strong>+{freezeDays} días</strong> y el estado pasará a congelado/pausado.
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFreezeModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={processing}
+                  className="px-5 py-2.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition flex items-center gap-1.5"
+                >
+                  {processing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Snowflake className="w-3.5 h-3.5" />}
+                  <span>Confirmar Congelamiento</span>
                 </button>
               </div>
             </form>

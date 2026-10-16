@@ -96,7 +96,9 @@ export default function ProduccionPage() {
     yield_unit: 'unidades',
     ingredients: [],
     extra_costs: [],
-    suggested_sale_price: 0
+    suggested_sale_price: 0,
+    waste_percentage: 0,
+    shelf_life_days: undefined
   });
 
   const [processing, setProcessing] = useState<boolean>(false);
@@ -339,6 +341,8 @@ export default function ProduccionPage() {
           ingredients: editingRecipe.ingredients,
           extra_costs: editingRecipe.extra_costs || [],
           suggested_sale_price: Number(editingRecipe.suggested_sale_price) || undefined,
+          waste_percentage: Number(editingRecipe.waste_percentage) || 0,
+          shelf_life_days: editingRecipe.shelf_life_days ? Number(editingRecipe.shelf_life_days) : undefined,
           notes: editingRecipe.notes
         },
         safeActor
@@ -877,9 +881,19 @@ export default function ProduccionPage() {
                   {productionOrders.map(order => (
                     <tr key={order.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition">
                       <td className="py-3.5 px-4">
-                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400 block">
                           {order.order_number}
                         </span>
+                        {order.lot_number && (
+                          <span className="inline-block px-1.5 py-0.2 rounded bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-mono text-[10px] font-bold mt-0.5">
+                            🏷️ {order.lot_number}
+                          </span>
+                        )}
+                        {order.expiry_date && (
+                          <div className="text-[10px] text-slate-400 mt-0.5">
+                            Vence: <strong className="text-foreground">{order.expiry_date}</strong>
+                          </div>
+                        )}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -1010,6 +1024,41 @@ export default function ProduccionPage() {
                     onChange={e => setEditingRecipe({ ...editingRecipe, suggested_sale_price: Number(e.target.value) })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none"
                   />
+                </div>
+              </div>
+
+              {/* Parámetros Avanzados MRP: % Merma y Vida Útil */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    % Merma / Desperdicio Estimado
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="50"
+                    placeholder="Ej: 5 (5% merma)"
+                    value={editingRecipe.waste_percentage ?? ''}
+                    onChange={e => setEditingRecipe({ ...editingRecipe, waste_percentage: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400">Infla los insumos necesarios para cubrir merma/recorte</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Vida Útil / Caducidad (Días)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Ej: 180 (días hasta caducidad)"
+                    value={editingRecipe.shelf_life_days ?? ''}
+                    onChange={e => setEditingRecipe({ ...editingRecipe, shelf_life_days: e.target.value ? Number(e.target.value) : undefined })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400">Genera fecha de caducidad automática para el lote</span>
                 </div>
               </div>
 

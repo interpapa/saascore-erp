@@ -55,7 +55,7 @@ export default function CalendarioPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   // Filter & Navigation States
-  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('week');
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'agenda'>('week');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [filterState, setFilterState] = useState<AppointmentFilterState>({
     status: 'all',
@@ -502,6 +502,8 @@ export default function CalendarioPage() {
             onFilterChange={setFilterState}
             employees={bookableEmployees}
             services={services}
+            appointments={appointments}
+            onSelectAppointment={handleSelectAppointment}
             onOpenCreateModal={(type = 'appointment') => {
               setSelectedDateForCreate(null);
               setCreateModalType(type);
@@ -518,6 +520,10 @@ export default function CalendarioPage() {
             isLoading={isLoading}
             onSelectAppointment={handleSelectAppointment}
             onSelectDateSlot={handleSelectDateSlot}
+            onDrillDown={(date, mode) => {
+              setCurrentDate(date);
+              setViewMode(mode);
+            }}
             onOpenCreateModal={(type = 'appointment') => {
               setSelectedDateForCreate(null);
               setCreateModalType(type);

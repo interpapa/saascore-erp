@@ -31,6 +31,8 @@ export interface Recipe {
   unit_production_cost: number; // total_batch_cost / batch_yield
   suggested_sale_price?: number;
   notes?: string | null;
+  waste_percentage?: number; // % Merma / Desperdicio (ej: 5 = 5%)
+  shelf_life_days?: number; // Días de caducidad / vida útil (ej: 180)
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -50,6 +52,8 @@ export interface ProductionOrder {
   total_cost: number;
   unit_cost: number;
   status: 'completed' | 'cancelled';
+  lot_number?: string; // Trazabilidad de lote (ej: LOTE-20261016-01)
+  expiry_date?: string; // Fecha de vencimiento estimada
   materials_consumed: Array<{
     id: string;
     name: string;

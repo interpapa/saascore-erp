@@ -34,6 +34,7 @@ export interface Subscription {
   price_usd: number;
   sessions_used?: number;
   max_sessions?: number | null;
+  max_sessions_per_cycle?: number | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;

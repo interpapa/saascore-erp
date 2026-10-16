@@ -635,3 +635,152 @@ export async function changeSubscriptionPlanAction(
     return { success: false, error: (err as Error).message };
   }
 }
+
+// ─── 8. REGISTRAR CHECK-IN / CONSUMO DE SESIÓN EN 1 TOQUE ─────────────────────
+export async function recordSessionCheckInAction(
+  subscriptionId: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; sessions_used?: number; max_sessions?: number | null; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const { data: subDoc, error: subErr } = await supabaseAdmin
+      .from('documents')
+      .select('metadata')
+      .eq('id', subscriptionId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (subErr || !subDoc) {
+      return { success: false, error: 'Suscripción no encontrada.' };
+    }
+
+    const meta = subDoc.metadata || {};
+    const maxSessions = meta.max_sessions || null;
+    const currentSessionsUsed = Number(meta.sessions_used) || 0;
+
+    // Si tiene límite y ya no le quedan sesiones
+    if (maxSessions && currentSessionsUsed >= maxSessions) {
+      return {
+        success: false,
+        error: `El suscriptor ya consumió el total de ${maxSessions} sesiones contratadas en este ciclo.`
+      };
+    }
+
+    const newSessionsUsed = currentSessionsUsed + 1;
+    const sessionHistory = meta.session_history || [];
+    sessionHistory.push({
+      id: `checkin-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      registered_by: actor.email
+    });
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('documents')
+      .update({
+        metadata: {
+          ...meta,
+          sessions_used: newSessionsUsed,
+          session_history: sessionHistory
+        }
+      })
+      .eq('id', subscriptionId);
+
+    if (updateErr) throw updateErr;
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.updated',
+      target_type: 'subscription_checkin',
+      target_id: subscriptionId,
+      metadata: { sessions_used: newSessionsUsed, max_sessions: maxSessions }
+    });
+
+    safeRevalidate(tenantId);
+    return { success: true, sessions_used: newSessionsUsed, max_sessions: maxSessions };
+  } catch (err: unknown) {
+    console.error('[recordSessionCheckInAction Error]:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+// ─── 9. CONGELAMIENTO TEMPORAL DE MEMBRESÍA (MEMBERSHIP FREEZE) ───────────────
+export async function freezeSubscriptionAction(
+  subscriptionId: string,
+  freezeDays: number,
+  reason: string,
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; newBillingDate?: string; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const days = Math.max(1, Number(freezeDays) || 1);
+
+    const { data: subDoc, error: subErr } = await supabaseAdmin
+      .from('documents')
+      .select('metadata')
+      .eq('id', subscriptionId)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (subErr || !subDoc) {
+      return { success: false, error: 'Suscripción no encontrada.' };
+    }
+
+    const meta = subDoc.metadata || {};
+    const currentBillingDateStr = meta.next_billing_date || new Date().toISOString().slice(0, 10);
+    const currentDate = new Date(currentBillingDateStr);
+    currentDate.setDate(currentDate.getDate() + days);
+    const newBillingDate = currentDate.toISOString().slice(0, 10);
+
+    const freezeHistory = meta.freeze_history || [];
+    freezeHistory.push({
+      id: `freeze-${Date.now()}`,
+      days,
+      reason: reason || 'Viaje / Solicitud del cliente',
+      frozen_at: new Date().toISOString(),
+      previous_billing_date: currentBillingDateStr,
+      new_billing_date: newBillingDate
+    });
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('documents')
+      .update({
+        metadata: {
+          ...meta,
+          next_billing_date: newBillingDate,
+          freeze_history: freezeHistory
+        }
+      })
+      .eq('id', subscriptionId);
+
+    if (updateErr) throw updateErr;
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.updated',
+      target_type: 'subscription_freeze',
+      target_id: subscriptionId,
+      metadata: { days_frozen: days, new_billing_date: newBillingDate }
+    });
+
+    safeRevalidate(tenantId);
+    return { success: true, newBillingDate };
+  } catch (err: unknown) {
+    console.error('[freezeSubscriptionAction Error]:', err);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
