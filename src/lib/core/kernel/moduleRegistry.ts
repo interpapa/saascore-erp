@@ -228,7 +228,6 @@ export const DEFAULT_ENABLED_MODULES: ModuleId[] = [
   'config',
   'clientes',
   'inventario',
-  'catalogo',
   'calendario',
   'equipo',
   'caja',
@@ -273,9 +272,7 @@ export function isModuleActive(
     if (moduleId === 'med_ginecologia') {
       return DEFAULT_ENABLED_MODULES.includes('med_ginecologia') || DEFAULT_ENABLED_MODULES.includes('ginecologia');
     }
-    return DEFAULT_ENABLED_MODULES.includes(moduleId) || 
-      (moduleId === 'inventario' && DEFAULT_ENABLED_MODULES.includes('catalogo')) ||
-      (moduleId === 'catalogo' && DEFAULT_ENABLED_MODULES.includes('inventario'));
+    return DEFAULT_ENABLED_MODULES.includes(moduleId);
   }
   if (moduleId === 'clinica') {
     return activeModules.includes('clinica') ||

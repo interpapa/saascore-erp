@@ -313,9 +313,7 @@ export async function updateTenantSettings(
     let updatedMetadata = metadata;
     const updatePayload: Record<string, unknown> = { name };
     if (activeModules !== undefined) {
-      const normalized = [...activeModules];
-      if (normalized.includes('inventario') && !normalized.includes('catalogo')) normalized.push('catalogo');
-      if (normalized.includes('catalogo') && !normalized.includes('inventario')) normalized.push('inventario');
+      const normalized = activeModules.filter(m => m !== 'catalogo');
       updatePayload.active_modules = normalized;
 
       if (updatedMetadata && typeof updatedMetadata === 'object') {
@@ -534,7 +532,7 @@ export async function getAllTenants(callerOrActor?: ActionActor | string | null,
           const displayName = autoName.charAt(0).toUpperCase() + autoName.slice(1);
           
           const initialModules = [
-            'caja', 'clientes', 'inventario', 'catalogo', 'calendario',
+            'caja', 'clientes', 'inventario', 'calendario',
             'equipo', 'contabilidad', 'compras', 'whatsapp', 'kanban',
             'estadisticas', 'config'
           ];
@@ -637,19 +635,18 @@ export async function toggleTenantStatus(tenantId: string, newStatus: 'active' |
 function sanitizeTenantPayload(tenant: any) {
   if (!tenant) return null;
   const rawMeta = (tenant.metadata || {}) as Record<string, any>;
-  let modulesList = tenant.active_modules || rawMeta.active_modules || DEFAULT_ENABLED_MODULES;
+  let modulesList: string[] = Array.isArray(tenant.active_modules)
+    ? tenant.active_modules
+    : Array.isArray(rawMeta.active_modules)
+      ? rawMeta.active_modules
+      : DEFAULT_ENABLED_MODULES;
+
   if (Array.isArray(modulesList)) {
-    const hasInventario = modulesList.includes('inventario');
-    const hasCatalogo = modulesList.includes('catalogo');
-    if (hasInventario && !hasCatalogo) {
-      modulesList = [...modulesList, 'catalogo'];
-    } else if (hasCatalogo && !hasInventario) {
-      modulesList = [...modulesList, 'inventario'];
-    }
+    modulesList = modulesList.filter((m: string) => m !== 'catalogo');
   }
 
   const cleanMetadata = {
-    plan: rawMeta.plan || 'pro',
+    plan: rawMeta.plan || tenant.subscription_plan || 'pro',
     currency: rawMeta.currency || tenant.currency || 'USD',
     symbol: rawMeta.symbol || tenant.symbol || '$',
     exchange_rate: rawMeta.exchange_rate || 850.0,
@@ -724,13 +721,7 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       const allowedModules = authUser?.app_metadata?.allowed_modules || authUser?.user_metadata?.allowed_modules;
       const operationalPermissions = authUser?.app_metadata?.operational_permissions || authUser?.user_metadata?.operational_permissions || [];
       if (Array.isArray(allowedModules) && allowedModules.length > 0) {
-        const normalizedAllowed = [...allowedModules];
-        if (normalizedAllowed.includes('inventario') && !normalizedAllowed.includes('catalogo')) {
-          normalizedAllowed.push('catalogo');
-        }
-        if (normalizedAllowed.includes('catalogo') && !normalizedAllowed.includes('inventario')) {
-          normalizedAllowed.push('inventario');
-        }
+        const normalizedAllowed = allowedModules.filter((m: string) => m !== 'catalogo');
         tenant.active_modules = normalizedAllowed;
         if (tenant.metadata && typeof tenant.metadata === 'object') {
           (tenant.metadata as Record<string, unknown>).active_modules = normalizedAllowed;
@@ -794,21 +785,15 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
     }
     const db = supabaseAdmin;
 
-    // Normalizar active_modules para sincronizar 'inventario' y 'catalogo'
-    let normalizedModules = updates.active_modules;
-    if (Array.isArray(normalizedModules)) {
-      const hasInventario = normalizedModules.includes('inventario');
-      const hasCatalogo = normalizedModules.includes('catalogo');
-      if (hasInventario && !hasCatalogo) {
-        normalizedModules = [...normalizedModules, 'catalogo'];
-      } else if (hasCatalogo && !hasInventario) {
-        normalizedModules = [...normalizedModules, 'inventario'];
-      }
+    // Normalizar active_modules purgando estrictamente el alias legado 'catalogo'
+    let normalizedModules: string[] | undefined = undefined;
+    if (Array.isArray(updates.active_modules)) {
+      normalizedModules = updates.active_modules.filter((m: string) => m !== 'catalogo');
     }
 
     // Traer metadata existente para mantener campos y sincronizar active_modules
     let currentMetadata: any = {};
-    if (normalizedModules !== undefined || updates.metadata !== undefined) {
+    if (normalizedModules !== undefined || updates.metadata !== undefined || updates.subscription_plan !== undefined || updates.plan !== undefined) {
       const { data: currentTenantRow } = await db
         .from('tenants')
         .select('metadata')
@@ -821,8 +806,21 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
 
     const payload: Record<string, any> = {};
     if (updates.name !== undefined) payload.name = updates.name;
-    if (updates.status !== undefined) payload.status = updates.status;
+    if (updates.status !== undefined) {
+      payload.status = updates.status;
+      payload.is_active = updates.status === 'active';
+    }
     if (updates.is_active !== undefined) payload.is_active = updates.is_active;
+    if (updates.subscription_plan !== undefined) {
+      payload.subscription_plan = updates.subscription_plan;
+      currentMetadata.plan = updates.subscription_plan;
+    }
+    if (updates.plan !== undefined) {
+      payload.subscription_plan = updates.plan;
+      currentMetadata.plan = updates.plan;
+    }
+    if (updates.currency !== undefined) payload.currency = updates.currency;
+    if (updates.country_code !== undefined) payload.country_code = updates.country_code;
 
     if (normalizedModules !== undefined) {
       payload.active_modules = normalizedModules;
@@ -843,12 +841,16 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
       .select()
       .single();
 
-    if (error && (error.message.includes('active_modules') || error.message.includes('column'))) {
-      // Fallback: Si no existe la columna active_modules en la BD, lo guardamos dentro de metadata
+    if (error && (error.message.includes('active_modules') || error.message.includes('column') || error.message.includes('subscription_plan'))) {
+      // Fallback: Si no existe la columna en la BD, lo guardamos dentro de metadata
       delete payload.active_modules;
+      if (error.message.includes('subscription_plan')) {
+        delete payload.subscription_plan;
+      }
       payload.metadata = {
         ...currentMetadata,
-        active_modules: normalizedModules
+        ...(normalizedModules !== undefined ? { active_modules: normalizedModules } : {}),
+        ...(updates.subscription_plan !== undefined ? { plan: updates.subscription_plan } : (updates.plan !== undefined ? { plan: updates.plan } : {}))
       };
       const retry = await db
         .from('tenants')
@@ -864,14 +866,16 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
     if (error) throw error;
 
     // Invalidar caché de módulos para este tenant
-    if (updates.active_modules !== undefined) {
+    if (normalizedModules !== undefined) {
       const { invalidateModuleCache } = await import('@/lib/core/kernel/moduleRegistry');
       invalidateModuleCache(tenantId);
     }
 
     revalidatePath('/admin');
+    revalidatePath('/admin/billing');
     revalidatePath(`/admin/tenant/${tenantId}`);
     revalidatePath('/dashboard');
+    revalidatePath('/configuracion');
     revalidatePath('/apps');
     revalidatePath('/configuracion');
 

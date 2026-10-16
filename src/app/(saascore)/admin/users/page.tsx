@@ -57,6 +57,7 @@ const ALL_SYSTEM_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones' },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología Especializada', category: 'salud' },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Dedicado)', category: 'salud' },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud' },
   { id: 'med_general', name: 'Medicina General e Interna', category: 'salud' },
   { id: 'med_pediatria', name: 'Pediatría y Puericultura', category: 'salud' },
@@ -67,6 +68,7 @@ const ALL_SYSTEM_MODULES = [
   // Servicios & Sistema
   { id: 'barberia', name: 'Barbería & Estilo', category: 'servicios' },
   { id: 'grooming', name: 'Grooming Canino', category: 'servicios' },
+  { id: 'integraciones', name: 'Conexiones & API', category: 'servicios' },
   { id: 'config', name: 'Ajustes Generales', category: 'servicios' }
 ];
 

@@ -175,7 +175,7 @@ export default function LauncherPage() {
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
-      : ['caja', 'clientes', 'inventario', 'catalogo', 'calendario', 'estadisticas', 'config'];
+      : ['caja', 'clientes', 'inventario', 'calendario', 'estadisticas', 'config'];
 
   const userAllowed = session?.allowed_modules && session.allowed_modules.length > 0 ? session.allowed_modules : null;
 
@@ -190,9 +190,7 @@ export default function LauncherPage() {
       ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
       : isGineco
         ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
-        : (app.id === 'inventario' || app.id === 'catalogo')
-          ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
-          : tenantModules.includes(app.id);
+        : tenantModules.includes(app.id);
 
     if (!isTenantActive) return false;
 
@@ -203,9 +201,6 @@ export default function LauncherPage() {
       }
       if (isGineco) {
         return userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia');
-      }
-      if (app.id === 'inventario' || app.id === 'catalogo') {
-        return userAllowed.includes('inventario') || userAllowed.includes('catalogo');
       }
       return userAllowed.includes(app.id);
     }

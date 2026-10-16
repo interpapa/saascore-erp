@@ -71,6 +71,7 @@ const ALL_SYSTEM_MODULES = [
   // Servicios & Sistema
   { id: 'barberia', name: 'Barbería & Estilo', category: 'servicios', desc: 'Sillón express y catálogo masculino' },
   { id: 'grooming', name: 'Grooming Canino', category: 'servicios', desc: 'Mascotas, peluquería y suplementos' },
+  { id: 'integraciones', name: 'Conexiones & API', category: 'servicios', desc: 'Webhooks y pasarelas de integración externa' },
   { id: 'config', name: 'Ajustes Generales', category: 'servicios', desc: 'Configuración general de la empresa' }
 ];
 
@@ -244,8 +245,9 @@ export default function AdminTenantsPage() {
 
   const handleOpenModulesModal = (tenant: any) => {
     setSelectedTenantForModules(tenant);
-    const mods = tenant.active_modules || (tenant.metadata as any)?.active_modules || ALL_SYSTEM_MODULES.map(m => m.id);
-    setTenantActiveModules(Array.isArray(mods) ? mods : []);
+    const rawMods = tenant.active_modules || (tenant.metadata as any)?.active_modules || ALL_SYSTEM_MODULES.map(m => m.id);
+    const cleaned = (Array.isArray(rawMods) ? rawMods : []).filter((m: string) => m !== 'catalogo');
+    setTenantActiveModules(cleaned);
   };
 
   const handleToggleTenantModule = (modId: string) => {

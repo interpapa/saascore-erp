@@ -5,7 +5,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
 import { ArrowLeft, Users, DollarSign, ShieldAlert } from 'lucide-react';
 import Link from 'next/link';
-import { getAllTenants, toggleTenantStatus } from '@/app/actions/tenant';
+import { getAllTenants, toggleTenantStatus, updateTenantAdminAction } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmptyState } from '@/components/core/EmptyState';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
@@ -48,6 +48,19 @@ export default function BillingAdminPage() {
     }
   };
 
+  const handleUpdatePlan = async (id: string, newPlan: string) => {
+    if (!session?.userEmail) return;
+    const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
+    setTenants(prev => prev.map(t => t.id === id ? { ...t, subscription_plan: newPlan } : t));
+    const result = await updateTenantAdminAction(id, { subscription_plan: newPlan, plan: newPlan }, activeActor);
+    if (result.success) {
+      toast({ variant: 'success', title: 'Plan Actualizado', description: `Plan cambiado a ${newPlan.toUpperCase()} exitosamente.` });
+    } else {
+      toast({ variant: 'error', title: 'Error', description: result.error });
+      fetchTenants();
+    }
+  };
+
   const isSuper = session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail);
 
   if (!isSuper) {
@@ -62,7 +75,7 @@ export default function BillingAdminPage() {
     );
   }
 
-  // Simulación de MRR por plan, ya que aún no tenemos Stripe conectado
+  // Precios por plan
   const PLAN_PRICES: Record<string, number> = {
     basic: 49,
     pro: 99,
@@ -72,6 +85,10 @@ export default function BillingAdminPage() {
   const totalInstances = tenants.length;
   const activeTenants = tenants.filter(t => t.status === 'active');
   const mrr = activeTenants.reduce((sum, t) => sum + (PLAN_PRICES[t.subscription_plan || 'basic'] || 49), 0);
+
+  const basicCount = tenants.filter(t => (t.subscription_plan || 'basic').toLowerCase() === 'basic').length;
+  const proCount = tenants.filter(t => (t.subscription_plan || '').toLowerCase() === 'pro').length;
+  const entCount = tenants.filter(t => (t.subscription_plan || '').toLowerCase() === 'enterprise').length;
 
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-300">
@@ -83,7 +100,7 @@ export default function BillingAdminPage() {
           </Link>
           <div>
             <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">Comercial &amp; Facturación</h1>
-            <p className="text-slate-500 text-xs sm:text-sm font-medium">Gestión de suscripciones y facturación del sistema</p>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">Gestión de suscripciones, planes y facturación recurrente SaaS</p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-200 dark:border-emerald-500/20">
@@ -92,7 +109,7 @@ export default function BillingAdminPage() {
       </div>
 
       {/* KPI */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <div className="bg-card p-5 sm:p-6 rounded-2xl shadow-xs border border-border">
           <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400 mb-2 font-semibold text-xs sm:text-sm uppercase tracking-wider">
             <Users size={18} className="text-indigo-500" /> Instancias Activas
@@ -104,6 +121,22 @@ export default function BillingAdminPage() {
             <DollarSign size={18} /> MRR Mensual Estimado
           </div>
           <p className="text-3xl sm:text-4xl font-black text-foreground">${mrr.toFixed(2)}</p>
+        </div>
+        <div className="bg-card p-5 sm:p-6 rounded-2xl shadow-xs border border-border">
+          <div className="text-slate-600 dark:text-slate-400 mb-2 font-semibold text-xs sm:text-sm uppercase tracking-wider">
+            Distribución de Planes
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <div className="text-xs">
+              <span className="font-bold text-foreground">{basicCount}</span> <span className="text-muted-foreground">Basic</span>
+            </div>
+            <div className="text-xs">
+              <span className="font-bold text-primary">{proCount}</span> <span className="text-muted-foreground">Pro</span>
+            </div>
+            <div className="text-xs">
+              <span className="font-bold text-emerald-500">{entCount}</span> <span className="text-muted-foreground">Enterprise</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -147,9 +180,17 @@ export default function BillingAdminPage() {
                   <td className="p-4 pl-6 font-mono text-xs text-slate-500">{t.id.slice(0, 8)}...</td>
                   <td className="p-4">
                     <div className="font-bold text-foreground">{t.name}</div>
-                    <div className="text-slate-500 text-xs uppercase tracking-wider font-semibold">{t.subscription_plan || 'basic'}</div>
+                    <select
+                      value={(t.subscription_plan || 'basic').toLowerCase()}
+                      onChange={(e) => handleUpdatePlan(t.id, e.target.value)}
+                      className="mt-1 text-xs font-bold text-primary bg-background border border-border rounded-lg px-2 py-1 outline-none focus:border-primary cursor-pointer uppercase"
+                    >
+                      <option value="basic">BASIC ($49/mes)</option>
+                      <option value="pro">PRO ($99/mes)</option>
+                      <option value="enterprise">ENTERPRISE ($199/mes)</option>
+                    </select>
                   </td>
-                  <td className="p-4 font-medium text-foreground">${PLAN_PRICES[t.subscription_plan || 'basic'] || 49}/mes</td>
+                  <td className="p-4 font-bold text-foreground">${PLAN_PRICES[(t.subscription_plan || 'basic').toLowerCase()] || 49}/mes</td>
                   <td className="p-4 text-slate-500 text-xs">{new Date(t.created_at).toLocaleDateString()}</td>
                   <td className="p-4">
                     <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${t.status === 'suspended' ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'}`}>
@@ -203,14 +244,22 @@ export default function BillingAdminPage() {
                     {t.status === 'suspended' ? 'Suspendido' : 'Al Día'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2">
-                  <div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border/40 pt-2 gap-2">
+                  <div className="flex-1">
                     <span className="block text-[10px] uppercase font-bold text-slate-400">Plan</span>
-                    <span className="font-bold text-primary uppercase">{t.subscription_plan || 'basic'}</span>
+                    <select
+                      value={(t.subscription_plan || 'basic').toLowerCase()}
+                      onChange={(e) => handleUpdatePlan(t.id, e.target.value)}
+                      className="mt-0.5 text-xs font-bold text-primary bg-background border border-border rounded-lg px-1.5 py-1 outline-none w-full uppercase"
+                    >
+                      <option value="basic">BASIC ($49)</option>
+                      <option value="pro">PRO ($99)</option>
+                      <option value="enterprise">ENTERPRISE ($199)</option>
+                    </select>
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-bold text-slate-400">Cuota</span>
-                    <span className="font-bold text-foreground">${PLAN_PRICES[t.subscription_plan || 'basic'] || 49}/mes</span>
+                    <span className="font-bold text-foreground">${PLAN_PRICES[(t.subscription_plan || 'basic').toLowerCase()] || 49}/mes</span>
                   </div>
                   <div>
                     <span className="block text-[10px] uppercase font-bold text-slate-400">Alta</span>

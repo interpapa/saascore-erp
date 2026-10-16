@@ -34,51 +34,58 @@ import { useToast } from '@/components/core/ToastProvider';
 import Link from 'next/link';
 
 const ALL_MODULES = [
+  // Comercial & Finanzas
   { 
     id: 'caja', 
     name: 'Caja POS', 
+    category: 'comercial',
     features: [
       { key: 'use_pos_discounts', label: 'Permitir aplicar descuentos manuales' },
       { key: 'use_pos_credits', label: 'Habilitar ventas a crédito' }
     ]
   },
-  { id: 'clientes', name: 'Clientes (CRM)', features: [] },
+  { id: 'clientes', name: 'Clientes (CRM)', category: 'comercial', features: [] },
   { 
     id: 'inventario', 
     name: 'Inventario de Mercancía',
+    category: 'comercial',
     features: [
       { key: 'use_inventory_recipes', label: 'Usar Recetas e Insumos (BOM)' },
       { key: 'use_multiple_warehouses', label: 'Habilitar Múltiples Almacenes' }
     ]
   },
-  { id: 'estadisticas', name: 'Estadísticas', features: [] },
-  { id: 'compras', name: 'Compras AP', features: [] },
-  { id: 'contabilidad', name: 'Contabilidad y Finanzas', features: [] },
+  { id: 'compras', name: 'Compras AP', category: 'comercial', features: [] },
+  { id: 'contabilidad', name: 'Contabilidad y Finanzas', category: 'comercial', features: [] },
+  { id: 'estadisticas', name: 'Estadísticas & Reportes', category: 'comercial', features: [] },
+  // Operaciones & CRM
   { 
     id: 'calendario', 
     name: 'Citas y Turnos',
+    category: 'operaciones',
     features: [
       { key: 'use_calendar_employees', label: 'Selección de Múltiples Profesionales/Empleados' },
       { key: 'use_calendar_whatsapp', label: 'Habilitar link de confirmación de WhatsApp' }
     ]
   },
-  { id: 'whatsapp', name: 'WhatsApp Inbox', features: [] },
-  { id: 'kanban', name: 'Órdenes de Trabajo', features: [] },
-  { id: 'odontologia', name: 'Odontología & Salud Dental', features: [] },
-  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Módulo Dedicado)', features: [] },
-  { id: 'clinica', name: 'Clínica Médica (Base)', features: [] },
-  { id: 'med_general', name: 'Especialidad: Medicina General e Interna', features: [] },
-  { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura', features: [] },
-  { id: 'med_ginecologia', name: 'Especialidad: Ginecología y Obstetricia', features: [] },
-  { id: 'med_dermatologia', name: 'Especialidad: Dermatología y Estética', features: [] },
-  { id: 'med_traumatologia', name: 'Especialidad: Traumatología y Fisioterapia', features: [] },
-  { id: 'med_oftalmologia', name: 'Especialidad: Oftalmología y Optometría', features: [] },
-  { id: 'barberia', name: 'Barbería & Estilo Masculino', features: [] },
-  { id: 'grooming', name: 'Peluquería & Spa Canino', features: [] },
-  { id: 'equipo', name: 'Personal HRMS', features: [] },
-  { id: 'franquicias', name: 'Franquicias', features: [] },
-  { id: 'integraciones', name: 'Conexiones API', features: [] },
-  { id: 'config', name: 'Ajustes del Sistema', features: [] }
+  { id: 'whatsapp', name: 'WhatsApp Inbox', category: 'operaciones', features: [] },
+  { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones', features: [] },
+  { id: 'equipo', name: 'Personal HRMS', category: 'operaciones', features: [] },
+  { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', features: [] },
+  // Salud & Especialidades Médicas
+  { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'salud', features: [] },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Dedicado)', category: 'salud', features: [] },
+  { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', features: [] },
+  { id: 'med_general', name: 'Especialidad: Medicina General e Interna', category: 'salud', features: [] },
+  { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura', category: 'salud', features: [] },
+  { id: 'med_ginecologia', name: 'Especialidad: Ginecología y Obstetricia', category: 'salud', features: [] },
+  { id: 'med_dermatologia', name: 'Especialidad: Dermatología y Estética', category: 'salud', features: [] },
+  { id: 'med_traumatologia', name: 'Especialidad: Traumatología y Fisioterapia', category: 'salud', features: [] },
+  { id: 'med_oftalmologia', name: 'Especialidad: Oftalmología y Optometría', category: 'salud', features: [] },
+  // Servicios & Sistema
+  { id: 'barberia', name: 'Barbería & Estilo Masculino', category: 'servicios', features: [] },
+  { id: 'grooming', name: 'Peluquería & Spa Canino', category: 'servicios', features: [] },
+  { id: 'integraciones', name: 'Conexiones & API', category: 'servicios', features: [] },
+  { id: 'config', name: 'Ajustes del Sistema', category: 'servicios', features: [] }
 ];
 
 import { UserRole } from '@/lib/rbac';
@@ -96,8 +103,11 @@ export default function TenantAdminPage() {
 
   // Formularios locales
   const [name, setName] = useState('');
+  const [subscriptionPlan, setSubscriptionPlan] = useState('basic');
+  const [status, setStatus] = useState<'active' | 'suspended'>('active');
   const [activeModules, setActiveModules] = useState<string[]>([]);
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
+  const [modulesCategoryFilter, setModulesCategoryFilter] = useState<'all' | 'comercial' | 'operaciones' | 'salud' | 'servicios'>('all');
 
   // Gestión de Usuarios del Tenant
   const [users, setUsers] = useState<any[]>([]);
@@ -123,10 +133,12 @@ export default function TenantAdminPage() {
     if (result.success && result.tenant) {
       setTenant(result.tenant);
       setName(result.tenant.name || '');
+      setSubscriptionPlan(result.tenant.subscription_plan || result.tenant.metadata?.plan || 'basic');
+      setStatus(result.tenant.status === 'suspended' ? 'suspended' : 'active');
       // Si está vacío en BD asume que todos estaban activos por retrocompatibilidad
       const rawModules: string[] = result.tenant.active_modules || ALL_MODULES.map(m => m.id);
-      // Migración defensiva: convertir cualquier 'catalogo' legado en 'inventario'
-      const normalizedModules = Array.from(new Set(rawModules.map(m => m === 'catalogo' ? 'inventario' : m)));
+      // Purgar 'catalogo' legado para respetar deshabilitaciones reales
+      const normalizedModules = Array.from(new Set(rawModules.filter(m => m !== 'catalogo')));
       setActiveModules(normalizedModules);
       
       setFeatureFlags(result.tenant.metadata?.features || {
@@ -264,14 +276,17 @@ export default function TenantAdminPage() {
 
     const updates = {
       name,
+      status,
+      subscription_plan: subscriptionPlan,
+      plan: subscriptionPlan,
       active_modules: finalModules,
       metadata: newMetadata
     };
 
     const result = await updateTenantAdminAction(tenant.id, updates, activeActor);
     if (result.success) {
-      toast({ variant: 'success', title: 'Guardado', description: 'Configuración de módulos actualizada exitosamente.' });
-      setTenant((prev: any) => ({ ...prev, name, active_modules: finalModules, metadata: newMetadata }));
+      toast({ variant: 'success', title: 'Guardado', description: 'Empresa y configuración de módulos actualizadas exitosamente.' });
+      setTenant((prev: any) => ({ ...prev, name, status, subscription_plan: subscriptionPlan, active_modules: finalModules, metadata: newMetadata }));
       const currentStoreTenant = useERPStore.getState().currentTenant;
       if (currentStoreTenant && currentStoreTenant.id === tenant.id) {
         useERPStore.getState().setCurrentTenant({
@@ -378,21 +393,31 @@ export default function TenantAdminPage() {
               className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
             />
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Plan Actual</label>
-              <div className="w-full bg-background border border-border rounded-xl px-4 py-3 text-primary font-bold text-sm uppercase">
-                {tenant.subscription_plan || 'BASIC'}
-              </div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Plan de Suscripción</label>
+              <select 
+                value={subscriptionPlan}
+                onChange={(e) => setSubscriptionPlan(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl px-3 py-3 text-primary font-bold text-sm uppercase focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer"
+              >
+                <option value="basic">Basic ($49/mes)</option>
+                <option value="pro">Pro ($99/mes)</option>
+                <option value="enterprise">Enterprise ($199/mes)</option>
+              </select>
             </div>
             <div className="flex-1">
-              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Estado</label>
-              <div className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm flex items-center gap-2">
-                {tenant.status === 'active' 
-                  ? <><ShieldCheck size={16} className="text-emerald-500"/> <span className="text-emerald-500 font-bold">Activo</span></>
-                  : <><span className="text-rose-500 font-bold">Suspendido</span></>
-                }
-              </div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">Estado del Negocio</label>
+              <select 
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'active' | 'suspended')}
+                className={`w-full bg-background border border-border rounded-xl px-3 py-3 text-sm font-bold focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all cursor-pointer ${
+                  status === 'active' ? 'text-emerald-500' : 'text-rose-500'
+                }`}
+              >
+                <option value="active" className="text-emerald-600 font-bold">Activo (Operativo)</option>
+                <option value="suspended" className="text-rose-600 font-bold">Suspendido (Bloqueado)</option>
+              </select>
             </div>
           </div>
         </div>
@@ -478,8 +503,53 @@ export default function TenantAdminPage() {
           </p>
         </div>
         
+        {/* Filtros de Categorías y Acciones Rápidas */}
+        <div className="p-4 bg-muted/10 border-b border-border/60 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {[
+              { id: 'all', label: 'Todos' },
+              { id: 'comercial', label: 'Comercial' },
+              { id: 'operaciones', label: 'Operaciones' },
+              { id: 'salud', label: 'Salud' },
+              { id: 'servicios', label: 'Servicios' }
+            ].map(cat => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setModulesCategoryFilter(cat.id as any)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all btn-haptic ${
+                  modulesCategoryFilter === cat.id
+                    ? 'bg-primary text-primary-foreground shadow-2xs'
+                    : 'bg-muted/60 text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveModules(ALL_MODULES.map(m => m.id))}
+              className="text-xs font-bold text-primary hover:underline px-2 py-1"
+            >
+              Activar Todos
+            </button>
+            <span className="text-muted-foreground text-xs">•</span>
+            <button
+              type="button"
+              onClick={() => setActiveModules([])}
+              className="text-xs font-bold text-muted-foreground hover:text-destructive hover:underline px-2 py-1"
+            >
+              Desactivar Todos
+            </button>
+          </div>
+        </div>
+
         <div className="divide-y divide-border/60">
-          {ALL_MODULES.map(mod => {
+          {ALL_MODULES
+            .filter(mod => modulesCategoryFilter === 'all' || mod.category === modulesCategoryFilter)
+            .map(mod => {
             const isActive = activeModules.includes(mod.id);
             const isExpanded = expandedModule === mod.id;
             const hasFeatures = mod.features.length > 0;

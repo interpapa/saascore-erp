@@ -63,7 +63,7 @@ export default function ERPLayout({
     ? currentTenant.active_modules 
     : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules) && (currentTenant?.metadata as any).active_modules.length > 0)
       ? (currentTenant?.metadata as any).active_modules
-      : ['caja', 'clientes', 'inventario', 'catalogo', 'calendario', 'estadisticas', 'config'];
+      : ['caja', 'clientes', 'inventario', 'calendario', 'estadisticas', 'config'];
 
   const userAllowed = session?.allowed_modules && session.allowed_modules.length > 0 ? session.allowed_modules : null;
 
@@ -78,8 +78,8 @@ export default function ERPLayout({
       ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
       : targetModule === 'ginecologia'
         ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
-        : (targetModule === 'inventario' || targetModule === 'catalogo')
-          ? (tenantModules.includes('inventario') || tenantModules.includes('catalogo'))
+        : targetModule === 'inventario'
+          ? tenantModules.includes('inventario')
           : tenantModules.includes(targetModule);
 
     if (!isTenantActive) {
@@ -90,8 +90,8 @@ export default function ERPLayout({
         ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_')))
         : targetModule === 'ginecologia'
           ? (userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia'))
-          : (targetModule === 'inventario' || targetModule === 'catalogo')
-            ? (userAllowed.includes('inventario') || userAllowed.includes('catalogo'))
+          : targetModule === 'inventario'
+            ? userAllowed.includes('inventario')
             : userAllowed.includes(targetModule);
       if (!isUserAllowed) isModuleDisabled = true;
     } else if (!isSuper && !isOwner && session?.role) {
