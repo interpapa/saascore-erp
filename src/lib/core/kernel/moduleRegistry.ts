@@ -95,7 +95,7 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     id: 'equipo',
     name: 'Personal & Nómina',
     category: 'administracion',
-    description: 'Gestión de colaboradores, contratos, asistencia y liquidación de sueldos.',
+    description: 'Gestión de colaboradores, contratos, comisiones y liquidación de sueldos.',
   },
   caja: {
     id: 'caja',

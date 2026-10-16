@@ -416,7 +416,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
           <Users size={36} className="mx-auto text-slate-400 opacity-50" />
           <p className="text-sm font-bold text-foreground">No hay colaboradores registrados</p>
           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            Registra tu equipo de trabajo para controlar la asistencia y procesar la nómina.
+            Registra tu equipo de trabajo para gestionar citas, comisiones y procesar la nómina.
           </p>
         </div>
       ) : (

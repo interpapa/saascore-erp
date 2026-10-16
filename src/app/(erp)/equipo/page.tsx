@@ -4,27 +4,23 @@ import { useState, useEffect, useCallback } from 'react';
 import { getEntitiesAction } from '@/app/actions/entities';
 import { getAuditLogsAction } from '@/app/actions/audit';
 import { Entity } from '@/lib/api/entities';
-import { Users, Clock, CreditCard, RefreshCw, Activity } from 'lucide-react';
+import { Users, CreditCard, RefreshCw, Activity } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmployeeDirectoryTab } from '@/components/equipo/EmployeeDirectoryTab';
-import { AttendanceTab } from '@/components/equipo/AttendanceTab';
 import { PayrollTab } from '@/components/equipo/PayrollTab';
-import { SkeletonCardGrid, SkeletonCard } from '@/components/ui/SkeletonCard';
+import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 import { SkeletonTable } from '@/components/ui/SkeletonTable';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
-import { useViewModeStore } from '@/store/useViewModeStore';
-import { EquipoKioskExpress } from '@/components/equipo/EquipoKioskExpress';
 
-type TabType = 'directorio' | 'asistencia' | 'nomina' | 'audit';
+type TabType = 'directorio' | 'nomina' | 'audit';
 
 export default function EquipoPage() {
   const currentTenant = useTenantResolver();
   const actor = useActionActor();
   const { toast } = useToast();
-  const globalViewMode = useViewModeStore((s) => s.viewMode);
   const [employees, setEmployees] = useState<Entity[]>([]);
   const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,7 +89,6 @@ export default function EquipoPage() {
 
   const tabs = [
     { id: 'directorio', label: 'Directorio de Personal', icon: Users, count: employees.length },
-    { id: 'asistencia', label: 'Marcaje & Asistencia', icon: Clock },
     { id: 'nomina', label: 'Procesamiento de Nómina', icon: CreditCard },
     { id: 'audit', label: 'Auditoría de Personal', icon: Activity },
   ];
@@ -111,7 +106,7 @@ export default function EquipoPage() {
             Gestión de Personal & Nómina
           </h1>
           <p className="text-slate-500 font-medium text-sm mt-1 font-sans">
-            Directorio de empleados, control de asistencia diario y procesamiento de sueldos
+            Directorio de colaboradores, comisiones y liquidación de sueldos
           </p>
         </div>
 
@@ -127,61 +122,47 @@ export default function EquipoPage() {
         </div>
       </div>
 
-      {globalViewMode === 'express' ? (
-        <EquipoKioskExpress
-          employees={employees}
-          tenantId={currentTenant?.id || ''}
-          onRefresh={fetchEmployees}
-        />
+      {/* Tabs de Navegación Stripe-Style */}
+      <UnderlineTabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onChange={(id) => setActiveTab(id as TabType)}
+      />
+
+      {/* Contenido Modular */}
+      {isLoading ? (
+        <div className="bg-card border border-border rounded-2xl p-6">
+          {activeTab === 'directorio' ? (
+            <SkeletonCardGrid count={4} columns={2} showAvatar />
+          ) : (
+            <SkeletonTable rows={5} columns={4} />
+          )}
+        </div>
       ) : (
         <>
-          {/* Tabs de Navegación Stripe-Style */}
-          <UnderlineTabs
-            tabs={tabs}
-            activeTab={activeTab}
-            onChange={(id) => setActiveTab(id as TabType)}
-          />
+          {activeTab === 'directorio' && (
+            <EmployeeDirectoryTab
+              employees={employees}
+              tenantId={currentTenant?.id || ''}
+              onRefresh={fetchEmployees}
+            />
+          )}
 
-          {/* Contenido Modular */}
-          {isLoading ? (
+          {activeTab === 'nomina' && (
+            <PayrollTab
+              employees={employees}
+              tenantId={currentTenant?.id || ''}
+            />
+          )}
+
+          {activeTab === 'audit' && (
             <div className="bg-card border border-border rounded-2xl p-6">
-              {activeTab === 'directorio' ? (
-                <SkeletonCardGrid count={4} columns={2} showAvatar />
-              ) : (
-                <SkeletonTable rows={5} columns={4} />
-              )}
+              <div className="mb-4">
+                <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora de Recursos Humanos</h3>
+                <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de registros de empleados, asignaciones y procesamiento de nóminas.</p>
+              </div>
+              <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
             </div>
-          ) : (
-            <>
-              {activeTab === 'directorio' && (
-                <EmployeeDirectoryTab
-                  employees={employees}
-                  tenantId={currentTenant?.id || ''}
-                  onRefresh={fetchEmployees}
-                />
-              )}
-
-              {activeTab === 'asistencia' && (
-                <AttendanceTab employees={employees} tenantId={currentTenant?.id || ''} />
-              )}
-
-              {activeTab === 'nomina' && (
-                <PayrollTab
-                  employees={employees}
-                  tenantId={currentTenant?.id || ''}
-                />
-              )}
-
-              {activeTab === 'audit' && (
-                <div className="bg-card border border-border rounded-2xl p-6">
-                  <div className="mb-4">
-                    <h3 className="text-h3 font-bold text-foreground font-sans">Bitácora de Recursos Humanos</h3>
-                    <p className="text-xs text-slate-500 font-sans mt-0.5">Historial cronológico de registros de empleados, asistencia y procesamiento de nóminas.</p>
-                  </div>
-                  <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
-                </div>
-              )}
-            </>
           )}
         </>
       )}
