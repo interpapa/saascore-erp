@@ -6,8 +6,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Scissors, Clock, Calendar, User, Users, ChevronRight } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
-import { normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
-import { matchesEmployeeService } from '@/lib/services/serviceMatching';
+import { matchesEmployeeService, detectClinicalDomain, getEmployeePrimaryDomain } from '@/lib/services/serviceMatching';
 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
@@ -270,9 +269,26 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         });
       }
 
-      // 3. Especialidades y ramas profesionales asignadas (ej. Cardiología, Pediatría, Ortodoncia)
+      // 3. Especialidades y ramas profesionales asignadas (ej. Cardiología, Pediatría, Ginecología, Ortodoncia)
+      const primaryRoleTitle = emp.metadata?.role_title?.trim();
+      const docSpecialty = emp.metadata?.doctor_config?.specialty?.trim();
+      const docRole = emp.metadata?.doctor_config?.role?.trim();
+      
+      // Sanitización: si docSpecialty quedó con 'Control Prenatal & Colposcopia' por residuo anterior
+      // pero el médico es Cardiólogo u otra especialidad, descartar ese residuo sucio
+      const isResidualPrenatal = 
+        docSpecialty?.toLowerCase().includes('control prenatal') && 
+        primaryRoleTitle && 
+        !primaryRoleTitle.toLowerCase().includes('gineco') && 
+        !primaryRoleTitle.toLowerCase().includes('obstetr') &&
+        !primaryRoleTitle.toLowerCase().includes('prenatal');
+
+      const cleanDocSpecialty = isResidualPrenatal ? undefined : docSpecialty;
+
       const specBranch = 
-        emp.metadata?.doctor_config?.specialty?.trim() || 
+        cleanDocSpecialty || 
+        (primaryRoleTitle && primaryRoleTitle !== 'Especialista' && primaryRoleTitle !== 'Espacio / Recurso' && primaryRoleTitle !== 'Colaborador' ? primaryRoleTitle : undefined) ||
+        docRole ||
         emp.metadata?.specialty?.trim() || 
         emp.metadata?.dentist_config?.specialty?.trim() ||
         emp.metadata?.barber_config?.specialty?.trim() ||
@@ -336,8 +352,19 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     // 2. Si hay colaboradores o doctores especializados coincidentes, mostrarlos
     if (matched.length > 0) return matched;
 
-    // 3. Fallback defensivo: mostrar los profesionales activos disponibles para no dejar la pantalla vacía
-    return employees.filter(emp => emp.is_active);
+    // 3. Si el servicio solicitado pertenece a un dominio médico/profesional específico (ej. Cardiología, Ginecología, Odontología)
+    // NUNCA hacer fallback a especialistas de otras ramas incompatibles (blindaje anti-contaminación)
+    const targetDomain = detectClinicalDomain(selectedService.name);
+    if (targetDomain && targetDomain !== 'med_general') {
+      return [];
+    }
+
+    // 4. Si el servicio es genérico (ej. "Consulta General"), mostrar únicamente profesionales sin especialidad clínica excluyente
+    return employees.filter(emp => {
+      if (!emp.is_active) return false;
+      const empDomain = getEmployeePrimaryDomain(emp);
+      return !empDomain || empDomain === 'med_general';
+    });
   }, [employees, selectedService]);
   
   const dates = useMemo(() => {

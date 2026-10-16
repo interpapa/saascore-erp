@@ -108,10 +108,10 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     groomerSpecialty: 'Corte a Tijera & Baño',
     groomerCommission: 45,
     groomerAvatar: '🐩',
-    // Configuración para Ginecología / Médicos
+    // Configuración para Ginecología / Médicos / Especialistas Clínicos
     isDoctor: false,
-    doctorRole: 'Ginecólogo(a) Obstetra',
-    doctorSpecialty: 'Control Prenatal & Colposcopia',
+    doctorRole: '',
+    doctorSpecialty: '',
     doctorLicense: '',
     doctorCommission: 50,
     doctorAvatar: '🩺',
@@ -177,10 +177,18 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       groomerCommission: Number(meta.groomer_config?.commission_percent ?? meta.commission_percent ?? 45),
       groomerAvatar: meta.groomer_config?.avatar || (isGroomer ? (meta.avatar || '🐩') : '🐩'),
 
-      // Médico / Ginecólogo
+      // Médico / Especialista Clínico
       isDoctor,
-      doctorRole: meta.doctor_config?.role || (isDoctor ? (meta.role || 'Ginecólogo(a) Obstetra') : 'Ginecólogo(a) Obstetra'),
-      doctorSpecialty: meta.doctor_config?.specialty || (isDoctor ? (meta.specialty || 'Control Prenatal & Colposcopia') : 'Control Prenatal & Colposcopia'),
+      doctorRole: meta.doctor_config?.role || (meta.role !== 'Especialista' ? meta.role : '') || (meta.role_title !== 'Especialista' ? meta.role_title : '') || '',
+      doctorSpecialty: (() => {
+        const rawSpec = meta.doctor_config?.specialty || meta.specialty || '';
+        // Si el médico es cardiólogo u otra especialidad y tenía el viejo default residual de ginecología, limpiarlo
+        const roleText = `${emp.name || ''} ${meta.role_title || ''} ${meta.role || ''}`.toLowerCase();
+        if (rawSpec.toLowerCase().includes('control prenatal') && !roleText.includes('gineco') && !roleText.includes('obstetr')) {
+          return '';
+        }
+        return rawSpec;
+      })(),
       doctorLicense: meta.doctor_config?.license_number || meta.licenseNumber || meta.license_number || '',
       doctorCommission: Number(meta.doctor_config?.commission_percent ?? meta.commission_percent ?? 50),
       doctorAvatar: meta.doctor_config?.avatar || (isDoctor ? (meta.avatar || '🩺') : '🩺'),
@@ -1419,20 +1427,28 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="text-sm font-black text-foreground">Ginecología & Clínica Médica</h4>
+                                <h4 className="text-sm font-black text-foreground">Clínica Médica & Especialistas</h4>
                                 <span className="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                                   Módulo Activo
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-500">
-                                Habilita a este colaborador como Médico Tratante / Ginecólogo para atender consultas, controles prenatales y emitir órdenes a caja.
+                                Habilita a este colaborador como Médico Tratante / Especialista (Cardiología, Pediatría, Ginecología, etc.) para atender consultas y emitir órdenes a caja.
                               </p>
                             </div>
                           </div>
 
                           <button
                             type="button"
-                            onClick={() => setForm({ ...form, isDoctor: !form.isDoctor })}
+                            onClick={() => {
+                              const willBeDoctor = !form.isDoctor;
+                              const autoRole = form.doctorRole || (form.roleTitle && form.roleTitle !== 'Especialista' && form.roleTitle !== 'Espacio / Recurso' ? form.roleTitle : '');
+                              setForm({ 
+                                ...form, 
+                                isDoctor: willBeDoctor,
+                                doctorRole: willBeDoctor ? autoRole : form.doctorRole
+                              });
+                            }}
                             className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out ${
                               form.isDoctor ? 'bg-pink-500' : 'bg-slate-300 dark:bg-slate-700'
                             }`}
@@ -1449,26 +1465,26 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                           <div className="pt-3 border-t border-pink-500/20 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in">
                             <div>
                               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                                Cargo / Rol Clínico
+                                Cargo / Especialidad Clínica
                               </label>
                               <input
                                 type="text"
                                 value={form.doctorRole}
                                 onChange={(e) => setForm({ ...form, doctorRole: e.target.value })}
-                                placeholder="Ej: Ginecólogo Obstetra, Médico General"
+                                placeholder="Ej: Cardiólogo, Pediatra, Ginecólogo, Médico Internista"
                                 className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background text-foreground font-semibold"
                               />
                             </div>
 
                             <div>
                               <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 block mb-1">
-                                Subespecialidad / Enfoque
+                                Rama / Subespecialidad / Enfoque
                               </label>
                               <input
                                 type="text"
                                 value={form.doctorSpecialty}
                                 onChange={(e) => setForm({ ...form, doctorSpecialty: e.target.value })}
-                                placeholder="Ej: Control Prenatal, Eco 4D, Colposcopia"
+                                placeholder="Ej: Cardiología Clínica, Control Prenatal, Eco Fetal"
                                 className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background text-foreground"
                               />
                             </div>
