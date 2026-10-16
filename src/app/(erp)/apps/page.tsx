@@ -21,7 +21,11 @@ import {
   Stethoscope,
   Scissors,
   Dog,
-  LayoutGrid
+  LayoutGrid,
+  HeartPulse,
+  Baby,
+  CreditCard,
+  Factory
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -71,6 +75,10 @@ export default function AppsManagerPage() {
     { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'operaciones', icon: Stethoscope, gradient: 'from-teal-400 to-cyan-600', description: 'Odontograma digital FDI interactivo, ortodoncia con brackets, endodoncia, periodoncia y planes de tratamiento.' },
     { id: 'barberia', name: 'Barbería & Estilo Masculino', category: 'operaciones', icon: Scissors, gradient: 'from-amber-600 to-stone-800', description: 'Estación de silla de barbero, turnos walk-in en sala, ritual de toalla caliente, cortes fade y comisiones de estilistas.' },
     { id: 'grooming', name: 'Peluquería & Spa Canino', category: 'operaciones', icon: Dog, gradient: 'from-emerald-500 to-teal-700', description: 'Ficha de mascotas, razas, tipos de manto, control de temperamento, inspección de nudos/parásitos y pipeline de baño/corte.' },
+    { id: 'clinica', name: 'Clínica Médica Multi-Especialidad', category: 'operaciones', icon: HeartPulse, gradient: 'from-rose-500 to-red-600', description: 'Historia médica unificada, triaje de signos vitales, evolución SOAP, récipe digital y 6 especialidades médicas.' },
+    { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'operaciones', icon: Baby, gradient: 'from-pink-500 to-rose-600', description: 'Fórmula obstétrica G-P-C-A, gestograma interactivo por FUM, control prenatal, citología Bethesda y colposcopia.' },
+    { id: 'suscripciones', name: 'Suscripciones & Membresías', category: 'comercial', icon: CreditCard, gradient: 'from-indigo-500 to-purple-600', description: 'Planes recurrentes, academias, cortes de cobro, extensiones de ciclo, semáforo de mora y WhatsApp.' },
+    { id: 'produccion', name: 'Producción & Recetas (MRP)', category: 'operaciones', icon: Factory, gradient: 'from-amber-500 to-orange-600', description: 'Formulación y listas de materiales (BOM), escandallos, cálculo de costo unitario y transformación de materias primas.' },
     { id: 'equipo', name: 'Personal & Nómina', category: 'administracion', icon: Users, gradient: 'from-indigo-400 to-indigo-600', description: 'Registro de empleados, marcaje de asistencia y liquidación de sueldos.' },
     { id: 'franquicias', name: 'Franquicias & Sedes', category: 'administracion', icon: Building2, gradient: 'from-cyan-500 to-blue-600', description: 'Control de múltiples locales, sucursales y consolidación de ingresos.' },
     { id: 'config', name: 'Ajustes del Sistema', category: 'administracion', icon: Settings, gradient: 'from-slate-500 to-slate-700', description: 'Datos del negocio, logotipo y moneda principal.', isCore: true },

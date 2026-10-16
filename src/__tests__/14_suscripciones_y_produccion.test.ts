@@ -116,5 +116,24 @@ export async function runSuscripcionesYProduccionTests() {
   assert.strictEqual(maxBatches, 1, 'El simulador debe limitar la producción a 1 lote debido a la escasez de sosa cáustica');
 
   console.log('  ✓ Detección de cuello de botella en materias primas validada');
+
+  // 14.5 Desacoplamiento e Independencia Total de Módulos (Requerimiento del Usuario)
+  console.log('14.5 Desacoplamiento de Módulos sin Dependencias Bloqueantes');
+  // Un cliente con SOLO 'odontologia' (sin kanban ni calendario) debe poder usar su modulo
+  const soloDentalTenant = ['odontologia'];
+  assert.strictEqual(isModuleActive(soloDentalTenant, 'odontologia'), true, 'Odontología debe estar activo sin requerir kanban');
+  assert.strictEqual(isModuleActive(soloDentalTenant, 'kanban'), false, 'Kanban debe permanecer inactivo');
+
+  // Un cliente con SOLO 'suscripciones' (sin caja ni inventario) debe poder usar su modulo
+  const soloSuscripcionesTenant = ['suscripciones'];
+  assert.strictEqual(isModuleActive(soloSuscripcionesTenant, 'suscripciones'), true, 'Suscripciones debe estar activo sin requerir caja');
+  assert.strictEqual(isModuleActive(soloSuscripcionesTenant, 'caja'), false, 'Caja debe permanecer inactivo');
+
+  // Un cliente con SOLO 'produccion' (sin compras ni contabilidad) debe poder usar su modulo
+  const soloProduccionTenant = ['produccion'];
+  assert.strictEqual(isModuleActive(soloProduccionTenant, 'produccion'), true, 'Producción debe estar activo sin requerir compras');
+  assert.strictEqual(isModuleActive(soloProduccionTenant, 'contabilidad'), false, 'Contabilidad debe permanecer inactivo');
+
+  console.log('  ✓ Autonomía completa y activación desacoplada verificada al 100%');
   console.log('✅ [14_suscripciones_y_produccion.test.ts] Todos los tests pasaron exitosamente.');
 }

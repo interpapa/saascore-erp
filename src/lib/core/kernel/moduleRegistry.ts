@@ -377,17 +377,9 @@ export async function assertModuleEnabled(
       };
     }
 
-    // Validar dependencias requeridas (ej: Caja requiere Catálogo)
-    const dependencies = MODULE_CATALOG[moduleId]?.dependencies || [];
-    for (const dep of dependencies) {
-      if (!enabledList.includes(dep)) {
-        return {
-          authorized: false,
-          error: `El módulo "${MODULE_CATALOG[moduleId]?.name}" requiere que "${MODULE_CATALOG[dep]?.name}" esté activo.`,
-        };
-      }
-    }
-
+    // Los modulos en Rendo son completamente desacoplados y autonomos.
+    // Las dependencias en MODULE_CATALOG son informativas/sugerencias de integracion,
+    // por lo que ningun modulo bloquea la operacion de otro si esta desactivado.
     return { authorized: true };
   } catch (err: unknown) {
     console.error('[assertModuleEnabled Error]:', err);

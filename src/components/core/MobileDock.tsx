@@ -27,7 +27,8 @@ import {
   Blocks,
   ArrowRight,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Factory
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { hasPermission } from '@/lib/rbac';
@@ -66,6 +67,8 @@ const ALL_ERP_MODULES: DockItem[] = [
   // Servicios & Especialidades
   { id: 'barberia', label: 'Barbería', href: '/barberia', icon: Scissors, category: 'servicios' },
   { id: 'grooming', label: 'Grooming', href: '/grooming', icon: Dog, category: 'servicios' },
+  { id: 'suscripciones', label: 'Suscripciones', href: '/suscripciones', icon: CreditCard, category: 'comercial' },
+  { id: 'produccion', label: 'Producción', href: '/produccion', icon: Factory, category: 'operaciones' },
 
   // Sistema
   { id: 'config', label: 'Ajustes', href: '/configuracion', icon: Settings, category: 'sistema' },
