@@ -182,6 +182,23 @@ export async function processBookingAction(formData: unknown) {
       console.warn('[Booking] Entity lookup/create warning (non-blocking):', e);
     }
 
+    // Obtener color asignado al profesional para la agenda
+    let staffColor = '#6366f1';
+    if (finalBarberId) {
+      try {
+        const { data: staffData } = await supabaseAdmin
+          .from('entities')
+          .select('metadata')
+          .eq('id', finalBarberId)
+          .maybeSingle();
+        if (staffData?.metadata?.color) {
+          staffColor = staffData.metadata.color;
+        }
+      } catch (e) {
+        console.warn('[Booking] Could not fetch staff color:', e);
+      }
+    }
+
     // INSERCIÓN REAL EN LA BASE DE DATOS
     // Intento 1: Insertar en 'appointments' con todas las columnas
     let createdApptId: string = crypto.randomUUID();
@@ -201,6 +218,7 @@ export async function processBookingAction(formData: unknown) {
           durationMinutes: duration,
           service_name: cleanData.serviceName || undefined,
           price: cleanData.price || 0,
+          color: staffColor,
         },
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { X, User, Mail, MapPin, Building, Tag, FileText, Calendar, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { PhoneInput } from '@/components/ui/PhoneInput';
+import { ImageUpload } from '@/components/core/ImageUpload';
 import { CustomFieldDefinition } from '@/lib/core/industryTemplates';
 
 interface ClientModalProps {
@@ -24,6 +25,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData, customSchema
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
   const [entitySubtype, setEntitySubtype] = useState<'natural' | 'juridica'>('natural');
+  const [avatarUrl, setAvatarUrl] = useState('');
 
   // Identificación fiscal venezolana (V, J, E, G)
   const [docPrefix, setDocPrefix] = useState<'V' | 'J' | 'E' | 'G'>('V');
@@ -71,6 +73,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData, customSchema
 
       const meta = initialData.metadata || {};
       setEntitySubtype(meta.entity_subtype || 'natural');
+      setAvatarUrl(meta.avatar_url || '');
       setNotes(meta.notes || '');
       setTags(Array.isArray(meta.tags) ? meta.tags : []);
       setCustomValues(meta.custom_fields || {});
@@ -109,6 +112,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData, customSchema
       setEmail('');
       setAddress('');
       setEntitySubtype('natural');
+      setAvatarUrl('');
       setDocPrefix('V');
       setDocNumber('');
       setBirthDate('');
@@ -193,6 +197,7 @@ export function ClientModal({ isOpen, onClose, onSave, initialData, customSchema
       total_debt: initialData ? (initialData.metadata?.total_debt || 0) : 0,
       metadata: {
         ...(initialData?.metadata || {}),
+        avatar_url: avatarUrl || null,
         entity_subtype: entitySubtype,
         birth_date: birthDate || null,
         notes: notes.trim() || null,
@@ -286,6 +291,24 @@ export function ClientModal({ isOpen, onClose, onSave, initialData, customSchema
               <Building size={13} />
               <span>Empresa / Jurídica (RIF)</span>
             </button>
+          </div>
+
+          {/* Foto de Perfil / Avatar con Encuadre Interactivo */}
+          <div className="flex items-center gap-4 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-border">
+            <ImageUpload
+              value={avatarUrl}
+              onChange={setAvatarUrl}
+              bucket="avatars"
+              folder="clients"
+            />
+            <div className="flex-1">
+              <span className="text-xs font-bold text-foreground block">
+                Foto de Perfil del Cliente
+              </span>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Sube una imagen y encuadra el rostro o la zona que prefieras para identificar al cliente al instante.
+              </p>
+            </div>
           </div>
 
           {/* Nombre Completo o Razón Social */}

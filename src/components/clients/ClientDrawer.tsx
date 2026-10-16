@@ -364,8 +364,12 @@ export function ClientDrawer({
         {/* Cabecera / Banner */}
         <div className="relative bg-gradient-to-r from-blue-600/20 via-indigo-600/20 to-purple-600/20 p-6 pb-4 shrink-0 border-b border-border/50">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md border-2 border-card text-2xl font-black shrink-0">
-              {client.name.charAt(0)}
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md border-2 border-card text-2xl font-black shrink-0 overflow-hidden">
+              {metadata.avatar_url ? (
+                <img src={metadata.avatar_url} alt={client.name} className="w-full h-full object-cover" />
+              ) : (
+                client.name.charAt(0)
+              )}
             </div>
 
             <div className="min-w-0 flex-1 pr-16">

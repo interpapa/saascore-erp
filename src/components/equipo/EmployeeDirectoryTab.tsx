@@ -22,13 +22,15 @@ import {
   Stethoscope,
   Dog,
   Baby,
-  HeartPulse
+  HeartPulse,
+  Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { EmployeeScheduleEditor, defaultWorkingHours, WorkingHours } from './EmployeeScheduleEditor';
 import { ImageUpload } from '@/components/core/ImageUpload';
 import { parsePhoneNumbers, getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
+import { AGENDA_20_COLORS, DEFAULT_AGENDA_COLOR } from '@/lib/calendario/calendarColors';
 
 interface EmployeeDirectoryTabProps {
   employees: Entity[];
@@ -814,18 +816,44 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       </div>
                       <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
-                          Color en Calendario de Citas
+                          Color en Calendario de Citas (20 Tonos Protegidos)
                         </label>
-                        <div className="flex items-center gap-3">
-                          <input 
-                            type="color" 
-                            value={form.color}
-                            onChange={(e) => setForm({ ...form, color: e.target.value })}
-                            className="w-10 h-10 rounded-xl cursor-pointer border border-border p-1 bg-background"
-                          />
-                          <span className="text-xs font-mono font-bold text-slate-600 dark:text-slate-300">{form.color.toUpperCase()}</span>
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-slate-500 font-medium">
+                              Tono: <strong className="text-foreground">{AGENDA_20_COLORS.find(c => c.hex.toLowerCase() === form.color.toLowerCase())?.name || form.color}</strong>
+                            </span>
+                            <div 
+                              className="w-5 h-5 rounded-full border border-white/50 shadow-xs" 
+                              style={{ backgroundColor: form.color }} 
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
+                            {AGENDA_20_COLORS.map((col) => {
+                              const isSelected = form.color.toLowerCase() === col.hex.toLowerCase();
+                              return (
+                                <button
+                                  key={col.id}
+                                  type="button"
+                                  onClick={() => setForm({ ...form, color: col.hex })}
+                                  title={col.name}
+                                  className={`w-7 h-7 rounded-xl transition-all flex items-center justify-center relative ${
+                                    isSelected 
+                                      ? 'ring-2 ring-indigo-500 ring-offset-2 scale-110 shadow-sm z-10' 
+                                      : 'hover:scale-105 opacity-85 hover:opacity-100'
+                                  }`}
+                                  style={{ backgroundColor: col.hex }}
+                                >
+                                  {isSelected && <Check size={13} className="text-white drop-shadow-md stroke-[3]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[10px] text-slate-400">
+                            Este tono se asigna automáticamente a las citas de este colaborador y nunca colisiona con el verde de pago ni el rojo de cancelación.
+                          </p>
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">Distingue sus reservas visualmente en la agenda.</p>
                       </div>
                     </div>
                   </div>

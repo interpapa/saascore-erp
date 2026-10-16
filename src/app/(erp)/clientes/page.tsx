@@ -577,8 +577,12 @@ export default function ClientesPage() {
                       {/* Cabecera de la Tarjeta */}
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-3">
-                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-sm uppercase shadow-xs">
-                            {client.name.substring(0, 2)}
+                          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-sm uppercase shadow-xs overflow-hidden shrink-0">
+                            {metadata.avatar_url ? (
+                              <img src={metadata.avatar_url} alt={client.name} className="w-full h-full object-cover" />
+                            ) : (
+                              client.name.substring(0, 2)
+                            )}
                           </div>
                           <div>
                             <span className="text-[10px] font-black uppercase text-slate-400 block">
@@ -784,8 +788,12 @@ export default function ClientesPage() {
                       >
                         <td className="p-3.5 font-bold text-foreground">
                           <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs shrink-0">
-                              {client.name.charAt(0)}
+                            <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-xs shrink-0 overflow-hidden">
+                              {metadata.avatar_url ? (
+                                <img src={metadata.avatar_url} alt={client.name} className="w-full h-full object-cover" />
+                              ) : (
+                                client.name.charAt(0)
+                              )}
                             </div>
                             <span className="truncate max-w-[180px]">{client.name}</span>
                           </div>

@@ -123,6 +123,9 @@ export function AppointmentModal({
     setEmployeeId(empId);
     if (!empId) return;
     const emp = employees.find(e => e.id === empId);
+    if (typeof emp?.metadata?.color === 'string' && emp.metadata.color) {
+      setColor(emp.metadata.color);
+    }
     const srv = services.find(s => s.id === serviceId);
     if (emp && srv) {
       const empSvcs = (emp?.metadata as any)?.services as Array<{ name: string; durationMinutes?: number; price?: number }> | undefined;

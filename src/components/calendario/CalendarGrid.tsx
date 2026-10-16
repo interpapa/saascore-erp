@@ -188,13 +188,14 @@ export function CalendarGrid({
                          if (topMins < 0) return null;
 
                          const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
+                         const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#6366f1';
 
                          return (
                            <div 
                              key={appt.id}
                              onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
-                             className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${cfg.bg}`}
-                             style={{ top: `${topPx}px`, height: `${heightPx}px` }}
+                             className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${cfg.bg}`}
+                             style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: apptColor }}
                            >
                              <span className="text-xs font-black leading-tight truncate">{appt.client_name || appt.title}</span>
                              {heightPx >= 50 && (
