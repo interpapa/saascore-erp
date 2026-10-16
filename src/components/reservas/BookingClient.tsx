@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Scissors, Clock, Calendar, User, Users, ChevronRight } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
+import { normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
 import { matchesEmployeeService, detectClinicalDomain, getEmployeePrimaryDomain } from '@/lib/services/serviceMatching';
 
 type Tenant = { id: string, name: string, metadata?: any };
