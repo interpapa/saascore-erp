@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Appointment, AppointmentStatus } from '@/types/calendario';
 import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
+import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
 
 interface DailyTimelineExpressProps {
   appointments: Appointment[];
@@ -157,20 +158,31 @@ export function DailyTimelineExpress({
           dayAppointments.map((appt) => {
             const timeFormatted = appt.start_time.slice(11, 16);
             const endTimeFormatted = appt.end_time?.slice(11, 16);
-            const statusConfig = statusStyles[appt.status] || { label: appt.status, color: 'bg-slate-100 text-slate-600' };
+            const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
             const clientPhone = (appt as any).client_phone || (appt as any).client?.phone;
-            const apptColor = (appt.metadata?.color as string) || '#6366f1';
+            const apptColor = (appt.metadata?.color as string) || visual.color || '#6366f1';
+            const cardBorderColor = visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor);
 
             return (
               <div
                 key={appt.id}
-                className="bg-card border border-border rounded-2xl p-4 shadow-xs space-y-3 transition-all hover:border-teal-500/40"
-                style={{ borderLeftColor: apptColor, borderLeftWidth: '4px' }}
+                className={`border rounded-2xl p-4 shadow-xs space-y-3 transition-all hover:border-teal-500/40 ${
+                  visual.isPendingPayment 
+                    ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-300/50 dark:border-amber-700/40' 
+                    : visual.isPaid
+                      ? 'bg-emerald-50/40 dark:bg-emerald-950/20 border-emerald-300/40'
+                      : 'bg-card border-border'
+                }`}
+                style={{ borderLeftColor: cardBorderColor, borderLeftWidth: '5px' }}
               >
                 {/* Cabecera de la Cita */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <div className="p-2.5 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 text-center shrink-0">
+                    <div className={`p-2.5 rounded-xl border text-center shrink-0 ${
+                      visual.isPendingPayment
+                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-700 dark:text-amber-300'
+                        : 'bg-teal-500/10 border-teal-500/20 text-teal-600 dark:text-teal-400'
+                    }`}>
                       <Clock size={16} className="mx-auto mb-0.5" />
                       <span className="text-xs font-black font-mono block">{timeFormatted}</span>
                       {endTimeFormatted && (
@@ -179,12 +191,19 @@ export function DailyTimelineExpress({
                     </div>
 
                     <div>
-                      <h4 
-                        onClick={() => onSelectAppointment(appt)}
-                        className="text-sm font-black text-foreground hover:text-teal-600 cursor-pointer transition-colors"
-                      >
-                        {appt.client_name || 'Paciente sin nombre'}
-                      </h4>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 
+                          onClick={() => onSelectAppointment(appt)}
+                          className="text-sm font-black text-foreground hover:text-teal-600 cursor-pointer transition-colors"
+                        >
+                          {appt.client_name || 'Paciente sin nombre'}
+                        </h4>
+                        {visual.isPendingPayment && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/30">
+                            🟡 Pago Pendiente
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500 font-medium mt-0.5">
                         {appt.service_name || appt.title || 'Consulta General'}
                         {appt.price ? ` · $${appt.price.toFixed(2)}` : ''}
@@ -197,8 +216,8 @@ export function DailyTimelineExpress({
                     </div>
                   </div>
 
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${statusConfig.color}`}>
-                    {statusConfig.label}
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md border shrink-0 ${visual.tagBg}`}>
+                    {visual.label}
                   </span>
                 </div>
 

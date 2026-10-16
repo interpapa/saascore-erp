@@ -49,3 +49,106 @@ export const DEFAULT_AGENDA_COLOR = AGENDA_20_COLORS[0].hex; // #6366f1 (Índigo
 export function isProtectedAgendaColor(hex: string): boolean {
   return AGENDA_20_COLORS.some((c) => c.hex.toLowerCase() === hex.toLowerCase());
 }
+
+/**
+ * Determina el estado visual cromático de una cita, priorizando el estado de cobro
+ * para que citas con "pago pendiente" se muestren en AMARILLO brillante y las pagadas en VERDE.
+ */
+export function getAppointmentVisualStatus(
+  status: string,
+  metadata?: Record<string, any> | null
+) {
+  const paymentStatus = metadata?.payment_status;
+
+  // 1. Pago Pendiente -> AMARILLO / ÁMBAR
+  if (paymentStatus === 'pending') {
+    return {
+      isPendingPayment: true,
+      isPaid: false,
+      label: 'Pago Pendiente',
+      bg: 'bg-amber-500/15 text-amber-900 dark:text-amber-200 border-amber-500/40',
+      dot: 'bg-amber-500',
+      tagBg: 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/40',
+      color: '#f59e0b',
+    };
+  }
+
+  // 2. Pagado -> VERDE / ESMERALDA
+  if (paymentStatus === 'paid') {
+    return {
+      isPendingPayment: false,
+      isPaid: true,
+      label: 'Pagado',
+      bg: 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border-emerald-500/40',
+      dot: 'bg-emerald-500',
+      tagBg: 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 border-emerald-500/40',
+      color: '#10b981',
+    };
+  }
+
+  // 3. Fallback a los estados regulares de agendamiento
+  switch (status) {
+    case 'in_progress':
+      return {
+        isPendingPayment: false,
+        isPaid: false,
+        label: 'En Curso',
+        bg: 'bg-teal-500/15 text-teal-900 dark:text-teal-200 border-teal-500/30',
+        dot: 'bg-teal-500',
+        tagBg: 'bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30',
+        color: '#14b8a6',
+      };
+    case 'confirmed':
+      return {
+        isPendingPayment: false,
+        isPaid: false,
+        label: 'Confirmada',
+        bg: 'bg-indigo-500/15 text-indigo-900 dark:text-indigo-200 border-indigo-500/30',
+        dot: 'bg-indigo-500',
+        tagBg: 'bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30',
+        color: '#6366f1',
+      };
+    case 'completed':
+      return {
+        isPendingPayment: false,
+        isPaid: true,
+        label: 'Completada',
+        bg: 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 border-emerald-500/30',
+        dot: 'bg-emerald-500',
+        tagBg: 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+        color: '#10b981',
+      };
+    case 'cancelled':
+      return {
+        isPendingPayment: false,
+        isPaid: false,
+        label: 'Cancelada',
+        bg: 'bg-rose-500/15 text-rose-900 dark:text-rose-200 border-rose-500/30',
+        dot: 'bg-rose-500',
+        tagBg: 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/30',
+        color: '#f43f5e',
+      };
+    case 'no_show':
+      return {
+        isPendingPayment: false,
+        isPaid: false,
+        label: 'No Asistió',
+        bg: 'bg-slate-500/15 text-slate-800 dark:text-slate-300 border-slate-500/30',
+        dot: 'bg-slate-400',
+        tagBg: 'bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/30',
+        color: '#64748b',
+      };
+    case 'scheduled':
+    default:
+      return {
+        isPendingPayment: false,
+        isPaid: false,
+        label: 'Programada',
+        bg: 'bg-blue-500/15 text-blue-900 dark:text-blue-200 border-blue-500/30',
+        dot: 'bg-blue-500',
+        tagBg: 'bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
+        color: '#3b82f6',
+      };
+  }
+}
+

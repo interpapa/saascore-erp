@@ -5,6 +5,7 @@ import { X, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign, FileTe
 import { CreateAppointmentInput, Employee, Service, AppointmentStatus } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
 import { AGENDA_20_COLORS, DEFAULT_AGENDA_COLOR } from '@/lib/calendario/calendarColors';
+import { matchesEmployeeService } from '@/lib/services/serviceMatching';
 
 export interface AppointmentModalProps {
   isOpen: boolean;
@@ -98,9 +99,22 @@ export function AppointmentModal({
       let dur = s.duration_minutes || 60;
       let prc = s.price !== undefined ? s.price : 0;
       
-      // Si ya hay un empleado seleccionado, ver si tiene tarifa personalizada
-      if (employeeId) {
-        const emp = employees.find(e => e.id === employeeId);
+      // Si no hay empleado seleccionado, intentar vincular automáticamente al especialista de esa rama
+      let activeEmpId = employeeId;
+      if (!activeEmpId) {
+        const matchedEmp = employees.find(emp => matchesEmployeeService(emp, s.name));
+        if (matchedEmp) {
+          activeEmpId = matchedEmp.id;
+          setEmployeeId(matchedEmp.id);
+          if (typeof (matchedEmp.metadata as any)?.color === 'string' && (matchedEmp.metadata as any).color) {
+            setColor((matchedEmp.metadata as any).color);
+          }
+        }
+      }
+
+      // Si ya hay un empleado seleccionado, ver si tiene tarifa o duración personalizada
+      if (activeEmpId) {
+        const emp = employees.find(e => e.id === activeEmpId);
         const empSvcs = (emp?.metadata as any)?.services as Array<{ name: string; durationMinutes?: number; price?: number }> | undefined;
         if (empSvcs) {
           const match = empSvcs.find(es => es.name?.trim().toLowerCase() === s.name.trim().toLowerCase());
@@ -361,11 +375,19 @@ export function AppointmentModal({
                 className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
               >
                 <option value="">-- Sin Asignar --</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </option>
-                ))}
+                {employees.map((emp) => {
+                  const spec = 
+                    (emp.metadata as any)?.doctor_config?.specialty || 
+                    (emp.metadata as any)?.specialty || 
+                    (emp.metadata as any)?.dentist_config?.specialty ||
+                    (emp.metadata as any)?.role_title ||
+                    (emp.role !== 'Empleado' ? emp.role : '');
+                  return (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} {spec ? `· ${spec}` : ''}
+                    </option>
+                  );
+                })}
               </select>
             </div>
           </div>

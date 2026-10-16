@@ -478,6 +478,7 @@ export default function CalendarioPage() {
         appointment={selectedAppointment}
         onUpdateStatus={handleUpdateStatus}
         clients={clients}
+        employees={bookableEmployees}
         onUpdateMetadata={handleUpdateMetadata}
       />
 

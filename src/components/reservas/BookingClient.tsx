@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, Scissors, Clock, Calendar, User, Users, ChevronRight } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
 import { normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
+import { matchesEmployeeService } from '@/lib/services/serviceMatching';
 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
@@ -268,6 +269,33 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           if (s.priceDisplay === 'hidden') entry.hasHidden = true;
         });
       }
+
+      // 3. Especialidades y ramas profesionales asignadas (ej. Cardiología, Pediatría, Ortodoncia)
+      const specBranch = 
+        emp.metadata?.doctor_config?.specialty?.trim() || 
+        emp.metadata?.specialty?.trim() || 
+        emp.metadata?.dentist_config?.specialty?.trim() ||
+        emp.metadata?.barber_config?.specialty?.trim() ||
+        emp.metadata?.groomer_config?.specialty?.trim();
+
+      if (specBranch && isGeneralEnabled) {
+        const specKey = specBranch.toLowerCase();
+        if (!allServices.has(specKey)) {
+          allServices.set(specKey, {
+            name: specBranch,
+            durationMinutes: defaultSlot,
+            prices: [],
+            hasFrom: false,
+            hasHidden: false,
+            basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
+          });
+        }
+        const entry = allServices.get(specKey)!;
+        if (generalPrice && generalPrice > 0) {
+          entry.prices.push(generalPrice);
+          if (!entry.basePrice) entry.basePrice = generalPrice;
+        }
+      }
     });
 
     return Array.from(allServices.values()).map(s => {
@@ -297,19 +325,19 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
 
   // Filter employees based on selected service (Memoized)
   const filteredEmployees = useMemo(() => {
-    return employees.filter(emp => {
-      if (!selectedService) return true;
+    if (!selectedService) return employees.filter(emp => emp.is_active);
+    
+    // 1. Filtrar por vinculación inteligente (servicios particulares, servicio general o especialidad/rama médica)
+    const matched = employees.filter(emp => {
       if (!emp.is_active) return false;
-      const svcs = emp.metadata?.services as any[];
-      const isGeneralEnabled = emp.metadata?.general_service_enabled !== false;
-      const generalName = (emp.metadata?.general_service_name?.trim() || emp.role || 'Servicio General').toLowerCase();
-      const targetServiceName = selectedService.name.trim().toLowerCase();
-
-      const matchesGeneral = (isGeneralEnabled || !svcs || svcs.length === 0) && generalName === targetServiceName;
-      const matchesParticular = svcs && svcs.length > 0 && svcs.some(s => s.name?.trim().toLowerCase() === targetServiceName);
-
-      return Boolean(matchesGeneral || matchesParticular);
+      return matchesEmployeeService(emp, selectedService.name);
     });
+
+    // 2. Si hay colaboradores o doctores especializados coincidentes, mostrarlos
+    if (matched.length > 0) return matched;
+
+    // 3. Fallback defensivo: mostrar los profesionales activos disponibles para no dejar la pantalla vacía
+    return employees.filter(emp => emp.is_active);
   }, [employees, selectedService]);
   
   const dates = useMemo(() => {

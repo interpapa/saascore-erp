@@ -8,6 +8,7 @@ import { eventBus } from '@/lib/core/events/eventBus';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { ActionActor } from './entities';
 import { normalizeHexColor } from '@/lib/theme/colorUtils';
+import { matchesEmployeeService } from '@/lib/services/serviceMatching';
 
 const bookingSchema = z.object({
   tenantId: z.string().uuid('ID de empresa inválido'),
@@ -89,7 +90,7 @@ export async function processBookingAction(formData: unknown) {
     if (finalBarberId === 'any') {
       const { data: employees } = await supabaseAdmin
         .from('entities')
-        .select('id, name')
+        .select('id, name, metadata, role')
         .eq('tenant_id', cleanData.tenantId)
         .eq('type', 'employee')
         .eq('status', 'active');
@@ -107,12 +108,20 @@ export async function processBookingAction(formData: unknown) {
           .gt('end_time', startDateTime.toISOString());
           
         const busyIds = new Set((busyApps || []).map(a => a.employee_id));
-        const availableEmployees = employees.filter(emp => !busyIds.has(emp.id));
+        const availableEmployees = employees.filter(emp => !busyIds.has(emp.id) && emp.metadata?.bookable !== false);
 
         if (availableEmployees.length > 0) {
-          const randomEmp = availableEmployees[Math.floor(Math.random() * availableEmployees.length)];
-          finalBarberId = randomEmp.id;
-          finalBarberName = randomEmp.name;
+          // Priorizar especialista que coincida con el servicio seleccionado (ej. Cardiología)
+          let candidatePool = availableEmployees;
+          if (cleanData.serviceName) {
+            const matchedSpecialists = availableEmployees.filter(emp => matchesEmployeeService(emp, cleanData.serviceName!));
+            if (matchedSpecialists.length > 0) {
+              candidatePool = matchedSpecialists;
+            }
+          }
+          const chosenEmp = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+          finalBarberId = chosenEmp.id;
+          finalBarberName = chosenEmp.name;
         } else {
           return { success: false, error: 'Todos los profesionales están ocupados en este horario exacto. Por favor elige otra hora.' };
         }

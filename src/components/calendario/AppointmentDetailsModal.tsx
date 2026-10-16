@@ -18,7 +18,7 @@ import {
   MessageCircle,
   Edit2
 } from 'lucide-react';
-import { Appointment, AppointmentStatus } from '@/types/calendario';
+import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -36,6 +36,7 @@ export interface AppointmentDetailsModalProps {
   appointment: Appointment | null;
   onUpdateStatus: (id: string, status: AppointmentStatus) => Promise<void>;
   clients?: Entity[];
+  employees?: Employee[];
   onUpdateMetadata?: (id: string, metadata: Record<string, any>) => Promise<void>;
 }
 
@@ -101,6 +102,7 @@ export function AppointmentDetailsModal({
   appointment,
   onUpdateStatus,
   clients = [],
+  employees = [],
   onUpdateMetadata,
 }: AppointmentDetailsModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -291,9 +293,57 @@ export function AppointmentDetailsModal({
                 </div>
               )}
 
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 sm:col-span-2">
                 <Briefcase size={14} className="text-slate-400 shrink-0" />
-                <span>Profesional: <strong className="text-foreground">{appointment.employee_name || 'Sin Asignar'}</strong></span>
+                <div className="flex-1 flex items-center justify-between gap-2 flex-wrap">
+                  <span>
+                    Profesional / Encargado:{' '}
+                    <strong className="text-foreground">
+                      {appointment.employee_name || 'Sin Asignar'}
+                    </strong>
+                  </span>
+
+                  {(!appointment.employee_name || appointment.employee_name === 'Sin Asignar') && employees.length > 0 && (
+                    <select
+                      className="text-[11px] font-bold px-2 py-1 rounded-lg border border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 outline-none"
+                      onChange={async (e) => {
+                        const empId = e.target.value;
+                        if (!empId) return;
+                        const emp = employees.find((x) => x.id === empId);
+                        if (!emp || !onUpdateMetadata) return;
+                        try {
+                          setIsUpdating(true);
+                          await onUpdateMetadata(appointment.id, {
+                            ...appointment.metadata,
+                            employee_id: emp.id,
+                            employee_name: emp.name,
+                            color: (emp.metadata as any)?.color || appointment.metadata?.color,
+                          });
+                        } finally {
+                          setIsUpdating(false);
+                        }
+                      }}
+                      defaultValue=""
+                    >
+                      <option value="" disabled>
+                        + Asignar Especialista / Doctor...
+                      </option>
+                      {employees.map((emp) => {
+                        const spec =
+                          (emp.metadata as any)?.doctor_config?.specialty ||
+                          (emp.metadata as any)?.specialty ||
+                          (emp.metadata as any)?.dentist_config?.specialty ||
+                          (emp.metadata as any)?.role_title ||
+                          (emp.role !== 'Empleado' ? emp.role : '');
+                        return (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.name} {spec ? `· ${spec}` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center justify-between text-slate-600 dark:text-slate-300">

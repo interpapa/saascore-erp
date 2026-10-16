@@ -4,6 +4,7 @@ import React from 'react';
 import { CalendarDays, Clock, User, Plus } from 'lucide-react';
 import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { EmptyState } from '@/components/core/EmptyState';
+import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
 
 export interface CalendarGridProps {
   viewMode: 'day' | 'week' | 'month';
@@ -187,23 +188,31 @@ export function CalendarGrid({
                          // Ignorar citas antes de las 8am
                          if (topMins < 0) return null;
 
-                         const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
-                         const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#6366f1';
+                         const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
+                         const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || visual.color || '#6366f1';
+                         const cardBorderColor = visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor);
 
                          return (
                            <div 
                              key={appt.id}
                              onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
-                             className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${cfg.bg}`}
-                             style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: apptColor }}
+                             className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${visual.bg}`}
+                             style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: cardBorderColor }}
                            >
-                             <span className="text-xs font-black leading-tight truncate">{appt.client_name || appt.title}</span>
+                             <div className="flex items-center justify-between gap-1">
+                               <span className="text-xs font-black leading-tight truncate">{appt.client_name || appt.title}</span>
+                               {visual.isPendingPayment && (
+                                 <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200 shrink-0">
+                                   Pago Pend.
+                                 </span>
+                               )}
+                             </div>
                              {heightPx >= 50 && (
                                <span className="text-[10px] font-medium leading-tight truncate opacity-80">{appt.service_name || appt.title}</span>
                              )}
                              <div className="mt-auto flex items-center justify-between">
                                 <span className="text-[10px] font-bold opacity-75">{formatTime(appt.start_time)}</span>
-                                <div className={`w-2 h-2 rounded-full ${cfg.dot}`} />
+                                <div className={`w-2 h-2 rounded-full ${visual.dot}`} />
                              </div>
                            </div>
                          )
@@ -292,16 +301,24 @@ export function CalendarGrid({
                         </div>
                       ) : (
                         dayAppts.map((appt) => {
-                          const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
-                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#6366f1';
+                          const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
+                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || visual.color || '#6366f1';
+                          const cardBorderColor = visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor);
                           return (
                             <div
                               key={appt.id}
                               onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
-                              className={`p-2.5 rounded-xl border-l-4 flex flex-col gap-1 transition-all hover:scale-[1.02] ${cfg.bg}`}
-                              style={{ borderLeftColor: apptColor }}
+                              className={`p-2.5 rounded-xl border-l-4 flex flex-col gap-1 transition-all hover:scale-[1.02] ${visual.bg}`}
+                              style={{ borderLeftColor: cardBorderColor }}
                             >
-                              <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.client_name || appt.title}</span>
+                              <div className="flex items-center justify-between gap-1">
+                                <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.client_name || appt.title}</span>
+                                {visual.isPendingPayment && (
+                                  <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200 shrink-0">
+                                    Pend.
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex items-center gap-1 text-[10px] opacity-80 font-medium">
                                 <Clock size={10} />
                                 <span>{formatTime(appt.start_time)}</span>
@@ -312,7 +329,7 @@ export function CalendarGrid({
                                     {appt.employee_name}
                                   </span>
                                 ) : <span />}
-                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${visual.dot}`} />
                               </div>
                             </div>
                           );
@@ -379,14 +396,20 @@ export function CalendarGrid({
                     {/* Desktop View: Text List */}
                     <div className="hidden sm:flex flex-col gap-0.5">
                         {dayAppts.slice(0, 4).map((appt) => {
-                          const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
-                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || '#6366f1';
+                          const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
+                          const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || visual.color || '#6366f1';
+                          const cardBorderColor = visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor);
                           return (
-                            <div key={appt.id} onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }} className={`text-[9px] font-bold p-1 rounded-md border-l-4 truncate ${cfg.bg}`} style={{ borderLeftColor: apptColor }}>
-                               {formatTime(appt.start_time)} {appt.client_name || appt.title}
+                            <div 
+                              key={appt.id} 
+                              onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }} 
+                              className={`text-[9px] font-bold p-1 rounded-md border-l-4 truncate ${visual.bg}`} 
+                              style={{ borderLeftColor: cardBorderColor }}
+                            >
+                               {visual.isPendingPayment ? '🟡 ' : ''}{formatTime(appt.start_time)} {appt.client_name || appt.title}
                             </div>
                           );
-                      })}
+                       })}
                       {dayAppts.length > 4 && (
                         <div className="text-[9px] font-bold text-slate-400 pl-1">+{dayAppts.length - 4} más</div>
                       )}
@@ -395,8 +418,8 @@ export function CalendarGrid({
                     {/* Mobile View: Dots */}
                     <div className="flex sm:hidden flex-wrap gap-0.5 justify-center mt-1">
                       {dayAppts.slice(0, 5).map((appt) => {
-                         const cfg = STATUS_CONFIG[appt.status] || STATUS_CONFIG.scheduled;
-                         return <div key={appt.id} className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                         const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
+                         return <div key={appt.id} className={`w-1.5 h-1.5 rounded-full ${visual.dot}`} />
                       })}
                       {dayAppts.length > 5 && (
                          <span className="text-[8px] font-black text-slate-400 leading-none inline-flex items-center">+</span>
