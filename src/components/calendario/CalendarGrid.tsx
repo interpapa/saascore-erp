@@ -349,6 +349,10 @@ export function CalendarGrid({
                                   <span className="text-[9px] font-bold bg-black/10 dark:bg-white/10 px-1.5 py-0.5 rounded-md truncate max-w-[80%]">
                                     {appt.employee_name}
                                   </span>
+                                ) : appt.metadata?.is_block ? (
+                                  <span className="text-[9px] font-bold bg-rose-500/15 text-rose-800 dark:text-rose-200 px-1.5 py-0.5 rounded-md truncate max-w-[80%]">
+                                    Toda la Empresa
+                                  </span>
                                 ) : <span />}
                                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${visual.dot}`} />
                               </div>

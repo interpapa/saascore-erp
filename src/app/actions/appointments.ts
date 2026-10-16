@@ -736,7 +736,12 @@ function filterAppointments(list: Appointment[], filter?: AppointmentFilterState
   if (!filter) return list;
   return list.filter((a) => {
     if (filter.status && filter.status !== 'all' && a.status !== filter.status) return false;
-    if (filter.employee_id && filter.employee_id !== 'all' && a.employee_id !== filter.employee_id) return false;
+    if (filter.employee_id && filter.employee_id !== 'all') {
+      const isCompanyBlock = !a.employee_id && a.metadata?.is_block;
+      if (a.employee_id !== filter.employee_id && !isCompanyBlock) {
+        return false;
+      }
+    }
     if (filter.service_id && filter.service_id !== 'all' && a.service_id !== filter.service_id) return false;
     if (filter.search) {
       const q = filter.search.toLowerCase();
