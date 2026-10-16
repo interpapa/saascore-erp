@@ -192,17 +192,32 @@ export function MobileDock() {
   };
 
   // Determinar cuántos caben en la barra principal
+  // Leer los accesos rápidos configurados en Ajustes por la empresa (filtrando solo los que están activos)
+  const configuredDockIds: string[] = Array.isArray((currentTenant?.metadata as any)?.mobile_dock_modules)
+    ? (currentTenant?.metadata as any).mobile_dock_modules
+    : [];
+
+  const configuredItems = configuredDockIds
+    .map(id => availableModules.find(m => m.id === id))
+    .filter((m): m is DockItem => Boolean(m));
+
+  // Combinar módulos configurados como prioridad, seguidos por el resto de módulos activos
+  const prioritizedModules = [
+    ...configuredItems,
+    ...availableModules.filter(m => !configuredItems.some(c => c.id === m.id))
+  ];
+
   let displayedDockItems: DockItem[] = [];
   const needsMoreButton = availableModules.length > 3;
 
   if (!needsMoreButton) {
     // Si hay 3 o menos módulos activos, se muestran todos directamente en el Dock
-    displayedDockItems = [dashboardItem, ...availableModules];
+    displayedDockItems = [dashboardItem, ...prioritizedModules];
   } else {
     // Si hay más de 3 módulos activos:
     // Identificar si la ruta actual es de un módulo activo que no está en el top 3
-    const currentActiveModule = availableModules.find(m => pathname.startsWith(m.href));
-    const topThree = availableModules.slice(0, 3);
+    const currentActiveModule = prioritizedModules.find(m => pathname.startsWith(m.href));
+    const topThree = prioritizedModules.slice(0, 3);
 
     if (currentActiveModule && !topThree.some(m => m.id === currentActiveModule.id)) {
       // El usuario está navegando en un módulo fuera del top 3 -> Lo colocamos en la 3ra ranura para visibilidad inmediata

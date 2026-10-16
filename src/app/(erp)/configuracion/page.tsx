@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useERPStore } from '@/store/useERPStore';
 import { updateTenantSettings, createTenantUserAction } from '@/app/actions/tenant';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -20,7 +20,12 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 
-const AVAILABLE_MODULES = [
+interface AvailableModuleItem {
+  id: string;
+  name: string;
+}
+
+const AVAILABLE_MODULES: AvailableModuleItem[] = [
   { id: 'caja', name: 'Caja POS' },
   { id: 'clientes', name: 'CRM (Clientes)' },
   { id: 'inventario', name: 'Inventario' },
@@ -34,7 +39,6 @@ const AVAILABLE_MODULES = [
   { id: 'kanban', name: 'Órdenes de Trabajo' },
   { id: 'equipo', name: 'Personal & Nómina' },
   { id: 'compras', name: 'Compras y Proveedores' },
-  { id: 'catalogo', name: 'Catálogo de Productos' },
   { id: 'contabilidad', name: 'Contabilidad' },
   { id: 'estadisticas', name: 'Estadísticas & Reportes' },
   { id: 'franquicias', name: 'Franquicias' },
@@ -93,8 +97,51 @@ export default function ConfiguracionPage() {
   const [createUserSuccess, setCreateUserSuccess] = useState<string | null>(null);
   const [createUserError, setCreateUserError] = useState<string | null>(null);
 
+  // Módulos activos reales del tenant (purgando estrictamente 'catalogo')
+  const fallbackModules = useMemo(() => [
+    'caja', 'clientes', 'inventario', 'compras', 'contabilidad', 'calendario', 
+    'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 
+    'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 
+    'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 
+    'config', 'apps'
+  ], []);
+
+  const tenantActiveModules = useMemo(() => {
+    const raw = (currentTenant?.active_modules && Array.isArray(currentTenant.active_modules) && currentTenant.active_modules.length > 0)
+      ? currentTenant.active_modules
+      : ((currentTenant?.metadata as any)?.active_modules && Array.isArray((currentTenant?.metadata as any).active_modules))
+        ? (currentTenant?.metadata as any).active_modules
+        : fallbackModules;
+    return raw.filter((m: string) => m !== 'catalogo');
+  }, [currentTenant?.active_modules, currentTenant?.metadata, fallbackModules]);
+
+  const availableDockModules = useMemo(() => {
+    return AVAILABLE_MODULES.filter(m => {
+      if (m.id === 'clinica') {
+        return tenantActiveModules.includes('clinica') || tenantActiveModules.some((t: string) => t.startsWith('med_'));
+      }
+      if (m.id === 'ginecologia') {
+        return tenantActiveModules.includes('ginecologia') || tenantActiveModules.includes('med_ginecologia');
+      }
+      return tenantActiveModules.includes(m.id);
+    });
+  }, [tenantActiveModules]);
+
+  const maxAllowedDock = Math.min(3, availableDockModules.length);
+
   useEffect(() => {
     if (currentTenant) {
+      // Filtrar estrictamente cualquier módulo guardado para que pertenezca a los módulos disponibles activos
+      const savedModules = ((currentTenant.metadata as any)?.mobile_dock_modules as string[]) || [];
+      const sanitizedSaved = savedModules
+        .map((m: string) => m === 'catalogo' ? 'inventario' : m)
+        .filter((m: string) => availableDockModules.some(adm => adm.id === m));
+
+      // Si no hay ninguno guardado válido, inicializar con los primeros módulos disponibles hasta maxAllowedDock
+      const initialDockModules = sanitizedSaved.length > 0
+        ? sanitizedSaved.slice(0, 3)
+        : availableDockModules.slice(0, maxAllowedDock).map(m => m.id);
+
       setFormData({
         name: currentTenant.name || '',
         tax_id: (currentTenant.metadata as any)?.tax_id || (currentTenant.metadata as any)?.rif || '',
@@ -104,11 +151,7 @@ export default function ConfiguracionPage() {
         currency: (currentTenant.metadata as any)?.currency || 'USD',
         language: (currentTenant.metadata as any)?.language || 'es',
         logo_url: (currentTenant.metadata as any)?.logo_url || '',
-        mobile_dock_modules: ((currentTenant.metadata as any)?.mobile_dock_modules as string[]) || (
-          ((currentTenant.active_modules || []).includes('inventario') || (currentTenant.active_modules || []).includes('catalogo'))
-            ? ['caja', 'clientes', 'inventario']
-            : ['caja', 'clientes', 'calendario']
-        )
+        mobile_dock_modules: initialDockModules
       });
 
       if (actor) {
@@ -120,21 +163,28 @@ export default function ConfiguracionPage() {
         }).finally(() => setIsLoadingAccounts(false));
       }
     }
-  }, [currentTenant, actor]);
+  }, [currentTenant, actor, availableDockModules, maxAllowedDock]);
 
   const [isSavingDock, setIsSavingDock] = useState(false);
   const [dockSaveFeedback, setDockSaveFeedback] = useState<string | null>(null);
 
   const toggleDockModule = (moduleId: string) => {
+    // Solo permitir interactuar con módulos válidos y activos en el tenant
+    if (!availableDockModules.some((m: AvailableModuleItem) => m.id === moduleId)) return;
+
     setFormData(prev => {
-      const isSelected = prev.mobile_dock_modules.includes(moduleId);
+      // Purgar cualquier módulo inactivo previo para no arrastrar módulos fantasma
+      const cleanCurrent = prev.mobile_dock_modules.filter((m: string) => 
+        availableDockModules.some((adm: AvailableModuleItem) => adm.id === m)
+      );
+      const isSelected = cleanCurrent.includes(moduleId);
       if (isSelected) {
-        return { ...prev, mobile_dock_modules: prev.mobile_dock_modules.filter(m => m !== moduleId) };
+        return { ...prev, mobile_dock_modules: cleanCurrent.filter((m: string) => m !== moduleId) };
       } else {
-        if (prev.mobile_dock_modules.length >= 3) {
-          return prev; // MÁXIMO 3 módulos adicionales para mantener 4 accesos en total junto con Inicio
+        if (cleanCurrent.length >= 3) {
+          return { ...prev, mobile_dock_modules: cleanCurrent }; // MÁXIMO 3 módulos adicionales
         }
-        return { ...prev, mobile_dock_modules: [...prev.mobile_dock_modules, moduleId] };
+        return { ...prev, mobile_dock_modules: [...cleanCurrent, moduleId] };
       }
     });
   };
@@ -145,9 +195,13 @@ export default function ConfiguracionPage() {
     setIsSavingDock(true);
     setDockSaveFeedback(null);
     try {
+      const cleanDockModules = formData.mobile_dock_modules
+        .filter((m: string) => availableDockModules.some((adm: AvailableModuleItem) => adm.id === m))
+        .slice(0, 3);
+
       const updatedMetadata = {
         ...currentTenant.metadata,
-        mobile_dock_modules: formData.mobile_dock_modules
+        mobile_dock_modules: cleanDockModules
       };
       const result = await updateTenantSettings(currentTenant.id, currentTenant.name, updatedMetadata, undefined, actor);
       if (!result.success) throw new Error(result.error);
@@ -157,7 +211,7 @@ export default function ConfiguracionPage() {
         metadata: updatedMetadata
       });
       if (typeof window !== 'undefined') {
-        localStorage.setItem('rendo_mobile_dock', JSON.stringify(formData.mobile_dock_modules));
+        localStorage.setItem('rendo_mobile_dock', JSON.stringify(cleanDockModules));
       }
       setDockSaveFeedback('¡Accesos rápidos guardados con éxito!');
       setTimeout(() => setDockSaveFeedback(null), 3500);
@@ -177,6 +231,10 @@ export default function ConfiguracionPage() {
     setIsSuccess(false);
 
     try {
+      const cleanDockModules = formData.mobile_dock_modules
+        .filter((m: string) => availableDockModules.some((adm: AvailableModuleItem) => adm.id === m))
+        .slice(0, 3);
+
       const metadata = {
         ...currentTenant.metadata,
         tax_id: formData.tax_id,
@@ -187,7 +245,7 @@ export default function ConfiguracionPage() {
         currency: formData.currency,
         language: formData.language,
         logo_url: formData.logo_url,
-        mobile_dock_modules: formData.mobile_dock_modules
+        mobile_dock_modules: cleanDockModules
       };
 
       if (!actor) {
@@ -293,10 +351,6 @@ export default function ConfiguracionPage() {
       setIsCreatingUser(false);
     }
   };
-
-  // Filtrar los módulos que el tenant tiene activos realmente
-  const fallbackModules = ['caja', 'clientes', 'inventario', 'catalogo', 'compras', 'contabilidad', 'calendario', 'odontologia', 'clinica', 'med_general', 'med_pediatria', 'med_ginecologia', 'med_dermatologia', 'med_traumatologia', 'med_oftalmologia', 'barberia', 'grooming', 'whatsapp', 'kanban', 'equipo', 'estadisticas', 'franquicias', 'config', 'apps'];
-  const tenantActiveModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) ? currentTenant.active_modules : fallbackModules;
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -528,11 +582,7 @@ export default function ConfiguracionPage() {
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {AVAILABLE_MODULES.filter(m => {
-              if (m.id === 'clinica') return tenantActiveModules.includes('clinica') || tenantActiveModules.some((t: string) => t.startsWith('med_'));
-              if (m.id === 'inventario' || m.id === 'catalogo') return tenantActiveModules.includes('inventario') || tenantActiveModules.includes('catalogo');
-              return tenantActiveModules.includes(m.id);
-            }).map(module => {
+            {availableDockModules.map((module: AvailableModuleItem) => {
               const isSelected = formData.mobile_dock_modules.includes(module.id);
               return (
                 <div 
@@ -554,9 +604,16 @@ export default function ConfiguracionPage() {
           </div>
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-6 pt-4 border-t border-border">
-            <p className="text-xs text-indigo-500 font-bold">
-              Seleccionados: {formData.mobile_dock_modules.length} de 3 (más Inicio = {formData.mobile_dock_modules.length + 1} accesos)
-            </p>
+            {(() => {
+              const activeSelectedCount = formData.mobile_dock_modules.filter((m: string) => 
+                availableDockModules.some((adm: AvailableModuleItem) => adm.id === m)
+              ).length;
+              return (
+                <p className="text-xs text-indigo-500 font-bold">
+                  Seleccionados: {activeSelectedCount} de {maxAllowedDock} {maxAllowedDock < 3 ? '(máx. disponible en tu negocio)' : '(máx. 3)'} — Total con Inicio: {activeSelectedCount + 1} accesos
+                </p>
+              );
+            })()}
             <div className="flex items-center gap-3 w-full sm:w-auto">
               {dockSaveFeedback && (
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 animate-in fade-in">
