@@ -82,6 +82,10 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     avatarUrl: '',
     color: '#3b82f6',
     workingHours: defaultWorkingHours as WorkingHours,
+    defaultSlotMinutes: 60,
+    generalServiceEnabled: true,
+    generalServiceName: '',
+    generalServicePrice: undefined as number | undefined,
     services: [] as { id: string; name: string; durationMinutes: number; price?: number; priceDisplay?: 'visible' | 'from' | 'hidden' }[],
     // Configuración para Barbería
     isBarber: false,
@@ -143,6 +147,10 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       avatarUrl: (meta.avatar_url as string) || '',
       color: (meta.color as string) || '#3b82f6',
       workingHours: (meta.working_hours as WorkingHours) || defaultWorkingHours,
+      defaultSlotMinutes: Number(meta.default_slot_minutes || meta.general_slot_minutes || 60),
+      generalServiceEnabled: meta.general_service_enabled !== false,
+      generalServiceName: (meta.general_service_name as string) || '',
+      generalServicePrice: meta.general_service_price !== undefined ? Number(meta.general_service_price) : undefined,
       services: (meta.services as any[]) || [],
 
       // Barbería
@@ -247,6 +255,11 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
           avatar_url: form.avatarUrl,
           color: form.color,
           working_hours: form.workingHours,
+          default_slot_minutes: form.defaultSlotMinutes || 60,
+          general_slot_minutes: form.defaultSlotMinutes || 60,
+          general_service_enabled: form.generalServiceEnabled,
+          general_service_name: form.generalServiceName?.trim() || '',
+          general_service_price: form.generalServicePrice,
           services: form.bookable ? form.services : [],
           modules: assignedModules,
 
@@ -821,24 +834,22 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 {/* TAB 2: JORNADA & HORARIOS */}
                 {modalTab === 'horarios' && (
                   <div className="space-y-4 animate-in fade-in duration-150">
-                    <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-border">
-                      <h4 className="text-xs font-black uppercase tracking-wider text-foreground mb-1">Horario Laboral Semanal</h4>
-                      <p className="text-xs text-slate-500">Define los días y franjas horarias en que este colaborador o espacio atiende al público.</p>
-                    </div>
-
                     <EmployeeScheduleEditor 
                       value={form.workingHours} 
-                      onChange={(wh) => setForm({ ...form, workingHours: wh })} 
+                      onChange={(wh) => setForm({ ...form, workingHours: wh })}
+                      slotMinutes={form.defaultSlotMinutes}
+                      onSlotMinutesChange={(mins) => setForm({ ...form, defaultSlotMinutes: mins })}
+                      onGoToServices={() => setModalTab('servicios')}
                     />
                   </div>
                 )}
 
                 {/* TAB 3: FUNCIONES & SERVICIOS */}
                 {modalTab === 'servicios' && (
-                  <div className="space-y-4 animate-in fade-in duration-150">
+                  <div className="space-y-5 animate-in fade-in duration-150">
                     <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
                       <div className="flex-1">
-                        <span className="block text-xs font-bold text-foreground">Mostrar en Agenda y Reservas</span>
+                        <span className="block text-xs font-bold text-foreground">Mostrar en Agenda y Reservas Web</span>
                         <span className="block text-[11px] text-slate-500">Permite a los clientes agendar citas directamente con este colaborador.</span>
                       </div>
                       <button
@@ -854,100 +865,200 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                     </div>
 
                     {form.bookable && (
-                      <div className="p-4 border border-border rounded-2xl bg-card space-y-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">Servicios, Duración & Precio</h4>
-                            <p className="text-[11px] text-slate-500">Configura los servicios que realiza, minutos y precio sugerido (o déjalo en blanco para precio libre).</p>
+                      <div className="space-y-4">
+                        {/* SECCIÓN 1: SERVICIO GENERAL VINCULADO AL HORARIO */}
+                        <div className="p-4 border-2 border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl bg-indigo-50/30 dark:bg-indigo-950/20 space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                  Servicio General
+                                </span>
+                                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                                  Atención General (Bloque Estándar)
+                                </h4>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-1">
+                                Utiliza el bloque general configurado en horarios (<strong>{form.defaultSlotMinutes} min</strong>). Ideal para consultas médicas generales o atenciones estándar.
+                              </p>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setForm({ ...form, generalServiceEnabled: !form.generalServiceEnabled })}
+                              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${form.generalServiceEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                              title={form.generalServiceEnabled ? 'Desactivar servicio general' : 'Activar servicio general'}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${form.generalServiceEnabled ? 'translate-x-2' : '-translate-x-2'}`}
+                              />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => setForm({...form, services: [...form.services, { id: crypto.randomUUID(), name: '', durationMinutes: 60, price: undefined }]})}
-                            className="px-3 py-1.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold hover:bg-indigo-500/20 transition-colors flex items-center gap-1.5 uppercase"
-                          >
-                            <Plus size={14} /> Añadir Servicio
-                          </button>
-                        </div>
-                        
-                        {form.services.length === 0 ? (
-                          <div className="text-center p-6 border border-dashed border-border rounded-2xl">
-                            <p className="text-xs text-slate-500 font-medium">Los clientes podrán seleccionarlo para cualquier servicio general de 60 minutos con precio estándar.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                            {form.services.map((svc, idx) => (
-                              <div key={svc.id} className="flex items-center gap-2">
+
+                          {form.generalServiceEnabled && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-indigo-100 dark:border-indigo-900/60">
+                              <div className="sm:col-span-2 space-y-1">
+                                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                  Nombre del Servicio General
+                                </label>
                                 <input
                                   type="text"
-                                  placeholder="Ej: Tratamiento Capilar, Consulta, Corte"
-                                  value={svc.name}
-                                  onChange={(e) => {
-                                    const newServices = [...form.services];
-                                    newServices[idx].name = e.target.value;
-                                    setForm({...form, services: newServices});
-                                  }}
-                                  className="flex-1 text-xs px-3 py-2 rounded-xl border border-border bg-background outline-none text-foreground focus:border-indigo-500 transition-colors font-medium"
+                                  placeholder={form.roleTitle ? `Consulta / ${form.roleTitle}` : 'Consulta General'}
+                                  value={form.generalServiceName}
+                                  onChange={(e) => setForm({ ...form, generalServiceName: e.target.value })}
+                                  className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background outline-none text-foreground focus:border-indigo-500 font-medium"
                                 />
-                                <div className="flex items-center gap-1 border border-border bg-background rounded-xl px-2 focus-within:border-indigo-500 transition-colors" title="Duración del servicio">
-                                  <input
-                                    type="number"
-                                    min="5"
-                                    step="5"
-                                    value={svc.durationMinutes === 0 ? '' : svc.durationMinutes}
-                                    placeholder="0"
-                                    onChange={(e) => {
-                                      const newServices = [...form.services];
-                                      newServices[idx].durationMinutes = e.target.value === '' ? 0 : Number(e.target.value);
-                                      setForm({...form, services: newServices});
-                                    }}
-                                    className="w-12 text-xs py-2 outline-none bg-transparent text-center text-foreground font-bold"
-                                  />
-                                  <span className="text-[10px] font-bold text-slate-400 uppercase">min</span>
-                                </div>
-                                <div className="flex items-center gap-1 border border-border bg-background rounded-xl px-2 focus-within:border-indigo-500 transition-colors" title="Precio establecido (deja vacío para precio libre/a convenir)">
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                                  Precio Base (USD)
+                                </label>
+                                <div className="flex items-center gap-1 border border-border bg-background rounded-xl px-2 focus-within:border-indigo-500">
                                   <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">$</span>
                                   <input
                                     type="number"
                                     min="0"
                                     step="0.5"
-                                    value={svc.price === undefined || svc.price === null ? '' : svc.price}
+                                    value={form.generalServicePrice === undefined || form.generalServicePrice === null ? '' : form.generalServicePrice}
                                     placeholder="Libre"
-                                    onChange={(e) => {
-                                      const newServices = [...form.services];
-                                      newServices[idx].price = e.target.value === '' ? undefined : Math.max(0, Number(e.target.value));
-                                      setForm({...form, services: newServices});
-                                    }}
-                                    className="w-14 text-xs py-2 outline-none bg-transparent text-center text-foreground font-bold placeholder:text-slate-400 placeholder:font-normal"
+                                    onChange={(e) => setForm({ ...form, generalServicePrice: e.target.value === '' ? undefined : Math.max(0, Number(e.target.value)) })}
+                                    className="w-full text-xs py-2 outline-none bg-transparent text-foreground font-bold placeholder:text-slate-400 placeholder:font-normal"
                                   />
                                 </div>
-                                <select
-                                  value={svc.priceDisplay || 'visible'}
-                                  onChange={(e) => {
-                                    const newServices = [...form.services];
-                                    newServices[idx].priceDisplay = e.target.value as any;
-                                    setForm({...form, services: newServices});
-                                  }}
-                                  className="text-[10px] font-bold px-1.5 py-2 rounded-xl border border-border bg-background text-foreground outline-none focus:border-indigo-500 transition-colors"
-                                  title="Cómo se mostrará el precio al cliente en la página web"
-                                >
-                                  <option value="visible">Fijo</option>
-                                  <option value="from">Desde</option>
-                                  <option value="hidden">Oculto 🔒</option>
-                                </select>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const newServices = form.services.filter((_, i) => i !== idx);
-                                    setForm({...form, services: newServices});
-                                  }}
-                                  className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors"
-                                >
-                                  <X size={16} />
-                                </button>
                               </div>
-                            ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* SECCIÓN 2: SERVICIOS PARTICULARES O ESPECIALIZADOS */}
+                        <div className="p-4 border border-border rounded-2xl bg-card space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="bg-purple-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                  Particulares
+                                </span>
+                                <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                                  Servicios Particulares (Duración & Precio Individual)
+                                </h4>
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5">
+                                Agrega procedimientos específicos que requieran tiempos propios (ej: 15, 30, 45, 90, 120 min) sin romper el horario.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setForm({
+                                ...form, 
+                                services: [
+                                  ...form.services, 
+                                  { 
+                                    id: crypto.randomUUID(), 
+                                    name: '', 
+                                    durationMinutes: form.defaultSlotMinutes || 45, 
+                                    price: undefined,
+                                    priceDisplay: 'visible'
+                                  }
+                                ]
+                              })}
+                              className="px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold hover:bg-purple-500/20 transition-colors flex items-center gap-1.5 uppercase shrink-0"
+                            >
+                              <Plus size={14} /> Añadir Particular
+                            </button>
                           </div>
-                        )}
+                          
+                          {form.services.length === 0 ? (
+                            <div className="text-center p-6 border border-dashed border-border rounded-2xl">
+                              <p className="text-xs text-slate-500 font-medium">
+                                No has añadido servicios particulares. {form.generalServiceEnabled ? `El colaborador atenderá citas en bloques de ${form.defaultSlotMinutes} minutos.` : 'Activa el servicio general o añade un servicio particular.'}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5 max-h-64 overflow-y-auto pr-1">
+                              {form.services.map((svc, idx) => (
+                                <div key={svc.id} className="flex flex-wrap sm:flex-nowrap items-center gap-2 p-2 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-border/80">
+                                  <input
+                                    type="text"
+                                    placeholder="Ej: Limpieza Profunda, Ecografía, Corte Fade"
+                                    value={svc.name}
+                                    onChange={(e) => {
+                                      const newServices = [...form.services];
+                                      newServices[idx].name = e.target.value;
+                                      setForm({...form, services: newServices});
+                                    }}
+                                    className="flex-1 min-w-[140px] text-xs px-3 py-2 rounded-xl border border-border bg-background outline-none text-foreground focus:border-purple-500 transition-colors font-medium"
+                                  />
+                                  <div className="flex items-center gap-1 border border-border bg-background rounded-xl px-2 focus-within:border-purple-500 transition-colors" title="Duración del servicio">
+                                    <input
+                                      type="number"
+                                      min="5"
+                                      step="5"
+                                      value={svc.durationMinutes === 0 ? '' : svc.durationMinutes}
+                                      placeholder="min"
+                                      onChange={(e) => {
+                                        const newServices = [...form.services];
+                                        newServices[idx].durationMinutes = e.target.value === '' ? 0 : Number(e.target.value);
+                                        setForm({...form, services: newServices});
+                                      }}
+                                      className="w-12 text-xs py-2 outline-none bg-transparent text-center text-foreground font-bold"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">min</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 border border-border bg-background rounded-xl px-2 focus-within:border-purple-500 transition-colors" title="Precio establecido (deja vacío para precio libre/a convenir)">
+                                    <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">$</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.5"
+                                      value={svc.price === undefined || svc.price === null ? '' : svc.price}
+                                      placeholder="Libre"
+                                      onChange={(e) => {
+                                        const newServices = [...form.services];
+                                        newServices[idx].price = e.target.value === '' ? undefined : Math.max(0, Number(e.target.value));
+                                        setForm({...form, services: newServices});
+                                      }}
+                                      className="w-14 text-xs py-2 outline-none bg-transparent text-center text-foreground font-bold placeholder:text-slate-400 placeholder:font-normal"
+                                    />
+                                  </div>
+                                  <select
+                                    value={svc.priceDisplay || 'visible'}
+                                    onChange={(e) => {
+                                      const newServices = [...form.services];
+                                      newServices[idx].priceDisplay = e.target.value as any;
+                                      setForm({...form, services: newServices});
+                                    }}
+                                    className="text-[10px] font-bold px-1.5 py-2 rounded-xl border border-border bg-background text-foreground outline-none focus:border-purple-500 transition-colors"
+                                    title="Cómo se mostrará el precio al cliente en la página web"
+                                  >
+                                    <option value="visible">Fijo</option>
+                                    <option value="from">Desde</option>
+                                    <option value="hidden">Oculto 🔒</option>
+                                  </select>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const newServices = form.services.filter((_, i) => i !== idx);
+                                      setForm({...form, services: newServices});
+                                    }}
+                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors shrink-0"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Banner Informativo de Convivencia */}
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-900 dark:text-emerald-200 flex items-center gap-2">
+                          <Sparkles size={16} className="text-emerald-600 shrink-0" />
+                          <span>
+                            <strong>Perfecta Armonía:</strong> La agenda adapta la duración de la cita al servicio que el cliente elija (general de {form.defaultSlotMinutes} min o particular) respetando siempre el horario laboral del colaborador sin choques ni sobreposiciones.
+                          </span>
+                        </div>
                       </div>
                     )}
                   </div>

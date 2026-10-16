@@ -211,13 +211,40 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     employees.forEach(emp => {
       if (!emp.is_active) return;
       const svcs = emp.metadata?.services as any[];
+      const defaultSlot = Number(emp.metadata?.default_slot_minutes || emp.metadata?.general_slot_minutes || 60);
+      const isGeneralEnabled = emp.metadata?.general_service_enabled !== false;
+      const generalName = (emp.metadata?.general_service_name?.trim() || emp.role || 'Servicio General').trim();
+      const generalPrice = emp.metadata?.general_service_price !== undefined ? Number(emp.metadata?.general_service_price) : undefined;
+
+      // 1. Servicio General (si está habilitado o si no tiene particulares configurados)
+      if (isGeneralEnabled || !svcs || svcs.length === 0) {
+        const key = generalName.toLowerCase();
+        if (!allServices.has(key)) {
+          allServices.set(key, {
+            name: generalName,
+            durationMinutes: defaultSlot,
+            prices: [],
+            hasFrom: false,
+            hasHidden: false,
+            basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
+          });
+        }
+        const entry = allServices.get(key)!;
+        if (generalPrice && generalPrice > 0) {
+          entry.prices.push(generalPrice);
+          if (!entry.basePrice) entry.basePrice = generalPrice;
+        }
+      }
+
+      // 2. Servicios Particulares o Especializados
       if (svcs && svcs.length > 0) {
         svcs.forEach(s => {
+          if (!s.name || !s.name.trim()) return;
           const key = s.name.trim().toLowerCase();
           if (!allServices.has(key)) {
             allServices.set(key, {
               name: s.name.trim(),
-              durationMinutes: Number(s.durationMinutes) || 60,
+              durationMinutes: Number(s.durationMinutes) || defaultSlot,
               prices: [],
               hasFrom: false,
               hasHidden: false,
@@ -232,18 +259,6 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           if (s.priceDisplay === 'from') entry.hasFrom = true;
           if (s.priceDisplay === 'hidden') entry.hasHidden = true;
         });
-      } else {
-        const role = emp.role || 'Servicio General';
-        const key = role.trim().toLowerCase();
-        if (!allServices.has(key)) {
-          allServices.set(key, {
-            name: role.trim(),
-            durationMinutes: 60,
-            prices: [],
-            hasFrom: false,
-            hasHidden: false,
-          });
-        }
       }
     });
 
@@ -278,12 +293,14 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       if (!selectedService) return true;
       if (!emp.is_active) return false;
       const svcs = emp.metadata?.services as any[];
-      if (svcs && svcs.length > 0) {
-        return svcs.some(s => s.name.trim().toLowerCase() === selectedService.name.toLowerCase());
-      } else {
-        const role = emp.role || 'Servicio General';
-        return role.trim().toLowerCase() === selectedService.name.toLowerCase();
-      }
+      const isGeneralEnabled = emp.metadata?.general_service_enabled !== false;
+      const generalName = (emp.metadata?.general_service_name?.trim() || emp.role || 'Servicio General').toLowerCase();
+      const targetServiceName = selectedService.name.trim().toLowerCase();
+
+      const matchesGeneral = (isGeneralEnabled || !svcs || svcs.length === 0) && generalName === targetServiceName;
+      const matchesParticular = svcs && svcs.length > 0 && svcs.some(s => s.name?.trim().toLowerCase() === targetServiceName);
+
+      return Boolean(matchesGeneral || matchesParticular);
     });
   }, [employees, selectedService]);
   
@@ -387,6 +404,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       const bSvc = bSvcs?.find(s => s.name.trim().toLowerCase() === selectedService.name.toLowerCase());
       if (bSvc?.price !== undefined && Number(bSvc.price) > 0) {
         setSelectedBarberPrice(Number(bSvc.price));
+      } else if (barber.metadata?.general_service_price !== undefined && Number(barber.metadata?.general_service_price) > 0) {
+        setSelectedBarberPrice(Number(barber.metadata?.general_service_price));
       } else {
         setSelectedBarberPrice(selectedService.basePrice);
       }
@@ -596,24 +615,31 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                 {filteredEmployees.length === 0 && (
                   <p className="text-center text-slate-400 mt-10 text-lg">No hay profesionales disponibles para este servicio.</p>
                 )}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredEmployees.length > 1 && (
                     <button
                       onClick={() => {
                         handleBarberSelect({ id: 'any', name: 'Cualquier Profesional', role: 'El que esté libre', is_active: true });
                       }}
-                      className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl overflow-hidden shadow-sm border border-slate-700 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                      className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl overflow-hidden shadow-sm border border-slate-700 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
                     >
-                      <div className="p-6 relative w-full flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-1">Sin preferencia</p>
-                          <h2 className="text-xl md:text-2xl font-black text-white">Cualquiera disponible</h2>
+                      <div className="p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-700/60">
+                        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-700/70 text-slate-200 flex items-center justify-center border-4 border-slate-800 shadow-md group-hover:scale-105 transition-transform shrink-0">
+                          <Users className="text-slate-300 w-12 h-12" />
                         </div>
-                        <div className="w-16 h-16 rounded-full bg-slate-700 flex items-center justify-center border-4 border-slate-800 shadow-sm">
-                           <Users className="text-slate-300 w-8 h-8" />
+                        <div className="text-center sm:text-left flex-1 min-w-0">
+                          <span className="inline-block text-[11px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full mb-1.5 border border-indigo-500/20">
+                            Sin preferencia
+                          </span>
+                          <h2 className="text-xl sm:text-2xl font-black text-white group-hover:text-indigo-200 transition-colors">
+                            Cualquiera disponible
+                          </h2>
+                          <p className="text-xs text-slate-400 font-medium mt-0.5">
+                            Asignación automática del especialista libre
+                          </p>
                         </div>
                       </div>
-                      <div className="p-4 flex items-center justify-between w-full bg-slate-800/50">
+                      <div className="p-4 flex items-center justify-between w-full bg-slate-800/50 mt-auto">
                         <div className="flex items-center gap-2 text-slate-400">
                           <Clock size={16} />
                           <span className="text-sm font-medium">Horarios más flexibles</span>
@@ -628,51 +654,74 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                     <button
                       key={barber.id}
                       onClick={() => handleBarberSelect(barber)}
-                      className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/40 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                      className="group bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/50 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
                     >
-                      <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
-                      <div>
-                                                <h2 className="text-xl md:text-2xl font-black text-[color:var(--theme-btn)]">{barber.name}</h2>
-                      </div>
-                      {barber.metadata?.avatar_url ? (
-                        <img src={barber.metadata.avatar_url} alt={barber.name} className="w-16 h-16 rounded-full object-cover border-4 border-white shadow-sm" />
-                      ) : (
-                        <div className="w-16 h-16 rounded-full bg-white/50 flex items-center justify-center border-4 border-white shadow-sm">
-                           <span className="text-xl font-black text-[color:var(--theme-btn)]">{barber.name.slice(0,2).toUpperCase()}</span>
+                      <div className="bg-gradient-to-b from-slate-50 to-white p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-100">
+                        {barber.metadata?.avatar_url ? (
+                          <div className="relative shrink-0">
+                            <img 
+                              src={barber.metadata.avatar_url} 
+                              alt={barber.name} 
+                              className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform" 
+                            />
+                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" title="Disponible" />
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-indigo-50 text-[color:var(--theme-btn)] flex items-center justify-center font-black text-2xl border-4 border-white shadow-md group-hover:scale-105 transition-transform shrink-0">
+                            {barber.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="text-center sm:text-left flex-1 min-w-0">
+                          <span className="inline-block text-[11px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                            {barber.role || 'Especialista'}
+                          </span>
+                          <h2 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors truncate">
+                            {barber.name}
+                          </h2>
+                          {barber.metadata?.specialty && (
+                            <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
+                              {barber.metadata.specialty}
+                            </p>
+                          )}
                         </div>
-                      )}
-                    </div>
-                    <div className="p-4 flex items-center justify-between w-full bg-white">
-                      <div className="flex items-center gap-2.5 text-slate-500">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold">
-                          <Scissors size={14} />
-                          <span>{barber.role || 'Profesional'}</span>
-                        </div>
-                        {(() => {
-                          if (!settings.showPrices) return null;
-                          const bSvcs = barber.metadata?.services as any[];
-                          const bSvc = bSvcs?.find(s => s.name.trim().toLowerCase() === selectedService?.name?.toLowerCase());
-                          if (bSvc?.priceDisplay === 'hidden') {
-                            return (
-                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                                {settings.noPriceLabel}
-                              </span>
-                            );
-                          }
-                          if (bSvc?.price !== undefined && Number(bSvc.price) > 0) {
-                            return (
-                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                {bSvc.priceDisplay === 'from' ? `Desde $${bSvc.price}` : `$${bSvc.price}`}
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
                       </div>
-                       <ChevronRight size={18} className="text-[color:var(--theme-btn)] transition-colors" />
-                    </div>
-                  </button>
-                ))}
+                      <div className="p-4 flex items-center justify-between w-full bg-slate-50/60 mt-auto">
+                        <div className="flex items-center gap-2.5 text-slate-500">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold">
+                            <Scissors size={14} />
+                            <span>{barber.role || 'Profesional'}</span>
+                          </div>
+                          {(() => {
+                            if (!settings.showPrices) return null;
+                            const bSvcs = barber.metadata?.services as any[];
+                            const bSvc = bSvcs?.find(s => s.name.trim().toLowerCase() === selectedService?.name?.toLowerCase());
+                            if (bSvc?.priceDisplay === 'hidden') {
+                              return (
+                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                  {settings.noPriceLabel}
+                                </span>
+                              );
+                            }
+                            const priceToDisplay = (bSvc?.price !== undefined && Number(bSvc.price) > 0)
+                              ? Number(bSvc.price)
+                              : (barber.metadata?.general_service_price !== undefined && Number(barber.metadata?.general_service_price) > 0)
+                                ? Number(barber.metadata?.general_service_price)
+                                : null;
+
+                            if (priceToDisplay !== null) {
+                              return (
+                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {bSvc?.priceDisplay === 'from' ? `Desde $${priceToDisplay}` : `$${priceToDisplay}`}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
+                        <ChevronRight size={18} className="text-[color:var(--theme-btn)] transition-colors" />
+                      </div>
+                    </button>
+                  ))}
               </div>
             </div>
           </div>
@@ -688,24 +737,28 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
               <button onClick={() => setStep(2)} className="p-2.5 bg-white/10 rounded-full text-white hover:bg-white/20 transition-colors">
                 <ArrowLeft size={20} />
               </button>
-              {settings.logoUrl && (
-                <div className="w-14 h-14 rounded-2xl bg-white p-2 shadow-sm hidden lg:flex items-center justify-center shrink-0">
+              
+              <div className="flex items-center gap-4 w-full">
+                {selectedBarber?.metadata?.avatar_url ? (
                   <img 
-                    src={settings.logoUrl} 
-                    alt="Logo" 
-                    className="max-w-full max-h-full object-contain rounded-xl"
-                    onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                    src={selectedBarber.metadata.avatar_url} 
+                    alt={selectedBarber.name} 
+                    className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-md shrink-0" 
                   />
-                </div>
-              )}
-              <div className="text-white">
-                <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider block mb-0.5">
-                  {settings.headerTitle}
-                </span>
-                <h2 className="text-xl lg:text-2xl font-black leading-tight">{selectedBarber?.name}</h2>
-                <p className="text-xs lg:text-sm text-emerald-200 font-medium">{selectedBarber?.role || 'Profesional'}</p>
-                <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-xs font-bold">
-                  <Scissors size={12} /> {selectedService?.name}
+                ) : (
+                  <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-2xl bg-white/20 flex items-center justify-center text-white font-black text-xl border-2 border-white/30 shadow-md shrink-0">
+                    {selectedBarber?.name ? selectedBarber.name.slice(0, 2).toUpperCase() : <Users size={24} />}
+                  </div>
+                )}
+                <div className="text-white min-w-0 flex-1">
+                  <span className="text-[10px] font-bold text-white/70 uppercase tracking-wider block mb-0.5">
+                    {settings.headerTitle}
+                  </span>
+                  <h2 className="text-xl lg:text-2xl font-black leading-tight truncate">{selectedBarber?.name}</h2>
+                  <p className="text-xs lg:text-sm text-emerald-200 font-medium truncate">{selectedBarber?.role || 'Profesional'}</p>
+                  <div className="mt-2 inline-flex items-center gap-1.5 bg-white/20 px-3 py-1 rounded-full text-xs font-bold">
+                    <Scissors size={12} /> {selectedService?.name}
+                  </div>
                 </div>
               </div>
             </div>
