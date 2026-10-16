@@ -15,18 +15,21 @@ import {
   RefreshCw, 
   Maximize2, 
   Minimize2, 
+  RotateCw,
+  Move,
   Sparkles,
-  Move
+  HelpCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/core/ToastProvider';
 
-interface ImageUploadProps {
+export interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
   bucket?: string;
   folder?: string;
   className?: string;
+  shape?: 'circle' | 'square';
 }
 
 export function ImageUpload({ 
@@ -34,34 +37,44 @@ export function ImageUpload({
   onChange, 
   bucket = 'avatars', 
   folder = 'employees', 
-  className = '' 
+  className = '',
+  shape = 'circle'
 }: ImageUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(null);
   const [isCropModalOpen, setIsCropModalOpen] = useState(false);
   
-  // Controles de encuadre en espacio de coordenadas Canvas (512x512)
+  // Transformaciones geométricas de encuadre en espacio de coordenadas Canvas (512x512)
   const [zoom, setZoom] = useState(1);
   const [offsetX, setOffsetX] = useState(0); // Desplazamiento en px relativo al centro
   const [offsetY, setOffsetY] = useState(0);
+  const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0);
   const [fitMode, setFitMode] = useState<'cover' | 'contain'>('cover');
   const [bgStyle, setBgStyle] = useState<'blur' | 'dark' | 'white'>('blur');
 
-  // Drag interactivo sobre el canvas
+  // Drag interactivo (Mouse y Touch)
   const [isDragging, setIsDragging] = useState(false);
-  const dragStartRef = useRef<{ x: number; y: number; initialOffsetX: number; initialOffsetY: number }>({ 
+  const dragStartRef = useRef<{ 
+    x: number; 
+    y: number; 
+    initialOffsetX: number; 
+    initialOffsetY: number;
+    viewportWidth: number;
+  }>({ 
     x: 0, 
     y: 0, 
     initialOffsetX: 0, 
-    initialOffsetY: 0 
+    initialOffsetY: 0,
+    viewportWidth: 288
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
   const imageElementRef = useRef<HTMLImageElement | null>(null);
   const { toast } = useToast();
 
-  // Función principal para redibujar el canvas en tiempo real (WYSIWYG 1:1)
+  // Redibujado del canvas en tiempo real con soporte de rotación, escalado inteligente y blur background
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imageElementRef.current;
@@ -80,40 +93,56 @@ export function ImageUpload({
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // 1. Escala base según modo de ajuste
-    const coverScale = Math.max(targetSize / W, targetSize / H);
-    const containScale = Math.min(targetSize / W, targetSize / H);
-    const baseScale = fitMode === 'contain' ? containScale : coverScale;
+    // Dimensiones efectivas según rotación
+    const isRotated90or270 = rotation === 90 || rotation === 270;
+    const effectiveW = isRotated90or270 ? H : W;
+    const effectiveH = isRotated90or270 ? W : H;
+
+    // Escalas de ajuste
+    const coverScale = Math.max(targetSize / effectiveW, targetSize / effectiveH);
+    const containScale = Math.min(targetSize / effectiveW, targetSize / effectiveH);
+    const baseScale = fitMode === 'contain' ? (containScale * 0.94) : coverScale;
 
     const currentScale = baseScale * zoom;
-    const destW = W * currentScale;
-    const destH = H * currentScale;
-    const destX = centerX - (destW / 2) + offsetX;
-    const destY = centerY - (destH / 2) + offsetY;
+    const drawW = W * currentScale;
+    const drawH = H * currentScale;
 
-    // 2. Fondo cuando la foto no llena los 512x512 (por ejemplo al alejar o en modo contain)
-    const needsBg = destW < targetSize || destH < targetSize || destX > 0 || destY > 0 || (destX + destW) < targetSize || (destY + destH) < targetSize;
-    
+    // Fondo cuando la imagen no llena los 512x512
+    const renderedWidth = effectiveW * currentScale;
+    const renderedHeight = effectiveH * currentScale;
+    const needsBg = fitMode === 'contain' || 
+                    renderedWidth < targetSize || 
+                    renderedHeight < targetSize || 
+                    Math.abs(offsetX) > 10 || 
+                    Math.abs(offsetY) > 10;
+
     if (needsBg) {
       if (bgStyle === 'blur') {
         ctx.save();
-        ctx.filter = 'blur(18px) brightness(0.65)';
-        ctx.drawImage(img, -20, -20, targetSize + 40, targetSize + 40);
+        ctx.filter = 'blur(22px) brightness(0.65) saturate(1.2)';
+        const blurScale = Math.max((targetSize + 60) / effectiveW, (targetSize + 60) / effectiveH);
+        ctx.translate(centerX, centerY);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.drawImage(img, (-W * blurScale) / 2, (-H * blurScale) / 2, W * blurScale, H * blurScale);
         ctx.restore();
       } else if (bgStyle === 'dark') {
-        ctx.fillStyle = '#0f172a';
+        ctx.fillStyle = '#090d16';
         ctx.fillRect(0, 0, targetSize, targetSize);
       } else if (bgStyle === 'white') {
-        ctx.fillStyle = '#f8fafc';
+        ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, targetSize, targetSize);
       }
     }
 
-    // 3. Dibujar la imagen principal
-    ctx.drawImage(img, destX, destY, destW, destH);
-  }, [zoom, offsetX, offsetY, fitMode, bgStyle]);
+    // Dibujado principal con traslación y rotación
+    ctx.save();
+    ctx.translate(centerX + offsetX, centerY + offsetY);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.restore();
+  }, [zoom, offsetX, offsetY, rotation, fitMode, bgStyle]);
 
-  // Cargar imagen en memoria cuando se abre el modal
+  // Inicializar estado cuando se carga una imagen nueva
   useEffect(() => {
     if (!rawImageSrc || !isCropModalOpen) return;
 
@@ -122,24 +151,29 @@ export function ImageUpload({
     img.onload = () => {
       imageElementRef.current = img;
 
-      // Si la foto es muy vertical (como fotos de celular 9:16 o 3:4),
-      // iniciar en modo 'contain' o con un zoom suave para que no aparezca cortada
+      // Detección automática de aspecto:
+      // Si es muy vertical (móvil retrato 9:16 o 3:4), se inicia en cover con un zoom balanceado
       const ar = img.naturalWidth / img.naturalHeight;
-      if (ar < 0.8) {
-        setFitMode('contain');
+      if (ar < 0.75) {
+        setFitMode('cover');
         setZoom(1.0);
+        // Pre-enfocar levemente el tercio superior para retratos de cuerpo entero
+        const coverScale = Math.max(512 / img.naturalWidth, 512 / img.naturalHeight);
+        const shiftY = (img.naturalHeight * 0.16) * coverScale;
+        setOffsetY(Math.round(shiftY));
       } else {
         setFitMode('cover');
         setZoom(1.0);
+        setOffsetY(0);
       }
       setOffsetX(0);
-      setOffsetY(0);
+      setRotation(0);
       renderCanvas();
     };
     img.src = rawImageSrc;
   }, [rawImageSrc, isCropModalOpen, renderCanvas]);
 
-  // Re-renderizar al cambiar cualquier control
+  // Re-renderizado continuo al cambiar cualquier parámetro
   useEffect(() => {
     if (isCropModalOpen) {
       renderCanvas();
@@ -151,12 +185,20 @@ export function ImageUpload({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast({ variant: 'error', title: 'Archivo inválido', description: 'Por favor selecciona un archivo de imagen (JPG, PNG, WebP).' });
+      toast({ 
+        variant: 'error', 
+        title: 'Archivo inválido', 
+        description: 'Por favor selecciona un archivo de imagen (JPG, PNG, WebP).' 
+      });
       return;
     }
 
-    if (file.size > 15 * 1024 * 1024) {
-      toast({ variant: 'error', title: 'Archivo muy grande', description: 'La imagen debe pesar menos de 15MB.' });
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ 
+        variant: 'error', 
+        title: 'Archivo muy grande', 
+        description: 'La imagen debe pesar menos de 20MB.' 
+      });
       return;
     }
 
@@ -174,59 +216,87 @@ export function ImageUpload({
     }
   };
 
-  // Presets de encuadre con 1 toque
+  // Presets de encuadre matemático dinámico
   const applyPreset = (preset: 'face' | 'center' | 'full' | 'body') => {
     const img = imageElementRef.current;
     if (!img) return;
 
+    const W = img.naturalWidth;
+    const H = img.naturalHeight;
+    const isRotated90or270 = rotation === 90 || rotation === 270;
+    const effectiveW = isRotated90or270 ? H : W;
+    const effectiveH = isRotated90or270 ? W : H;
+    const targetSize = 512;
+
+    const coverScale = Math.max(targetSize / effectiveW, targetSize / effectiveH);
+
     if (preset === 'full') {
-      // Ver foto completa sin recortar absolutamente nada
+      // Ver foto completa sin recortar ningún detalle
       setFitMode('contain');
-      setZoom(0.95);
+      setZoom(0.92);
       setOffsetX(0);
       setOffsetY(0);
     } else if (preset === 'face') {
-      // Enfocar rostro / parte superior
+      // Enfocar rostro / cabeza: calcula el tercio superior relativo a la altura real
       setFitMode('cover');
-      setZoom(1.25);
+      const targetZoom = 1.35;
+      const currentScale = coverScale * targetZoom;
+      // La cabeza suele estar en el ~22-26% superior de la foto
+      const shiftY = (effectiveH * 0.22) * currentScale;
+      setZoom(targetZoom);
       setOffsetX(0);
-      setOffsetY(120); // Mueve la imagen hacia abajo para centrar la cara arriba
+      setOffsetY(Math.round(shiftY));
     } else if (preset === 'center') {
-      // Centrado estándar
+      // Centrado perfecto
       setFitMode('cover');
       setZoom(1.0);
       setOffsetX(0);
       setOffsetY(0);
     } else if (preset === 'body') {
-      // Enfocar abajo
+      // Enfocar torso o zona media
       setFitMode('cover');
-      setZoom(1.05);
+      const targetZoom = 1.05;
+      const currentScale = coverScale * targetZoom;
+      // Desplazar hacia arriba para mostrar el cuerpo
+      const shiftY = -(effectiveH * 0.12) * currentScale;
+      setZoom(targetZoom);
       setOffsetX(0);
-      setOffsetY(-110);
+      setOffsetY(Math.round(shiftY));
     }
   };
 
-  // Drag interactivo sobre el canvas (Mouse)
+  // Girar 90 grados en el sentido de las agujas del reloj
+  const handleRotate = () => {
+    setRotation(prev => {
+      const next = ((prev + 90) % 360) as 0 | 90 | 180 | 270;
+      return next;
+    });
+    setOffsetX(0);
+    setOffsetY(0);
+  };
+
+  // Drag interactivo con mouse
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
+    const vpWidth = viewportRef.current?.clientWidth || 288;
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
       initialOffsetX: offsetX,
-      initialOffsetY: offsetY
+      initialOffsetY: offsetY,
+      viewportWidth: vpWidth
     };
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging) return;
-    // La vista en pantalla es de 256px y el canvas interno es de 512px (factor 2)
-    const factor = 2;
+    const factor = 512 / (dragStartRef.current.viewportWidth || 288);
     const deltaX = (e.clientX - dragStartRef.current.x) * factor;
     const deltaY = (e.clientY - dragStartRef.current.y) * factor;
 
-    setOffsetX(dragStartRef.current.initialOffsetX + deltaX);
-    setOffsetY(dragStartRef.current.initialOffsetY + deltaY);
+    setOffsetX(Math.round(dragStartRef.current.initialOffsetX + deltaX));
+    setOffsetY(Math.round(dragStartRef.current.initialOffsetY + deltaY));
   }, [isDragging]);
 
   const handleMouseUp = useCallback(() => {
@@ -244,16 +314,18 @@ export function ImageUpload({
     }
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  // Touch Drag para móviles
+  // Touch Drag para pantallas táctiles de móviles y tablets
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       setIsDragging(true);
+      const vpWidth = viewportRef.current?.clientWidth || 288;
       dragStartRef.current = {
         x: touch.clientX,
         y: touch.clientY,
         initialOffsetX: offsetX,
-        initialOffsetY: offsetY
+        initialOffsetY: offsetY,
+        viewportWidth: vpWidth
       };
     }
   };
@@ -261,22 +333,22 @@ export function ImageUpload({
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!isDragging || e.touches.length !== 1) return;
     const touch = e.touches[0];
-    const factor = 2;
+    const factor = 512 / (dragStartRef.current.viewportWidth || 288);
     const deltaX = (touch.clientX - dragStartRef.current.x) * factor;
     const deltaY = (touch.clientY - dragStartRef.current.y) * factor;
 
-    setOffsetX(dragStartRef.current.initialOffsetX + deltaX);
-    setOffsetY(dragStartRef.current.initialOffsetY + deltaY);
+    setOffsetX(Math.round(dragStartRef.current.initialOffsetX + deltaX));
+    setOffsetY(Math.round(dragStartRef.current.initialOffsetY + deltaY));
   };
 
-  // Zoom con rueda del ratón
+  // Zoom interactivo con rueda del mouse
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomDelta = e.deltaY < 0 ? 0.08 : -0.08;
-    setZoom(prev => Math.min(3.0, Math.max(0.35, Number((prev + zoomDelta).toFixed(2)))));
+    setZoom(prev => Math.min(3.5, Math.max(0.4, Number((prev + zoomDelta).toFixed(2)))));
   };
 
-  // Guardar y subir a Supabase Storage
+  // Guardar y subir a Supabase Storage con compresión WebP/JPEG de alta calidad
   const handleCropAndSave = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -313,15 +385,15 @@ export function ImageUpload({
       setRawImageSrc(null);
       toast({ 
         variant: 'success', 
-        title: 'Foto guardada', 
-        description: 'La imagen ha sido encuadrada y guardada con la máxima nitidez.' 
+        title: 'Foto actualizada con éxito', 
+        description: 'La foto de perfil se encuadró y guardó con resolución nítida.' 
       });
     } catch (err: any) {
       console.error('Error al guardar foto:', err);
       toast({ 
         variant: 'error', 
-        title: 'Error al procesar', 
-        description: err.message || 'Inténtalo de nuevo.' 
+        title: 'Error al procesar foto', 
+        description: err.message || 'Inténtalo de nuevo o verifica tu conexión.' 
       });
     } finally {
       setIsUploading(false);
@@ -338,7 +410,7 @@ export function ImageUpload({
       <div className={`relative flex flex-col items-center gap-2 ${className}`}>
         <div 
           onClick={() => !isUploading && fileInputRef.current?.click()}
-          className={`relative w-24 h-24 rounded-full border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all ${
+          className={`relative w-24 h-24 ${shape === 'circle' ? 'rounded-full' : 'rounded-2xl'} border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all ${
             value 
               ? 'border-primary shadow-md hover:ring-2 hover:ring-primary/40' 
               : 'border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -395,22 +467,22 @@ export function ImageUpload({
         />
       </div>
 
-      {/* MODAL DE ENCUADRE Y RECORTE INTERACTIVO EN TIEMPO REAL */}
+      {/* MODAL DE ENCUADRE Y RECORTE PROFESIONAL WYSIWYG */}
       {isCropModalOpen && rawImageSrc && (
-        <div className="fixed inset-0 z-70 bg-black/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-70 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
           <div 
-            className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh]"
+            className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-200 flex flex-col max-h-[94vh]"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header del Modal */}
-            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70 shrink-0">
+            <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
               <div className="pr-4">
                 <h3 className="text-base font-black text-foreground flex items-center gap-2">
                   <Sliders size={18} className="text-primary" />
-                  Ajustar y Encuadrar Foto de Perfil
+                  Editor de Foto de Perfil
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Aleja para ver la foto completa o amplía para enfocar el rostro. Arrastra directamente sobre el círculo.
+                  Arrastra libremente, ajusta el zoom o usa los botones inteligentes para el encuadre perfecto.
                 </p>
               </div>
               <button
@@ -424,16 +496,12 @@ export function ImageUpload({
 
             {/* Contenido scrolleable */}
             <div className="overflow-y-auto flex-1 p-4 sm:p-5 space-y-4">
-              {/* Botones de Modo Rápido (Llenar vs Completa) */}
-              <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-border">
+              
+              {/* Botones de Modo Base (Llenar Círculo vs Foto Completa) */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl border border-border">
                 <button
                   type="button"
-                  onClick={() => {
-                    setFitMode('contain');
-                    setZoom(0.95);
-                    setOffsetX(0);
-                    setOffsetY(0);
-                  }}
+                  onClick={() => applyPreset('full')}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     fitMode === 'contain'
                       ? 'bg-card text-foreground shadow-sm'
@@ -441,16 +509,11 @@ export function ImageUpload({
                   }`}
                 >
                   <Minimize2 size={14} className="text-teal-500" />
-                  <span>Ver Foto Completa (Fit)</span>
+                  <span>Ver Foto Completa</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setFitMode('cover');
-                    setZoom(1.0);
-                    setOffsetX(0);
-                    setOffsetY(0);
-                  }}
+                  onClick={() => applyPreset('center')}
                   className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                     fitMode === 'cover'
                       ? 'bg-card text-foreground shadow-sm'
@@ -458,107 +521,155 @@ export function ImageUpload({
                   }`}
                 >
                   <Maximize2 size={14} className="text-indigo-500" />
-                  <span>Llenar Círculo (Cover)</span>
+                  <span>Llenar Avatar (Cover)</span>
                 </button>
               </div>
 
-              {/* Viewport Interactivo con Canvas Real-Time */}
-              <div className="flex flex-col items-center bg-slate-950 p-6 rounded-3xl border border-slate-800 select-none relative">
+              {/* Viewport Interactivo con Canvas y Máscara Visual Tipo WhatsApp / Google */}
+              <div className="flex flex-col items-center bg-slate-950 p-5 rounded-3xl border border-slate-800 select-none relative">
                 <div 
-                  className="relative w-64 h-64 rounded-full overflow-hidden border-4 border-primary shadow-2xl cursor-grab active:cursor-grabbing group"
+                  ref={viewportRef}
+                  className="relative w-64 h-64 sm:w-72 sm:h-72 overflow-hidden shadow-2xl cursor-grab active:cursor-grabbing group select-none rounded-2xl"
                   onMouseDown={handleMouseDown}
                   onTouchStart={handleTouchStart}
                   onTouchMove={handleTouchMove}
                   onTouchEnd={() => setIsDragging(false)}
                   onWheel={handleWheel}
-                  title="Arrastra para mover la imagen · Usa la rueda del mouse para zoom"
+                  title="Arrastra para mover la imagen · Usa la rueda del mouse o el slider para zoom"
                 >
-                  {/* Canvas de alta fidelidad WYSIWYG */}
+                  {/* Canvas de procesamiento 512x512 */}
                   <canvas
                     ref={canvasRef}
                     width={512}
                     height={512}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover pointer-events-none"
                   />
 
-                  {/* Guía visual tenue en cruz */}
-                  <div className="absolute inset-0 pointer-events-none border border-white/20 rounded-full flex items-center justify-center">
-                    <div className="w-full h-[1px] bg-white/10" />
-                    <div className="h-full w-[1px] bg-white/10 absolute" />
-                  </div>
+                  {/* Overlay con Máscara Circular y Guías de Regla de los Tercios */}
+                  {shape === 'circle' ? (
+                    <div className="absolute inset-0 pointer-events-none">
+                      {/* Máscara oscura exterior al círculo */}
+                      <svg className="w-full h-full absolute inset-0" viewBox="0 0 100 100">
+                        <defs>
+                          <mask id="avatar-circle-mask">
+                            <rect width="100" height="100" fill="white" />
+                            <circle cx="50" cy="50" r="48" fill="black" />
+                          </mask>
+                        </defs>
+                        <rect 
+                          width="100" 
+                          height="100" 
+                          fill="rgba(0, 0, 0, 0.55)" 
+                          mask="url(#avatar-circle-mask)" 
+                        />
+                        {/* Borde exterior del círculo */}
+                        <circle 
+                          cx="50" 
+                          cy="50" 
+                          r="48" 
+                          fill="none" 
+                          stroke="rgba(255, 255, 255, 0.7)" 
+                          strokeWidth="0.8" 
+                          strokeDasharray="2 1"
+                        />
+                      </svg>
 
-                  {/* Badge de ayuda al posarse */}
-                  <div className="absolute bottom-2 inset-x-0 text-center pointer-events-none">
-                    <span className="text-[10px] bg-black/70 text-white/90 px-2.5 py-0.5 rounded-full backdrop-blur-xs font-medium inline-flex items-center gap-1 shadow-sm">
-                      <Move size={10} /> Arrastra para mover
+                      {/* Guías tenues en cruz / regla de los tercios */}
+                      <div className="absolute inset-2.5 rounded-full border border-white/20 flex items-center justify-center pointer-events-none">
+                        <div className="w-full h-[1px] bg-white/10" />
+                        <div className="h-full w-[1px] bg-white/10 absolute" />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 pointer-events-none border-2 border-dashed border-white/60 rounded-2xl" />
+                  )}
+
+                  {/* Badge flotante indicador */}
+                  <div className="absolute bottom-2.5 inset-x-0 text-center pointer-events-none">
+                    <span className="text-[10px] bg-black/75 text-white/90 px-3 py-0.5 rounded-full backdrop-blur-xs font-medium inline-flex items-center gap-1 shadow-sm border border-white/10">
+                      <Move size={10} /> Arrastra libremente para reubicar
                     </span>
                   </div>
                 </div>
 
-                {/* Presets Rápidos de 1-Clic */}
+                {/* Barra de Presets y Rotación */}
                 <div className="mt-4 flex items-center gap-1.5 flex-wrap justify-center">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Enfoque:</span>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('full')}
-                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1 border border-slate-700 btn-haptic"
-                    title="Alejar para que se vea toda la persona o foto sin recortar"
-                  >
-                    <Minimize2 size={12} className="text-teal-400" />
-                    Completa
-                  </button>
+                  
                   <button
                     type="button"
                     onClick={() => applyPreset('face')}
-                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1 border border-slate-700 btn-haptic"
-                    title="Ampliar y enfocar en la parte superior (rostro)"
+                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 btn-haptic"
+                    title="Centrar y enfocar el rostro en la parte superior"
                   >
                     <User size={12} className="text-indigo-400" />
                     Rostro
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('center')}
-                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1 border border-slate-700 btn-haptic"
-                    title="Centrar en el medio"
-                  >
-                    <Target size={12} className="text-amber-400" />
-                    Centro
-                  </button>
+
                   <button
                     type="button"
                     onClick={() => applyPreset('body')}
-                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1 border border-slate-700 btn-haptic"
-                    title="Enfocar la parte inferior"
+                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 btn-haptic"
+                    title="Enfocar torso o plano medio"
                   >
                     <Shirt size={12} className="text-pink-400" />
                     Cuerpo
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('center')}
+                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 btn-haptic"
+                    title="Centrar foto en el medio"
+                  >
+                    <Target size={12} className="text-amber-400" />
+                    Centro
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => applyPreset('full')}
+                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 btn-haptic"
+                    title="Ver imagen completa sin ningún corte"
+                  >
+                    <Minimize2 size={12} className="text-teal-400" />
+                    Completa
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleRotate}
+                    className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 btn-haptic text-sky-400"
+                    title="Girar foto 90 grados"
+                  >
+                    <RotateCw size={12} />
+                    Girar 90°
+                  </button>
                 </div>
               </div>
 
-              {/* Controles Deslizadores */}
+              {/* Controles de Precisión (Zoom y Posición) */}
               <div className="space-y-3.5 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-border">
-                {/* Slider de Zoom con soporte para alejar desde 0.35x */}
+                {/* Slider de Zoom con botones +/- */}
                 <div>
-                  <div className="flex items-center justify-between text-xs font-bold text-foreground mb-1">
+                  <div className="flex items-center justify-between text-xs font-bold text-foreground mb-1.5">
                     <span className="flex items-center gap-1.5">
                       <ZoomIn size={14} className="text-slate-400" />
-                      Zoom / Escala ({(zoom * 100).toFixed(0)}%)
+                      Zoom / Escala: <strong className="text-primary font-mono">{Math.round(zoom * 100)}%</strong>
                     </span>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => setZoom(prev => Math.max(0.35, Number((prev - 0.1).toFixed(2))))}
-                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500"
+                        onClick={() => setZoom(prev => Math.max(0.4, Number((prev - 0.1).toFixed(2))))}
+                        className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
                         title="Alejar foto"
                       >
                         <ZoomOut size={13} />
                       </button>
                       <button
                         type="button"
-                        onClick={() => setZoom(prev => Math.min(3.0, Number((prev + 0.1).toFixed(2))))}
-                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500"
+                        onClick={() => setZoom(prev => Math.min(3.5, Number((prev + 0.1).toFixed(2))))}
+                        className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
                         title="Acercar foto"
                       >
                         <ZoomIn size={13} />
@@ -567,32 +678,32 @@ export function ImageUpload({
                   </div>
                   <input
                     type="range"
-                    min="0.35"
-                    max="3.0"
+                    min="0.4"
+                    max="3.5"
                     step="0.05"
                     value={zoom}
                     onChange={(e) => setZoom(parseFloat(e.target.value))}
-                    className="w-full accent-primary h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer"
+                    className="w-full accent-primary h-2 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer"
                   />
                   <div className="flex justify-between text-[10px] text-slate-400 mt-1 font-medium">
-                    <span>Alejar (Ver completa)</span>
-                    <span>100%</span>
+                    <span>Alejar (Foto Completa)</span>
+                    <span>100% (Estándar)</span>
                     <span>Primer Plano</span>
                   </div>
                 </div>
 
-                {/* Slider Posición Vertical */}
+                {/* Slider Fino de Desplazamiento Vertical */}
                 <div>
                   <div className="flex items-center justify-between text-xs font-bold text-foreground mb-1">
-                    <span>Posición Vertical</span>
+                    <span>Ajuste Fino Vertical</span>
                     <span className="text-[11px] text-slate-400 font-mono">
-                      {offsetY > 40 ? 'Enfocado Arriba' : offsetY < -40 ? 'Enfocado Abajo' : 'Centrado'}
+                      {offsetY > 30 ? 'Enfocado Arriba' : offsetY < -30 ? 'Enfocado Abajo' : 'Centrado'}
                     </span>
                   </div>
                   <input
                     type="range"
-                    min="-250"
-                    max="250"
+                    min="-300"
+                    max="300"
                     step="2"
                     value={offsetY}
                     onChange={(e) => setOffsetY(parseFloat(e.target.value))}
@@ -600,18 +711,18 @@ export function ImageUpload({
                   />
                 </div>
 
-                {/* Slider Posición Horizontal */}
+                {/* Slider Fino de Desplazamiento Horizontal */}
                 <div>
                   <div className="flex items-center justify-between text-xs font-bold text-foreground mb-1">
-                    <span>Posición Horizontal</span>
+                    <span>Ajuste Fino Horizontal</span>
                     <span className="text-[11px] text-slate-400 font-mono">
-                      {offsetX < -40 ? 'Izquierda' : offsetX > 40 ? 'Derecha' : 'Centrado'}
+                      {offsetX < -30 ? 'Izquierda' : offsetX > 30 ? 'Derecha' : 'Centrado'}
                     </span>
                   </div>
                   <input
                     type="range"
-                    min="-250"
-                    max="250"
+                    min="-300"
+                    max="300"
                     step="2"
                     value={offsetX}
                     onChange={(e) => setOffsetX(parseFloat(e.target.value))}
@@ -619,28 +730,28 @@ export function ImageUpload({
                   />
                 </div>
 
-                {/* Estilo de Fondo al alejar */}
-                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs">
+                {/* Opciones de Fondo al alejar */}
+                <div className="pt-2 border-t border-border/60 flex items-center justify-between text-xs flex-wrap gap-2">
                   <span className="font-bold text-slate-500">Fondo al alejar la foto:</span>
                   <div className="flex gap-1.5">
                     <button
                       type="button"
                       onClick={() => setBgStyle('blur')}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
                         bgStyle === 'blur' 
-                          ? 'bg-primary/10 text-primary border-primary/40' 
-                          : 'bg-card text-slate-500 border-border'
+                          ? 'bg-primary/10 text-primary border-primary/40 shadow-xs' 
+                          : 'bg-card text-slate-500 border-border hover:text-foreground'
                       }`}
                     >
-                      ✨ Difuminado
+                      ✨ Desenfoque Artístico
                     </button>
                     <button
                       type="button"
                       onClick={() => setBgStyle('dark')}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
                         bgStyle === 'dark' 
-                          ? 'bg-primary/10 text-primary border-primary/40' 
-                          : 'bg-card text-slate-500 border-border'
+                          ? 'bg-primary/10 text-primary border-primary/40 shadow-xs' 
+                          : 'bg-card text-slate-500 border-border hover:text-foreground'
                       }`}
                     >
                       Oscuro
@@ -648,10 +759,10 @@ export function ImageUpload({
                     <button
                       type="button"
                       onClick={() => setBgStyle('white')}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] font-bold border ${
+                      className={`px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all ${
                         bgStyle === 'white' 
-                          ? 'bg-primary/10 text-primary border-primary/40' 
-                          : 'bg-card text-slate-500 border-border'
+                          ? 'bg-primary/10 text-primary border-primary/40 shadow-xs' 
+                          : 'bg-card text-slate-500 border-border hover:text-foreground'
                       }`}
                     >
                       Blanco
@@ -662,15 +773,16 @@ export function ImageUpload({
             </div>
 
             {/* Footer de Acciones */}
-            <div className="p-4 sm:p-5 border-t border-border flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70 shrink-0">
+            <div className="p-4 sm:p-5 border-t border-border flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/80 shrink-0">
               <button
                 type="button"
                 disabled={isUploading}
                 onClick={() => {
-                  setFitMode('contain');
-                  setZoom(0.95);
+                  setFitMode('cover');
+                  setZoom(1.0);
                   setOffsetX(0);
                   setOffsetY(0);
+                  setRotation(0);
                   setBgStyle('blur');
                 }}
                 className="px-3 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-foreground hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5"
@@ -692,7 +804,7 @@ export function ImageUpload({
                   type="button"
                   disabled={isUploading}
                   onClick={handleCropAndSave}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm btn-haptic disabled:opacity-50"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm btn-haptic disabled:opacity-50"
                 >
                   {isUploading ? (
                     <>
