@@ -407,6 +407,68 @@ export async function updateTenantMetadataAction(
   }
 }
 
+/**
+ * Actualiza el catálogo centralizado de puestos / cargos de la empresa (company_roles)
+ * persistido en tenants.metadata.company_roles con validación de seguridad multi-tenant.
+ */
+export async function updateCompanyRolesAction(
+  tenantId: string,
+  roles: string[],
+  actor: ActionActor
+) {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado a la empresa.' };
+    }
+
+    const db = supabaseAdmin;
+    const { data: tenant, error: fetchError } = await db
+      .from('tenants')
+      .select('metadata')
+      .eq('id', tenantId)
+      .single();
+
+    if (fetchError) throw new Error('Error al obtener la empresa: ' + fetchError.message);
+
+    const currentMeta = (tenant?.metadata as any) || {};
+
+    // Normalizar lista de puestos: eliminar duplicados insensibles a mayúsculas/minúsculas y espacios en blanco
+    const seen = new Set<string>();
+    const cleanedRoles: string[] = [];
+
+    for (const r of roles) {
+      const trimmed = (r || '').trim();
+      if (!trimmed) continue;
+      const lower = trimmed.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        cleanedRoles.push(trimmed);
+      }
+    }
+
+    const newMeta = {
+      ...currentMeta,
+      company_roles: cleanedRoles
+    };
+
+    const { data: updated, error: updateError } = await db
+      .from('tenants')
+      .update({ metadata: newMeta })
+      .eq('id', tenantId)
+      .select()
+      .single();
+
+    if (updateError) throw new Error('Error al guardar catálogo de puestos: ' + updateError.message);
+
+    revalidatePath('/equipo');
+    revalidatePath('/dashboard');
+    return { success: true, company_roles: cleanedRoles, tenant: updated };
+  } catch (err: any) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
 export async function getAllTenants(callerOrActor?: ActionActor | string | null, token?: string) {
   try {
     const authCheck = await verifySuperAdminActor(callerOrActor, token);

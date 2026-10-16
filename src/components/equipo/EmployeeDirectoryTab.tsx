@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Entity } from '@/lib/api/entities';
 import { createEntityAction, updateEntityAction, deleteEntityAction, ActionActor } from '@/app/actions/entities';
+import { updateCompanyRolesAction } from '@/app/actions/tenant';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useERPStore } from '@/store/useERPStore';
@@ -23,7 +24,8 @@ import {
   Dog,
   Baby,
   HeartPulse,
-  Check
+  Check,
+  Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -118,6 +120,190 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   };
   
   const [form, setForm] = useState(defaultForm);
+
+  // Catálogo Centralizado de Puestos / Roles de la Empresa
+  const [companyRoles, setCompanyRoles] = useState<string[]>([]);
+  const [isCreatingRoleInline, setIsCreatingRoleInline] = useState(false);
+  const [inlineRoleName, setInlineRoleName] = useState('');
+  const [isManageRolesOpen, setIsManageRolesOpen] = useState(false);
+  const [manageNewRoleInput, setManageNewRoleInput] = useState('');
+  const [isSavingRolesToBackend, setIsSavingRolesToBackend] = useState(false);
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
+
+  // Sincronización reactiva del catálogo de puestos
+  useEffect(() => {
+    const rawTenantRoles: string[] = Array.isArray((currentTenant?.metadata as any)?.company_roles)
+      ? (currentTenant?.metadata as any).company_roles
+      : [];
+
+    const rawEmployeeRoles: string[] = employees
+      .map(e => (e.metadata as any)?.role_title)
+      .filter(Boolean) as string[];
+
+    const defaultSuggestedRoles = [
+      ...(isClinicaActive ? ['Médico General', 'Especialista en Cardiología', 'Ginecólogo Obstetra', 'Pediatra'] : []),
+      ...(isOdontologiaActive ? ['Odontólogo General', 'Ortodoncista', 'Asistente Dental'] : []),
+      ...(isBarberiaActive ? ['Master Barber', 'Barbero Profesional'] : []),
+      ...(isGroomingActive ? ['Groomer Canino', 'Bañador & Estilista'] : []),
+      'Especialista',
+      'Administrador',
+      'Recepcionista'
+    ];
+
+    const set = new Set<string>();
+    const list: string[] = [];
+    const addRole = (r: string) => {
+      const trimmed = (r || '').trim();
+      if (!trimmed || trimmed === 'Espacio / Recurso') return;
+      const lower = trimmed.toLowerCase();
+      if (!set.has(lower)) {
+        set.add(lower);
+        list.push(trimmed);
+      }
+    };
+
+    rawTenantRoles.forEach(addRole);
+    rawEmployeeRoles.forEach(addRole);
+    if (list.length === 0) {
+      defaultSuggestedRoles.forEach(addRole);
+    }
+
+    setCompanyRoles(list);
+  }, [currentTenant?.metadata, employees, isClinicaActive, isOdontologiaActive, isBarberiaActive, isGroomingActive]);
+
+  /**
+   * Asigna el puesto seleccionado al formulario y activa de forma inteligente 
+   * el módulo especializado correspondiente (médico, dental, barbero, groomer)
+   * para evitar inconsistencias o tener que escribir el rol dos veces.
+   */
+  const applyRoleSelection = (roleName: string) => {
+    const trimmed = roleName.trim();
+    if (!trimmed) {
+      setForm(prev => ({ ...prev, roleTitle: '' }));
+      return;
+    }
+
+    const lower = trimmed.toLowerCase();
+    const updates: Partial<typeof form> = {
+      roleTitle: trimmed
+    };
+
+    // Detección Médica / Clínica
+    const isMedRelated = lower.includes('médic') || lower.includes('medic') || lower.includes('doctor') ||
+      lower.includes('cardio') || lower.includes('gineco') || lower.includes('pediatr') ||
+      lower.includes('trauma') || lower.includes('derma') || lower.includes('oftalmo') ||
+      lower.includes('cirujan') || lower.includes('obstetr') || lower.includes('especialista');
+
+    if (isMedRelated && (isClinicaActive || isGinecologiaActive)) {
+      updates.isDoctor = true;
+      if (!form.doctorRole || form.doctorRole === 'Especialista' || form.doctorRole === form.roleTitle) {
+        updates.doctorRole = trimmed;
+      }
+    }
+
+    // Detección Odontología
+    const isDentalRelated = lower.includes('odont') || lower.includes('dentist') || lower.includes('dental') || lower.includes('ortodonc');
+    if (isDentalRelated && isOdontologiaActive) {
+      updates.isDentist = true;
+      if (!form.dentistRole || form.dentistRole === 'Especialista' || form.dentistRole === form.roleTitle) {
+        updates.dentistRole = trimmed;
+      }
+    }
+
+    // Detección Barbería
+    const isBarberRelated = lower.includes('barber') || lower.includes('fade') || lower.includes('navaj');
+    if (isBarberRelated && isBarberiaActive) {
+      updates.isBarber = true;
+      if (!form.barberRole || form.barberRole === 'Especialista' || form.barberRole === form.roleTitle) {
+        updates.barberRole = trimmed;
+      }
+    }
+
+    // Detección Grooming
+    const isGroomerRelated = lower.includes('groom') || lower.includes('canin') || lower.includes('mascot') || lower.includes('bañador');
+    if (isGroomerRelated && isGroomingActive) {
+      updates.isGroomer = true;
+      if (!form.groomerRole || form.groomerRole === 'Especialista' || form.groomerRole === form.roleTitle) {
+        updates.groomerRole = trimmed;
+      }
+    }
+
+    setForm(prev => ({ ...prev, ...updates }));
+  };
+
+  /**
+   * Guarda un nuevo puesto en el catálogo persistido de la empresa
+   */
+  const handleSaveNewCompanyRole = async (newRoleText: string) => {
+    const trimmed = newRoleText.trim();
+    if (!trimmed) {
+      toast({ variant: 'error', title: 'Nombre Requerido', description: 'Por favor escribe el nombre del puesto.' });
+      return;
+    }
+
+    const exists = companyRoles.some(r => r.toLowerCase() === trimmed.toLowerCase());
+    const updatedRoles = exists ? companyRoles : [...companyRoles, trimmed];
+
+    if (!exists) {
+      setCompanyRoles(updatedRoles);
+      setIsSavingRolesToBackend(true);
+      try {
+        const res = await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
+        if (res.success) {
+          toast({ variant: 'success', title: 'Puesto Creado', description: `El puesto "${trimmed}" fue registrado en la empresa.` });
+          if (currentTenant) {
+            useERPStore.getState().setCurrentTenant({
+              ...currentTenant,
+              metadata: {
+                ...(currentTenant.metadata || {}),
+                company_roles: updatedRoles
+              }
+            });
+          }
+        } else {
+          toast({ variant: 'error', title: 'Error al persistir', description: res.error || 'No se pudo guardar el puesto en el servidor.' });
+        }
+      } catch (e: any) {
+        toast({ variant: 'error', title: 'Error de red', description: e.message });
+      } finally {
+        setIsSavingRolesToBackend(false);
+      }
+    }
+
+    applyRoleSelection(trimmed);
+    setInlineRoleName('');
+    setIsCreatingRoleInline(false);
+  };
+
+  /**
+   * Elimina un puesto del catálogo de la empresa
+   */
+  const handleDeleteCompanyRole = async (roleToDelete: string) => {
+    const updatedRoles = companyRoles.filter(r => r.toLowerCase() !== roleToDelete.toLowerCase());
+    setCompanyRoles(updatedRoles);
+    setIsSavingRolesToBackend(true);
+    try {
+      const res = await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
+      if (res.success) {
+        toast({ variant: 'success', title: 'Puesto Retirado', description: `Se retiró "${roleToDelete}" del catálogo de puestos.` });
+        if (currentTenant) {
+          useERPStore.getState().setCurrentTenant({
+            ...currentTenant,
+            metadata: {
+              ...(currentTenant.metadata || {}),
+              company_roles: updatedRoles
+            }
+          });
+        }
+      } else {
+        toast({ variant: 'error', title: 'Error al eliminar', description: res.error });
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Error', description: e.message });
+    } finally {
+      setIsSavingRolesToBackend(false);
+    }
+  };
 
   const openNewModal = () => {
     setEditingId(null);
@@ -413,25 +599,86 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     }
   };
 
+  const filteredEmployees = employees.filter((emp) => {
+    if (selectedRoleFilter === 'ALL') return true;
+    const meta = (emp.metadata || {}) as Record<string, any>;
+    const roleTitle = (meta.role_title as string) || (meta.is_resource ? 'Espacio / Recurso' : 'Especialista');
+    return roleTitle.trim().toLowerCase() === selectedRoleFilter.trim().toLowerCase();
+  });
+
   return (
     <div className="space-y-6">
       {/* Sub-header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
             <Users size={20} className="text-indigo-500" />
             Directorio de Personal
           </h2>
           <p className="text-xs text-slate-500 font-medium mt-0.5">
-            Personal operativo, técnicos y administrativos registrados en la empresa
+            Personal operativo, especialistas y administrativos registrados en la empresa
           </p>
         </div>
 
-        <Button onClick={openNewModal} className="flex items-center gap-2 text-xs font-bold btn-haptic">
-          <Plus size={16} />
-          Nuevo Colaborador
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsManageRolesOpen(true)}
+            className="px-3 py-2 rounded-xl border border-border bg-card hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-bold text-foreground flex items-center gap-1.5 transition-colors shadow-2xs"
+          >
+            <Settings2 size={14} className="text-indigo-500" />
+            <span>Puestos de la Empresa ({companyRoles.length})</span>
+          </button>
+          <Button onClick={openNewModal} className="flex items-center gap-2 text-xs font-bold btn-haptic">
+            <Plus size={16} />
+            Nuevo Colaborador
+          </Button>
+        </div>
       </div>
+
+      {/* Barra de Filtros Rápidos por Puesto */}
+      {employees.length > 0 && companyRoles.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <button
+            type="button"
+            onClick={() => setSelectedRoleFilter('ALL')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+              selectedRoleFilter === 'ALL'
+                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                : 'bg-card text-slate-600 dark:text-slate-300 border-border hover:bg-slate-50 dark:hover:bg-slate-800'
+            }`}
+          >
+            Todos ({employees.length})
+          </button>
+          {companyRoles.map((role) => {
+            const count = employees.filter((e) => {
+              const meta = (e.metadata || {}) as Record<string, any>;
+              const title = (meta.role_title as string) || (meta.is_resource ? 'Espacio / Recurso' : 'Especialista');
+              return title.trim().toLowerCase() === role.trim().toLowerCase();
+            }).length;
+            if (count === 0 && selectedRoleFilter !== role) return null;
+            return (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setSelectedRoleFilter(role)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border flex items-center gap-1.5 ${
+                  selectedRoleFilter === role
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                    : 'bg-card text-slate-600 dark:text-slate-300 border-border hover:bg-slate-50 dark:hover:bg-slate-800'
+                }`}
+              >
+                <span>{role}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  selectedRoleFilter === role ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Grid de Empleados */}
       {employees.length === 0 ? (
@@ -442,9 +689,21 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             Registra tu equipo de trabajo para gestionar citas, comisiones y procesar la nómina.
           </p>
         </div>
+      ) : filteredEmployees.length === 0 ? (
+        <div className="text-center py-12 bg-card border border-dashed border-border rounded-3xl space-y-3">
+          <Users size={32} className="mx-auto text-slate-400 opacity-40" />
+          <p className="text-sm font-bold text-foreground">No hay colaboradores con el puesto "{selectedRoleFilter}"</p>
+          <button
+            type="button"
+            onClick={() => setSelectedRoleFilter('ALL')}
+            className="text-xs font-bold text-indigo-600 hover:underline"
+          >
+            Ver todos los colaboradores
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {employees.map((emp) => {
+          {filteredEmployees.map((emp) => {
             const meta = (emp.metadata || {}) as Record<string, any>;
             const isBookable = meta.bookable !== false;
             const salary = Number(meta.base_salary || meta.salary || 0);
@@ -774,33 +1033,123 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                     </div>
 
                     {!form.isResource ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Input
-                          label="Cargo / Profesión"
-                          value={form.roleTitle}
-                          onChange={(e) => setForm({ ...form, roleTitle: e.target.value })}
-                          placeholder="Ej. Barbero, Masajista"
-                        />
-                        <Input
-                          label="Sueldo Base ($)"
-                          type="number"
-                          value={form.baseSalary === 0 ? '' : form.baseSalary}
-                          onChange={(e) => setForm({ ...form, baseSalary: e.target.value === '' ? 0 : Number(e.target.value) })}
-                          placeholder="0"
-                        />
-                        <div>
-                          <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                            Frecuencia de Pago
-                          </label>
-                          <select
-                            value={form.paymentFrequency}
-                            onChange={(e) => setForm({ ...form, paymentFrequency: e.target.value as any })}
-                            className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
-                          >
-                            <option value="quincenal">Quincenal (Cada 15 días)</option>
-                            <option value="mensual">Mensual (Fin de mes)</option>
-                            <option value="semanal">Semanal (Cada semana)</option>
-                          </select>
+                      <div className="space-y-3">
+                        {/* Selector Centralizado de Puesto / Rol de la Empresa */}
+                        <div className="bg-slate-50 dark:bg-slate-900/40 p-3.5 rounded-2xl border border-border space-y-2">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                              <Briefcase size={14} className="text-indigo-500" />
+                              Puesto / Cargo en la Empresa *
+                            </label>
+                            <div className="flex items-center gap-2">
+                              {!isCreatingRoleInline && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIsCreatingRoleInline(true)}
+                                  className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 flex items-center gap-1 hover:underline"
+                                >
+                                  <Plus size={13} />
+                                  Nuevo Puesto
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setIsManageRolesOpen(true)}
+                                className="text-xs font-bold text-slate-500 hover:text-foreground flex items-center gap-1 hover:underline"
+                              >
+                                <Settings2 size={13} />
+                                Gestionar ({companyRoles.length})
+                              </button>
+                            </div>
+                          </div>
+
+                          {isCreatingRoleInline ? (
+                            <div className="flex items-center gap-2 animate-in fade-in">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={inlineRoleName}
+                                onChange={(e) => setInlineRoleName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveNewCompanyRole(inlineRoleName);
+                                  } else if (e.key === 'Escape') {
+                                    setIsCreatingRoleInline(false);
+                                  }
+                                }}
+                                placeholder="Escribe el nuevo puesto (Ej. Cardiólogo Intervencionista, Barbero Master...)"
+                                className="flex-1 bg-background border border-indigo-500/50 rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleSaveNewCompanyRole(inlineRoleName)}
+                                disabled={isSavingRolesToBackend || !inlineRoleName.trim()}
+                                className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1 shrink-0"
+                              >
+                                <Check size={13} />
+                                Guardar y Asignar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsCreatingRoleInline(false);
+                                  setInlineRoleName('');
+                                }}
+                                className="px-2.5 py-2 text-slate-500 hover:text-foreground rounded-xl text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-800"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="relative">
+                              <select
+                                value={form.roleTitle}
+                                onChange={(e) => {
+                                  if (e.target.value === '__NEW__') {
+                                    setIsCreatingRoleInline(true);
+                                  } else {
+                                    applyRoleSelection(e.target.value);
+                                  }
+                                }}
+                                className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                              >
+                                <option value="">-- Seleccionar puesto registrado --</option>
+                                {form.roleTitle && !companyRoles.some(r => r.toLowerCase() === form.roleTitle.toLowerCase()) && (
+                                  <option value={form.roleTitle}>{form.roleTitle} (Actual)</option>
+                                )}
+                                {companyRoles.map((role) => (
+                                  <option key={role} value={role}>{role}</option>
+                                ))}
+                                <option value="__NEW__" className="font-bold text-indigo-600">+ Crear nuevo puesto...</option>
+                              </select>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Sueldo Base y Frecuencia de Pago */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Input
+                            label="Sueldo Base ($)"
+                            type="number"
+                            value={form.baseSalary === 0 ? '' : form.baseSalary}
+                            onChange={(e) => setForm({ ...form, baseSalary: e.target.value === '' ? 0 : Number(e.target.value) })}
+                            placeholder="0"
+                          />
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                              Frecuencia de Pago
+                            </label>
+                            <select
+                              value={form.paymentFrequency}
+                              onChange={(e) => setForm({ ...form, paymentFrequency: e.target.value as any })}
+                              className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+                            >
+                              <option value="quincenal">Quincenal (Cada 15 días)</option>
+                              <option value="mensual">Mensual (Fin de mes)</option>
+                              <option value="semanal">Semanal (Cada semana)</option>
+                            </select>
+                          </div>
                         </div>
                       </div>
                     ) : (
@@ -1619,6 +1968,127 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 <Trash2 size={14} />
                 {isDeleting ? 'Eliminando...' : 'Sí, Eliminar'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Gestión Centralizada de Puestos y Roles de la Empresa (z-[105]) */}
+      {isManageRolesOpen && (
+        <div className="fixed inset-0 z-[105] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-3xl p-6 w-full max-w-lg shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col">
+            <div className="flex items-start justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20">
+                  <Briefcase size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-foreground">
+                    Catálogo de Puestos de la Empresa
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Estandariza los cargos para que todo el equipo comparta los mismos puestos sin errores de tipeo.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsManageRolesOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Input para agregar nuevo puesto */}
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={manageNewRoleInput}
+                onChange={(e) => setManageNewRoleInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (manageNewRoleInput.trim()) {
+                      handleSaveNewCompanyRole(manageNewRoleInput);
+                      setManageNewRoleInput('');
+                    }
+                  }
+                }}
+                placeholder="Escribe un nuevo puesto (Ej. Dermatólogo, Barbero Senior...)"
+                className="flex-1 bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <Button
+                type="button"
+                onClick={() => {
+                  if (manageNewRoleInput.trim()) {
+                    handleSaveNewCompanyRole(manageNewRoleInput);
+                    setManageNewRoleInput('');
+                  }
+                }}
+                disabled={!manageNewRoleInput.trim() || isSavingRolesToBackend}
+                className="text-xs font-bold shrink-0"
+              >
+                <Plus size={14} className="mr-1" />
+                Agregar
+              </Button>
+            </div>
+
+            {/* Lista de puestos registrados */}
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px]">
+              {companyRoles.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-400">
+                  No hay puestos registrados en la empresa. Crea el primero arriba.
+                </div>
+              ) : (
+                companyRoles.map((role) => {
+                  const assignedCount = employees.filter(e => {
+                    const t = ((e.metadata as any)?.role_title || '').trim().toLowerCase();
+                    return t === role.toLowerCase();
+                  }).length;
+
+                  return (
+                    <div
+                      key={role}
+                      className="flex items-center justify-between p-3 rounded-2xl border border-border bg-slate-50/50 dark:bg-slate-900/30 hover:border-indigo-500/30 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center font-bold text-xs">
+                          💼
+                        </div>
+                        <div>
+                          <span className="text-xs font-bold text-foreground block">{role}</span>
+                          <span className="text-[10px] text-slate-400">
+                            {assignedCount === 1 ? '1 colaborador asignado' : `${assignedCount} colaboradores asignados`}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCompanyRole(role)}
+                          disabled={isSavingRolesToBackend}
+                          title={assignedCount > 0 ? `Atención: Hay ${assignedCount} empleado(s) con este puesto` : 'Eliminar puesto'}
+                          className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-border flex justify-end">
+              <Button
+                type="button"
+                onClick={() => setIsManageRolesOpen(false)}
+                className="text-xs font-bold"
+              >
+                Listo
+              </Button>
             </div>
           </div>
         </div>
