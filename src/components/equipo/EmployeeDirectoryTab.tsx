@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Entity } from '@/lib/api/entities';
 import { createEntityAction, updateEntityAction, deleteEntityAction, ActionActor } from '@/app/actions/entities';
 import { updateCompanyRolesAction } from '@/app/actions/tenant';
@@ -25,7 +25,10 @@ import {
   Baby,
   HeartPulse,
   Check,
-  Settings2
+  Settings2,
+  Pencil,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -120,6 +123,8 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   };
   
   const [form, setForm] = useState(defaultForm);
+  const formRef = useRef<HTMLFormElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Catálogo Centralizado de Puestos / Roles de la Empresa con Íconos Personalizables
   const [companyRoles, setCompanyRoles] = useState<Array<{ name: string; icon: string }>>([]);
@@ -134,8 +139,27 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   const [isManagePickerOpen, setIsManagePickerOpen] = useState(false);
   const [editingRoleIconFor, setEditingRoleIconFor] = useState<string | null>(null);
 
+  // Estado para Renombrar / Editar puesto existente
+  const [editingRoleNameFor, setEditingRoleNameFor] = useState<string | null>(null);
+  const [editingRoleNameInput, setEditingRoleNameInput] = useState('');
+  const [editingRoleIconInput, setEditingRoleIconInput] = useState('💼');
+  const [isEditPickerOpen, setIsEditPickerOpen] = useState(false);
+
   const [isSavingRolesToBackend, setIsSavingRolesToBackend] = useState(false);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState<string>('ALL');
+
+  // Funciones de navegación vertical para usuarios con mouse sin rueda o touchpad fallando
+  const scrollToTop = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const scrollToBottom = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' });
+    }
+  };
 
   // Paleta de Íconos / Emojis Universales para cualquier industria
   const ROLE_ICONS_LIST = [
@@ -225,13 +249,15 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       }
     };
 
+    // Si el tenant ya tiene una lista de puestos guardada en la base de datos, esa es la fuente de verdad estricta.
+    // Esto garantiza que si el usuario borra o edita un puesto, los roles huérfanos de empleados viejos no lo vuelvan a resucitar.
     if (Array.isArray(rawTenantRoles)) {
       rawTenantRoles.forEach(parseAndAdd);
-    }
-    rawEmployeeRoles.forEach(parseAndAdd);
-
-    if (map.size === 0) {
-      defaultSuggestedRoles.forEach(parseAndAdd);
+    } else {
+      rawEmployeeRoles.forEach(parseAndAdd);
+      if (map.size === 0) {
+        defaultSuggestedRoles.forEach(parseAndAdd);
+      }
     }
 
     setCompanyRoles(Array.from(map.values()));
@@ -334,6 +360,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             }
           });
         }
+        onRefresh();
       } else {
         toast({ variant: 'error', title: 'Error al persistir', description: res.error || 'No se pudo guardar el puesto en el servidor.' });
       }
@@ -371,8 +398,81 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
           }
         });
       }
+      onRefresh();
     } catch (e: any) {
       toast({ variant: 'error', title: 'Error', description: e.message });
+    }
+  };
+
+  /**
+   * Renombra un puesto del catálogo y actualiza a los empleados que lo tengan asignado
+   */
+  const handleRenameCompanyRole = async (oldName: string, newName: string, iconText?: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) {
+      toast({ variant: 'error', title: 'Nombre Requerido', description: 'Por favor escribe el nuevo nombre del puesto.' });
+      return;
+    }
+
+    const icon = iconText || inferDefaultIcon(trimmed);
+    const updatedRoles = companyRoles.map(r => 
+      r.name.toLowerCase() === oldName.toLowerCase() ? { name: trimmed, icon } : r
+    );
+
+    setCompanyRoles(updatedRoles);
+    setEditingRoleNameFor(null);
+    setIsSavingRolesToBackend(true);
+
+    try {
+      const res = await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
+      if (res.success) {
+        // Actualizar el role_title de los colaboradores que tenían el nombre anterior
+        const affectedEmployees = employees.filter(e => {
+          const t = ((e.metadata as any)?.role_title || '').trim().toLowerCase();
+          return t === oldName.toLowerCase();
+        });
+
+        for (const emp of affectedEmployees) {
+          try {
+            await updateEntityAction(
+              emp.id,
+              {
+                metadata: {
+                  ...(emp.metadata || {}),
+                  role_title: trimmed
+                }
+              },
+              tenantId,
+              effectiveActor
+            );
+          } catch (updateErr) {
+            console.error('Error actualizando colaborador:', updateErr);
+          }
+        }
+
+        toast({ 
+          variant: 'success', 
+          title: 'Puesto Modificado', 
+          description: `Se actualizó a "${icon} ${trimmed}".` 
+        });
+
+        if (currentTenant) {
+          useERPStore.getState().setCurrentTenant({
+            ...currentTenant,
+            metadata: {
+              ...(currentTenant.metadata || {}),
+              company_roles: updatedRoles
+            }
+          });
+        }
+        onRefresh();
+      } else {
+        toast({ variant: 'error', title: 'Error al modificar', description: res.error || 'No se pudo actualizar el puesto.' });
+      }
+    } catch (e: any) {
+      toast({ variant: 'error', title: 'Error de red', description: e.message });
+    } finally {
+      setIsSavingRolesToBackend(false);
     }
   };
 
@@ -386,6 +486,30 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     try {
       const res = await updateCompanyRolesAction(tenantId, updatedRoles, effectiveActor);
       if (res.success) {
+        // Reasignar a 'Especialista' a los empleados que tenían el puesto eliminado
+        const affectedEmployees = employees.filter(e => {
+          const t = ((e.metadata as any)?.role_title || '').trim().toLowerCase();
+          return t === roleToDelete.toLowerCase();
+        });
+
+        for (const emp of affectedEmployees) {
+          try {
+            await updateEntityAction(
+              emp.id,
+              {
+                metadata: {
+                  ...(emp.metadata || {}),
+                  role_title: updatedRoles[0]?.name || 'Especialista'
+                }
+              },
+              tenantId,
+              effectiveActor
+            );
+          } catch (updateErr) {
+            console.error('Error reasignando colaborador:', updateErr);
+          }
+        }
+
         toast({ variant: 'success', title: 'Puesto Retirado', description: `Se retiró "${roleToDelete}" del catálogo de puestos.` });
         if (currentTenant) {
           useERPStore.getState().setCurrentTenant({
@@ -396,6 +520,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             }
           });
         }
+        onRefresh();
       } else {
         toast({ variant: 'error', title: 'Error al eliminar', description: res.error });
       }
@@ -967,13 +1092,13 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
 
       {/* Modal Ficha Técnica / Nuevo Colaborador (z-[100] para evitar obstrucción con barra de navegación) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden">
           <div 
-            className="bg-card border border-border rounded-3xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[88vh] overflow-hidden my-auto"
+            className="bg-card border border-border rounded-3xl w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col h-[92vh] sm:h-[88vh] max-h-[94vh] overflow-hidden my-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Sticky Header */}
-            <div className="p-5 sm:p-6 border-b border-border bg-card sticky top-0 z-20 flex items-center justify-between">
+            <div className="p-4 sm:p-5 border-b border-border bg-card/95 backdrop-blur-xs shrink-0 flex items-center justify-between z-20">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold border border-indigo-500/20 shrink-0">
                   {form.isResource ? '🏟️' : <Users size={20} />}
@@ -988,21 +1113,33 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-foreground flex items-center justify-center transition-colors"
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={() => formRef.current?.requestSubmit()}
+                  disabled={isSaving}
+                  size="sm"
+                  className="btn-haptic font-bold text-xs shrink-0 shadow-xs"
+                >
+                  {isSaving ? 'Guardando...' : 'Guardar Ficha'}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-foreground flex items-center justify-center transition-colors shrink-0"
+                >
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
-            {/* Sub-tabs dentro de la Ficha Técnica */}
-            <div className="flex border-b border-border bg-slate-50/50 dark:bg-slate-900/50 px-6 gap-2 pt-2">
+            {/* Sub-tabs dentro de la Ficha Técnica (Con scroll horizontal fluido para que nunca se corten) */}
+            <div className="flex border-b border-border bg-slate-50/70 dark:bg-slate-900/70 px-4 sm:px-6 gap-2 pt-2 overflow-x-auto scrollbar-none shrink-0 flex-nowrap">
               <button
                 type="button"
                 onClick={() => setModalTab('datos')}
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
+                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
                   modalTab === 'datos'
                     ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
                     : 'border-transparent text-slate-500 hover:text-foreground'
@@ -1015,7 +1152,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
               <button
                 type="button"
                 onClick={() => setModalTab('horarios')}
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
                   modalTab === 'horarios'
                     ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
                     : 'border-transparent text-slate-500 hover:text-foreground'
@@ -1028,7 +1165,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
               <button
                 type="button"
                 onClick={() => setModalTab('servicios')}
-                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
                   modalTab === 'servicios'
                     ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
                     : 'border-transparent text-slate-500 hover:text-foreground'
@@ -1042,7 +1179,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 <button
                   type="button"
                   onClick={() => setModalTab('modulos')}
-                  className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 whitespace-nowrap ${
+                  className={`pb-3 px-3 text-xs font-bold border-b-2 transition-all flex items-center gap-2 shrink-0 whitespace-nowrap ${
                     modalTab === 'modulos'
                       ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
                       : 'border-transparent text-slate-500 hover:text-foreground'
@@ -1060,8 +1197,35 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             </div>
 
             {/* Modal Body Scrollable */}
-            <form onSubmit={handleSaveEmployee} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 overflow-y-auto space-y-5 flex-1">
+            <form 
+              ref={formRef} 
+              onSubmit={handleSaveEmployee} 
+              className="flex flex-col flex-1 min-h-0 overflow-hidden relative"
+            >
+              {/* Botones de navegación asistida (ideales si el mouse no tiene rueda de scroll) */}
+              <div className="absolute right-4 bottom-20 z-30 flex flex-col gap-1.5 opacity-90 hover:opacity-100 transition-opacity">
+                <button
+                  type="button"
+                  onClick={scrollToTop}
+                  title="Subir al inicio (sin rueda de mouse)"
+                  className="w-8 h-8 rounded-full bg-card/95 border border-border shadow-md flex items-center justify-center text-slate-600 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                >
+                  <ArrowUp size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  title="Bajar al final (sin rueda de mouse)"
+                  className="w-8 h-8 rounded-full bg-card/95 border border-border shadow-md flex items-center justify-center text-slate-600 hover:text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
+                >
+                  <ArrowDown size={14} />
+                </button>
+              </div>
+
+              <div 
+                ref={scrollContainerRef}
+                className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 min-h-0 scrollbar-thin scrollbar-thumb-indigo-200 dark:scrollbar-thumb-indigo-800 hover:scrollbar-thumb-indigo-400"
+              >
                 {/* Banner de Error Visible si la Acción Falla */}
                 {saveError && (
                   <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center justify-between text-rose-700 dark:text-rose-300 text-xs font-semibold animate-in fade-in">
@@ -2066,8 +2230,8 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                 )}
               </div>
 
-              {/* Modal Sticky Footer */}
-              <div className="p-4 sm:p-5 border-t border-border bg-card flex items-center justify-between gap-3 sticky bottom-0 z-20">
+              {/* Modal Sticky Footer (Siempre visible en el viewport sin depender de scroll o rueda de ratón) */}
+              <div className="p-3.5 sm:p-5 border-t border-border bg-card/95 backdrop-blur-xs flex items-center justify-between gap-3 shrink-0 sticky bottom-0 z-20">
                 <div>
                   {editingId ? (
                     <button
@@ -2076,10 +2240,11 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       className="px-3 py-2 rounded-xl text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 border border-red-200 dark:border-red-900/40 flex items-center gap-1.5 transition-colors"
                     >
                       <Trash2 size={14} />
-                      Eliminar Colaborador
+                      <span className="hidden sm:inline">Eliminar Colaborador</span>
+                      <span className="sm:hidden">Eliminar</span>
                     </button>
                   ) : (
-                    <span className="text-[11px] text-slate-400">Todos los campos con * son obligatorios</span>
+                    <span className="text-[11px] text-slate-400 hidden sm:inline">Todos los campos con * son obligatorios</span>
                   )}
                 </div>
 
@@ -2087,11 +2252,11 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-foreground transition-colors"
+                    className="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-foreground transition-colors"
                   >
                     Cancelar
                   </button>
-                  <Button type="submit" disabled={isSaving} className="btn-haptic font-bold text-xs">
+                  <Button type="submit" disabled={isSaving} className="btn-haptic font-bold text-xs shadow-xs">
                     {isSaving ? 'Guardando...' : 'Guardar Ficha Técnica'}
                   </Button>
                 </div>
@@ -2257,7 +2422,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
             </div>
 
             {/* Lista de puestos registrados */}
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[200px]">
+            <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1 max-h-[55vh] scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-700">
               {companyRoles.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-400">
                   No hay puestos registrados en la empresa. Crea el primero arriba.
@@ -2269,7 +2434,83 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                     return t === role.name.toLowerCase();
                   }).length;
 
+                  const isEditingThisRole = editingRoleNameFor === role.name;
                   const isEditingThisIcon = editingRoleIconFor === role.name;
+
+                  if (isEditingThisRole) {
+                    return (
+                      <div
+                        key={role.name}
+                        className="p-3 rounded-2xl border-2 border-indigo-500/60 bg-indigo-50/20 dark:bg-indigo-950/20 space-y-2 animate-in fade-in"
+                      >
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsEditPickerOpen(!isEditPickerOpen)}
+                            className="w-9 h-9 rounded-xl bg-card border border-border flex items-center justify-center text-lg shrink-0 shadow-2xs"
+                            title="Cambiar ícono del puesto"
+                          >
+                            {editingRoleIconInput}
+                          </button>
+                          <input
+                            type="text"
+                            autoFocus
+                            value={editingRoleNameInput}
+                            onChange={(e) => setEditingRoleNameInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleRenameCompanyRole(role.name, editingRoleNameInput, editingRoleIconInput);
+                              } else if (e.key === 'Escape') {
+                                setEditingRoleNameFor(null);
+                              }
+                            }}
+                            className="flex-1 bg-background border border-border rounded-xl px-3 py-1.5 text-xs font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRenameCompanyRole(role.name, editingRoleNameInput, editingRoleIconInput)}
+                            disabled={isSavingRolesToBackend || !editingRoleNameInput.trim()}
+                            className="p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                            title="Guardar nuevo nombre"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingRoleNameFor(null);
+                              setIsEditPickerOpen(false);
+                            }}
+                            className="p-2 text-slate-500 hover:text-foreground hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl text-xs font-bold"
+                            title="Cancelar edición"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+
+                        {isEditPickerOpen && (
+                          <div className="bg-card border border-border rounded-2xl p-2.5 shadow-xl grid grid-cols-6 gap-1 max-h-36 overflow-y-auto">
+                            {ROLE_ICONS_LIST.map((ic) => (
+                              <button
+                                key={ic}
+                                type="button"
+                                onClick={() => {
+                                  setEditingRoleIconInput(ic);
+                                  setIsEditPickerOpen(false);
+                                }}
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm hover:bg-indigo-50 dark:hover:bg-indigo-950/50 ${
+                                  editingRoleIconInput === ic ? 'bg-indigo-100 dark:bg-indigo-900 border border-indigo-400' : ''
+                                }`}
+                              >
+                                {ic}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
 
                   return (
                     <div
@@ -2329,9 +2570,23 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
+                          onClick={() => {
+                            setEditingRoleNameFor(role.name);
+                            setEditingRoleNameInput(role.name);
+                            setEditingRoleIconInput(role.icon);
+                            setIsEditPickerOpen(false);
+                          }}
+                          disabled={isSavingRolesToBackend}
+                          title="Modificar nombre de este puesto"
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
                           onClick={() => handleDeleteCompanyRole(role.name)}
                           disabled={isSavingRolesToBackend}
-                          title={assignedCount > 0 ? `Atención: Hay ${assignedCount} empleado(s) con este puesto` : 'Eliminar puesto'}
+                          title={assignedCount > 0 ? `Eliminar puesto (los ${assignedCount} colaboradores se reasignarán a un puesto estándar)` : 'Eliminar puesto'}
                           className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                         >
                           <Trash2 size={15} />
@@ -2343,7 +2598,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
               )}
             </div>
 
-            <div className="pt-3 border-t border-border flex justify-end">
+            <div className="pt-3 border-t border-border flex justify-end shrink-0">
               <Button
                 type="button"
                 onClick={() => setIsManageRolesOpen(false)}

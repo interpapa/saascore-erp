@@ -347,17 +347,17 @@ export function AppointmentModal({
 
   return (
     <div 
-      className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+      className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden"
       onClick={() => { if (!isSubmitting) onClose(); }}
     >
       <div
-        className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200"
+        className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className={`border-b border-border p-5 sm:p-6 flex items-center justify-between ${type === 'block' ? 'bg-rose-50/70 dark:bg-rose-950/30' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
+        <div className={`shrink-0 border-b border-border p-4 sm:p-5 flex items-center justify-between ${type === 'block' ? 'bg-rose-50/70 dark:bg-rose-950/30' : 'bg-slate-50/50 dark:bg-slate-900/50'}`}>
           <div className="flex items-center gap-3">
             {type === 'block' && (
               <div className="w-10 h-10 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/20 shadow-xs">
@@ -383,13 +383,14 @@ export function AppointmentModal({
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
-          {formError && (
-            <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
-              {formError}
-            </div>
-          )}
+        {/* Form con contenedor con scroll y footer sticky */}
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4">
+            {formError && (
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold">
+                {formError}
+              </div>
+            )}
 
           {/* ======================================================== */}
           {/* VISTA ESPECÍFICA DE BLOQUEO / MANTENIMIENTO               */}
@@ -833,8 +834,8 @@ export function AppointmentModal({
                 </div>
               </div>
 
-              {/* Date, Time & Duration Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Date & Time Row (Duración automática según procedimiento/especialista) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5 flex items-center gap-1.5">
                     <CalendarIcon size={14} className="text-slate-400" /> Fecha
@@ -860,24 +861,6 @@ export function AppointmentModal({
                     onChange={(e) => setTimeStr(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                    Duración (min)
-                  </label>
-                  <select
-                    value={durationMinutes}
-                    onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  >
-                    <option value={15}>15 min</option>
-                    <option value={30}>30 min</option>
-                    <option value={45}>45 min</option>
-                    <option value={60}>1 hora (60 min)</option>
-                    <option value={90}>1.5 horas (90 min)</option>
-                    <option value={120}>2 horas (120 min)</option>
-                  </select>
                 </div>
               </div>
 
@@ -962,13 +945,14 @@ export function AppointmentModal({
               className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
             />
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+        {/* Actions Sticky Footer (Siempre visible sin depender de scroll o rueda de ratón) */}
+        <div className="shrink-0 p-4 sm:px-6 bg-slate-50/90 dark:bg-slate-900/90 border-t border-border flex items-center justify-end gap-3 z-10">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
             >
               Cancelar
             </button>
