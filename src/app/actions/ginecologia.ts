@@ -603,3 +603,266 @@ export async function updateGinecoWorkOrderStepAction(
     return { success: false, error: (err as Error).message };
   }
 }
+
+/**
+ * Guarda un informe ecográfico (Ginecológico u Obstétrico) en el expediente de la paciente.
+ */
+export async function saveGinecoUltrasoundReportAction(
+  tenantId: string,
+  payload: {
+    patientId: string;
+    patientName: string;
+    doctorName: string;
+    reportType: 'ginecologico' | 'obstetrico_i' | 'obstetrico_ii_iii';
+    title: string;
+    reportData: Record<string, any>;
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; reportId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(payload.patientId) || isTemporaryId(payload.patientId)) {
+      return { success: false, error: 'Paciente no válida.' };
+    }
+
+    const { data: record, error: recErr } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        tenant_id: tenantId,
+        entity_id: payload.patientId,
+        record_type: 'gineco_ultrasound',
+        title: `${payload.title} — ${new Date().toLocaleDateString()}`,
+        body: payload.reportData.diagnosticImpression || payload.title,
+        metadata: {
+          ...payload.reportData,
+          reportType: payload.reportType,
+          doctorName: payload.doctorName,
+          date: new Date().toISOString(),
+          source: 'ginecologia_ultrasound',
+        },
+      })
+      .select('id')
+      .single();
+
+    if (recErr) return { success: false, error: recErr.message };
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'ginecologia.ultrasound_saved',
+      target_type: 'entity_record',
+      target_id: record.id,
+      metadata: { patientId: payload.patientId, reportType: payload.reportType },
+    });
+
+    return { success: true, reportId: record.id };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Guarda el registro de exámenes ginecológicos especializados (Citología, Biopsia, Mamografía, Densitometría).
+ */
+export async function saveGinecoExamsRecordAction(
+  tenantId: string,
+  payload: {
+    patientId: string;
+    patientName: string;
+    doctorName: string;
+    examsData: Record<string, any>;
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; recordId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(payload.patientId) || isTemporaryId(payload.patientId)) {
+      return { success: false, error: 'Paciente no válida.' };
+    }
+
+    const { data: record, error: recErr } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        tenant_id: tenantId,
+        entity_id: payload.patientId,
+        record_type: 'gineco_exams',
+        title: `Citología / Exámenes Ginecológicos — ${new Date().toLocaleDateString()}`,
+        body: `Bethesda: ${payload.examsData.cytologyBethesdaCode || 'NILM'} | Biopsia: ${payload.examsData.biopsyLocation || 'N/A'}`,
+        metadata: {
+          ...payload.examsData,
+          doctorName: payload.doctorName,
+          date: new Date().toISOString(),
+          source: 'ginecologia_exams',
+        },
+      })
+      .select('id')
+      .single();
+
+    if (recErr) return { success: false, error: recErr.message };
+
+    return { success: true, recordId: record.id };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Guarda el panel paramétrico de laboratorio obstétrico/ginecológico.
+ */
+export async function saveGinecoLabRecordAction(
+  tenantId: string,
+  payload: {
+    patientId: string;
+    patientName: string;
+    doctorName: string;
+    labData: Record<string, any>;
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; recordId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(payload.patientId) || isTemporaryId(payload.patientId)) {
+      return { success: false, error: 'Paciente no válida.' };
+    }
+
+    const { data: record, error: recErr } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        tenant_id: tenantId,
+        entity_id: payload.patientId,
+        record_type: 'gineco_lab',
+        title: `Parámetros de Laboratorio — ${new Date().toLocaleDateString()}`,
+        body: `Hb: ${payload.labData.hemoglobin || '—'} | VDRL: ${payload.labData.vdrl} | Toxo IgM: ${payload.labData.toxoIgm}`,
+        metadata: {
+          ...payload.labData,
+          doctorName: payload.doctorName,
+          date: new Date().toISOString(),
+          source: 'ginecologia_lab',
+        },
+      })
+      .select('id')
+      .single();
+
+    if (recErr) return { success: false, error: recErr.message };
+
+    return { success: true, recordId: record.id };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Guarda un registro de intervención quirúrgica y honorarios, y opcionalmente crea la orden en Caja POS.
+ */
+export async function saveGinecoSurgeryRecordAction(
+  tenantId: string,
+  payload: {
+    patientId: string;
+    patientName: string;
+    doctorName: string;
+    surgeryData: Record<string, any>;
+    dispatchToPOS?: boolean;
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; surgeryRecordId?: string; posDocumentId?: string; error?: string }> {
+  'use server';
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) return { success: false, error: securityCheck.error };
+
+    if (!isValidUUID(payload.patientId) || isTemporaryId(payload.patientId)) {
+      return { success: false, error: 'Paciente no válida.' };
+    }
+
+    // 1. Guardar en entity_records
+    const { data: record, error: recErr } = await supabaseAdmin
+      .from('entity_records')
+      .insert({
+        tenant_id: tenantId,
+        entity_id: payload.patientId,
+        record_type: 'gineco_surgery',
+        title: `Intervención: ${payload.surgeryData.procedureName} — ${new Date().toLocaleDateString()}`,
+        body: `Clínica: ${payload.surgeryData.clinicName} | Honorarios Totales: $${payload.surgeryData.totalPackagePriceUSD} USD`,
+        metadata: {
+          ...payload.surgeryData,
+          doctorName: payload.doctorName,
+          date: new Date().toISOString(),
+          source: 'ginecologia_surgery',
+        },
+      })
+      .select('id')
+      .single();
+
+    if (recErr) return { success: false, error: recErr.message };
+
+    let posDocumentId: string | undefined = undefined;
+
+    // 2. Si se solicitó despacho a Caja POS, insertar en documents
+    if (payload.dispatchToPOS) {
+      const now = new Date();
+      const docNumber = `QX-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Math.floor(
+        1000 + Math.random() * 9000
+      )}`;
+
+      const { data: doc, error: docErr } = await supabaseAdmin
+        .from('documents')
+        .insert({
+          tenant_id: tenantId,
+          type: 'quotation',
+          document_number: docNumber,
+          entity_id: payload.patientId,
+          subtotal_amount: payload.surgeryData.totalPackagePriceUSD,
+          tax_amount: 0,
+          total_amount: payload.surgeryData.totalPackagePriceUSD,
+          status: 'draft',
+          metadata: {
+            source: 'ginecologia_surgery',
+            specialty_name: 'Ginecología Quirúrgica',
+            doctor_name: payload.doctorName,
+            patient_name: payload.patientName,
+            procedure_name: payload.surgeryData.procedureName,
+            clinic_name: payload.surgeryData.clinicName,
+            cart_lines: [
+              {
+                id: payload.surgeryData.procedureId,
+                name: payload.surgeryData.procedureName,
+                price: payload.surgeryData.totalPackagePriceUSD,
+                quantity: 1,
+                total: payload.surgeryData.totalPackagePriceUSD,
+                category: 'Cirugía / Pabellón',
+              },
+            ],
+            surgical_fee_breakdown: {
+              surgeon: payload.surgeryData.surgeonFeeUSD,
+              assistant: payload.surgeryData.assistantFeeUSD,
+              anesthesiologist: payload.surgeryData.anesthesiologistFeeUSD,
+              pediatrician: payload.surgeryData.pediatricianFeeUSD,
+              instrumentist: payload.surgeryData.instrumentistFeeUSD,
+            },
+            notes: payload.surgeryData.notes,
+          },
+        })
+        .select('id')
+        .single();
+
+      if (!docErr && doc) {
+        posDocumentId = doc.id;
+      }
+    }
+
+    return { success: true, surgeryRecordId: record.id, posDocumentId };
+  } catch (err: unknown) {
+    return { success: false, error: (err as Error).message };
+  }
+}
+

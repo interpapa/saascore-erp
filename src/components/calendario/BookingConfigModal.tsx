@@ -5,7 +5,7 @@ import { updateBookingConfigAction } from '@/app/actions/booking';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
-import { Palette, MessageCircle, Clock, Save, X, DollarSign, Image as ImageIcon, Sparkles, Check } from 'lucide-react';
+import { Palette, MessageCircle, Clock, Save, X, DollarSign, Image as ImageIcon, Sparkles, Check, QrCode, Download, Share2, Phone, ExternalLink } from 'lucide-react';
 import { PRESET_PUBLIC_THEMES, normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
 
 export function BookingConfigModal({ 
@@ -126,6 +126,120 @@ export function BookingConfigModal({
 
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           
+          {/* Código QR y Enlace Directo para Clientes */}
+          {(() => {
+            const bookingPublicUrl = typeof window !== 'undefined' && tenant?.id
+              ? `${window.location.origin}/reservas/${tenant.id}`
+              : `https://rendorp.com/reservas/${tenant?.id || ''}`;
+            
+            return (
+              <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-slate-50 dark:to-slate-900/40 p-5 rounded-2xl border border-emerald-500/30 space-y-4">
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  <div className="p-3 bg-white rounded-2xl shadow-md border border-emerald-200 shrink-0">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(bookingPublicUrl)}`}
+                      alt="QR de Reservas"
+                      className="w-28 h-28 object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 space-y-2 text-center sm:text-left">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-bold">
+                      <QrCode className="w-3.5 h-3.5" />
+                      Código QR de Reservas
+                    </div>
+                    <h3 className="font-black text-slate-800 dark:text-slate-100 text-base leading-tight">
+                      Comparte el Acceso a Citas en Línea
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Tus pacientes pueden escanear este código con su teléfono para reservar cita directamente en tu clínica.
+                    </p>
+                    
+                    {/* Enlace copiable */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-300 font-mono">
+                      <span className="flex-1 truncate">{bookingPublicUrl}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(bookingPublicUrl);
+                          toast({ variant: 'success', title: '¡Enlace copiado!', description: 'Listo para pegar en redes o WhatsApp.' });
+                        }}
+                        className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-emerald-600 font-bold transition-colors shrink-0"
+                        title="Copiar Link"
+                      >
+                        <Share2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botones de Acción */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(bookingPublicUrl)}`;
+                        const response = await fetch(qrUrl);
+                        const blob = await response.blob();
+                        const blobUrl = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.href = blobUrl;
+                        link.download = `QR_Reservas_${tenant?.name || 'Citas'}.png`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(blobUrl);
+                        toast({ variant: 'success', title: 'QR Descargado', description: 'Imagen PNG guardada en tu equipo.' });
+                      } catch {
+                        window.open(`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(bookingPublicUrl)}`, '_blank');
+                      }
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Descargar PNG
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(bookingPublicUrl);
+                      toast({ variant: 'success', title: '¡Enlace copiado!', description: 'URL de reservas copiada al portapapeles.' });
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 text-slate-700 dark:text-slate-200 text-xs font-bold transition-colors"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    Copiar Link
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const text = encodeURIComponent(`¡Hola! Puedes reservar tu cita médica en línea fácilmente desde aquí:\n${bookingPublicUrl}`);
+                      window.open(`https://wa.me/?text=${text}`, '_blank');
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 text-xs font-bold transition-colors"
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    WhatsApp
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.open(bookingPublicUrl, '_blank');
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold transition-colors"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    Ver Portal
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* Identidad de Marca y Portada Pública */}
           <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
             <h3 className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 text-sm">

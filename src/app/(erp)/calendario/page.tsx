@@ -36,6 +36,7 @@ import {
 import { BookingConfigModal } from '@/components/calendario/BookingConfigModal';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 import { supabase } from '@/lib/supabase';
+import { QrCode, Settings } from 'lucide-react';
 
 export default function CalendarioPage() {
   const currentTenant = useTenantResolver();
@@ -439,27 +440,39 @@ export default function CalendarioPage() {
           </p>
         </div>
         
-        {/* Botón de Link Público y Configuración */}
+        {/* Botones de QR, Enlace Público y Configuración */}
         <div className="flex items-center gap-2 flex-wrap">
           {currentTenant && (
             <>
               <button 
                 onClick={() => setIsConfigModalOpen(true)}
-                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
-                title="Configurar Horarios de Reserva"
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-sm"
+                title="Ver y Descargar Código QR de Reservas para Clientes"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                <QrCode className="w-4 h-4" />
+                <span>QR de Citas</span>
               </button>
+
+              <button 
+                onClick={() => setIsConfigModalOpen(true)}
+                className="flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
+                title="Configuración de Página Pública, Horarios y Tema"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Configuración</span>
+              </button>
+
               <button 
                 onClick={() => {
                   const url = `${window.location.origin}/reservas/${currentTenant.id}`;
                   navigator.clipboard.writeText(url);
                   toast({ variant: 'success', title: '¡Enlace copiado!', description: 'El enlace público de reservas ha sido copiado al portapapeles.' });
                 }}
-                className="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400 px-4 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
+                className="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 px-3.5 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm"
+                title="Copiar Link para enviar a clientes o publicar en redes"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                Copiar Enlace
+                <span className="hidden sm:inline">Copiar Enlace</span>
               </button>
             </>
           )}
