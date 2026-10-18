@@ -46,7 +46,7 @@ import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 /* ─────────────────────────────────────────────
    Tipos del Dominio de BI
 ───────────────────────────────────────────── */
-export type PeriodType = 'today' | 'week' | 'month' | 'year' | 'all';
+export type PeriodType = 'today' | 'week' | 'month' | 'year' | 'all' | 'custom';
 export type TabType = 'overview' | 'sales' | 'inventory' | 'operations';
 
 interface KPICardProps {
@@ -132,7 +132,12 @@ interface TopProfitableProductStat {
 /* ─────────────────────────────────────────────
    Helper: Filtrado por Período
 ───────────────────────────────────────────── */
-function isDateInPeriod(dateStr: string | null | undefined, period: PeriodType): boolean {
+function isDateInPeriod(
+  dateStr: string | null | undefined,
+  period: PeriodType,
+  customStart?: string,
+  customEnd?: string
+): boolean {
   if (!dateStr) return false;
   if (period === 'all') return true;
   const d = new Date(dateStr);
@@ -155,6 +160,12 @@ function isDateInPeriod(dateStr: string | null | undefined, period: PeriodType):
   }
   if (period === 'year') {
     return d.getFullYear() === now.getFullYear();
+  }
+  if (period === 'custom') {
+    if (!customStart || !customEnd) return true;
+    const start = new Date(customStart + 'T00:00:00');
+    const end = new Date(customEnd + 'T23:59:59');
+    return d >= start && d <= end;
   }
   return true;
 }
@@ -251,6 +262,14 @@ export default function EstadisticasPage() {
   const actor = useActionActor();
 
   const [period, setPeriod] = useState<PeriodType>('month');
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [customEndDate, setCustomEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0];
+  });
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -362,9 +381,35 @@ export default function EstadisticasPage() {
      Cálculos Fácticos y Análisis de Negocio (Zero-Fake)
   ───────────────────────────────────────────── */
   const metrics = useMemo(() => {
+    // 0. Métricas de HOY (Facturación de Hoy vs Compras/Gastos de Hoy)
+    const todayInvoices = rawInvoices.filter((inv) =>
+      isDateInPeriod(inv.issue_date || inv.created_at, 'today')
+    );
+    const validTodayInvoices = todayInvoices.filter(
+      (inv) => inv.status === 'invoiced' || inv.status === 'paid'
+    );
+    const todayRevenue = validTodayInvoices.reduce((sum, inv) => {
+      const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+    const todaySalesCount = validTodayInvoices.length;
+
+    const todayPOs = rawPOs.filter((po) =>
+      isDateInPeriod(po.issue_date || po.created_at, 'today') && po.status !== 'annulled'
+    );
+    const todaySpent = todayPOs.reduce((sum, po) => {
+      const linesTotal = (po.lines || []).reduce(
+        (acc: number, l: any) => acc + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0),
+        0
+      );
+      const amt = linesTotal > 0 ? linesTotal : Number(po.total_amount || 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+    const todayPurchasesCount = todayPOs.length;
+
     // 1. Facturas y Ventas del período seleccionado
     const periodInvoices = rawInvoices.filter((inv) =>
-      isDateInPeriod(inv.issue_date || inv.created_at, period)
+      isDateInPeriod(inv.issue_date || inv.created_at, period, customStartDate, customEndDate)
     );
     const validInvoices = periodInvoices.filter(
       (inv) => inv.status === 'invoiced' || inv.status === 'paid'
@@ -674,7 +719,7 @@ export default function EstadisticasPage() {
 
     // 8. Citas y Operaciones Reales
     const periodAppointments = rawAppointments.filter((a) =>
-      isDateInPeriod(a.created_at || (a as any).date || (a as any).start_time, period)
+      isDateInPeriod(a.created_at || (a as any).date || (a as any).start_time, period, customStartDate, customEndDate)
     );
     const totalAppointments = periodAppointments.length;
     const completedAppointments = periodAppointments.filter((a) => a.status === 'completed').length;
@@ -691,7 +736,7 @@ export default function EstadisticasPage() {
 
     // 9. Asistencia de Colaboradores en el Período
     const periodAttendanceLogs = rawAttendanceLogs.filter((log) =>
-      isDateInPeriod(log.created_at, period)
+      isDateInPeriod(log.created_at, period, customStartDate, customEndDate)
     );
 
     // 10. Agrupación Cronológica Real de Ventas para el Gráfico SVG
@@ -709,7 +754,7 @@ export default function EstadisticasPage() {
         const hour = d.getHours();
         key = `${hour.toString().padStart(2, '0')}:00`;
         label = key;
-      } else if (period === 'week' || period === 'month') {
+      } else if (period === 'week' || period === 'month' || period === 'custom') {
         key = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
         label = `${d.getDate()} ${d.toLocaleDateString('es', { month: 'short' })}`;
       } else {
@@ -738,6 +783,10 @@ export default function EstadisticasPage() {
       .slice(0, 8);
 
     return {
+      todayRevenue,
+      todaySalesCount,
+      todaySpent,
+      todayPurchasesCount,
       periodInvoicesCount: periodInvoices.length,
       validInvoicesCount: validInvoices.length,
       totalRevenue,
@@ -791,6 +840,8 @@ export default function EstadisticasPage() {
     rawAttendanceLogs,
     accountingIncome,
     period,
+    customStartDate,
+    customEndDate,
   ]);
 
   /* ─────────────────────────────────────────────
@@ -908,34 +959,60 @@ export default function EstadisticasPage() {
       {/* ── Selector de Período y Pestañas de Dominio ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Selector de Período Temporal */}
-        <div className="inline-flex p-1 bg-muted/60 border border-border rounded-xl">
-          {(
-            [
-              { id: 'today', label: 'Hoy' },
-              { id: 'week', label: 'Esta Semana' },
-              { id: 'month', label: 'Este Mes' },
-              { id: 'year', label: 'Este Año' },
-              { id: 'all', label: 'Histórico' },
-            ] as const
-          ).map((p) => {
-            const active = period === p.id;
-            return (
-              <button
-                key={p.id}
-                onClick={() => setPeriod(p.id)}
-                className={`
-                  px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all
-                  ${
-                    active
-                      ? 'bg-card text-foreground shadow-xs border border-border/80'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }
-                `}
-              >
-                {p.label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex p-1 bg-muted/60 border border-border rounded-xl">
+            {(
+              [
+                { id: 'today', label: 'Hoy' },
+                { id: 'week', label: 'Esta Semana' },
+                { id: 'month', label: 'Este Mes' },
+                { id: 'year', label: 'Este Año' },
+                { id: 'all', label: 'Histórico' },
+                { id: 'custom', label: 'Personalizado' },
+              ] as const
+            ).map((p) => {
+              const active = period === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setPeriod(p.id)}
+                  className={`
+                    px-3 py-1.5 text-xs font-semibold rounded-lg transition-all
+                    ${
+                      active
+                        ? 'bg-card text-foreground shadow-xs border border-border/80'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }
+                  `}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {period === 'custom' && (
+            <div className="flex items-center gap-2 p-1.5 bg-card border border-border rounded-xl text-xs animate-in fade-in duration-150 shadow-2xs">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Desde:</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="bg-background border border-border rounded-lg px-2 py-0.5 text-xs text-foreground font-mono"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Hasta:</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="bg-background border border-border rounded-lg px-2 py-0.5 text-xs text-foreground font-mono"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Pestañas de Dominio (Adaptativas a Módulos Habilitados) */}
@@ -1040,19 +1117,53 @@ export default function EstadisticasPage() {
       ───────────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <section className="space-y-6">
-          {/* Tarjetas KPI Superiores: Rendimiento Comercial & Financiero */}
+          {/* Fila 1: Rendimiento Comercial de HOY (Vendido Hoy y Gastado Hoy de primero) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard
-              label="Ingresos Facturados"
-              value={fmt(metrics.totalRevenue)}
-              subValue={`${metrics.validInvoicesCount} facturas cobradas`}
-              trend={metrics.totalRevenue > 0 ? 'up' : 'neutral'}
+              label="Vendido Hoy"
+              value={fmt(metrics.todayRevenue)}
+              subValue={`${metrics.todaySalesCount} venta(s) cobradas hoy`}
+              trend={metrics.todayRevenue > 0 ? 'up' : 'neutral'}
               icon={<DollarSign size={20} />}
               accentColor="var(--success)"
               accentBg="var(--success-50)"
               onClick={hasCaja ? () => router.push('/caja') : undefined}
               linkLabel={hasCaja ? 'Ver Caja POS' : undefined}
             />
+            <KPICard
+              label="Gastado Hoy"
+              value={fmt(metrics.todaySpent)}
+              subValue={`${metrics.todayPurchasesCount} compra(s) registradas hoy`}
+              trend={metrics.todaySpent > 0 ? 'down' : 'neutral'}
+              icon={<ShoppingCart size={20} />}
+              accentColor="#ef4444"
+              accentBg="rgba(239, 68, 68, 0.1)"
+              onClick={hasCompras ? () => router.push('/compras') : undefined}
+              linkLabel={hasCompras ? 'Ver Compras' : undefined}
+            />
+            <KPICard
+              label={period === 'custom' ? 'Ingresos en Período' : 'Ingresos Facturados'}
+              value={fmt(metrics.totalRevenue)}
+              subValue={`${metrics.validInvoicesCount} facturas cobradas`}
+              trend={metrics.totalRevenue > 0 ? 'up' : 'neutral'}
+              icon={<TrendingUp size={20} />}
+              accentColor="var(--primary)"
+              accentBg="var(--primary-50)"
+              onClick={hasCaja ? () => router.push('/caja') : undefined}
+              linkLabel={hasCaja ? 'Ver Caja POS' : undefined}
+            />
+            <KPICard
+              label="Rentabilidad Real de Venta"
+              value={`${metrics.realGrossMarginPct.toFixed(1)}%`}
+              subValue={`Utilidad: +${fmt(metrics.realGrossProfit)} s/ ventas`}
+              trend={metrics.realGrossMarginPct >= 20 ? 'up' : 'neutral'}
+              icon={<TrendingUp size={20} />}
+              accentColor="var(--success)"
+              accentBg="var(--success-50)"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard
               label="Promedio de Ventas Diarias"
               value={`${fmt(metrics.dailySalesAverage)}/día`}
@@ -1071,18 +1182,6 @@ export default function EstadisticasPage() {
               accentColor="var(--primary)"
               accentBg="var(--primary-50)"
             />
-            <KPICard
-              label="Rentabilidad Real de Venta"
-              value={`${metrics.realGrossMarginPct.toFixed(1)}%`}
-              subValue={`Utilidad: +${fmt(metrics.realGrossProfit)} s/ ventas`}
-              trend={metrics.realGrossMarginPct >= 20 ? 'up' : 'neutral'}
-              icon={<TrendingUp size={20} />}
-              accentColor="var(--success)"
-              accentBg="var(--success-50)"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard
               label="Día Pico de Ventas"
               value={metrics.peakDay?.amount ? metrics.peakDay.dayName : 'N/A'}
@@ -1171,29 +1270,35 @@ export default function EstadisticasPage() {
                   </div>
                 ) : (
                   <div className="relative pt-6 pb-2">
-                    <div className="h-44 w-full flex items-end gap-2 sm:gap-4 px-2">
+                    <div className="h-48 w-full flex items-end gap-1.5 sm:gap-4 px-2">
                       {metrics.buckets.map((b, idx) => {
                         const heightPercent =
                           maxBucketAmount > 0 ? Math.round((b.amount / maxBucketAmount) * 100) : 0;
                         return (
                           <div
                             key={idx}
-                            className="flex-1 flex flex-col items-center gap-2 h-full justify-end group relative"
+                            className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group relative cursor-pointer"
                           >
-                            <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-[10px] font-semibold py-1 px-2 rounded shadow-lg pointer-events-none whitespace-nowrap z-20">
+                            {/* Monto siempre visible (solución para móvil y pantallas táctiles) */}
+                            {b.amount > 0 && (
+                              <span className="text-[9px] sm:text-[10px] font-bold text-foreground font-mono truncate w-full text-center">
+                                ${Math.round(b.amount)}
+                              </span>
+                            )}
+                            <div className="absolute -top-10 opacity-0 group-hover:opacity-100 transition-opacity bg-foreground text-background text-[10px] font-semibold py-1 px-2 rounded-lg shadow-lg pointer-events-none whitespace-nowrap z-20">
                               {b.label}: {fmt(b.amount)} ({b.count} ventas)
                             </div>
                             <div
-                              className="w-full rounded-t-md transition-all duration-300 group-hover:brightness-110"
+                              className="w-full rounded-t-md transition-all duration-300 group-hover:brightness-110 min-h-1"
                               style={{
-                                height: `${Math.max(heightPercent, 6)}%`,
+                                height: `${Math.max(heightPercent, b.amount > 0 ? 8 : 4)}%`,
                                 background:
                                   b.amount > 0
                                     ? 'linear-gradient(180deg, var(--primary) 0%, rgba(99, 102, 241, 0.4) 100%)'
                                     : 'var(--muted)',
                               }}
                             />
-                            <span className="text-[10px] font-medium text-muted-foreground truncate w-full text-center">
+                            <span className="text-[9px] sm:text-[10px] font-medium text-muted-foreground truncate w-full text-center">
                               {b.label}
                             </span>
                           </div>

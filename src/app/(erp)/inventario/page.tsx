@@ -868,6 +868,7 @@ export default function InventarioPage() {
                 const isOut = item.type === 'product' && stock <= 0;
                 const profitUnit = Math.max(0, price - cost);
                 const marginPct = price > 0 ? ((profitUnit / price) * 100).toFixed(0) : '0';
+                const itemImage = item.metadata?.image_url || (item as any).image_url;
 
                 return (
                   <div
@@ -876,6 +877,21 @@ export default function InventarioPage() {
                     className="bg-card border border-border rounded-2xl p-5 flex flex-col justify-between hover:border-primary/50 hover:shadow-md transition-all cursor-pointer group relative overflow-hidden animate-in fade-in duration-200"
                   >
                     <div>
+                      {/* Imagen / Foto del Producto */}
+                      {itemImage && (
+                        <div className="w-full h-36 rounded-xl overflow-hidden border border-border/60 bg-slate-100 dark:bg-slate-900 mb-3 relative">
+                          <img
+                            src={itemImage}
+                            alt={item.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            onError={(e) => {
+                              const parent = (e.target as HTMLElement).parentElement;
+                              if (parent) parent.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+
                       {/* Fila Superior: Categoría y Badge de Stock */}
                       <div className="flex justify-between items-start mb-2.5">
                         <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 truncate max-w-[140px]">
@@ -1021,10 +1037,28 @@ export default function InventarioPage() {
                           {item.sku || '-'}
                         </td>
                         <td className="p-3.5">
-                          <span className="font-bold text-foreground text-sm block">{item.name}</span>
-                          {item.metadata?.brand && (
-                            <span className="text-[10px] text-slate-400">{item.metadata.brand}</span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {item.metadata?.image_url || (item as any).image_url ? (
+                              <img
+                                src={item.metadata?.image_url || (item as any).image_url}
+                                alt={item.name}
+                                className="w-9 h-9 rounded-lg object-cover border border-border/80 shrink-0 bg-slate-100 dark:bg-slate-800"
+                                onError={(e) => {
+                                  (e.target as HTMLElement).style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-800 border border-border/60 flex items-center justify-center text-slate-400 shrink-0">
+                                <Package size={16} />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="font-bold text-foreground text-sm block truncate">{item.name}</span>
+                              {item.metadata?.brand && (
+                                <span className="text-[10px] text-slate-400 block truncate">{item.metadata.brand}</span>
+                              )}
+                            </div>
+                          </div>
                         </td>
                         <td className="p-3.5 text-slate-500 font-semibold">{item.category || 'General'}</td>
                         <td className="p-3.5 text-slate-500 font-medium">

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { X, Package, Tag, DollarSign, Archive, Check, MapPin, Building2, Barcode, TrendingUp, AlertTriangle, Layers, Clock, Sparkles } from 'lucide-react';
+import { X, Package, Tag, DollarSign, Archive, Check, MapPin, Building2, Barcode, TrendingUp, AlertTriangle, Layers, Clock, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { CreateItemInput } from '@/lib/api/items';
@@ -24,6 +24,7 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
   const [wholesalePrice, setWholesalePrice] = useState<number>(0);
   const [wholesaleMinQty, setWholesaleMinQty] = useState<number>(3);
   const [costPrice, setCostPrice] = useState<number>(0);
+  const [imageUrl, setImageUrl] = useState<string>('');
 
   useEffect(() => {
     if (editItem) {
@@ -32,12 +33,14 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
       setWholesalePrice(Number(editItem.metadata?.wholesale_price || 0));
       setWholesaleMinQty(Number(editItem.metadata?.wholesale_min_qty || 3));
       setCostPrice(Number(editItem.cost || 0));
+      setImageUrl(editItem.metadata?.image_url || editItem.image_url || '');
     } else {
       setItemType('product');
       setSalePrice(0);
       setWholesalePrice(0);
       setWholesaleMinQty(3);
       setCostPrice(0);
+      setImageUrl('');
       setActiveFormTab('general');
     }
   }, [editItem, isOpen]);
@@ -119,6 +122,7 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
         is_group_session: isGroupSession,
         max_capacity: maxCapacity,
         buffer_time_minutes: bufferTimeMinutes,
+        image_url: imageUrl.trim() || null,
       },
       is_active: true
     };
@@ -311,6 +315,57 @@ export function CatalogModal({ isOpen, onClose, onSave, editItem }: CatalogModal
                 placeholder={itemType === 'service' ? 'Detalles de lo que incluye el procedimiento o indicaciones al paciente...' : 'Especificaciones, compatibilidad o notas para el mostrador...'}
                 className="w-full bg-background border border-border rounded-xl p-3 text-sm focus:outline-hidden focus:ring-2 focus:ring-primary/20"
               />
+            </div>
+
+            {/* Logo / Imagen del Producto o Servicio */}
+            <div className="p-3 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-border space-y-2">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <ImageIcon size={15} className="text-primary" />
+                  Logo / Foto del Producto o Servicio
+                </span>
+                {imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setImageUrl('')}
+                    className="text-[10px] text-rose-500 font-bold hover:underline"
+                  >
+                    Quitar foto
+                  </button>
+                )}
+              </label>
+
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://images.unsplash.com/... o enlace de imagen directo"
+                    className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20 font-mono"
+                  />
+                </div>
+
+                {imageUrl ? (
+                  <div className="relative w-12 h-12 rounded-xl border border-border overflow-hidden bg-white dark:bg-slate-800 shrink-0 shadow-xs">
+                    <img
+                      src={imageUrl}
+                      alt="Vista previa"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLElement).style.opacity = '0.3';
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 rounded-xl border border-dashed border-border flex items-center justify-center text-slate-400 bg-background shrink-0">
+                    <ImageIcon size={18} />
+                  </div>
+                )}
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Pega la URL del logo o foto para visualizarlo en el punto de venta (Caja POS) y en el catálogo de inventario.
+              </p>
             </div>
           </div>
 

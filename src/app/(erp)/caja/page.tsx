@@ -146,7 +146,8 @@ function CajaPageContent() {
   const [cashTenderedUSD, setCashTenderedUSD] = useState<string>('');
   const [cashTenderedVES, setCashTenderedVES] = useState<string>('');
   
-  const [mixedPayments, setMixedPayments] = useState({ cash: 0, card: 0, transfer: 0 });
+  const [mixedPayments, setMixedPayments] = useState({ cash: 0, card: 0, transfer: 0, credit: 0 });
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [selectedBankAccountId, setSelectedBankAccountId] = useState<string>('');
 
   // Acordeón de Entrega / Despacho Opcional
@@ -784,7 +785,7 @@ function CajaPageContent() {
   const changeDueVES_in_USD = currentRate > 0 ? changeDueVES / currentRate : 0;
 
   // Validación de Pago Mixto
-  const remainingToAssign = total - (mixedPayments.cash + mixedPayments.card + mixedPayments.transfer);
+  const remainingToAssign = total - (mixedPayments.cash + mixedPayments.card + mixedPayments.transfer + (mixedPayments.credit || 0));
 
   // Auto-prellenar monto de cobro con el total de venta si no ha sido editado
   useEffect(() => {
@@ -841,6 +842,22 @@ function CajaPageContent() {
   };
 
   const selectedCustomerObj = customers.find((c) => c.id === selectedCustomer);
+
+  // Filtrado de clientes por nombre, cédula o teléfono
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearchQuery.trim()) return customers;
+    const q = customerSearchQuery.toLowerCase().trim();
+    const cleanQ = q.replace(/[^a-z0-9]/gi, '');
+    return customers.filter((c) => {
+      const nameMatch = c.name?.toLowerCase().includes(q);
+      const taxMatch = c.tax_id?.toLowerCase().includes(q) || (c.tax_id && c.tax_id.replace(/[^a-z0-9]/gi, '').includes(cleanQ));
+      const phoneMatch = c.phone?.includes(q);
+      const metaCedula = c.metadata?.cedula ? String(c.metadata.cedula).toLowerCase() : '';
+      const metaDni = c.metadata?.dni ? String(c.metadata.dni).toLowerCase() : '';
+      const metaCi = c.metadata?.ci ? String(c.metadata.ci).toLowerCase() : '';
+      return nameMatch || taxMatch || phoneMatch || metaCedula.includes(q) || metaDni.includes(q) || metaCi.includes(q);
+    });
+  }, [customers, customerSearchQuery]);
 
   // Gestión de Tickets en Espera (Park / Hold Cart)
   const holdCurrentTicket = () => {
@@ -932,7 +949,7 @@ function CajaPageContent() {
         token: session?.token,
       };
 
-      if (paymentMethod === 'credit' && selectedCustomer === 'generic_counter_customer') {
+      if ((paymentMethod === 'credit' || (paymentMethod === 'mixed' && (mixedPayments.credit || 0) > 0)) && selectedCustomer === 'generic_counter_customer') {
         toast({
           variant: 'warning',
           title: 'Cliente Requerido para Crédito',
@@ -953,6 +970,7 @@ function CajaPageContent() {
         ...(mixedPayments.cash > 0 ? [{ method: 'cash' as const, amount: mixedPayments.cash }] : []),
         ...(mixedPayments.card > 0 ? [{ method: 'card' as const, amount: mixedPayments.card }] : []),
         ...(mixedPayments.transfer > 0 ? [{ method: 'transfer' as const, amount: mixedPayments.transfer }] : []),
+        ...(mixedPayments.credit > 0 ? [{ method: 'credit' as const, amount: mixedPayments.credit }] : []),
       ] : undefined;
 
       const deliveryPayload = showDeliveryAccordion && deliveryAddress ? {
@@ -1443,6 +1461,7 @@ function CajaPageContent() {
                   const isLowStock = item.type === 'product' && stockVal > 0 && stockVal <= 3;
                   const priceUSD = Number(item.base_price || 0);
                   const priceVES = priceUSD * currentRate;
+                  const itemImage = item.metadata?.image_url || (item as any).image_url;
 
                   return (
                     <div
@@ -1454,6 +1473,21 @@ function CajaPageContent() {
                           : 'border-border bg-card hover:border-indigo-500 hover:shadow-md cursor-pointer hover:-translate-y-0.5 active:scale-98'
                       }`}
                     >
+                      {/* Imagen / Foto del Producto */}
+                      {itemImage && (
+                        <div className="w-full h-24 rounded-xl overflow-hidden border border-border/50 bg-slate-100 dark:bg-slate-900 mb-2.5 relative shrink-0">
+                          <img
+                            src={itemImage}
+                            alt={item.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            onError={(e) => {
+                              const parent = (e.target as HTMLElement).parentElement;
+                              if (parent) parent.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+
                       {/* Stock Badge */}
                       {item.type === 'product' && (
                         <span
@@ -1509,6 +1543,7 @@ function CajaPageContent() {
                   const isOutOfStock = item.type === 'product' && stockVal <= 0;
                   const priceUSD = Number(item.base_price || 0);
                   const priceVES = priceUSD * currentRate;
+                  const itemImage = item.metadata?.image_url || (item as any).image_url;
 
                   return (
                     <div
@@ -1520,13 +1555,25 @@ function CajaPageContent() {
                           : 'border-border bg-card hover:border-indigo-500 cursor-pointer hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20'
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <span className="font-bold text-foreground block truncate">{item.name}</span>
-                        <span className="text-[10px] text-slate-400 flex items-center gap-2">
-                          <span>{item.sku || 'Sin SKU'}</span>
-                          <span>•</span>
-                          <span>{item.category || 'General'}</span>
-                        </span>
+                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                        {itemImage && (
+                          <img
+                            src={itemImage}
+                            alt={item.name}
+                            className="w-9 h-9 rounded-lg object-cover border border-border/60 shrink-0 bg-slate-100 dark:bg-slate-800"
+                            onError={(e) => {
+                              (e.target as HTMLElement).style.display = 'none';
+                            }}
+                          />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <span className="font-bold text-foreground block truncate">{item.name}</span>
+                          <span className="text-[10px] text-slate-400 flex items-center gap-2">
+                            <span>{item.sku || 'Sin SKU'}</span>
+                            <span>•</span>
+                            <span>{item.category || 'General'}</span>
+                          </span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
@@ -1766,18 +1813,40 @@ function CajaPageContent() {
               </div>
             </div>
 
-            <select
-              value={selectedCustomer}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-              className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="generic_counter_customer">👤 Venta de Mostrador (Cliente General)</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} {c.tax_id ? `(${c.tax_id})` : ''}
-                </option>
-              ))}
-            </select>
+            <div className="space-y-1.5">
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar cliente por nombre o cédula..."
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                  className="w-full bg-background border border-border rounded-xl pl-8 pr-7 py-1.5 text-xs text-foreground placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+                />
+                {customerSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCustomerSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-foreground p-0.5"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+
+              <select
+                value={selectedCustomer}
+                onChange={(e) => setSelectedCustomer(e.target.value)}
+                className="w-full bg-background border border-border rounded-xl px-3 py-2 text-xs font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="generic_counter_customer">👤 Venta de Mostrador (Cliente General)</option>
+                {filteredCustomers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.tax_id ? `(${c.tax_id})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {linkedAppointmentId && (
               <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 flex items-center justify-between text-xs animate-in fade-in duration-200">
@@ -2442,7 +2511,7 @@ function CajaPageContent() {
                     Falta: ${remainingToAssign.toFixed(2)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div>
                     <span className="text-[10px] text-slate-400 block mb-0.5">Efectivo ($)</span>
                     <input
@@ -2479,6 +2548,51 @@ function CajaPageContent() {
                       className="w-full bg-background border border-border rounded-lg px-2 py-1 text-xs font-mono font-bold text-foreground"
                     />
                   </div>
+                  <div>
+                    <span className="text-[10px] text-rose-600 dark:text-rose-400 font-black block mb-0.5">Crédito (CxC)</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0"
+                      value={mixedPayments.credit === 0 ? '' : mixedPayments.credit}
+                      onChange={(e) => setMixedPayments({ ...mixedPayments, credit: e.target.value === '' ? 0 : Number(e.target.value) })}
+                      className="w-full bg-background border border-rose-500/40 rounded-lg px-2 py-1 text-xs font-mono font-bold text-rose-600 dark:text-rose-400"
+                    />
+                  </div>
+                </div>
+
+                {/* Atajos Rápidos de Pago Dividido */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-500/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const half = Math.round((total / 2) * 100) / 100;
+                      setMixedPayments({
+                        cash: half,
+                        card: 0,
+                        transfer: 0,
+                        credit: Math.round((total - half) * 100) / 100,
+                      });
+                    }}
+                    className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    ⚡ 50% Efectivo / 50% Deuda
+                  </button>
+                  {remainingToAssign > 0.01 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMixedPayments({
+                          ...mixedPayments,
+                          credit: Math.round(((mixedPayments.credit || 0) + remainingToAssign) * 100) / 100,
+                        });
+                      }}
+                      className="text-[10px] font-bold text-rose-600 dark:text-rose-400 hover:underline"
+                    >
+                      ⚡ Pasar ${remainingToAssign.toFixed(2)} a Deuda
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -2991,6 +3105,12 @@ function CajaPageContent() {
         }}
         isSaving={isSaving}
         customerName={selectedCustomerObj?.name}
+        mixedPayments={mixedPayments}
+        setMixedPayments={setMixedPayments}
+        selectedCustomer={selectedCustomer}
+        setSelectedCustomer={setSelectedCustomer}
+        customers={customers}
+        onOpenCustomerModal={() => setIsCustomerModalOpen(true)}
       />
 
       {/* ─────────────────────────────────────────────────────────────

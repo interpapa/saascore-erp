@@ -286,10 +286,25 @@ export default function ClientesPage() {
   const filteredClients = useMemo(() => {
     return clients.filter((client) => {
       const q = searchQuery.toLowerCase().trim();
+      const cleanDigits = (s: string) => (s || '').replace(/\D/g, '');
+      const qDigits = cleanDigits(q);
+      const clientTaxDigits = cleanDigits(
+        client.tax_id ||
+        (client.metadata as any)?.cedula ||
+        (client.metadata as any)?.dni ||
+        (client.metadata as any)?.ci ||
+        ''
+      );
+
       const nameMatch = client.name?.toLowerCase().includes(q);
-      const taxIdMatch = client.tax_id?.toLowerCase().includes(q);
+      const taxIdMatch =
+        client.tax_id?.toLowerCase().includes(q) ||
+        Boolean((client.metadata as any)?.cedula && String((client.metadata as any).cedula).toLowerCase().includes(q)) ||
+        Boolean((client.metadata as any)?.dni && String((client.metadata as any).dni).toLowerCase().includes(q)) ||
+        Boolean((client.metadata as any)?.ci && String((client.metadata as any).ci).toLowerCase().includes(q));
+      const digitMatch = qDigits.length >= 3 && clientTaxDigits.includes(qDigits);
       const phoneMatch = client.phone?.toLowerCase().includes(q);
-      const matchesSearch = !q || nameMatch || taxIdMatch || phoneMatch;
+      const matchesSearch = !q || nameMatch || taxIdMatch || digitMatch || phoneMatch;
 
       const debt = Number((client.metadata as any)?.total_debt || 0);
       const subtype = (client.metadata as any)?.entity_subtype;

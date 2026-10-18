@@ -142,6 +142,9 @@ export async function getJournalEntriesAction(
           description: l.description,
         })),
         created_at: e.created_at,
+        products: Array.isArray(e.metadata?.products)
+          ? e.metadata.products
+          : (e.lines || []).map((l: any) => l.description).filter(Boolean),
       }));
 
       return { success: true, data: filterEntries(formatted, filter as any), totalCount: formatted.length };
@@ -297,6 +300,18 @@ export async function getJournalEntriesAction(
         const totalDebit = lines.reduce((sum, l) => sum + l.debit, 0);
         const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
 
+        const docProducts: string[] = [];
+        const rawLines = doc.metadata?.cart_lines || doc.lines || doc.metadata?.items || [];
+        if (Array.isArray(rawLines)) {
+          rawLines.forEach((l: any) => {
+            const pName = l.description || l.name || l.title || l.item_name;
+            if (pName) {
+              const qtyStr = l.quantity && Number(l.quantity) > 1 ? ` (${l.quantity}x)` : '';
+              docProducts.push(`${pName}${qtyStr}`);
+            }
+          });
+        }
+
         synthesized.push({
           id: doc.id,
           tenant_id: tenantId,
@@ -310,6 +325,7 @@ export async function getJournalEntriesAction(
           lines,
           created_at: doc.created_at,
           source_document_ref: doc.document_number,
+          products: docProducts,
         });
       });
 

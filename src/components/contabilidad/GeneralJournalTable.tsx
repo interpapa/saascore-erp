@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Ban,
+  Package,
+  Clock,
 } from 'lucide-react';
 
 interface GeneralJournalTableProps {
@@ -38,6 +40,7 @@ export function GeneralJournalTable({
       (e.entry_number && e.entry_number.toLowerCase().includes(query)) ||
       e.description.toLowerCase().includes(query) ||
       (e.source_document_ref && e.source_document_ref.toLowerCase().includes(query)) ||
+      (e.products && e.products.some((p) => p.toLowerCase().includes(query))) ||
       e.lines.some(
         (l) =>
           l.account_code.toLowerCase().includes(query) ||
@@ -53,15 +56,23 @@ export function GeneralJournalTable({
       minimumFractionDigits: 2,
     }).format(val);
 
-  const formatDate = (dateStr: string) => {
+  const formatDateTime = (dateStr: string) => {
     try {
-      return new Date(dateStr).toLocaleDateString('es-ES', {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return { date: dateStr, time: '' };
+      const date = d.toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'short',
         day: '2-digit',
       });
+      const time = d.toLocaleTimeString('es-ES', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return { date, time };
     } catch {
-      return dateStr;
+      return { date: dateStr, time: '' };
     }
   };
 
@@ -123,8 +134,8 @@ export function GeneralJournalTable({
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                 <th className="py-3 px-3 w-10"></th>
                 <th className="py-3 px-3">Asiento #</th>
-                <th className="py-3 px-3">Fecha</th>
-                <th className="py-3 px-3">Descripción</th>
+                <th className="py-3 px-3">Fecha y Hora</th>
+                <th className="py-3 px-3">Descripción / Productos</th>
                 <th className="py-3 px-3">Ref. Doc</th>
                 <th className="py-3 px-3 text-right">Débito Total</th>
                 <th className="py-3 px-3 text-right">Crédito Total</th>
@@ -135,6 +146,7 @@ export function GeneralJournalTable({
               {filteredEntries.map((entry) => {
                 const isExpanded = !!expandedEntries[entry.id];
                 const isBalanced = Math.abs(entry.total_debit - entry.total_credit) < 0.01;
+                const dt = formatDateTime(entry.created_at || entry.entry_date);
 
                 return (
                   <React.Fragment key={entry.id}>
@@ -152,11 +164,37 @@ export function GeneralJournalTable({
                       <td className="py-3 px-3 font-mono font-bold text-slate-900 dark:text-white">
                         {entry.entry_number || `AS-${entry.id.slice(0, 6)}`}
                       </td>
-                      <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
-                        {formatDate(entry.entry_date)}
+                      <td className="py-3 px-3 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        <div className="font-semibold text-slate-900 dark:text-white">{dt.date}</div>
+                        {dt.time && (
+                          <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1 mt-0.5">
+                            <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{dt.time}</span>
+                          </div>
+                        )}
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-800 dark:text-slate-200 max-w-xs truncate">
-                        {entry.description}
+                      <td className="py-3 px-3 max-w-xs">
+                        <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                          {entry.description}
+                        </div>
+                        {entry.products && entry.products.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {entry.products.slice(0, 2).map((prod, pIdx) => (
+                              <span
+                                key={pIdx}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] font-medium border border-slate-200 dark:border-slate-700/60"
+                              >
+                                <Package className="w-2.5 h-2.5 text-primary/70 shrink-0" />
+                                <span className="truncate max-w-[120px]">{prod}</span>
+                              </span>
+                            ))}
+                            {entry.products.length > 2 && (
+                              <span className="text-[10px] text-slate-400 font-medium self-center">
+                                +{entry.products.length - 2} más
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-3 text-slate-500 dark:text-slate-400 font-mono">
                         {entry.source_document_ref || entry.document_id?.slice(0, 8) || '-'}
@@ -194,11 +232,24 @@ export function GeneralJournalTable({
                     {isExpanded && (
                       <tr className="bg-slate-50/70 dark:bg-slate-800/50">
                         <td colSpan={8} className="p-3 sm:p-4">
-                          <div className="pl-6 border-l-2 border-primary/50 space-y-2">
+                          <div className="pl-6 border-l-2 border-primary/50 space-y-3">
                             <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                               <span>Movimientos de Partida Doble ({entry.lines.length} líneas)</span>
                               <span>Asiento NIIF ID: {entry.id}</span>
                             </div>
+
+                            {entry.products && entry.products.length > 0 && (
+                              <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-2 flex-wrap">
+                                <span className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-1">
+                                  <Package size={13} className="text-primary" /> Productos / Ítems de la Operación:
+                                </span>
+                                {entry.products.map((p, pIdx) => (
+                                  <span key={pIdx} className="px-2 py-0.5 rounded-md bg-card text-foreground font-semibold text-xs border border-border">
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
 
                             <table className="w-full text-xs">
                               <thead>

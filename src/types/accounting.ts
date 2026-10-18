@@ -38,6 +38,7 @@ export interface JournalEntry {
   lines: JournalLine[];
   created_at?: string;
   source_document_ref?: string;
+  products?: string[];
 }
 
 export interface TrialBalanceRow {

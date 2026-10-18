@@ -103,7 +103,6 @@ export default function GinecologiaPage() {
   const [isSurgeriesOpen, setIsSurgeriesOpen] = useState(false);
   const [isDocumentsOpen, setIsDocumentsOpen] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
   // Pacientes, Citas y Médicos
   const [patients, setPatients] = useState<any[]>([]);
@@ -298,12 +297,30 @@ export default function GinecologiaPage() {
 
   const filteredPatients = useMemo(() => {
     if (!patientSearchQuery.trim()) return patients.slice(0, 30);
-    const q = patientSearchQuery.toLowerCase();
-    return patients.filter((p) =>
-      p.name?.toLowerCase().includes(q) ||
-      p.tax_id?.toLowerCase().includes(q) ||
-      p.phone?.toLowerCase().includes(q)
-    );
+    const q = patientSearchQuery.toLowerCase().trim();
+    const cleanDigits = (s: string) => (s || '').replace(/\D/g, '');
+    const qDigits = cleanDigits(q);
+
+    return patients.filter((p) => {
+      const pTaxDigits = cleanDigits(
+        p.tax_id ||
+        (p.metadata as any)?.cedula ||
+        (p.metadata as any)?.dni ||
+        (p.metadata as any)?.ci ||
+        ''
+      );
+
+      const nameMatch = p.name?.toLowerCase().includes(q);
+      const taxMatch =
+        p.tax_id?.toLowerCase().includes(q) ||
+        Boolean((p.metadata as any)?.cedula && String((p.metadata as any).cedula).toLowerCase().includes(q)) ||
+        Boolean((p.metadata as any)?.dni && String((p.metadata as any).dni).toLowerCase().includes(q)) ||
+        Boolean((p.metadata as any)?.ci && String((p.metadata as any).ci).toLowerCase().includes(q));
+      const digitMatch = qDigits.length >= 3 && pTaxDigits.includes(qDigits);
+      const phoneMatch = p.phone?.toLowerCase().includes(q);
+
+      return nameMatch || taxMatch || digitMatch || phoneMatch;
+    });
   }, [patients, patientSearchQuery]);
 
   const bmiInfo = useMemo(() => {
@@ -726,17 +743,6 @@ export default function GinecologiaPage() {
             </div>
 
             <div className="flex items-center gap-2.5">
-              {/* Botón QR de Reservas */}
-              <button
-                type="button"
-                onClick={() => setIsQRModalOpen(true)}
-                className="px-3.5 py-2.5 rounded-2xl bg-card border border-border hover:border-pink-500/40 text-xs font-bold text-foreground transition-all flex items-center gap-2 shadow-2xs btn-haptic"
-                title="Ver y Compartir Código QR de Reservas para Clientes"
-              >
-                <QrCode size={16} className="text-pink-500" />
-                <span>QR de Reservas</span>
-              </button>
-
               <button
                 type="button"
                 onClick={() => setIsGuideOpen(true)}
@@ -1630,105 +1636,6 @@ export default function GinecologiaPage() {
                 {isSubmittingPatient ? 'Creando...' : 'Crear Paciente'}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-          MODAL: QR DE RESERVAS EN LÍNEA PARA CLIENTES
-          ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-      {isQRModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-card border border-border rounded-3xl p-6 max-w-sm w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-500 to-rose-600 text-white flex items-center justify-center mx-auto shadow-md">
-              <QrCode size={26} />
-            </div>
-            <div>
-              <h3 className="text-base font-black text-foreground">QR de Reservas en Línea</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Los clientes pueden escanear este código con su teléfono para agendar su cita de ginecología o consulta.
-              </p>
-            </div>
-
-            {/* Código QR Generado Dinámicamente */}
-            <div className="p-4 bg-white rounded-2xl shadow-inner border border-slate-200 inline-block mx-auto">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(bookingPublicUrl)}`}
-                alt="QR de Reservas"
-                className="w-48 h-48 mx-auto"
-              />
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] text-slate-500 font-mono break-all text-left">
-              {bookingPublicUrl}
-            </div>
-
-            {/* Acciones del QR */}
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(bookingPublicUrl)}`;
-                    const response = await fetch(qrUrl);
-                    const blob = await response.blob();
-                    const blobUrl = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    link.download = `QR_Reservas_${currentTenant?.name || 'Clinica'}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(blobUrl);
-                    toast({ variant: 'success', title: 'QR Descargado', description: 'Imagen PNG guardada en tu equipo.' });
-                  } catch (e) {
-                    window.open(`https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(bookingPublicUrl)}`, '_blank');
-                  }
-                }}
-                className="py-2.5 px-3 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black shadow-xs transition-all flex items-center justify-center gap-1.5"
-              >
-                <Download size={14} /> Descargar PNG
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  const text = encodeURIComponent(`Hola! Puedes reservar tu cita médica en línea aquí: ${bookingPublicUrl}`);
-                  window.open(`https://wa.me/?text=${text}`, '_blank');
-                }}
-                className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black shadow-xs transition-all flex items-center justify-center gap-1.5"
-              >
-                <Phone size={14} /> WhatsApp
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(bookingPublicUrl);
-                  toast({ variant: 'success', title: 'Enlace Copiado', description: 'Enlace de reservas copiado al portapapeles.' });
-                }}
-                className="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-foreground transition-all flex items-center justify-center gap-1.5"
-              >
-                <Share2 size={14} /> Copiar Link
-              </button>
-
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-xs font-bold text-foreground transition-all flex items-center justify-center gap-1.5"
-              >
-                <Printer size={14} /> Imprimir Afiche
-              </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setIsQRModalOpen(false)}
-              className="text-xs font-bold text-slate-400 hover:text-foreground pt-1 block mx-auto"
-            >
-              Cerrar
-            </button>
           </div>
         </div>
       )}
