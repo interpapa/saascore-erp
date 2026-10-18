@@ -605,8 +605,24 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
 
       setSuccessMessage('¡Reserva confirmada con éxito!');
       
-      // WhatsApp Redirection: Usa el número configurado dinámicamente en el módulo de Citas
-      const cleanPhone = normalizeWhatsAppPhone(settings.whatsappNumber);
+      // WhatsApp Redirection: Enrutamiento Inteligente (Al empleado o a Central de Recepción)
+      const routingMode = tenant.metadata?.booking_settings?.whatsappRoutingMode || 'employee_first';
+      
+      const assignedEmp = result.assignedBarberId 
+        ? employees.find(e => e.id === result.assignedBarberId) 
+        : (selectedBarber && selectedBarber.id !== 'any' ? selectedBarber : null);
+
+      const employeePhone = assignedEmp?.metadata?.whatsapp 
+        || assignedEmp?.metadata?.phone 
+        || assignedEmp?.metadata?.cellphone 
+        || '';
+
+      let targetPhone = settings.whatsappNumber;
+      if (routingMode === 'employee_first' && employeePhone && assignedEmp?.metadata?.bookable_whatsapp !== false) {
+        targetPhone = employeePhone;
+      }
+
+      const cleanPhone = normalizeWhatsAppPhone(targetPhone);
       const template = tenant.metadata?.booking_settings?.whatsappMessageTemplate || settings.whatsappMessageTemplate;
       const readableTime = allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime;
       const assignedName = result.assignedBarberName || selectedBarber.name; // Usar el asignado si era 'cualquiera'

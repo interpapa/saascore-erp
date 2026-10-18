@@ -44,6 +44,7 @@ export function BookingConfigModal({
     intervalMinutes: 30,
     maxDaysInAdvance: 14,
     whatsappNumber: '', 
+    whatsappRoutingMode: 'employee_first' as 'employee_first' | 'central_only',
     resourceName: 'Profesional',
     whatsappMessageTemplate: '¡Hola! 👋 Vengo de su página web y me gustaría agendar una cita.\n\n👤 *Cliente:* {{cliente}}\n📅 *Fecha:* {{fecha}}\n⏰ *Hora:* {{hora}}\n✂️ *{{recurso}}:* {{profesional}}\n\nPor favor confirmen mi reserva. ¡Gracias!',
     themeBg: '#ffffff',
@@ -67,6 +68,7 @@ export function BookingConfigModal({
           intervalMinutes: dbSettings.intervalMinutes || defaultSettings.intervalMinutes,
           maxDaysInAdvance: dbSettings.maxDaysInAdvance || defaultSettings.maxDaysInAdvance,
           whatsappNumber: dbSettings.whatsappNumber || (tenant.metadata as any)?.phone || (tenant as any)?.phone || defaultSettings.whatsappNumber,
+          whatsappRoutingMode: dbSettings.whatsappRoutingMode || defaultSettings.whatsappRoutingMode,
           resourceName: dbSettings.resourceName || defaultSettings.resourceName,
           whatsappMessageTemplate: dbSettings.whatsappMessageTemplate || defaultSettings.whatsappMessageTemplate,
           themeBg: publicTheme.bgColor || defaultSettings.themeBg,
@@ -95,6 +97,7 @@ export function BookingConfigModal({
       intervalMinutes: Number(settings.intervalMinutes) || 30,
       maxDaysInAdvance: Number(settings.maxDaysInAdvance) || 14,
       whatsappNumber: settings.whatsappNumber,
+      whatsappRoutingMode: settings.whatsappRoutingMode || 'employee_first',
       resourceName: settings.resourceName || 'Profesional',
       whatsappMessageTemplate: settings.whatsappMessageTemplate,
       showPricesOnBookingPage: settings.showPricesOnBookingPage,
@@ -330,31 +333,22 @@ export function BookingConfigModal({
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           {activeTab === 'schedule' && (
             <div className="space-y-5 animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Duración de Citas */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-black text-foreground">
-                    Duración Estimada de Cita
-                  </label>
-                  <select 
-                    value={settings.intervalMinutes}
-                    onChange={e => setSettings({...settings, intervalMinutes: Number(e.target.value)})}
-                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  >
-                    <option value={15}>15 minutos (Control / Rápida)</option>
-                    <option value={30}>30 minutos (Recomendado estándar)</option>
-                    <option value={45}>45 minutos (Consulta Médica)</option>
-                    <option value={60}>1 hora (Especialidad / Eco)</option>
-                    <option value={90}>1 hora y media</option>
-                    <option value={120}>2 horas (Tratamiento Extenso)</option>
-                  </select>
-                  <p className="text-[10px] text-muted-foreground">Bloque de tiempo para cada cita en la agenda.</p>
+              <div className="space-y-4">
+                {/* Nota de Duración Personalizada */}
+                <div className="p-3.5 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/30 text-xs text-muted-foreground flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <div>
+                    <span className="font-bold text-foreground">Duración Personalizada por Especialista y Servicio:</span>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Cada cita calcula automáticamente su duración en base al procedimiento agendado y la configuración particular de cada especialista en el sistema.
+                    </p>
+                  </div>
                 </div>
 
                 {/* Anticipación Máxima */}
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 bg-card p-4 rounded-2xl border border-border">
                   <label className="block text-xs font-black text-foreground">
-                    Días Visibles para Reservar
+                    Días Visibles para Reservar en el Calendario
                   </label>
                   <select 
                     value={settings.maxDaysInAdvance}
@@ -365,8 +359,9 @@ export function BookingConfigModal({
                     <option value={7}>Próximos 7 días (1 semana)</option>
                     <option value={14}>Próximos 14 días (2 semanas)</option>
                     <option value={30}>Próximos 30 días (1 mes)</option>
+                    <option value={60}>Próximos 60 días (2 meses)</option>
                   </select>
-                  <p className="text-[10px] text-muted-foreground">Días futuros disponibles en el calendario.</p>
+                  <p className="text-[10px] text-muted-foreground">Define hasta cuántos días en el futuro los pacientes pueden agendar turnos.</p>
                 </div>
               </div>
 
@@ -630,9 +625,53 @@ export function BookingConfigModal({
           {activeTab === 'whatsapp' && (
             <div className="space-y-4 animate-in fade-in duration-200">
               
+              {/* Enrutamiento Inteligente de Mensajes */}
+              <div className="space-y-2 bg-card border border-border p-4 rounded-2xl">
+                <label className="block text-xs font-black text-foreground">
+                  ¿A dónde deben llegar las reservas de los pacientes?
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, whatsappRoutingMode: 'employee_first' })}
+                    className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
+                      settings.whatsappRoutingMode !== 'central_only'
+                        ? 'border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-950/30'
+                        : 'border-border bg-slate-50 dark:bg-slate-800/40 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <span className="font-black text-foreground flex items-center gap-1.5">
+                      📱 Al Especialista Asignado
+                    </span>
+                    <span className="text-[11px] text-muted-foreground leading-snug">
+                      Llega directo al WhatsApp del doctor o especialista. Si este no tiene número o no lo activa, se desvía a la Central de Recepción.
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSettings({ ...settings, whatsappRoutingMode: 'central_only' })}
+                    className={`p-3 rounded-xl border text-left text-xs transition-all flex flex-col gap-1 ${
+                      settings.whatsappRoutingMode === 'central_only'
+                        ? 'border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/40 dark:bg-emerald-950/30'
+                        : 'border-border bg-slate-50 dark:bg-slate-800/40 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <span className="font-black text-foreground flex items-center gap-1.5">
+                      🏥 Siempre a Central de Recepción
+                    </span>
+                    <span className="text-[11px] text-muted-foreground leading-snug">
+                      Todas las citas reservadas se envían exclusivamente al número central de la clínica para control administrativo.
+                    </span>
+                  </button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-black text-foreground mb-1.5">WhatsApp de Notificaciones</label>
+                  <label className="block text-xs font-black text-foreground mb-1.5">
+                    WhatsApp Central / Recepción (Respaldo)
+                  </label>
                   <input 
                     type="text" 
                     placeholder="Ej: 584241234567"
@@ -640,7 +679,9 @@ export function BookingConfigModal({
                     onChange={e => setSettings({...settings, whatsappNumber: e.target.value})}
                     className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Número donde recibirás los avisos de reservas.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Número donde se recibirán las alertas si el especialista no tiene teléfono o está en modo central.
+                  </p>
                 </div>
 
                 <div>
@@ -652,7 +693,7 @@ export function BookingConfigModal({
                     onChange={e => setSettings({...settings, resourceName: e.target.value})}
                     className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
-                  <p className="text-[10px] text-muted-foreground mt-1">Cómo se llama a la persona asignada (Médico, Barbero, etc.).</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Cómo se llama al profesional asignado (Médico, Especialista, etc.).</p>
                 </div>
               </div>
 
