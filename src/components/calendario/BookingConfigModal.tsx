@@ -6,20 +6,23 @@ import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
 import { 
+  Palette, 
+  MessageCircle, 
   Clock, 
   Save, 
   X, 
   DollarSign, 
+  Image as ImageIcon, 
+  Sparkles, 
+  Check, 
   QrCode, 
   Download, 
   Share2, 
   Phone, 
   ExternalLink,
-  Calendar,
-  Building2,
-  BellRing
+  Calendar
 } from 'lucide-react';
-import { normalizeHexColor } from '@/lib/theme/colorUtils';
+import { PRESET_PUBLIC_THEMES, normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
 
 export function BookingConfigModal({ 
   isOpen, 
@@ -34,7 +37,7 @@ export function BookingConfigModal({
   const { setCurrentTenant } = useERPStore();
   const actor = useActionActor();
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'qr' | 'schedule' | 'preferences'>('qr');
+  const [activeTab, setActiveTab] = useState<'qr' | 'schedule' | 'theme' | 'whatsapp'>('qr');
   
   // Valores por defecto
   const defaultSettings = {
@@ -42,7 +45,7 @@ export function BookingConfigModal({
     maxDaysInAdvance: 14,
     whatsappNumber: '', 
     resourceName: 'Profesional',
-    whatsappMessageTemplate: '¡Hola! 👋 Vengo de su página web y me gustaría agendar una cita.',
+    whatsappMessageTemplate: '¡Hola! 👋 Vengo de su página web y me gustaría agendar una cita.\n\n👤 *Cliente:* {{cliente}}\n📅 *Fecha:* {{fecha}}\n⏰ *Hora:* {{hora}}\n✂️ *{{recurso}}:* {{profesional}}\n\nPor favor confirmen mi reserva. ¡Gracias!',
     themeBg: '#ffffff',
     themeBtn: '#0B3B24',
     showPricesOnBookingPage: true,
@@ -116,7 +119,7 @@ export function BookingConfigModal({
     
     if (result.success && result.metadata) {
       setCurrentTenant({ ...tenant, metadata: result.metadata });
-      toast({ variant: 'success', title: 'Configuración Guardada', description: 'Las preferencias de citas han sido actualizadas.' });
+      toast({ variant: 'success', title: 'Configuración Guardada', description: 'Las preferencias han sido actualizadas.' });
       onClose();
     } else {
       toast({ variant: 'error', title: 'Error', description: 'No se pudo guardar la configuración.' });
@@ -136,7 +139,7 @@ export function BookingConfigModal({
             </div>
             <div>
               <h2 className="text-base font-black text-foreground leading-tight">Configuración de Citas & Reservas</h2>
-              <p className="text-xs text-muted-foreground">Código QR, horarios y opciones de agenda pública</p>
+              <p className="text-xs text-muted-foreground">Código QR, horarios, tema público y notificaciones</p>
             </div>
           </div>
           <button 
@@ -148,12 +151,12 @@ export function BookingConfigModal({
           </button>
         </div>
 
-        {/* Selector de Pestañas Compacto */}
-        <div className="px-6 pt-3 pb-0 border-b border-border/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0 flex gap-2">
+        {/* Navegación por Pestañas (Scroll horizontal protegido sin salirse) */}
+        <div className="px-6 pt-3 pb-0 border-b border-border/80 bg-slate-50/50 dark:bg-slate-900/40 shrink-0 flex gap-1 overflow-x-auto no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('qr')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
               activeTab === 'qr'
                 ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 font-black'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -166,80 +169,91 @@ export function BookingConfigModal({
           <button
             type="button"
             onClick={() => setActiveTab('schedule')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
               activeTab === 'schedule'
                 ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 font-black'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
             <Clock className="w-3.5 h-3.5" />
-            Horarios & Agenda
+            Horarios & Precios
           </button>
 
           <button
             type="button"
-            onClick={() => setActiveTab('preferences')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 ${
-              activeTab === 'preferences'
+            onClick={() => setActiveTab('theme')}
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'theme'
                 ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 font-black'
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}
           >
-            <DollarSign className="w-3.5 h-3.5" />
-            Precios & Alertas
+            <Palette className="w-3.5 h-3.5" />
+            Portada & Tema
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('whatsapp')}
+            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 flex items-center gap-1.5 shrink-0 ${
+              activeTab === 'whatsapp'
+                ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400 font-black'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            WhatsApp
           </button>
         </div>
 
         {/* Contenido Central Scrolleable Fluido */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+        <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 space-y-5">
           
           {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
               PESTAÑA 1: CÓDIGO QR Y ENLACE DE COMPARTIR
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           {activeTab === 'qr' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-5 rounded-2xl border border-emerald-500/30 text-center sm:text-left flex flex-col sm:flex-row items-center gap-5">
-                {/* Cuadro del QR */}
-                <div className="p-3 bg-white rounded-2xl shadow-md border border-slate-200 shrink-0 mx-auto sm:mx-0">
+            <div className="space-y-5 animate-in fade-in duration-200">
+              
+              {/* Tarjeta Centrada del QR */}
+              <div className="bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent p-6 rounded-3xl border border-emerald-500/30 text-center space-y-4">
+                
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-black mx-auto">
+                  <QrCode className="w-3.5 h-3.5" />
+                  Código QR de Reservas en Línea
+                </div>
+
+                {/* Imagen del QR Centrada */}
+                <div className="p-4 bg-white rounded-2xl shadow-md border border-slate-200 inline-block mx-auto">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(bookingPublicUrl)}`}
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(bookingPublicUrl)}`}
                     alt="Código QR de Reservas"
-                    className="w-36 h-36 object-contain block mx-auto"
+                    className="w-44 h-44 object-contain mx-auto"
                   />
                 </div>
 
-                <div className="flex-1 space-y-2">
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 text-xs font-black">
-                    <QrCode className="w-3 h-3" />
-                    Página de Reservas Activa
-                  </div>
-                  <h3 className="font-black text-foreground text-base leading-snug">
-                    Código QR para tus Clientes
+                <div className="max-w-md mx-auto space-y-1">
+                  <h3 className="font-black text-foreground text-base">
+                    Escanea para Agendar Cita
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Escanea este código o comparte el enlace para que tus pacientes o clientes reserven turnos en línea desde su móvil.
+                    Los pacientes pueden apuntar con la cámara de su teléfono móvil a este código para ingresar directamente.
                   </p>
-                  
-                  {/* Enlace Directo Copiable */}
-                  <div className="flex items-center gap-2 bg-card p-2 rounded-xl border border-border text-xs text-muted-foreground font-mono">
-                    <span className="flex-1 truncate text-left">{bookingPublicUrl}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(bookingPublicUrl);
-                        toast({ variant: 'success', title: '¡Enlace copiado!', description: 'URL de reservas copiada al portapapeles.' });
-                      }}
-                      className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-emerald-600 font-bold transition-colors shrink-0"
-                      title="Copiar Link"
-                    >
-                      <Share2 className="w-4 h-4" />
-                    </button>
+                </div>
+
+                {/* Enlace Directo Centrado con Quiebre Hacia Abajo (break-all para nunca desbordar) */}
+                <div className="w-full max-w-md mx-auto bg-card p-3 rounded-2xl border border-border shadow-xs text-center space-y-2">
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Enlace Público de tu Clínica
+                  </div>
+                  <div className="text-xs font-mono text-foreground break-all whitespace-normal text-center select-all leading-relaxed px-2 bg-slate-50 dark:bg-slate-900/80 p-2.5 rounded-xl border border-border/60">
+                    {bookingPublicUrl}
                   </div>
                 </div>
               </div>
 
-              {/* Acciones del QR en Cuadrícula 2x2 */}
+              {/* Botones de Acción en Cuadrícula 2x2 */}
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
@@ -256,7 +270,7 @@ export function BookingConfigModal({
                       link.click();
                       document.body.removeChild(link);
                       URL.revokeObjectURL(blobUrl);
-                      toast({ variant: 'success', title: 'QR Descargado', description: 'Imagen PNG en alta resolución guardada.' });
+                      toast({ variant: 'success', title: 'QR Descargado', description: 'Imagen PNG guardada en tu equipo.' });
                     } catch {
                       window.open(`https://api.qrserver.com/v1/create-qr-code/?size=600x600&data=${encodeURIComponent(bookingPublicUrl)}`, '_blank');
                     }
@@ -271,7 +285,7 @@ export function BookingConfigModal({
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(bookingPublicUrl);
-                    toast({ variant: 'success', title: '¡Enlace Copiado!', description: 'Listo para compartir en Instagram o redes sociales.' });
+                    toast({ variant: 'success', title: '¡Enlace Copiado!', description: 'Listo para compartir en Instagram o WhatsApp.' });
                   }}
                   className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-foreground text-xs font-bold transition-colors border border-border"
                 >
@@ -301,21 +315,21 @@ export function BookingConfigModal({
                 </button>
               </div>
 
-              {/* Mensaje de Ayuda */}
+              {/* Tips de Recepción */}
               <div className="p-3 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-border text-[11px] text-muted-foreground flex items-center gap-2.5">
                 <span className="text-base">💡</span>
                 <span>
-                  <strong>Recomendación:</strong> Puedes descargar la imagen del QR para imprimir un display de acrílico o afiche y colocarlo en el mostrador de recepción o sala de espera.
+                  <strong>Tip:</strong> Puedes descargar la imagen PNG para mandar a imprimir un exhibidor de acrílico en la recepción para agilizar el ingreso de los pacientes.
                 </span>
               </div>
             </div>
           )}
 
           {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              PESTAÑA 2: HORARIOS Y REGLAS DE AGENDA
+              PESTAÑA 2: HORARIOS & PRECIOS
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           {activeTab === 'schedule' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
+            <div className="space-y-5 animate-in fade-in duration-200">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Duración de Citas */}
                 <div className="space-y-1.5">
@@ -328,13 +342,13 @@ export function BookingConfigModal({
                     className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value={15}>15 minutos (Control / Rápida)</option>
-                    <option value={30}>30 minutos (Recomendado)</option>
+                    <option value={30}>30 minutos (Recomendado estándar)</option>
                     <option value={45}>45 minutos (Consulta Médica)</option>
                     <option value={60}>1 hora (Especialidad / Eco)</option>
                     <option value={90}>1 hora y media</option>
                     <option value={120}>2 horas (Tratamiento Extenso)</option>
                   </select>
-                  <p className="text-[10px] text-muted-foreground">Define el bloque de tiempo asignado a cada turno.</p>
+                  <p className="text-[10px] text-muted-foreground">Bloque de tiempo para cada cita en la agenda.</p>
                 </div>
 
                 {/* Anticipación Máxima */}
@@ -352,66 +366,11 @@ export function BookingConfigModal({
                     <option value={14}>Próximos 14 días (2 semanas)</option>
                     <option value={30}>Próximos 30 días (1 mes)</option>
                   </select>
-                  <p className="text-[10px] text-muted-foreground">Hasta cuántos días en el futuro pueden agendar los clientes.</p>
+                  <p className="text-[10px] text-muted-foreground">Días futuros disponibles en el calendario.</p>
                 </div>
               </div>
 
-              {/* Título de la Portada */}
-              <div className="space-y-1.5 pt-1">
-                <label className="block text-xs font-black text-foreground flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-emerald-600" />
-                  Nombre o Título del Consultorio / Clínica
-                </label>
-                <input 
-                  type="text" 
-                  placeholder={`Por defecto: ${tenant?.name || 'Nombre de la empresa'}`}
-                  value={settings.headerTitle}
-                  onChange={e => setSettings({ ...settings, headerTitle: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <p className="text-[10px] text-muted-foreground">Encabezado principal visible en la página pública de reservas.</p>
-              </div>
-
-              {/* Mensaje de Bienvenida */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-foreground">
-                  Mensaje o Instrucción de Bienvenida
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="Por defecto: Selecciona el servicio y fecha para tu consulta"
-                  value={settings.headerSubtitle}
-                  onChange={e => setSettings({ ...settings, headerSubtitle: e.target.value })}
-                  className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                />
-                <p className="text-[10px] text-muted-foreground">Frase corta para orientar a los pacientes al reservar.</p>
-              </div>
-            </div>
-          )}
-
-          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-              PESTAÑA 3: PRECIOS Y NOTIFICACIONES
-              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-          {activeTab === 'preferences' && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              
-              {/* WhatsApp de Recepción */}
-              <div className="bg-emerald-50/60 dark:bg-emerald-950/20 p-4 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 space-y-2">
-                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-black text-xs">
-                  <BellRing className="w-4 h-4" />
-                  WhatsApp para Avisos de Nuevas Citas
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="Ej: 584241234567 (con código de país)"
-                  value={settings.whatsappNumber || ''}
-                  onChange={e => setSettings({...settings, whatsappNumber: e.target.value})}
-                  className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                />
-                <p className="text-[10px] text-muted-foreground">Número de WhatsApp donde tu equipo o recepción recibe las notificaciones de cada reserva.</p>
-              </div>
-
-              {/* Switch de Precios Públicos */}
+              {/* Control de Precios al Público */}
               <div className="bg-card border border-border p-4 rounded-2xl space-y-3">
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -420,7 +379,7 @@ export function BookingConfigModal({
                       Mostrar Precios en la Página de Reservas
                     </h4>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
-                      Activa si deseas que los pacientes vean el valor de cada consulta o servicio.
+                      Activa si deseas que los pacientes vean el precio de cada consulta o servicio.
                     </p>
                   </div>
                   <button
@@ -438,7 +397,7 @@ export function BookingConfigModal({
 
                 {!settings.showPricesOnBookingPage && (
                   <div className="p-2.5 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-200/50 text-[11px] text-amber-800 dark:text-amber-200">
-                    🔒 <strong>Modo Privado:</strong> Los clientes podrán agendar libremente pero sin ver tarifas públicas.
+                    🔒 <strong>Modo Privado Activado:</strong> Los clientes podrán agendar libremente pero sin ver tarifas públicas.
                   </div>
                 )}
 
@@ -453,6 +412,320 @@ export function BookingConfigModal({
                     onChange={e => setSettings({ ...settings, noPriceLabel: e.target.value })}
                     className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              PESTAÑA 3: PORTADA & TEMA
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {activeTab === 'theme' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              
+              {/* Logo de la Empresa */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-foreground">
+                    Logo de la Empresa (URL de Imagen)
+                  </label>
+                  {settings.logoUrl && (
+                    <button 
+                      type="button" 
+                      onClick={() => setSettings({ ...settings, logoUrl: '' })} 
+                      className="text-[11px] text-red-500 hover:underline font-bold"
+                    >
+                      Quitar logo
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-border p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-xs">
+                    {settings.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img 
+                        src={settings.logoUrl} 
+                        alt="Logo Preview" 
+                        className="max-w-full max-h-full object-contain"
+                        onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                      />
+                    ) : (
+                      <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <input 
+                    type="url" 
+                    placeholder="https://ejemplo.com/logo.png"
+                    value={settings.logoUrl}
+                    onChange={e => setSettings({ ...settings, logoUrl: e.target.value })}
+                    className="flex-1 bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans"
+                  />
+                </div>
+              </div>
+
+              {/* Título y Mensaje de Portada */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-foreground">
+                    Título Principal
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder={`Por defecto: ${tenant?.name || 'Nombre del negocio'}`}
+                    value={settings.headerTitle}
+                    onChange={e => setSettings({ ...settings, headerTitle: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-foreground">
+                    Mensaje de Bienvenida
+                  </label>
+                  <input 
+                    type="text" 
+                    placeholder="Por defecto: ¿Qué necesitas hoy?"
+                    value={settings.headerSubtitle}
+                    onChange={e => setSettings({ ...settings, headerSubtitle: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              {/* Paletas Prediseñadas */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    Paletas Recomendadas (1 Clic)
+                  </label>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                    Contraste WCAG 2.1
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {PRESET_PUBLIC_THEMES.map((preset) => {
+                    const isSelected = 
+                      normalizeHexColor(settings.themeBg).toLowerCase() === preset.bgColor.toLowerCase() &&
+                      normalizeHexColor(settings.themeBtn).toLowerCase() === preset.btnColor.toLowerCase();
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => setSettings({ ...settings, themeBg: preset.bgColor, themeBtn: preset.btnColor })}
+                        className={`flex items-center gap-2 p-2 rounded-xl text-left border text-xs transition-all ${
+                          isSelected 
+                            ? 'border-emerald-600 ring-2 ring-emerald-500/20 bg-card shadow-xs' 
+                            : 'border-border bg-card/60 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        <span 
+                          className="w-4 h-4 rounded-full shrink-0 border border-black/10 shadow-xs" 
+                          style={{ backgroundColor: preset.btnColor }} 
+                        />
+                        <span className="truncate font-medium text-foreground text-[11px]">
+                          {preset.name}
+                        </span>
+                        {isSelected && <Check className="w-3 h-3 text-emerald-600 ml-auto shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selectores Hex Personalizados */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">Color de Fondo</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="color" 
+                      value={normalizeHexColor(settings.themeBg, '#ffffff')}
+                      onChange={e => setSettings({...settings, themeBg: e.target.value})}
+                      className="w-10 h-10 rounded-xl border border-border cursor-pointer bg-transparent"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.themeBg}
+                      onChange={e => setSettings({...settings, themeBg: e.target.value})}
+                      className="flex-1 bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground"
+                      placeholder="#ffffff"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-foreground mb-1.5">Color de Botones</label>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="color" 
+                      value={normalizeHexColor(settings.themeBtn, '#0B3B24')}
+                      onChange={e => setSettings({...settings, themeBtn: e.target.value})}
+                      className="w-10 h-10 rounded-xl border border-border cursor-pointer bg-transparent"
+                    />
+                    <input 
+                      type="text" 
+                      value={settings.themeBtn}
+                      onChange={e => setSettings({...settings, themeBtn: e.target.value})}
+                      className="flex-1 bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2 text-xs font-mono text-foreground"
+                      placeholder="#0B3B24"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Vista Previa en Vivo */}
+              {(() => {
+                const previewBg = normalizeHexColor(settings.themeBg, '#ffffff');
+                const previewBtn = normalizeHexColor(settings.themeBtn, '#0B3B24');
+                const btnTextColor = getContrastTextColor(previewBtn);
+                const bgTextColor = getContrastTextColor(previewBg);
+                return (
+                  <div 
+                    className="p-3.5 rounded-2xl border border-border space-y-2.5 transition-colors shadow-xs"
+                    style={{ backgroundColor: previewBg }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span 
+                        className="text-[10px] font-black tracking-wider uppercase opacity-75"
+                        style={{ color: bgTextColor }}
+                      >
+                        Vista Previa en Vivo
+                      </span>
+                      <span 
+                        className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+                        style={{ backgroundColor: previewBtn, color: btnTextColor }}
+                      >
+                        Paso 1 de 3
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                      <div>
+                        <h4 className="text-xs font-black truncate max-w-[200px]" style={{ color: bgTextColor }}>
+                          {settings.headerTitle || tenant?.name || 'Mi Negocio'}
+                        </h4>
+                        <p className="text-[10px] opacity-70 truncate max-w-[220px]" style={{ color: bgTextColor }}>
+                          {settings.headerSubtitle || 'Reserva tu cita en pocos pasos'}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold shadow-xs shrink-0 transition-transform pointer-events-none"
+                        style={{ backgroundColor: previewBtn, color: btnTextColor }}
+                      >
+                        Confirmar Cita →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+              PESTAÑA 4: WHATSAPP & COMUNICACIONES
+              ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+          {activeTab === 'whatsapp' && (
+            <div className="space-y-4 animate-in fade-in duration-200">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black text-foreground mb-1.5">WhatsApp de Notificaciones</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: 584241234567"
+                    value={settings.whatsappNumber || ''}
+                    onChange={e => setSettings({...settings, whatsappNumber: e.target.value})}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Número donde recibirás los avisos de reservas.</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-black text-foreground mb-1.5">Terminología del Recurso</label>
+                  <input 
+                    type="text" 
+                    placeholder="Ej: Médico, Especialista, Profesional"
+                    value={settings.resourceName || ''}
+                    onChange={e => setSettings({...settings, resourceName: e.target.value})}
+                    className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Cómo se llama a la persona asignada (Médico, Barbero, etc.).</p>
+                </div>
+              </div>
+
+              {/* Plantilla de Mensaje */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black text-foreground">Mensaje Automático de WhatsApp</label>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">Personalizable</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  Presiona los botones para insertar etiquetas dinámicas en el mensaje:
+                </p>
+                
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, whatsappMessageTemplate: prev.whatsappMessageTemplate + ' {{cliente}}' }))}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-card border border-border hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground transition-colors"
+                  >
+                    + Nombre Cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, whatsappMessageTemplate: prev.whatsappMessageTemplate + ' {{fecha}}' }))}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-card border border-border hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground transition-colors"
+                  >
+                    + Fecha
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, whatsappMessageTemplate: prev.whatsappMessageTemplate + ' {{hora}}' }))}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-card border border-border hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground transition-colors"
+                  >
+                    + Hora
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, whatsappMessageTemplate: prev.whatsappMessageTemplate + ' {{servicio}}' }))}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-card border border-border hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground transition-colors"
+                  >
+                    + Servicio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSettings(prev => ({ ...prev, whatsappMessageTemplate: prev.whatsappMessageTemplate + ' {{profesional}}' }))}
+                    className="px-2.5 py-1 rounded-lg text-xs font-bold bg-card border border-border hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground transition-colors"
+                  >
+                    + Profesional / Especialista
+                  </button>
+                </div>
+
+                <textarea 
+                  rows={4}
+                  value={settings.whatsappMessageTemplate}
+                  onChange={e => setSettings({...settings, whatsappMessageTemplate: e.target.value})}
+                  className="w-full bg-slate-50 dark:bg-slate-800/80 border border-border rounded-xl px-3 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans leading-relaxed mt-2"
+                />
+
+                {/* Vista previa en vivo estilo WhatsApp */}
+                <div className="mt-3 bg-[#EFEAE2] dark:bg-slate-950 p-3 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/40">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                    <span>📱 Vista Previa en WhatsApp:</span>
+                  </p>
+                  <div className="bg-white dark:bg-emerald-950/50 text-slate-800 dark:text-slate-100 p-3 rounded-xl rounded-tr-none shadow-xs text-xs whitespace-pre-wrap leading-relaxed border border-emerald-100 dark:border-emerald-900/50">
+                    {settings.whatsappMessageTemplate
+                      .replace(/{{profesional}}/g, 'Dra. María Pérez')
+                      .replace(/{{fecha}}/g, '2026-09-18')
+                      .replace(/{{hora}}/g, '10:30 AM')
+                      .replace(/{{cliente}}/g, 'Laura Gómez')
+                      .replace(/{{servicio}}/g, 'Consulta Ginecológica')
+                      .replace(/{{recurso}}/g, settings.resourceName || 'Especialista')
+                    }
+                  </div>
                 </div>
               </div>
             </div>
@@ -477,7 +750,7 @@ export function BookingConfigModal({
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 shadow-md transition-all text-xs"
           >
             <Save className="w-3.5 h-3.5" />
-            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+            {isSaving ? 'Guardando...' : 'Guardar Configuración'}
           </button>
         </div>
 
