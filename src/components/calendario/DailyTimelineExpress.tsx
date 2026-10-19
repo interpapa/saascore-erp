@@ -18,7 +18,7 @@ import {
   Play,
   UserCheck
 } from 'lucide-react';
-import { Appointment, AppointmentStatus } from '@/types/calendario';
+import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
 
@@ -31,6 +31,7 @@ interface DailyTimelineExpressProps {
   onDateChange: (date: Date) => void;
   isDentalActive?: boolean;
   onOpenBlockModal?: () => void;
+  employees?: Employee[];
 }
 
 export function DailyTimelineExpress({
@@ -42,8 +43,10 @@ export function DailyTimelineExpress({
   onDateChange,
   isDentalActive = false,
   onOpenBlockModal,
+  employees = [],
 }: DailyTimelineExpressProps) {
   const router = useRouter();
+  const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<string>('all');
 
   // Cambiar día
   const handlePrevDay = () => {
@@ -81,6 +84,10 @@ export function DailyTimelineExpress({
       return a.start_time.startsWith(dateStr);
     })
     .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  const filteredDayAppointments = selectedEmployeeId === 'all'
+    ? dayAppointments
+    : dayAppointments.filter((a) => a.employee_id === selectedEmployeeId);
 
   // Estados visuales
   const statusStyles: Record<string, { label: string; color: string }> = {
@@ -148,15 +155,65 @@ export function DailyTimelineExpress({
         </div>
       </div>
 
-      {/* 2. LISTA CRONOLÓGICA DE CITAS */}
+      {/* 2. SELECTOR HORIZONTAL RÁPIDO DE PROFESIONAL */}
+      {employees.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <button
+            type="button"
+            onClick={() => setSelectedEmployeeId('all')}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-black shrink-0 transition-all ${
+              selectedEmployeeId === 'all'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'bg-card border border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Todos ({dayAppointments.length})
+          </button>
+          {employees.map((emp) => {
+            const isSelected = selectedEmployeeId === emp.id;
+            const empCount = dayAppointments.filter((a) => a.employee_id === emp.id).length;
+            const firstName = emp.name.split(' ')[0];
+            return (
+              <button
+                key={emp.id}
+                type="button"
+                onClick={() => setSelectedEmployeeId(emp.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black shrink-0 transition-all ${
+                  isSelected
+                    ? 'bg-teal-600 text-white shadow-xs ring-2 ring-teal-500/30'
+                    : 'bg-card border border-border text-muted-foreground hover:bg-muted'
+                }`}
+              >
+                <div className="w-4 h-4 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-bold overflow-hidden shrink-0">
+                  {emp.avatar_url ? (
+                    <img src={emp.avatar_url} alt={emp.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span>{emp.name.charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <span>{firstName}</span>
+                {empCount > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                    isSelected ? 'bg-teal-700/80 text-white' : 'bg-muted text-foreground'
+                  }`}>
+                    {empCount}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 3. LISTA CRONOLÓGICA DE CITAS */}
       <div className="space-y-3">
-        {dayAppointments.length === 0 ? (
+        {filteredDayAppointments.length === 0 ? (
           <div className="bg-card border border-dashed border-border rounded-2xl p-10 text-center space-y-3">
             <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
               <CalendarDays size={24} />
             </div>
             <div>
-              <p className="text-sm font-black text-foreground">Sin citas para este día</p>
+              <p className="text-sm font-black text-foreground">{selectedEmployeeId !== 'all' ? 'Sin citas para este especialista hoy' : 'Sin citas para este día'}</p>
               <p className="text-xs text-slate-400 mt-0.5">Toca el botón (+) para agendar un turno.</p>
             </div>
             <button
@@ -168,7 +225,7 @@ export function DailyTimelineExpress({
             </button>
           </div>
         ) : (
-          dayAppointments.map((appt) => {
+          filteredDayAppointments.map((appt) => {
             const timeFormatted = appt.start_time.slice(11, 16);
             const endTimeFormatted = appt.end_time?.slice(11, 16);
             const visual = getAppointmentVisualStatus(appt.status, appt.metadata);

@@ -8,7 +8,7 @@ import { getItemsAction } from '@/app/actions/items';
 import { getEntitiesAction, createEntityAction } from '@/app/actions/entities';
 import { createDocumentAction, getDocumentsAction, updateDocumentStatusAction } from '@/app/actions/documents';
 import { getCashSessionStatusAction, CashSession } from '@/app/actions/cashRegister';
-import { getBankAccountsAction, createBankAccountAction, BankAccount } from '@/app/actions/bankAccounts';
+import { getBankAccountsAction, BankAccount } from '@/app/actions/bankAccounts';
 import { getExchangeRateAction, updateExchangeRateAction, syncLiveBCVRateAction } from '@/app/actions/currency';
 import { CashRegisterModal } from '@/components/caja/CashRegisterModal';
 import { CustomerHistoryModal } from '@/components/caja/CustomerHistoryModal';
@@ -25,6 +25,7 @@ import {
   Search, 
   ShoppingCart, 
   ShoppingBag, 
+  Package, 
   User, 
   Plus, 
   Minus, 
@@ -191,18 +192,7 @@ function CajaPageContent() {
   const [newCustomer, setNewCustomer] = useState({ name: '', email: '', phone: '', address: '' });
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
 
-  // Formulario Nueva Cuenta Bancaria
-  const [newAccount, setNewAccount] = useState({
-    bank_name: '',
-    account_type: 'corriente',
-    account_number: '',
-    holder_name: '',
-    tax_id: '',
-    phone: '',
-    email: '',
-    notes: '',
-  });
-  const [isSavingAccount, setIsSavingAccount] = useState(false);
+
 
   // Carga de Carrito desde LocalStorage
   const isCartLoadedRef = useRef(false);
@@ -809,37 +799,7 @@ function CajaPageContent() {
     toast({ variant: 'success', title: 'Datos Copiados', description: 'Datos bancarios copiados al portapapeles.' });
   };
 
-  // Guardar nueva cuenta bancaria
-  const handleSaveBankAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentTenant || !actor) return;
-    setIsSavingAccount(true);
-    try {
-      const res = await createBankAccountAction(newAccount, currentTenant.id, actor);
-      if (res.success && res.account) {
-        toast({ variant: 'success', title: 'Cuenta Registrada', description: 'La cuenta bancaria está lista para usarse.' });
-        setBankAccounts([res.account, ...bankAccounts]);
-        setSelectedBankAccountId(res.account.id);
-        setIsBankModalOpen(false);
-        setNewAccount({
-          bank_name: '',
-          account_type: 'corriente',
-          account_number: '',
-          holder_name: '',
-          tax_id: '',
-          phone: '',
-          email: '',
-          notes: '',
-        });
-      } else {
-        toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo guardar la cuenta.' });
-      }
-    } catch (err: unknown) {
-      toast({ variant: 'error', title: 'Error', description: (err as Error).message });
-    } finally {
-      setIsSavingAccount(false);
-    }
-  };
+
 
   const selectedCustomerObj = customers.find((c) => c.id === selectedCustomer);
 
@@ -1201,36 +1161,62 @@ function CajaPageContent() {
         </div>
 
         {/* Botones de Cabecera */}
-        <div className="flex items-center flex-wrap gap-2">
-          {/* Tasa Oficial BCV con Sincronización Automática */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-background text-xs font-bold shadow-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-blue-600 dark:text-blue-400 font-black">🇻🇪 BCV:</span>
-              <span className="font-mono font-black text-foreground">Bs. {currentRate.toFixed(2)}</span>
+        <div className="flex items-center flex-wrap gap-2.5">
+          {/* Tasa Oficial BCV Destacada y Gigante */}
+          <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-2xl border-2 border-blue-500/30 bg-blue-50/70 dark:bg-blue-950/40 text-xs font-bold shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🇻🇪</span>
+              <div>
+                <span className="text-[10px] text-blue-700 dark:text-blue-300 uppercase font-black tracking-wider block">Tasa BCV Oficial</span>
+                <span className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-white leading-tight block">Bs. {currentRate.toFixed(2)}</span>
+              </div>
             </div>
 
-            <button
-              type="button"
-              disabled={isSyncingBCV}
-              onClick={handleSyncBCV}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-600 transition-colors btn-haptic disabled:opacity-50"
-              title="Sincronizar en vivo con la tasa oficial del BCV"
-            >
-              <RefreshCw size={13} className={isSyncingBCV ? 'animate-spin text-blue-600' : ''} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setRateInput(currentRate.toFixed(2));
-                setIsRateModalOpen(true);
-              }}
-              className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"
-              title="Ajustar manualmente"
-            >
-              <Edit3 size={13} />
-            </button>
+            <div className="flex items-center gap-1 border-l border-blue-500/20 pl-2">
+              <button
+                type="button"
+                disabled={isSyncingBCV}
+                onClick={handleSyncBCV}
+                className="p-1.5 hover:bg-blue-500/10 rounded-lg text-blue-600 dark:text-blue-400 transition-colors btn-haptic disabled:opacity-50"
+                title="Sincronizar en vivo con la tasa oficial del BCV"
+              >
+                <RefreshCw size={14} className={isSyncingBCV ? 'animate-spin text-blue-600' : ''} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setRateInput(currentRate.toFixed(2));
+                  setIsRateModalOpen(true);
+                }}
+                className="p-1.5 hover:bg-blue-500/10 rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors"
+                title="Ajustar manualmente"
+              >
+                <Edit3 size={14} />
+              </button>
+            </div>
           </div>
+
+          {/* Sección Dedicada para Tickets en Espera */}
+          <button
+            type="button"
+            onClick={() => setIsHeldModalOpen(true)}
+            className={`px-3 py-2 rounded-2xl border text-xs font-black transition-all flex items-center gap-2 btn-haptic ${
+              heldTickets.length > 0
+                ? 'border-amber-500/50 bg-amber-500/20 text-amber-800 dark:text-amber-300 shadow-sm ring-1 ring-amber-500/30'
+                : 'border-border bg-background hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}
+            title="Ver y recuperar tickets en espera"
+          >
+            <Pause size={15} className={heldTickets.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400'} />
+            <span>Tickets en Espera</span>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${
+              heldTickets.length > 0
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+            }`}>
+              {heldTickets.length}
+            </span>
+          </button>
 
           {/* Cuentas Bancarias */}
           <button
@@ -1248,12 +1234,12 @@ function CajaPageContent() {
             )}
           </button>
 
-          {/* Reponer Stock Rápido (Solo si Inventario está habilitado) */}
+          {/* Reponer Stock Rápido (Solo visible en PC) */}
           {isInventoryEnabled && (
             <button
               type="button"
               onClick={() => setIsStockModalOpen(true)}
-              className="px-3 py-2 rounded-xl border border-border bg-background hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic"
+              className="hidden md:inline-flex px-3 py-2 rounded-xl border border-border bg-background hover:bg-slate-100 dark:hover:bg-slate-800 text-foreground text-xs font-bold transition-all items-center gap-1.5 btn-haptic"
               title="Entrada rápida de inventario"
             >
               <PackagePlus size={15} className="text-emerald-500" />
@@ -1447,7 +1433,7 @@ function CajaPageContent() {
                 <button
                   type="button"
                   onClick={() => setIsStockModalOpen(true)}
-                  className="px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20"
+                  className="hidden md:inline-block px-3 py-1.5 bg-primary/10 text-primary text-xs font-bold rounded-xl hover:bg-primary/20"
                 >
                   + Crear o reponer producto
                 </button>
@@ -1473,61 +1459,66 @@ function CajaPageContent() {
                           : 'border-border bg-card hover:border-indigo-500 hover:shadow-md cursor-pointer hover:-translate-y-0.5 active:scale-98'
                       }`}
                     >
-                      {/* Imagen / Foto del Producto */}
-                      {itemImage && (
-                        <div className="w-full h-24 rounded-xl overflow-hidden border border-border/50 bg-slate-100 dark:bg-slate-900 mb-2.5 relative shrink-0">
+                      {/* Imagen / Foto o Icono del Producto */}
+                      <div className="w-full h-28 sm:h-32 rounded-2xl overflow-hidden border border-border/60 bg-slate-100 dark:bg-slate-900 mb-3 relative shrink-0 flex items-center justify-center">
+                        {itemImage ? (
                           <img
                             src={itemImage}
                             alt={item.name}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                             onError={(e) => {
                               const parent = (e.target as HTMLElement).parentElement;
-                              if (parent) parent.style.display = 'none';
+                              if (parent) {
+                                parent.innerHTML = '<div class="text-2xl opacity-40">📦</div>';
+                              }
                             }}
                           />
-                        </div>
-                      )}
-
-                      {/* Stock Badge */}
-                      {item.type === 'product' && (
-                        <span
-                          className={`absolute top-2.5 right-2.5 text-[9px] font-extrabold px-2 py-0.5 rounded-full border ${
-                            isOutOfStock
-                              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                              : isLowStock
-                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                          }`}
-                        >
-                          {isOutOfStock ? 'Agotado' : `${stockVal} disp.`}
-                        </span>
-                      )}
-
-                      <div className="pr-12">
-                        <span className="text-[10px] text-slate-400 uppercase tracking-wider font-extrabold block truncate">
-                          {item.category || (item.type === 'service' ? 'Servicio' : 'General')}
-                        </span>
-                        <h4 className="font-bold text-foreground text-xs mt-0.5 line-clamp-2">
-                          {item.name}
-                        </h4>
-                        {item.sku && (
-                          <span className="text-[9px] font-mono text-slate-400 mt-0.5 block truncate">
-                            {item.sku}
+                        ) : (
+                          <div className="w-12 h-12 rounded-xl bg-slate-200/70 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                            {item.type === 'service' ? <span className="text-xl">✂️</span> : <Package size={24} />}
+                          </div>
+                        )}
+                        {/* Stock Badge flotante sobre la foto */}
+                        {item.type === 'product' && (
+                          <span
+                            className={`absolute top-2 right-2 text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-xs ${
+                              isOutOfStock
+                                ? 'bg-rose-500 text-white border-rose-600'
+                                : isLowStock
+                                ? 'bg-amber-500 text-white border-amber-600'
+                                : 'bg-emerald-600 text-white border-emerald-700'
+                            }`}
+                          >
+                            {isOutOfStock ? 'Agotado' : `${stockVal} disp.`}
                           </span>
                         )}
                       </div>
 
-                      {/* Precio Dual: USD ($) + Bolívares (Bs) */}
-                      <div className="mt-3 pt-2 border-t border-border/40 flex items-baseline justify-between">
+                      <div className="space-y-1">
+                        <span className="text-[11px] text-slate-600 dark:text-slate-300 uppercase tracking-wider font-extrabold block truncate">
+                          {item.category || (item.type === 'service' ? 'Servicio' : 'General')}
+                        </span>
+                        <h4 className="font-black text-slate-900 dark:text-white text-sm sm:text-base leading-snug line-clamp-2">
+                          {item.name}
+                        </h4>
+                        {item.sku && (
+                          <span className="text-[10px] font-mono font-bold text-slate-500 block truncate">
+                            SKU: {item.sku}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Precio Dual: USD ($) + Bolívares (Bs) con Alto Contraste */}
+                      <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between">
                         <div>
-                          <span className="text-sm font-black text-foreground font-mono block">
+                          <span className="text-base sm:text-lg font-black text-emerald-700 dark:text-emerald-400 font-mono block leading-tight">
                             ${priceUSD.toFixed(2)}
                           </span>
-                          <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 font-mono block">
-                            ≈ Bs. {priceVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <span className="text-xs font-black text-blue-700 dark:text-blue-300 font-mono block">
+                            Bs. {priceVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
-                        <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black">
+                        <span className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-black shadow-xs group-hover:scale-105 active:scale-90 transition-transform">
                           +
                         </span>
                       </div>
@@ -1537,7 +1528,7 @@ function CajaPageContent() {
               </div>
             ) : (
               /* VISTA LISTA COMPACTA BIMONEDA */
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {filteredItems.map((item) => {
                   const stockVal = item.stock ?? item.stock_quantity ?? 0;
                   const isOutOfStock = item.type === 'product' && stockVal <= 0;
@@ -1549,51 +1540,62 @@ function CajaPageContent() {
                     <div
                       key={item.id}
                       onClick={() => !isOutOfStock && addLine(item)}
-                      className={`p-2.5 rounded-xl border flex items-center justify-between gap-3 text-xs transition-all ${
+                      className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
                         isOutOfStock
                           ? 'opacity-40 border-border cursor-not-allowed bg-slate-50 dark:bg-slate-900/30'
                           : 'border-border bg-card hover:border-indigo-500 cursor-pointer hover:bg-indigo-50/20 dark:hover:bg-indigo-950/20'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        {itemImage && (
-                          <img
-                            src={itemImage}
-                            alt={item.name}
-                            className="w-9 h-9 rounded-lg object-cover border border-border/60 shrink-0 bg-slate-100 dark:bg-slate-800"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = 'none';
-                            }}
-                          />
-                        )}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-12 h-12 rounded-xl overflow-hidden border border-border/60 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                          {itemImage ? (
+                            <img
+                              src={itemImage}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                const parent = (e.target as HTMLElement).parentElement;
+                                if (parent) parent.innerHTML = '<div class="text-base">📦</div>';
+                              }}
+                            />
+                          ) : (
+                            <div className="text-slate-400">
+                              {item.type === 'service' ? <span>✂️</span> : <Package size={18} />}
+                            </div>
+                          )}
+                        </div>
                         <div className="min-w-0 flex-1">
-                          <span className="font-bold text-foreground block truncate">{item.name}</span>
-                          <span className="text-[10px] text-slate-400 flex items-center gap-2">
-                            <span>{item.sku || 'Sin SKU'}</span>
-                            <span>•</span>
+                          <span className="font-black text-slate-900 dark:text-white text-sm block truncate leading-tight">{item.name}</span>
+                          <span className="text-xs font-bold text-slate-600 dark:text-slate-300 flex items-center gap-2 mt-0.5">
                             <span>{item.category || 'General'}</span>
+                            {item.sku && (
+                              <>
+                                <span>•</span>
+                                <span className="font-mono text-slate-500 font-bold">{item.sku}</span>
+                              </>
+                            )}
                           </span>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
                         {item.type === 'product' && (
-                          <span className={`text-[10px] font-bold ${stockVal > 0 ? 'text-slate-500' : 'text-rose-500'}`}>
-                            {stockVal} disp.
+                          <span className={`text-[11px] font-black px-2 py-0.5 rounded-full ${stockVal > 0 ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'}`}>
+                            {stockVal > 0 ? `${stockVal} disp.` : 'Agotado'}
                           </span>
                         )}
                         <div className="text-right">
-                          <span className="font-mono font-black text-xs text-foreground block">
+                          <span className="font-mono font-black text-sm text-emerald-700 dark:text-emerald-400 block">
                             ${priceUSD.toFixed(2)}
                           </span>
-                          <span className="font-mono text-[9px] text-blue-600 dark:text-blue-400 font-bold block">
+                          <span className="font-mono text-[11px] text-blue-700 dark:text-blue-300 font-black block">
                             Bs. {priceVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         </div>
                         <button
                           type="button"
                           disabled={isOutOfStock}
-                          className="px-2.5 py-1 bg-primary text-primary-foreground rounded-lg text-[10px] font-black hover:bg-primary/90 transition-all btn-haptic disabled:opacity-40"
+                          className="px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-black hover:bg-emerald-700 transition-all btn-haptic disabled:opacity-40"
                         >
                           + Agregar
                         </button>
@@ -3198,78 +3200,29 @@ function CajaPageContent() {
               )}
             </div>
 
-            {/* Formulario para Agregar Nueva Cuenta */}
-            <form onSubmit={handleSaveBankAccount} className="pt-3 border-t border-border space-y-2.5">
-              <h4 className="font-bold text-xs text-foreground uppercase tracking-wider">
-                + Registrar Nueva Cuenta / Pago Móvil
-              </h4>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <input
-                  type="text"
-                  required
-                  placeholder="Banco (ej. Banesco, Mercantil)"
-                  value={newAccount.bank_name}
-                  onChange={(e) => setNewAccount({ ...newAccount, bank_name: e.target.value })}
-                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground"
-                />
-
-                <select
-                  value={newAccount.account_type}
-                  onChange={(e) => setNewAccount({ ...newAccount, account_type: e.target.value })}
-                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground"
-                >
-                  <option value="corriente">Corriente</option>
-                  <option value="ahorro">Ahorro</option>
-                  <option value="pago_movil">Pago Móvil</option>
-                  <option value="zelle">Zelle / Dólares</option>
-                </select>
-
-                <input
-                  type="text"
-                  required
-                  placeholder="N° de Cuenta o Teléfono"
-                  value={newAccount.account_number}
-                  onChange={(e) => setNewAccount({ ...newAccount, account_number: e.target.value })}
-                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground font-mono"
-                />
-
-                <input
-                  type="text"
-                  required
-                  placeholder="Nombre del Titular"
-                  value={newAccount.holder_name}
-                  onChange={(e) => setNewAccount({ ...newAccount, holder_name: e.target.value })}
-                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Cédula / RIF (opcional)"
-                  value={newAccount.tax_id}
-                  onChange={(e) => setNewAccount({ ...newAccount, tax_id: e.target.value })}
-                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground"
-                />
-
-                <input
-                  type="text"
-                  placeholder="Teléfono Pago Móvil (opcional)"
-                  value={newAccount.phone}
-                  onChange={(e) => setNewAccount({ ...newAccount, phone: e.target.value })}
-                  className="bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground"
-                />
+            {/* Aviso de Configuración de Cuentas (Centralizado en Ajustes) */}
+            <div className="pt-4 border-t border-border bg-slate-50/70 dark:bg-slate-900/60 rounded-2xl p-4 text-center space-y-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                <Landmark size={20} />
               </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button
-                  type="submit"
-                  disabled={isSavingAccount || !newAccount.bank_name || !newAccount.holder_name}
-                  className="px-4 py-2 bg-primary text-primary-foreground font-bold text-xs rounded-xl transition-all btn-haptic disabled:opacity-40"
-                >
-                  {isSavingAccount ? 'Guardando...' : 'Guardar Cuenta'}
-                </button>
-              </div>
-            </form>
+              <p className="text-xs font-black text-foreground">
+                ¿Deseas agregar o editar cuentas bancarias o Pago Móvil?
+              </p>
+              <p className="text-[11px] text-slate-500 max-w-sm mx-auto leading-relaxed">
+                Por seguridad contable y trazabilidad, las cuentas se gestionan de forma centralizada desde <strong>Ajustes &gt; Cuentas Bancarias</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBankModalOpen(false);
+                  window.location.href = '/configuracion';
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all btn-haptic"
+              >
+                <Landmark size={14} />
+                <span>Ir a Ajustes (Cuentas)</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

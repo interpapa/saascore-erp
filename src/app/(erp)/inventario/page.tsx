@@ -608,75 +608,10 @@ export default function InventarioPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
-      {/* Cabecera Principal */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shrink-0">
-              <Package size={24} />
-            </div>
-            <div>
-              <h1 className="text-3xl font-black text-foreground tracking-tight">Inventario de Mercancías</h1>
-              <p className="text-slate-500 text-sm font-medium">Control de existencias, valuación contable, costos de adquisición y reposición</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full md:w-auto justify-end">
-          <button
-            onClick={() => {
-              setStockModalItemId('');
-              setIsStockModalOpen(true);
-            }}
-            className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-xs btn-haptic flex items-center gap-2"
-          >
-            <PackagePlus size={16} />
-            Ajuste de Stock
-          </button>
-
-          <button
-            onClick={handleExportCSV}
-            className="btn-base bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-bold text-xs px-3 py-2.5 rounded-xl border border-border btn-haptic flex items-center gap-1.5"
-            title="Exportar a CSV / Excel"
-          >
-            <Download size={15} />
-            Exportar CSV
-          </button>
-
-          <button
-            onClick={() => setIsCsvModalOpen(true)}
-            className="btn-base bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-bold text-xs px-3 py-2.5 rounded-xl border border-border btn-haptic flex items-center gap-1.5"
-          >
-            <FileSpreadsheet size={15} />
-            Importar
-          </button>
-
-          {isDentalActive && (
-            <button
-              onClick={handleSyncDentalProcedures}
-              disabled={isSyncingDental}
-              className="btn-base bg-teal-600/10 hover:bg-teal-600/20 text-teal-700 dark:text-teal-400 font-bold text-xs px-3 py-2.5 rounded-xl border border-teal-500/30 btn-haptic flex items-center gap-1.5"
-              title="Sincronizar procedimientos maestros de odontología en este catálogo"
-            >
-              <span>🦷</span>
-              <span>{isSyncingDental ? 'Sincronizando...' : 'Sincronizar Odontología'}</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => {
-              setEditingItem(null);
-              setIsModalOpen(true);
-            }}
-            className="btn-base bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs px-4 py-2.5 rounded-xl shadow-md btn-haptic flex items-center gap-2"
-          >
-            <Plus size={16} />
-            Nuevo Artículo
-          </button>
-        </div>
-      </div>
-
-      {globalViewMode === 'express' ? (
+      {/* ─────────────────────────────────────────────────────────────
+          1. VISTA MÓVIL OPTIMIZADA (0 Ruido, Táctil, Fotos y Pestañas)
+         ───────────────────────────────────────────────────────────── */}
+      <div className="block md:hidden">
         <InventarioExpress
           items={items}
           tenantId={activeTenant?.id || ''}
@@ -697,8 +632,79 @@ export default function InventarioPage() {
           auditLogs={auditLogs}
           isLoading={isLoading}
         />
-      ) : (
-        <>
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          2. VISTA ESCRITORIO (Centro de Mando Gerencial y Métricas)
+         ───────────────────────────────────────────────────────────── */}
+      <div className="hidden md:block space-y-6">
+        {/* Cabecera Principal Escritorio */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20 shrink-0">
+                <Package size={24} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black text-foreground tracking-tight">Inventario de Mercancías</h1>
+                <p className="text-slate-500 text-sm font-medium">Control de existencias, valuación contable, costos de adquisición y reposición</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full md:w-auto justify-end">
+            <button
+              onClick={() => {
+                setStockModalItemId('');
+                setIsStockModalOpen(true);
+              }}
+              className="btn-base bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl shadow-xs btn-haptic flex items-center gap-2"
+            >
+              <PackagePlus size={16} />
+              Ajuste de Stock
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              className="btn-base bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-bold text-xs px-3 py-2.5 rounded-xl border border-border btn-haptic flex items-center gap-1.5"
+              title="Exportar a CSV / Excel"
+            >
+              <Download size={15} />
+              Exportar CSV
+            </button>
+
+            <button
+              onClick={() => setIsCsvModalOpen(true)}
+              className="btn-base bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-bold text-xs px-3 py-2.5 rounded-xl border border-border btn-haptic flex items-center gap-1.5"
+            >
+              <FileSpreadsheet size={15} />
+              Importar
+            </button>
+
+            {isDentalActive && (
+              <button
+                onClick={handleSyncDentalProcedures}
+                disabled={isSyncingDental}
+                className="btn-base bg-teal-600/10 hover:bg-teal-600/20 text-teal-700 dark:text-teal-400 font-bold text-xs px-3 py-2.5 rounded-xl border border-teal-500/30 btn-haptic flex items-center gap-1.5"
+                title="Sincronizar procedimientos maestros de odontología en este catálogo"
+              >
+                <span>🦷</span>
+                <span>{isSyncingDental ? 'Sincronizando...' : 'Sincronizar Odontología'}</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => {
+                setEditingItem(null);
+                setIsModalOpen(true);
+              }}
+              className="btn-base bg-primary hover:bg-primary/90 text-primary-foreground font-black text-xs px-4 py-2.5 rounded-xl shadow-md btn-haptic flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Nuevo Artículo
+            </button>
+          </div>
+        </div>
           {/* Tarjetas de Métricas Odoo / SAP */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* KPI 1: Valuación al Costo (Activo Realizable) */}
@@ -1158,8 +1164,7 @@ export default function InventarioPage() {
           <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
         </div>
       )}
-      </>
-      )}
+      </div>
 
       {/* Modal de Creación / Edición Odoo */}
       <CatalogModal

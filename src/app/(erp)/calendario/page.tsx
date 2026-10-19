@@ -479,10 +479,40 @@ export default function CalendarioPage() {
         </div>
       </div>
 
-      {globalViewMode === 'express' ? (
+      {/* ─────────────────────────────────────────────────────────────
+          1. VISTA MÓVIL OPERATIVA (1 profesional a la vez con selector táctil)
+         ───────────────────────────────────────────────────────────── */}
+      <div className="block md:hidden">
+        <DailyTimelineExpress
+          appointments={appointments}
+          employees={bookableEmployees}
+          onSelectAppointment={handleSelectAppointment}
+          onUpdateStatus={handleUpdateStatus}
+          onOpenCreateModal={() => {
+            setSelectedDateForCreate(currentDate);
+            setCreateModalType('appointment');
+            setIsCreateModalOpen(true);
+          }}
+          currentDate={currentDate}
+          onDateChange={setCurrentDate}
+          isDentalActive={isDentalActive}
+          onOpenBlockModal={() => {
+            setSelectedDateForCreate(currentDate);
+            setCreateModalType('block');
+            setIsCreateModalOpen(true);
+          }}
+        />
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          2. VISTA ESCRITORIO (Centro de Mando con Grilla Multi-Recurso)
+         ───────────────────────────────────────────────────────────── */}
+      <div className="hidden md:block space-y-6">
+        {globalViewMode === 'express' ? (
         <div className="animate-in fade-in duration-200">
           <DailyTimelineExpress
             appointments={appointments}
+            employees={bookableEmployees}
             onSelectAppointment={handleSelectAppointment}
             onUpdateStatus={handleUpdateStatus}
             onOpenCreateModal={() => {
@@ -544,7 +574,8 @@ export default function CalendarioPage() {
             }}
           />
         </>
-      )}
+        )}
+      </div>
 
       {/* Create Appointment Modal */}
       <AppointmentModal

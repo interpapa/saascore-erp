@@ -8,6 +8,7 @@ import { GeneralJournalTable } from '@/components/contabilidad/GeneralJournalTab
 import { TrialBalanceTable } from '@/components/contabilidad/TrialBalanceTable';
 import { IncomeStatementCard } from '@/components/contabilidad/IncomeStatementCard';
 import { CreateJournalEntryModal } from '@/components/contabilidad/CreateJournalEntryModal';
+import { MobileBankingFeed } from '@/components/contabilidad/MobileBankingFeed';
 import { useToast } from '@/components/core/ToastProvider';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -226,12 +227,29 @@ export default function ContabilidadPage() {
 
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative z-10">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
-        <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight">
-            Contabilidad NIIF / IFRS
-          </h1>
+      {/* ─────────────────────────────────────────────────────────────
+          1. VISTA MÓVIL: FEED BANCARIO ERGONÓMICO TIPO APP BANCARIA
+         ───────────────────────────────────────────────────────────── */}
+      <div className="block md:hidden">
+        <MobileBankingFeed
+          journalEntries={journalEntries}
+          trialBalance={trialBalance}
+          incomeStatement={incomeStatement}
+          isLoading={isLoading}
+          onRefresh={fetchAccountingData}
+        />
+      </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          2. VISTA ESCRITORIO: CENTRO DE MANDO CONTABLE COMPLETO NIIF
+         ───────────────────────────────────────────────────────────── */}
+      <div className="hidden md:block space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/60 pb-5">
+          <div>
+            <h1 className="text-3xl font-black text-foreground tracking-tight">
+              Contabilidad NIIF / IFRS
+            </h1>
           <p className="text-slate-600 dark:text-slate-400 font-medium text-sm">
             Libro Mayor, Balance de Comprobación y Estado de Resultados
           </p>
@@ -318,6 +336,7 @@ export default function ContabilidadPage() {
           <AuditTrailSection logs={auditLogs as any} isLoading={isLoadingAudit} />
         </div>
       )}
+      </div>
 
       {/* Create Journal Entry Modal */}
       <CreateJournalEntryModal

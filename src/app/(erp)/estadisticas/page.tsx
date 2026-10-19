@@ -935,8 +935,8 @@ export default function EstadisticasPage() {
           </p>
         </div>
 
-        {/* Acciones de Cabecera */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Acciones de Cabecera (Solo visibles en PC para mantener móvil limpio) */}
+        <div className="hidden md:flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleExportCSV}
             className="btn-base btn-secondary btn-haptic flex items-center gap-2 text-xs py-2 px-3"
@@ -956,19 +956,19 @@ export default function EstadisticasPage() {
         </div>
       </div>
 
-      {/* ── Selector de Período y Pestañas de Dominio ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        {/* Selector de Período Temporal */}
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex p-1 bg-muted/60 border border-border rounded-xl">
+      {/* ── Selector de Período y Pestañas de Dominio (Táctiles & Modernas) ── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        {/* Selector de Período Temporal Segmentado */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl border border-border overflow-x-auto no-scrollbar shadow-2xs">
             {(
               [
                 { id: 'today', label: 'Hoy' },
-                { id: 'week', label: 'Esta Semana' },
-                { id: 'month', label: 'Este Mes' },
-                { id: 'year', label: 'Este Año' },
+                { id: 'week', label: '7D' },
+                { id: 'month', label: 'Mes' },
+                { id: 'year', label: 'Año' },
                 { id: 'all', label: 'Histórico' },
-                { id: 'custom', label: 'Personalizado' },
+                { id: 'custom', label: '📅 Rango' },
               ] as const
             ).map((p) => {
               const active = period === p.id;
@@ -977,11 +977,11 @@ export default function EstadisticasPage() {
                   key={p.id}
                   onClick={() => setPeriod(p.id)}
                   className={`
-                    px-3 py-1.5 text-xs font-semibold rounded-lg transition-all
+                    flex-1 sm:flex-initial px-3.5 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap btn-haptic
                     ${
                       active
                         ? 'bg-card text-foreground shadow-xs border border-border/80'
-                        : 'text-muted-foreground hover:text-foreground'
+                        : 'text-slate-500 hover:text-foreground'
                     }
                   `}
                 >
@@ -992,36 +992,36 @@ export default function EstadisticasPage() {
           </div>
 
           {period === 'custom' && (
-            <div className="flex items-center gap-2 p-1.5 bg-card border border-border rounded-xl text-xs animate-in fade-in duration-150 shadow-2xs">
-              <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2 p-2 bg-card border border-border rounded-2xl text-xs animate-in fade-in duration-150 shadow-xs flex-wrap">
+              <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">Desde:</span>
                 <input
                   type="date"
                   value={customStartDate}
                   onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="bg-background border border-border rounded-lg px-2 py-0.5 text-xs text-foreground font-mono"
+                  className="w-full bg-background border border-border rounded-xl px-2 py-1 text-xs text-foreground font-mono"
                 />
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5 flex-1 min-w-[120px]">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase">Hasta:</span>
                 <input
                   type="date"
                   value={customEndDate}
                   onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="bg-background border border-border rounded-lg px-2 py-0.5 text-xs text-foreground font-mono"
+                  className="w-full bg-background border border-border rounded-xl px-2 py-1 text-xs text-foreground font-mono"
                 />
               </div>
             </div>
           )}
         </div>
 
-        {/* Pestañas de Dominio (Adaptativas a Módulos Habilitados) */}
-        <div className="inline-flex p-1 bg-muted/40 border border-border/60 rounded-xl overflow-x-auto">
+        {/* Pestañas de Dominio (Adaptativas, Ergonómicas y Táctiles) */}
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900 border border-border rounded-2xl overflow-x-auto no-scrollbar shadow-2xs w-full lg:w-auto">
           {[
-            { id: 'overview' as const, label: 'Cockpit Central', icon: Activity },
-            { id: 'sales' as const, label: 'Ventas & Facturación', icon: DollarSign },
-            ...(hasInventario ? [{ id: 'inventory' as const, label: 'Inventario & Costos', icon: Package }] : []),
-            { id: 'operations' as const, label: 'Operaciones & Cartera', icon: Calendar },
+            { id: 'overview' as const, label: 'Cockpit', icon: Activity },
+            { id: 'sales' as const, label: 'Ventas', icon: DollarSign },
+            ...(hasInventario ? [{ id: 'inventory' as const, label: 'Inventario', icon: Package }] : []),
+            { id: 'operations' as const, label: 'Operaciones', icon: Calendar },
           ].map((t) => {
             const active = activeTab === t.id;
             const Icon = t.icon;
@@ -1030,16 +1030,16 @@ export default function EstadisticasPage() {
                 key={t.id}
                 onClick={() => setActiveTab(t.id)}
                 className={`
-                  flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all whitespace-nowrap
+                  flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl transition-all whitespace-nowrap btn-haptic
                   ${
                     active
-                      ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                      : 'text-muted-foreground hover:text-foreground'
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-slate-500 hover:text-foreground'
                   }
                 `}
               >
                 <Icon size={14} />
-                {t.label}
+                <span>{t.label}</span>
               </button>
             );
           })}
@@ -1047,11 +1047,11 @@ export default function EstadisticasPage() {
       </div>
 
       {/* ─────────────────────────────────────────────
-         BANNER DE CAJA POS EN VIVO (ARQUEO REAL)
-         Solo visible si el módulo de Caja está habilitado
+         BANNER DE CAJA POS EN VIVO (ARQUEO REAL EN PC)
+         Solo visible en PC para no saturar al usuario móvil
       ───────────────────────────────────────────── */}
       {hasCaja && (
-        <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="hidden md:flex bg-card border border-border rounded-2xl p-4 sm:p-5 flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
