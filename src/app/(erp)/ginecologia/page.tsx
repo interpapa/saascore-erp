@@ -69,8 +69,20 @@ import {
   GINECO_CIE10_CATALOG, 
   GINECO_PRESCRIPTION_TEMPLATES, 
   mergeTenantGinecoServices,
-  GinecoProcedureDefinition 
+  GinecoProcedureDefinition,
+  BLOOD_TYPES,
+  ALLERGY_PRESETS,
+  MEDICATION_PRESETS,
+  SURGERY_PRESETS,
+  FAMILY_ANTECEDENT_PRESETS,
+  MENSTRUAL_RHYTHM_PRESETS,
+  CONTRACEPTIVE_PRESETS,
+  CESAREAN_REASON_PRESETS,
+  ABORTION_TYPE_PRESETS,
+  ABORTION_RESOLUTION_PRESETS,
+  BETHESDA_PRESETS,
 } from '@/lib/ginecologia/proceduresCatalog';
+import { VENEZUELA_STATES, getCitiesForState } from '@/lib/medical/venezuelaGeo';
 import { GestationalWheelWidget } from '@/components/ginecologia/GestationalWheelWidget';
 import { GinecoPrescriptionPrintModal } from '@/components/ginecologia/GinecoPrescriptionPrintModal';
 import { GinecoClinicalGuideModal } from '@/components/ginecologia/GinecoClinicalGuideModal';
@@ -123,6 +135,9 @@ export default function GinecologiaPage() {
   const [newPatientPhone, setNewPatientPhone] = useState('');
   const [newPatientBirthDate, setNewPatientBirthDate] = useState('');
   const [newPatientAllergies, setNewPatientAllergies] = useState('');
+  const [newPatientBloodType, setNewPatientBloodType] = useState('O+');
+  const [newPatientState, setNewPatientState] = useState('Distrito Capital');
+  const [newPatientCity, setNewPatientCity] = useState('Caracas');
   const [isSubmittingPatient, setIsSubmittingPatient] = useState(false);
 
   // Búsqueda interactiva
@@ -133,8 +148,8 @@ export default function GinecologiaPage() {
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const [demographics, setDemographics] = useState({
     address: '',
-    city: '',
-    state: '',
+    city: 'Caracas',
+    state: 'Distrito Capital',
     phoneHome: '',
     phoneCell: '',
     email: '',
@@ -143,7 +158,9 @@ export default function GinecologiaPage() {
     education: 'Universitario',
     referredBy: 'Iniciativa propia',
     birthPlace: '',
+    bloodTypeRh: 'O+',
   });
+  const [isCustomCity, setIsCustomCity] = useState(false);
 
   const [spouseData, setSpouseData] = useState({
     name: '',
@@ -198,7 +215,10 @@ export default function GinecologiaPage() {
     partosEutocicos: 0,
     partosDistocicos: 0,
     cesareaReason: 'ESTRECHA',
+    cesareaNotes: '',
     abortoType: 'ESPONTANEO',
+    abortoResolution: 'AMEU',
+    abortoNotes: '',
     hijosVarones: 0,
     hijosHembras: 0,
     pesoMaxFetalGrams: 3500,
@@ -208,6 +228,7 @@ export default function GinecologiaPage() {
     isPregnant: true,
     fppNaegele: '',
     plannedDeliveryPlace: 'Clínica Privada',
+    complicationsPrev: '',
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -420,7 +441,15 @@ export default function GinecologiaPage() {
     const p = patients.find((pat) => pat.id === selectedPatientId);
     if (p && p.metadata) {
       const meta = p.metadata;
-      if (meta.demographics) setDemographics((prev) => ({ ...prev, ...meta.demographics }));
+      if (meta.demographics) {
+        setDemographics((prev) => ({
+          ...prev,
+          ...meta.demographics,
+          bloodTypeRh: meta.demographics.bloodTypeRh || meta.blood_type || prev.bloodTypeRh || 'O+',
+        }));
+      } else if (meta.blood_type) {
+        setDemographics((prev) => ({ ...prev, bloodTypeRh: meta.blood_type }));
+      }
       if (meta.spouse_data) setSpouseData((prev) => ({ ...prev, ...meta.spouse_data }));
       if (meta.medical_antecedents) setMedicalAntecedents((prev) => ({ ...prev, ...meta.medical_antecedents }));
       if (meta.extended_obstetrics) setExtendedObstetrics((prev) => ({ ...prev, ...meta.extended_obstetrics }));
@@ -440,6 +469,7 @@ export default function GinecologiaPage() {
         spouse_data: spouseData,
         medical_antecedents: medicalAntecedents,
         extended_obstetrics: extendedObstetrics,
+        blood_type: demographics.bloodTypeRh,
         allergies: medicalAntecedents.personalAllergies || profile.alergias,
         fum: profile.fum,
       };
@@ -480,6 +510,12 @@ export default function GinecologiaPage() {
           metadata: {
             birth_date: newPatientBirthDate || undefined,
             allergies: newPatientAllergies.trim() || undefined,
+            blood_type: newPatientBloodType,
+            demographics: {
+              state: newPatientState,
+              city: newPatientCity,
+              bloodTypeRh: newPatientBloodType,
+            },
             has_clinical_history: true,
             has_history: true,
           },
@@ -497,6 +533,7 @@ export default function GinecologiaPage() {
         setNewPatientPhone('');
         setNewPatientBirthDate('');
         setNewPatientAllergies('');
+        setNewPatientBloodType('O+');
         toast({ variant: 'success', title: 'Paciente Creada', description: 'Expediente ginecológico iniciado.' });
       } else {
         toast({ variant: 'error', title: 'Error', description: res.error || 'No se pudo crear.' });
@@ -886,6 +923,9 @@ export default function GinecologiaPage() {
                   <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-[11px] font-bold">
                     C.I: {activePatient?.tax_id || 'S/C'}
                   </span>
+                  <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 font-black text-[11px] flex items-center gap-1 border border-rose-500/20">
+                    <Heart size={11} className="fill-rose-500 text-rose-500" /> {demographics.bloodTypeRh || 'O+'}
+                  </span>
                   {extendedObstetrics.isPregnant && (
                     <span className="px-2.5 py-0.5 rounded-full bg-pink-500/20 text-pink-600 dark:text-pink-300 text-[11px] font-black uppercase tracking-wider animate-pulse">
                       🤰 En Gestante
@@ -898,7 +938,7 @@ export default function GinecologiaPage() {
                   )}
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5">
-                  FUM: {profile.fum || 'Sin FUM'} | Médico: {activeDoctor?.name || 'Ginecólogo/a'} | Tel: {activePatient?.phone || 'Sin teléfono'}
+                  FUM: {profile.fum || 'Sin FUM'} | Médico: {activeDoctor?.name || 'Ginecólogo/a'} | Tel: {activePatient?.phone || 'Sin teléfono'}{demographics.city ? ` · ${demographics.city}, ${demographics.state}` : ''}
                 </p>
               </div>
             </div>
@@ -1010,44 +1050,130 @@ export default function GinecologiaPage() {
               <div className="space-y-3 text-xs">
                 {/* 1. PACIENTE */}
                 {patientChartTab === 'paciente' && (
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
+                    {/* Dirección */}
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 block mb-1">Dirección de Habitación</label>
                       <input
                         type="text"
                         value={demographics.address}
                         onChange={(e) => setDemographics({ ...demographics, address: e.target.value })}
-                        placeholder="Calle, Residencia, Apto..."
-                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                        placeholder="Calle, Residencia, Edificio, Apto..."
+                        className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Ciudad</label>
-                        <input
-                          type="text"
-                          value={demographics.city}
-                          onChange={(e) => setDemographics({ ...demographics, city: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
-                        />
+
+                    {/* Geografía de Venezuela: Estado y Ciudad en Cascada */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-pink-600 dark:text-pink-400 flex items-center gap-1">
+                          🇻🇪 Ubicación (Venezuela)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsCustomCity(!isCustomCity)}
+                          className="text-[10px] font-bold text-slate-400 hover:text-pink-500 underline"
+                        >
+                          {isCustomCity ? '← Usar lista desplegable' : '✏️ Escribir ciudad manual'}
+                        </button>
                       </div>
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Estado</label>
-                        <input
-                          type="text"
-                          value={demographics.state}
-                          onChange={(e) => setDemographics({ ...demographics, state: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
-                        />
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-1">Estado</label>
+                          <select
+                            value={demographics.state || 'Distrito Capital'}
+                            onChange={(e) => {
+                              const newState = e.target.value;
+                              const cities = getCitiesForState(newState);
+                              setDemographics({
+                                ...demographics,
+                                state: newState,
+                                city: cities[0] || '',
+                              });
+                            }}
+                            className="w-full p-2 rounded-xl bg-card border border-border text-xs font-semibold"
+                          >
+                            {VENEZUELA_STATES.map((st) => (
+                              <option key={st} value={st}>
+                                {st}
+                              </option>
+                            ))}
+                            <option value="Otro">Otro / Fuera del país</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 block mb-1">Ciudad / Municipio</label>
+                          {isCustomCity ? (
+                            <input
+                              type="text"
+                              value={demographics.city}
+                              onChange={(e) => setDemographics({ ...demographics, city: e.target.value })}
+                              placeholder="Escribe la ciudad o sector..."
+                              className="w-full p-2 rounded-xl bg-card border border-border text-xs font-semibold"
+                            />
+                          ) : (
+                            <select
+                              value={demographics.city}
+                              onChange={(e) => {
+                                if (e.target.value === '__custom__') {
+                                  setIsCustomCity(true);
+                                  setDemographics({ ...demographics, city: '' });
+                                } else {
+                                  setDemographics({ ...demographics, city: e.target.value });
+                                }
+                              }}
+                              className="w-full p-2 rounded-xl bg-card border border-border text-xs font-semibold"
+                            >
+                              {getCitiesForState(demographics.state || 'Distrito Capital').map((ct) => (
+                                <option key={ct} value={ct}>
+                                  {ct}
+                                </option>
+                              ))}
+                              <option value="__custom__">✏️ Otra / No listada...</option>
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Grupo Sanguíneo & Rh */}
+                    <div className="p-3 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-500/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                          <Heart size={12} className="fill-rose-500 text-rose-500" /> Grupo Sanguíneo & Factor Rh
+                        </label>
+                        <span className="text-[11px] font-black font-mono text-rose-600">
+                          {demographics.bloodTypeRh || 'O+'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {BLOOD_TYPES.map((bt) => (
+                          <button
+                            key={bt}
+                            type="button"
+                            onClick={() => setDemographics({ ...demographics, bloodTypeRh: bt })}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all ${
+                              demographics.bloodTypeRh === bt
+                                ? 'bg-rose-500 text-white shadow-xs'
+                                : 'bg-card border border-border hover:border-rose-400 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            {bt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Estado Civil y Ocupación */}
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 block mb-1">Estado Civil</label>
                         <select
                           value={demographics.civilStatus}
                           onChange={(e) => setDemographics({ ...demographics, civilStatus: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs"
                         >
                           <option value="Soltera">Soltera</option>
                           <option value="Casada">Casada</option>
@@ -1062,7 +1188,8 @@ export default function GinecologiaPage() {
                           type="text"
                           value={demographics.occupation}
                           onChange={(e) => setDemographics({ ...demographics, occupation: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                          placeholder="Profesión u ocupación..."
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs"
                         />
                       </div>
                     </div>
@@ -1071,14 +1198,15 @@ export default function GinecologiaPage() {
 
                 {/* 2. CÓNYUGE / PAREJA */}
                 {patientChartTab === 'conyugue' && (
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     <div>
                       <label className="text-[10px] font-bold text-slate-400 block mb-1">Nombre de la Pareja</label>
                       <input
                         type="text"
                         value={spouseData.name}
                         onChange={(e) => setSpouseData({ ...spouseData, name: e.target.value })}
-                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                        placeholder="Nombre y apellido del cónyuge..."
+                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1088,27 +1216,91 @@ export default function GinecologiaPage() {
                           type="text"
                           value={spouseData.taxId}
                           onChange={(e) => setSpouseData({ ...spouseData, taxId: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border font-mono"
+                          placeholder="V-..."
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border font-mono text-xs"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Grupo Sanguíneo & Rh</label>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Teléfono</label>
                         <input
                           type="text"
-                          value={spouseData.bloodTypeRh}
-                          onChange={(e) => setSpouseData({ ...spouseData, bloodTypeRh: e.target.value })}
-                          placeholder="Ej: O+ o A-"
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border font-black text-pink-600"
+                          value={spouseData.phone}
+                          onChange={(e) => setSpouseData({ ...spouseData, phone: e.target.value })}
+                          placeholder="0412 / 0414..."
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs"
                         />
                       </div>
                     </div>
+
+                    {/* Grupo Sanguíneo Pareja */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <Heart size={12} className="text-pink-500" /> Grupo Sanguíneo Pareja
+                        </label>
+                        <span className="text-[11px] font-black font-mono text-pink-600">
+                          {spouseData.bloodTypeRh || 'O+'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {BLOOD_TYPES.map((bt) => (
+                          <button
+                            key={bt}
+                            type="button"
+                            onClick={() => setSpouseData({ ...spouseData, bloodTypeRh: bt })}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all ${
+                              spouseData.bloodTypeRh === bt
+                                ? 'bg-pink-500 text-white shadow-xs'
+                                : 'bg-card border border-border hover:border-pink-400 text-slate-600 dark:text-slate-300'
+                            }`}
+                          >
+                            {bt}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Alerta de Incompatibilidad Rh */}
+                      {demographics.bloodTypeRh?.includes('-') && spouseData.bloodTypeRh?.includes('+') && (
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-700 dark:text-amber-400 flex items-start gap-1.5 mt-2">
+                          <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                          <span>
+                            <strong>Incompatibilidad Rh Posible:</strong> Madre Rh (-) y Pareja Rh (+). Se sugiere solicitar Test de Coombs Indirecto seriado e indicación de Inmunoglobulina Anti-D (RhoGAM) en semana 28 de gestación.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Antecedentes de la Pareja con Chips */}
                     <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Antecedentes de la Pareja</label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[10px] font-bold text-slate-400">Antecedentes Clínicos de la Pareja</label>
+                        <span className="text-[9px] text-slate-400">Toca para agregar</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {['Aparentemente sano', 'Hipertensión', 'Diabetes', 'Fumador activo', 'Asma'].map((chip) => (
+                          <button
+                            key={chip}
+                            type="button"
+                            onClick={() => {
+                              const cur = spouseData.medicalNotes.trim();
+                              if (!cur || cur === 'Aparentemente sano.') {
+                                setSpouseData({ ...spouseData, medicalNotes: chip });
+                              } else if (!cur.includes(chip)) {
+                                setSpouseData({ ...spouseData, medicalNotes: `${cur}, ${chip}` });
+                              }
+                            }}
+                            className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-pink-500 hover:text-white transition-all"
+                          >
+                            + {chip}
+                          </button>
+                        ))}
+                      </div>
                       <textarea
                         rows={2}
                         value={spouseData.medicalNotes}
                         onChange={(e) => setSpouseData({ ...spouseData, medicalNotes: e.target.value })}
-                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                        placeholder="Notas médicas o hábitos psicobiológicos de la pareja..."
+                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs"
                       />
                     </div>
                   </div>
@@ -1116,34 +1308,212 @@ export default function GinecologiaPage() {
 
                 {/* 3. ANTECEDENTES F/P */}
                 {patientChartTab === 'antecedentes_fp' && (
-                  <div className="space-y-2.5">
-                    <div>
-                      <label className="text-[10px] font-bold text-red-500 block mb-1">Alergias Medicamentosas (Crítico)</label>
+                  <div className="space-y-3">
+                    {/* Alergias con Chips */}
+                    <div className="p-3 rounded-2xl bg-red-50/60 dark:bg-red-950/20 border border-red-500/20 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-red-600 uppercase flex items-center gap-1">
+                          <AlertCircle size={12} /> Alergias Medicamentosas (Crítico)
+                        </label>
+                        <span className="text-[9px] text-red-500">Toca chips o escribe</span>
+                      </div>
                       <input
                         type="text"
                         value={medicalAntecedents.personalAllergies}
                         onChange={(e) => setMedicalAntecedents({ ...medicalAntecedents, personalAllergies: e.target.value })}
                         placeholder="Penicilina, AINEs, Yodo..."
-                        className="w-full p-2 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-500/30 text-red-600 font-bold"
+                        className="w-full p-2 rounded-xl bg-card border border-red-500/30 text-red-600 font-bold text-xs"
                       />
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {ALLERGY_PRESETS.map((allergy) => {
+                          const isSelected = medicalAntecedents.personalAllergies?.toLowerCase().includes(allergy.toLowerCase());
+                          return (
+                            <button
+                              key={allergy}
+                              type="button"
+                              onClick={() => {
+                                const cur = medicalAntecedents.personalAllergies.trim();
+                                if (allergy === 'Ninguna conocida (NKDA)') {
+                                  setMedicalAntecedents({ ...medicalAntecedents, personalAllergies: 'Ninguna conocida (NKDA)' });
+                                  return;
+                                }
+                                if (isSelected) {
+                                  const updated = cur.replace(new RegExp(`(^|,\\s*)${allergy}`, 'i'), '').replace(/^,\s*/, '').trim();
+                                  setMedicalAntecedents({ ...medicalAntecedents, personalAllergies: updated });
+                                } else {
+                                  const cleanCur = cur === 'Ninguna conocida (NKDA)' ? '' : cur;
+                                  setMedicalAntecedents({
+                                    ...medicalAntecedents,
+                                    personalAllergies: cleanCur ? `${cleanCur}, ${allergy}` : allergy,
+                                  });
+                                }
+                              }}
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                                isSelected
+                                  ? 'bg-red-600 text-white shadow-xs'
+                                  : 'bg-card border border-red-200 dark:border-red-900/40 text-red-700 dark:text-red-300 hover:bg-red-500 hover:text-white'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : '+ '}{allergy}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Cirugías Previas</label>
+
+                    {/* Medicamentos Habituales */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-500 uppercase">
+                          Medicamentos Habituales / Prenatales
+                        </label>
+                        <span className="text-[9px] text-slate-400">Toca chips o escribe</span>
+                      </div>
+                      <input
+                        type="text"
+                        value={medicalAntecedents.personalMedications}
+                        onChange={(e) => setMedicalAntecedents({ ...medicalAntecedents, personalMedications: e.target.value })}
+                        placeholder="Ácido fólico, Hierro, Calcio, Levotiroxina..."
+                        className="w-full p-2 rounded-xl bg-card border border-border text-xs"
+                      />
+                      <div className="flex flex-wrap gap-1">
+                        {MEDICATION_PRESETS.map((med) => {
+                          const isSelected = medicalAntecedents.personalMedications?.toLowerCase().includes(med.toLowerCase());
+                          return (
+                            <button
+                              key={med}
+                              type="button"
+                              onClick={() => {
+                                const cur = medicalAntecedents.personalMedications.trim();
+                                if (med === 'Ninguno') {
+                                  setMedicalAntecedents({ ...medicalAntecedents, personalMedications: 'Ninguno' });
+                                  return;
+                                }
+                                if (isSelected) {
+                                  const updated = cur.replace(new RegExp(`(^|,\\s*)${med}`, 'i'), '').replace(/^,\s*/, '').trim();
+                                  setMedicalAntecedents({ ...medicalAntecedents, personalMedications: updated });
+                                } else {
+                                  const cleanCur = cur === 'Ninguno' ? '' : cur;
+                                  setMedicalAntecedents({
+                                    ...medicalAntecedents,
+                                    personalMedications: cleanCur ? `${cleanCur}, ${med}` : med,
+                                  });
+                                }
+                              }}
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all ${
+                                isSelected
+                                  ? 'bg-pink-600 text-white'
+                                  : 'bg-card border border-border hover:border-pink-400 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : '+ '}{med}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Cirugías Previas */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-500 uppercase">
+                          Cirugías Previas (Quirúrgicos)
+                        </label>
+                        <span className="text-[9px] text-slate-400">Toca chips o escribe</span>
+                      </div>
                       <input
                         type="text"
                         value={medicalAntecedents.personalSurgeries}
                         onChange={(e) => setMedicalAntecedents({ ...medicalAntecedents, personalSurgeries: e.target.value })}
-                        placeholder="Apendicectomía, Laparoscopia..."
-                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                        placeholder="Cesárea, Apendicectomía, Miomectomía..."
+                        className="w-full p-2 rounded-xl bg-card border border-border text-xs"
                       />
+                      <div className="flex flex-wrap gap-1">
+                        {SURGERY_PRESETS.map((surg) => {
+                          const isSelected = medicalAntecedents.personalSurgeries?.toLowerCase().includes(surg.toLowerCase());
+                          return (
+                            <button
+                              key={surg}
+                              type="button"
+                              onClick={() => {
+                                const cur = medicalAntecedents.personalSurgeries.trim();
+                                if (surg === 'Ninguna previa') {
+                                  setMedicalAntecedents({ ...medicalAntecedents, personalSurgeries: 'Ninguna previa' });
+                                  return;
+                                }
+                                if (isSelected) {
+                                  const updated = cur.replace(new RegExp(`(^|,\\s*)${surg}`, 'i'), '').replace(/^,\s*/, '').trim();
+                                  setMedicalAntecedents({ ...medicalAntecedents, personalSurgeries: updated });
+                                } else {
+                                  const cleanCur = cur === 'Ninguna previa' ? '' : cur;
+                                  setMedicalAntecedents({
+                                    ...medicalAntecedents,
+                                    personalSurgeries: cleanCur ? `${cleanCur}, ${surg}` : surg,
+                                  });
+                                }
+                              }}
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all ${
+                                isSelected
+                                  ? 'bg-purple-600 text-white'
+                                  : 'bg-card border border-border hover:border-purple-400 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : '+ '}{surg}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Antecedentes Familiares (HTA, DM, Cáncer)</label>
+
+                    {/* Antecedentes Familiares */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-500 uppercase">
+                          Antecedentes Familiares
+                        </label>
+                        <span className="text-[9px] text-slate-400">Toca chips o escribe</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {FAMILY_ANTECEDENT_PRESETS.map((fam) => {
+                          const isSelected = medicalAntecedents.familyNotes?.toLowerCase().includes(fam.toLowerCase());
+                          return (
+                            <button
+                              key={fam}
+                              type="button"
+                              onClick={() => {
+                                const cur = medicalAntecedents.familyNotes.trim();
+                                if (fam === 'Sin antecedentes relevantes') {
+                                  setMedicalAntecedents({ ...medicalAntecedents, familyNotes: 'Sin antecedentes relevantes' });
+                                  return;
+                                }
+                                if (isSelected) {
+                                  const updated = cur.replace(new RegExp(`(^|,\\s*)${fam}`, 'i'), '').replace(/^,\s*/, '').trim();
+                                  setMedicalAntecedents({ ...medicalAntecedents, familyNotes: updated });
+                                } else {
+                                  const cleanCur = cur === 'Sin antecedentes relevantes' ? '' : cur;
+                                  setMedicalAntecedents({
+                                    ...medicalAntecedents,
+                                    familyNotes: cleanCur ? `${cleanCur}, ${fam}` : fam,
+                                  });
+                                }
+                              }}
+                              className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all ${
+                                isSelected
+                                  ? 'bg-indigo-600 text-white'
+                                  : 'bg-card border border-border hover:border-indigo-400 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {isSelected ? '✓ ' : '+ '}{fam}
+                            </button>
+                          );
+                        })}
+                      </div>
                       <textarea
                         rows={2}
                         value={medicalAntecedents.familyNotes}
                         onChange={(e) => setMedicalAntecedents({ ...medicalAntecedents, familyNotes: e.target.value })}
-                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                        placeholder="Detalles de antecedentes familiares..."
+                        className="w-full p-2 rounded-xl bg-card border border-border text-xs"
                       />
                     </div>
                   </div>
@@ -1151,115 +1521,291 @@ export default function GinecologiaPage() {
 
                 {/* 4. ANT GIN */}
                 {patientChartTab === 'ant_gin' && (
-                  <div className="space-y-2.5">
+                  <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Menarquia (edad)</label>
-                        <input
-                          type="number"
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Menarquia (edad 1ª regla)</label>
+                        <select
                           value={profile.menarquia || 12}
                           onChange={(e) => setProfile({ ...profile, menarquia: Number(e.target.value) })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border font-mono"
-                        />
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs font-mono font-bold"
+                        >
+                          {[9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map((age) => (
+                            <option key={age} value={age}>
+                              {age} años
+                            </option>
+                          ))}
+                        </select>
                       </div>
+
                       <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Ritmo Menstrual</label>
-                        <input
-                          type="text"
-                          value={profile.ritmoMenstrual || '28 x 4'}
-                          onChange={(e) => setProfile({ ...profile, ritmoMenstrual: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border font-mono font-bold"
-                        />
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Sexarquia (Inicio sexual)</label>
+                        <select
+                          value={profile.inicioVidaSexual || 18}
+                          onChange={(e) => setProfile({ ...profile, inicioVidaSexual: Number(e.target.value) })}
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs font-mono font-bold"
+                        >
+                          {[14, 15, 16, 17, 18, 19, 20, 21, 22, 25].map((age) => (
+                            <option key={age} value={age}>
+                              {age} años
+                            </option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 block mb-1">Método Anticonceptivo (MAC)</label>
+
+                    {/* Ritmo Menstrual con Dropdown y Fallback */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-500 uppercase">
+                          Ritmo Menstrual (Intervalo x Días)
+                        </label>
+                        <span className="text-[11px] font-mono font-black text-pink-600">
+                          {profile.ritmoMenstrual || '28 x 4'}
+                        </span>
+                      </div>
+                      <select
+                        value={
+                          MENSTRUAL_RHYTHM_PRESETS.some((p) => p.startsWith(profile.ritmoMenstrual || ''))
+                            ? MENSTRUAL_RHYTHM_PRESETS.find((p) => p.startsWith(profile.ritmoMenstrual || ''))
+                            : '__custom__'
+                        }
+                        onChange={(e) => {
+                          if (e.target.value !== '__custom__') {
+                            const clean = e.target.value.split(' ')[0] + ' x ' + e.target.value.split(' ')[2];
+                            setProfile({ ...profile, ritmoMenstrual: clean });
+                          }
+                        }}
+                        className="w-full p-2 rounded-xl bg-card border border-border text-xs font-semibold"
+                      >
+                        {MENSTRUAL_RHYTHM_PRESETS.map((rhy) => (
+                          <option key={rhy} value={rhy}>
+                            {rhy}
+                          </option>
+                        ))}
+                        <option value="__custom__">✏️ Personalizado (Escribir abajo)...</option>
+                      </select>
+                      <input
+                        type="text"
+                        value={profile.ritmoMenstrual || ''}
+                        onChange={(e) => setProfile({ ...profile, ritmoMenstrual: e.target.value })}
+                        placeholder="Ej: 28 x 4 o 30 x 3-5..."
+                        className="w-full p-2 rounded-xl bg-card border border-border font-mono font-bold text-xs"
+                      />
+                    </div>
+
+                    {/* Método Anticonceptivo (MAC) */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase block">
+                        Método Anticonceptivo (MAC)
+                      </label>
                       <select
                         value={profile.metodoAnticonceptivo || 'Ninguno'}
                         onChange={(e) => setProfile({ ...profile, metodoAnticonceptivo: e.target.value })}
-                        className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                        className="w-full p-2 rounded-xl bg-card border border-border text-xs font-semibold"
                       >
-                        <option value="Ninguno">Ninguno</option>
-                        <option value="Anticonceptivos Orales">Anticonceptivos Orales (AOC)</option>
-                        <option value="Inyectable Mensual">Inyectable Mensual</option>
-                        <option value="DIU T de Cobre">DIU T de Cobre</option>
-                        <option value="DIU Mirena / Hormonal">DIU Mirena / Hormonal</option>
-                        <option value="Implante Subdérmico">Implante Subdérmico</option>
-                        <option value="Preservativo">Preservativo</option>
-                        <option value="Esterilización Quirúrgica">Esterilización Quirúrgica</option>
+                        {CONTRACEPTIVE_PRESETS.map((mac) => (
+                          <option key={mac} value={mac}>
+                            {mac}
+                          </option>
+                        ))}
                       </select>
+                      <input
+                        type="text"
+                        value={profile.tiempoUsoAnticonceptivo && profile.tiempoUsoAnticonceptivo !== 'N/A' ? profile.tiempoUsoAnticonceptivo : ''}
+                        onChange={(e) => setProfile({ ...profile, tiempoUsoAnticonceptivo: e.target.value })}
+                        placeholder="Tiempo de uso, marca o notas (Ej: Hace 2 años, Mesigyna)..."
+                        className="w-full p-2 rounded-xl bg-card border border-border text-xs"
+                      />
+                    </div>
+
+                    {/* Última Citología (PAP) */}
+                    <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase block">
+                        Última Citología Vaginal (PAP / Bethesda)
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-400 block mb-1">Fecha de Toma</label>
+                          <input
+                            type="date"
+                            value={profile.ultimaCitologiaFecha || ''}
+                            onChange={(e) => setProfile({ ...profile, ultimaCitologiaFecha: e.target.value })}
+                            className="w-full p-2 rounded-xl bg-card border border-border text-xs font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[9px] font-bold text-slate-400 block mb-1">Resultado Bethesda</label>
+                          <select
+                            value={profile.ultimaCitologiaResultado || 'NILM'}
+                            onChange={(e) => setProfile({ ...profile, ultimaCitologiaResultado: e.target.value })}
+                            className="w-full p-2 rounded-xl bg-card border border-border text-xs font-semibold"
+                          >
+                            {BETHESDA_PRESETS.map((b) => (
+                              <option key={b} value={b.split(' ')[0]}>
+                                {b}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 )}
 
                 {/* 5. ANT OBS */}
                 {patientChartTab === 'ant_obs' && (
-                  <div className="space-y-2.5">
-                    {/* Switch En Gestante */}
-                    <div className="p-2.5 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-between">
-                      <span className="text-[11px] font-black text-pink-700 dark:text-pink-300">
-                        ¿Actualmente en Estado Gestante?
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={extendedObstetrics.isPregnant}
-                        onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, isPregnant: e.target.checked })}
-                        className="w-4 h-4 rounded text-pink-600"
-                      />
+                  <div className="space-y-3">
+                    {/* Banner Educativo & Clínico */}
+                    <div className="p-3 rounded-2xl bg-pink-500/10 border border-pink-500/20 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black text-pink-700 dark:text-pink-300 flex items-center gap-1.5">
+                          <Baby size={14} className="text-pink-600" /> Historial Obstétrico (Embarazos y Partos)
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold text-pink-600">¿Gestando?</span>
+                          <input
+                            type="checkbox"
+                            checked={extendedObstetrics.isPregnant}
+                            onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, isPregnant: e.target.checked })}
+                            className="w-4 h-4 rounded text-pink-600"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-pink-600/80 leading-tight">
+                        Fórmula GPCAE: <strong>G</strong> (Gestas totales) · <strong>P</strong> (Partos vaginales) · <strong>C</strong> (Cesáreas) · <strong>A</strong> (Abortos) · <strong>E</strong> (Ectópicos).
+                      </p>
                     </div>
 
-                    {/* Fórmula Obstétrica G-P-C-A-E */}
-                    <div className="grid grid-cols-5 gap-1 text-center">
-                      <div className="p-2 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                        <span className="text-[9px] font-black text-slate-400 block">G</span>
-                        <span className="text-sm font-black font-mono">{profile.gestas}</span>
+                    {/* Fórmula Obstétrica GPCAE con Steppers Táctiles */}
+                    <div className="grid grid-cols-5 gap-1.5 text-center">
+                      {[
+                        { key: 'gestas', label: 'G', full: 'Gestas', val: profile.gestas },
+                        { key: 'partos', label: 'P', full: 'Partos', val: profile.partos },
+                        { key: 'cesareas', label: 'C', full: 'Cesáreas', val: profile.cesareas },
+                        { key: 'abortos', label: 'A', full: 'Abortos', val: profile.abortos },
+                        { key: 'ectopicos', label: 'E', full: 'Ectópicos', val: profile.ectopicos },
+                      ].map((item) => (
+                        <div key={item.key} className="p-2 bg-slate-50 dark:bg-slate-900/70 border border-border/80 rounded-2xl flex flex-col justify-between">
+                          <div>
+                            <span className="text-[10px] font-black text-pink-600 block">{item.label}</span>
+                            <span className="text-[8px] text-slate-400 block leading-tight">{item.full}</span>
+                          </div>
+                          <span className="text-base font-black font-mono my-1 text-foreground">{item.val}</span>
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = Number(profile[item.key as keyof GinecoObstetricProfile] || 0);
+                                if (cur > 0) {
+                                  setProfile({ ...profile, [item.key]: cur - 1 });
+                                }
+                              }}
+                              className="w-5 h-5 rounded-md bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black text-xs flex items-center justify-center hover:bg-slate-300"
+                            >
+                              -
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const cur = Number(profile[item.key as keyof GinecoObstetricProfile] || 0);
+                                setProfile({ ...profile, [item.key]: cur + 1 });
+                              }}
+                              className="w-5 h-5 rounded-md bg-pink-500 text-white font-black text-xs flex items-center justify-center hover:bg-pink-600"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Hijos Vivos */}
+                    <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 flex items-center justify-between">
+                      <div>
+                        <span className="text-[11px] font-black text-foreground block">Hijos Vivos Actuales</span>
+                        <span className="text-[10px] text-slate-400">Total de hijos que conviven / vivos</span>
                       </div>
-                      <div className="p-2 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                        <span className="text-[9px] font-black text-slate-400 block">P</span>
-                        <span className="text-sm font-black font-mono">{profile.partos}</span>
-                      </div>
-                      <div className="p-2 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                        <span className="text-[9px] font-black text-slate-400 block">C</span>
-                        <span className="text-sm font-black font-mono">{profile.cesareas}</span>
-                      </div>
-                      <div className="p-2 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                        <span className="text-[9px] font-black text-slate-400 block">A</span>
-                        <span className="text-sm font-black font-mono">{profile.abortos}</span>
-                      </div>
-                      <div className="p-2 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                        <span className="text-[9px] font-black text-slate-400 block">E</span>
-                        <span className="text-sm font-black font-mono">{profile.ectopicos}</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (profile.hijosVivos > 0) setProfile({ ...profile, hijosVivos: profile.hijosVivos - 1 });
+                          }}
+                          className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-black flex items-center justify-center hover:bg-slate-300"
+                        >
+                          -
+                        </button>
+                        <span className="text-sm font-black font-mono w-6 text-center">{profile.hijosVivos}</span>
+                        <button
+                          type="button"
+                          onClick={() => setProfile({ ...profile, hijosVivos: (profile.hijosVivos || 0) + 1 })}
+                          className="w-7 h-7 rounded-lg bg-pink-500 text-white font-black flex items-center justify-center hover:bg-pink-600"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
 
-                    {/* Desplegables Himego de Cesáreas y Abortos */}
+                    {/* Desplegables de Cesárea y Aborto */}
                     <div className="grid grid-cols-2 gap-2 pt-1">
                       <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Causa de Cesárea</label>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Causa de Cesárea Previa</label>
                         <select
                           value={extendedObstetrics.cesareaReason}
                           onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, cesareaReason: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px]"
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-semibold"
                         >
-                          <option value="ESTRECHA">ESTRECHA (Pelvis)</option>
-                          <option value="PODALICO">PODÁLICO</option>
-                          <option value="ITERATIVA">ITERATIVA (2+ cesáreas)</option>
-                          <option value="SFA">SFA (Sufrimiento fetal)</option>
-                          <option value="PLACENTA PREVIA">PLACENTA PREVIA</option>
+                          {CESAREAN_REASON_PRESETS.map((reason) => (
+                            <option key={reason} value={reason}>
+                              {reason}
+                            </option>
+                          ))}
+                          <option value="OTRA">OTRA (No listada)</option>
                         </select>
                       </div>
+
                       <div>
                         <label className="text-[10px] font-bold text-slate-400 block mb-1">Tipo de Aborto</label>
                         <select
                           value={extendedObstetrics.abortoType}
                           onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, abortoType: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px]"
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-semibold"
                         >
-                          <option value="ESPONTANEO">ESPONTÁNEO</option>
-                          <option value="TERAPEUTICO">TERAPÉUTICO</option>
-                          <option value="HUEVO ANEMBRIONADO">HUEVO ANEMBRIONADO</option>
-                          <option value="SEPTICO">SÉPTICO</option>
+                          {ABORTION_TYPE_PRESETS.map((ab) => (
+                            <option key={ab} value={ab}>
+                              {ab}
+                            </option>
+                          ))}
                         </select>
+                      </div>
+                    </div>
+
+                    {/* Resolución de Aborto y Peso Fetal */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Resolución de Aborto</label>
+                        <select
+                          value={extendedObstetrics.abortoResolution || 'AMEU'}
+                          onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, abortoResolution: e.target.value })}
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-semibold"
+                        >
+                          {ABORTION_RESOLUTION_PRESETS.map((res) => (
+                            <option key={res} value={res}>
+                              {res}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Peso Fetal Mayor (g)</label>
+                        <input
+                          type="number"
+                          value={extendedObstetrics.pesoMaxFetalGrams || 3500}
+                          onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, pesoMaxFetalGrams: Number(e.target.value) })}
+                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-mono"
+                        />
                       </div>
                     </div>
                   </div>
@@ -1576,8 +2122,20 @@ export default function GinecologiaPage() {
           ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
       {isNewPatientModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
-          <div className="bg-card border border-border rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-base font-black text-foreground">Crear Nueva Paciente</h3>
+          <div className="bg-card border border-border rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                <UserPlus size={18} className="text-pink-500" /> Crear Nueva Paciente
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsNewPatientModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
             <div className="space-y-3 text-xs">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 block mb-1">Nombre Completo *</label>
@@ -1585,9 +2143,11 @@ export default function GinecologiaPage() {
                   type="text"
                   value={newPatientName}
                   onChange={(e) => setNewPatientName(e.target.value)}
+                  placeholder="Nombres y Apellidos de la paciente..."
                   className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 block mb-1">Cédula</label>
@@ -1595,7 +2155,8 @@ export default function GinecologiaPage() {
                     type="text"
                     value={newPatientTaxId}
                     onChange={(e) => setNewPatientTaxId(e.target.value)}
-                    className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                    placeholder="V-..."
+                    className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border font-mono"
                   />
                 </div>
                 <div>
@@ -1604,21 +2165,105 @@ export default function GinecologiaPage() {
                     type="text"
                     value={newPatientPhone}
                     onChange={(e) => setNewPatientPhone(e.target.value)}
+                    placeholder="0412 / 0414..."
                     className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
                   />
                 </div>
               </div>
+
+              {/* Grupo Sanguíneo */}
               <div>
-                <label className="text-[10px] font-bold text-slate-400 block mb-1">Alergias Conocidas</label>
+                <label className="text-[10px] font-bold text-slate-400 block mb-1">Grupo Sanguíneo & Factor Rh</label>
+                <div className="flex flex-wrap gap-1">
+                  {BLOOD_TYPES.map((bt) => (
+                    <button
+                      key={bt}
+                      type="button"
+                      onClick={() => setNewPatientBloodType(bt)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-black transition-all ${
+                        newPatientBloodType === bt
+                          ? 'bg-rose-500 text-white shadow-xs'
+                          : 'bg-card border border-border text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {bt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Ubicación: Estado y Ciudad */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Estado (Venezuela)</label>
+                  <select
+                    value={newPatientState}
+                    onChange={(e) => {
+                      const st = e.target.value;
+                      setNewPatientState(st);
+                      const cities = getCitiesForState(st);
+                      setNewPatientCity(cities[0] || '');
+                    }}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs font-semibold"
+                  >
+                    {VENEZUELA_STATES.map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 block mb-1">Ciudad</label>
+                  <select
+                    value={newPatientCity}
+                    onChange={(e) => setNewPatientCity(e.target.value)}
+                    className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-xs font-semibold"
+                  >
+                    {getCitiesForState(newPatientState).map((ct) => (
+                      <option key={ct} value={ct}>
+                        {ct}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Alergias con chips */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] font-bold text-red-500">Alergias Conocidas</label>
+                  <span className="text-[9px] text-slate-400">Toca para agregar</span>
+                </div>
                 <input
                   type="text"
                   value={newPatientAllergies}
                   onChange={(e) => setNewPatientAllergies(e.target.value)}
                   placeholder="Ninguna o Penicilina, AINEs..."
-                  className="w-full p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border"
+                  className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border mb-1.5"
                 />
+                <div className="flex flex-wrap gap-1">
+                  {['Ninguna conocida', 'Penicilina', 'AINEs / Ibuprofeno', 'Sulfas', 'Dipirona', 'Látex'].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => {
+                        if (chip === 'Ninguna conocida') {
+                          setNewPatientAllergies('Ninguna conocida (NKDA)');
+                        } else {
+                          const cur = newPatientAllergies === 'Ninguna conocida (NKDA)' ? '' : newPatientAllergies.trim();
+                          setNewPatientAllergies(cur ? `${cur}, ${chip}` : chip);
+                        }
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-pink-500 hover:text-white transition-all"
+                    >
+                      + {chip}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
+
             <div className="flex items-center justify-between pt-3 border-t border-border">
               <button
                 type="button"
@@ -1631,7 +2276,7 @@ export default function GinecologiaPage() {
                 type="button"
                 onClick={handleCreateFastPatient}
                 disabled={isSubmittingPatient}
-                className="px-5 py-2.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black shadow-md shadow-pink-500/20"
+                className="px-5 py-2.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black shadow-md shadow-pink-500/20 disabled:opacity-50"
               >
                 {isSubmittingPatient ? 'Creando...' : 'Crear Paciente'}
               </button>
