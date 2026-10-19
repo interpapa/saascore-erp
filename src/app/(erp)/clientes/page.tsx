@@ -354,24 +354,26 @@ export default function ClientesPage() {
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
       {/* Cabecera Estandarizada */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex justify-between items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight">Directorio Universal</h1>
+          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">Directorio de Contactos</h1>
           <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5 text-xs">
-            Fichas de clientes, pacientes, historias de atención y cuentas por cobrar
+            Clientes, proveedores y cuentas por cobrar
           </p>
         </div>
 
         {activeTab === 'clients' && (
-          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-            <ViewToggle storageKey="clientes-view-mode" currentView={viewMode} onViewChange={setViewMode} />
-            <button
-              onClick={handleExportCSV}
-              className="bg-card hover:bg-slate-100 dark:hover:bg-slate-800 border border-border text-foreground px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic shadow-xs"
-            >
-              <Download size={15} />
-              <span>Exportar</span>
-            </button>
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2">
+              <ViewToggle storageKey="clientes-view-mode" currentView={viewMode} onViewChange={setViewMode} />
+              <button
+                onClick={handleExportCSV}
+                className="bg-card hover:bg-slate-100 dark:hover:bg-slate-800 border border-border text-foreground px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 btn-haptic shadow-xs"
+              >
+                <Download size={15} />
+                <span>Exportar</span>
+              </button>
+            </div>
             <button
               onClick={() => {
                 setClientToEdit(null);
@@ -386,17 +388,19 @@ export default function ClientesPage() {
         )}
       </div>
 
-      {/* Tabs */}
-      <UnderlineTabs
-        tabs={tabs}
-        activeTab={activeTab}
-        onChange={(id) => setActiveTab(id as TabType)}
-      />
+      {/* Tabs (Solo visibles en PC, en móvil siempre estamos en el directorio operativo) */}
+      <div className="hidden sm:block">
+        <UnderlineTabs
+          tabs={tabs}
+          activeTab={activeTab}
+          onChange={(id) => setActiveTab(id as TabType)}
+        />
+      </div>
 
       {activeTab === 'clients' ? (
         <>
-          {/* KPI Bar Enriquecida */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* KPI Bar Enriquecida (Telemetría gerencial: solo visible en PC como centro de mando, en móvil se oculta para no estorbar) */}
+          <div className="hidden sm:grid sm:grid-cols-4 gap-3">
             <div className="bg-card border border-border rounded-2xl p-4 flex items-center gap-3 shadow-xs">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
                 <Users size={18} />
@@ -501,7 +505,7 @@ export default function ClientesPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus('natural')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  className={`hidden sm:inline-flex px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                     filterStatus === 'natural'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-foreground'
@@ -512,7 +516,7 @@ export default function ClientesPage() {
                 <button
                   type="button"
                   onClick={() => setFilterStatus('juridica')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  className={`hidden sm:inline-flex px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
                     filterStatus === 'juridica'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-foreground'
@@ -523,9 +527,9 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            {/* Chips de Tags si existen */}
+            {/* Chips de Tags si existen (Solo visibles en PC) */}
             {availableTags.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-border/50 text-[11px]">
+              <div className="hidden sm:flex items-center gap-1.5 overflow-x-auto pt-1 border-t border-border/50 text-[11px]">
                 <span className="text-slate-400 font-bold shrink-0 flex items-center gap-1 mr-1">
                   <Tag size={12} /> Tags:
                 </span>
@@ -669,105 +673,65 @@ export default function ClientesPage() {
                       </div>
 
                       <div className="flex items-center gap-1.5 flex-wrap justify-end" onClick={(e) => e.stopPropagation()}>
-                        {globalViewMode === 'express' ? (
-                          <>
-                            {client.phone && (
-                              <a
-                                href={getPrimaryWhatsAppUrl(
-                                  client.phone,
-                                  `Hola ${client.name}, te escribimos para ponernos en contacto.`
-                                )}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="px-2 py-1 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all flex items-center gap-1 border border-emerald-500/20 btn-haptic"
-                                title="WhatsApp directo"
-                              >
-                                <MessageSquare size={13} />
-                                <span className="hidden sm:inline">WhatsApp</span>
-                              </a>
-                            )}
-                            {isDentalActive ? (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/odontologia?client_id=${client.id}`)}
-                                className="px-2 py-1 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 text-teal-600 dark:text-teal-400 text-xs font-bold transition-all flex items-center gap-1 border border-teal-500/20 btn-haptic"
-                                title="Iniciar Odontograma en Sillón"
-                              >
-                                <Stethoscope size={13} />
-                                <span>Sillón</span>
-                              </button>
-                            ) : isGinecoActive ? (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/ginecologia?client_id=${client.id}`)}
-                                className="px-2 py-1 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold transition-all flex items-center gap-1 border border-pink-500/20 btn-haptic"
-                                title="Abrir Consulta Gineco-Obstétrica"
-                              >
-                                <Baby size={13} />
-                                <span>Gineco</span>
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setDrawerInitialTab('registros');
-                                  setSelectedClient(client);
-                                }}
-                                className="px-2 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
-                                title="Ver Ficha y Servicios"
-                              >
-                                <FileText size={13} />
-                                <span>Ficha</span>
-                              </button>
-                            )}
-                            {isDentalActive && isGinecoActive && (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/ginecologia?client_id=${client.id}`)}
-                                className="px-2 py-1 rounded-xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 text-xs font-bold transition-all flex items-center gap-1 border border-pink-500/20 btn-haptic"
-                                title="Abrir Consulta Gineco-Obstétrica"
-                              >
-                                <Baby size={13} />
-                                <span>Gineco</span>
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => router.push(hasDebt ? `/caja?debt_client_id=${client.id}&debt_amount=${debt}` : `/caja?client_id=${client.id}`)}
-                              className="px-2 py-1 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-all flex items-center gap-1 border border-indigo-500/20 btn-haptic"
-                              title="Cobrar en Caja"
-                            >
-                              <DollarSign size={13} />
-                              <span>Cobrar</span>
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDrawerInitialTab('registros');
-                                setSelectedClient(client);
-                              }}
-                              className="px-2.5 py-1 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
-                              title={isDentalActive ? "Abrir historia clínica odontológica" : "Abrir ficha de contacto y servicios"}
-                            >
-                              {isDentalActive ? <Stethoscope size={13} /> : <FileText size={13} />}
-                              <span>{isDentalActive ? 'Historia' : 'Ficha'}</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setDrawerInitialTab('perfil');
-                                setSelectedClient(client);
-                              }}
-                              className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground text-xs font-bold transition-all flex items-center gap-1 btn-haptic"
-                            >
-                              <span>Ficha</span>
-                              <ArrowRight size={13} />
-                            </button>
-                          </>
+                        {/* Botón directo de Llamada Telefónica */}
+                        {client.phone && (
+                          <a
+                            href={`tel:${client.phone}`}
+                            className="p-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-bold transition-all flex items-center gap-1 border border-blue-500/20 btn-haptic"
+                            title={`Llamar a ${client.name}`}
+                          >
+                            <Phone size={13} />
+                            <span className="hidden xs:inline">Llamar</span>
+                          </a>
                         )}
+
+                        {/* Botón directo de WhatsApp */}
+                        {client.phone && (
+                          <a
+                            href={getPrimaryWhatsAppUrl(
+                              client.phone,
+                              hasDebt 
+                                ? `Hola ${client.name}, le escribimos para recordarle su saldo pendiente de $${debt.toFixed(2)}.`
+                                : `Hola ${client.name}, un saludo desde nuestro equipo.`
+                            )}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold transition-all flex items-center gap-1 border border-emerald-500/20 btn-haptic"
+                            title="Abrir WhatsApp directo"
+                          >
+                            <MessageSquare size={13} />
+                            <span className="hidden xs:inline">WhatsApp</span>
+                          </a>
+                        )}
+
+                        {/* Botón directo de Cobro / Venta en Caja */}
+                        <button
+                          type="button"
+                          onClick={() => router.push(hasDebt ? `/caja?debt_client_id=${client.id}&debt_amount=${debt}` : `/caja?client_id=${client.id}`)}
+                          className={`px-3 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-1 shadow-xs btn-haptic ${
+                            hasDebt
+                              ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
+                              : 'bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20'
+                          }`}
+                          title={hasDebt ? 'Cobrar deuda en Caja' : 'Iniciar venta en Caja'}
+                        >
+                          <DollarSign size={13} />
+                          <span>{hasDebt ? 'Cobrar' : 'Vender'}</span>
+                        </button>
+
+                        {/* Botón de Ficha Detallada */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDrawerInitialTab('perfil');
+                            setSelectedClient(client);
+                          }}
+                          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground text-xs font-bold transition-all flex items-center gap-1 btn-haptic"
+                          title="Ver Ficha y Detalles"
+                        >
+                          <FileText size={13} />
+                          <span className="hidden sm:inline">Ficha</span>
+                        </button>
                       </div>
                     </div>
                   </div>
