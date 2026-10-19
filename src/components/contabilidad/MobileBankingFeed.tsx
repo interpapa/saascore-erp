@@ -19,7 +19,9 @@ import {
   RefreshCw, 
   X,
   ChevronRight,
-  FileText
+  FileText,
+  Package,
+  Clock
 } from 'lucide-react';
 
 interface MobileBankingFeedProps {
@@ -35,7 +37,7 @@ function getEntryConcept(e: any): string {
 }
 
 function getEntryDate(e: any): string {
-  return e?.entry_date || e?.date || '';
+  return e?.created_at || e?.entry_date || e?.date || '';
 }
 
 function getEntryReference(e: any): string {
@@ -145,15 +147,25 @@ export function MobileBankingFeed({
       let timeLabel = '';
       try {
         const d = new Date(dateStr);
-        timeLabel = d.toLocaleDateString('es-VE', { 
-          day: '2-digit', 
-          month: 'short', 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        });
+        if (!isNaN(d.getTime())) {
+          const datePart = d.toLocaleDateString('es-VE', { 
+            day: '2-digit', 
+            month: 'short' 
+          });
+          const timePart = d.toLocaleTimeString('es-VE', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true
+          });
+          timeLabel = `${datePart} · ${timePart}`;
+        } else {
+          timeLabel = dateStr;
+        }
       } catch {
         timeLabel = dateStr;
       }
+
+      const products = (entry as any).products || [];
 
       return {
         ...entry,
@@ -165,6 +177,7 @@ export function MobileBankingFeed({
         methodIcon,
         methodLabel,
         timeLabel,
+        products,
       };
     });
   }, [journalEntries]);
@@ -278,19 +291,40 @@ export function MobileBankingFeed({
                   {tx.methodIcon === 'receipt' && <Receipt size={20} />}
                 </div>
 
-                {/* Concepto y Método */}
+                {/* Concepto, Productos y Método */}
                 <div className="flex-1 min-w-0 pr-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-black text-slate-900 dark:text-white text-sm truncate">
                       {tx.concept}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+
+                  {/* Pills de Productos de la Venta/Compra */}
+                  {tx.products && tx.products.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                      {tx.products.slice(0, 2).map((p: string, pIdx: number) => (
+                        <span
+                          key={pIdx}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold border border-border/60"
+                        >
+                          <Package className="w-2.5 h-2.5 text-primary shrink-0" />
+                          <span className="truncate max-w-[120px]">{p}</span>
+                        </span>
+                      ))}
+                      {tx.products.length > 2 && (
+                        <span className="text-[10px] text-slate-400 font-bold self-center">
+                          +{tx.products.length - 2}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                     <span className="font-bold text-slate-600 dark:text-slate-400">
                       {tx.methodLabel}
                     </span>
                     <span>•</span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-[11px] text-slate-400 font-mono">
                       {tx.timeLabel}
                     </span>
                   </div>
@@ -342,6 +376,25 @@ export function MobileBankingFeed({
                 <X size={16} />
               </button>
             </div>
+
+            {/* Productos si los tiene */}
+            {(selectedEntry as any).products && (selectedEntry as any).products.length > 0 && (
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border space-y-1.5">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider flex items-center gap-1">
+                  <Package size={12} className="text-primary" /> Productos / Ítems de la Operación
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedEntry as any).products.map((p: string, pIdx: number) => (
+                    <span
+                      key={pIdx}
+                      className="px-2.5 py-1 rounded-xl bg-card border border-border text-foreground text-xs font-bold shadow-2xs"
+                    >
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Partida Doble: Cuentas Involucradas */}
             <div className="space-y-2">

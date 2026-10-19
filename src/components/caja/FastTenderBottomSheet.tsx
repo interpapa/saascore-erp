@@ -16,7 +16,9 @@ import {
   UserCheck,
   AlertCircle,
   Search,
-  Plus
+  Plus,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { MobileBottomSheet } from '@/components/ui/mobile/MobileBottomSheet';
 
@@ -79,6 +81,20 @@ export function FastTenderBottomSheet({
 
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [showCustomerPicker, setShowCustomerPicker] = useState(false);
+  const [isPaymentSelectorOpen, setIsPaymentSelectorOpen] = useState(false);
+
+  const paymentOptions = [
+    { id: 'cash_usd', label: 'Efectivo ($ USD)', sublabel: 'Billetes en dólares físicos', icon: DollarSign, badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' },
+    { id: 'pago_movil', label: 'Pago Móvil', sublabel: 'Transferencia interbancaria Bs.', icon: Smartphone, badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' },
+    { id: 'card', label: 'Punto Débito / Tarjeta', sublabel: 'Terminal POS bancario', icon: CreditCard, badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' },
+    { id: 'zelle', label: 'Zelle', sublabel: 'Transferencia USD en línea', icon: Landmark, badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' },
+    { id: 'cash_ves', label: 'Efectivo Bs.', sublabel: 'Bolívares en efectivo', icon: Coins, badgeClass: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20' },
+    { id: 'credit', label: 'Crédito (Deuda Total)', sublabel: 'Cuenta por Cobrar (CxC)', icon: FileText, badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20' },
+    { id: 'mixed', label: 'Pago Dividido / Abono', sublabel: 'Varios métodos o parte a crédito', icon: Split, badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20' },
+  ];
+
+  const currentOption = paymentOptions.find((p) => p.id === paymentMethod) || paymentOptions[0];
+  const CurrentIcon = currentOption.icon;
 
   // Auto-prellenar monto exacto de cobro al abrir o cambiar de método si está vacío
   React.useEffect(() => {
@@ -176,118 +192,91 @@ export function FastTenderBottomSheet({
           </div>
         </div>
 
-        {/* 2. SELECTOR DE FORMA DE PAGO TÁCTIL */}
-        <div>
-          <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider block mb-2">
-            Forma de Pago
-          </label>
-          <div className="grid grid-cols-2 gap-2">
+        {/* 2. SELECTOR DE FORMA DE PAGO DESPLEGABLE (0 RUIDO VISUAL) */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-wider">
+              Forma de Pago
+            </label>
             <button
               type="button"
-              onClick={() => {
-                setPaymentMethod('cash_usd');
-                setCashTenderedUSD(totalUSD.toFixed(2));
-              }}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
-                paymentMethod === 'cash_usd'
-                  ? 'bg-emerald-500 text-white border-emerald-600 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
+              onClick={() => setIsPaymentSelectorOpen(!isPaymentSelectorOpen)}
+              className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1"
             >
-              <DollarSign size={16} className={paymentMethod === 'cash_usd' ? 'text-white' : 'text-emerald-500'} />
-              <span>Efectivo ($ USD)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('pago_movil')}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
-                paymentMethod === 'pago_movil'
-                  ? 'bg-amber-500 text-white border-amber-600 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Smartphone size={16} className={paymentMethod === 'pago_movil' ? 'text-white' : 'text-amber-500'} />
-              <span>Pago Móvil</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('card')}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
-                paymentMethod === 'card'
-                  ? 'bg-blue-600 text-white border-blue-700 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <CreditCard size={16} className={paymentMethod === 'card' ? 'text-white' : 'text-blue-500'} />
-              <span>Punto Débito</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('zelle')}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
-                paymentMethod === 'zelle'
-                  ? 'bg-purple-600 text-white border-purple-700 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Landmark size={16} className={paymentMethod === 'zelle' ? 'text-white' : 'text-purple-500'} />
-              <span>Zelle</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setPaymentMethod('cash_ves');
-                setCashTenderedVES(totalVES.toFixed(2));
-              }}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
-                paymentMethod === 'cash_ves'
-                  ? 'bg-teal-600 text-white border-teal-700 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Coins size={16} className={paymentMethod === 'cash_ves' ? 'text-white' : 'text-teal-500'} />
-              <span>Efectivo Bs.</span>
-            </button>
-
-            {/* OPCIÓN: CRÉDITO / DEUDA TOTAL */}
-            <button
-              type="button"
-              onClick={() => setPaymentMethod('credit')}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic ${
-                paymentMethod === 'credit'
-                  ? 'bg-rose-600 text-white border-rose-700 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <FileText size={16} className={paymentMethod === 'credit' ? 'text-white' : 'text-rose-500'} />
-              <span>Crédito (Deuda Total)</span>
-            </button>
-
-            {/* OPCIÓN: PAGO DIVIDIDO / ABONO */}
-            <button
-              type="button"
-              onClick={() => {
-                setPaymentMethod('mixed');
-                if (setMixedPayments && (!mixedPayments.cash && !mixedPayments.card && !mixedPayments.transfer && !mixedPayments.credit)) {
-                  // Prellenar con mitad y mitad por defecto
-                  const half = Math.round((totalUSD / 2) * 100) / 100;
-                  setMixedPayments({ cash: half, card: 0, transfer: 0, credit: Math.round((totalUSD - half) * 100) / 100 });
-                }
-              }}
-              className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic col-span-2 ${
-                paymentMethod === 'mixed'
-                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-sm'
-                  : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
-              }`}
-            >
-              <Split size={16} className={paymentMethod === 'mixed' ? 'text-white' : 'text-indigo-500'} />
-              <span>Pago Dividido / Abono a Crédito (Mitad y Mitad)</span>
+              <span>{isPaymentSelectorOpen ? 'Ocultar opciones' : 'Cambiar método'}</span>
+              {isPaymentSelectorOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
             </button>
           </div>
+
+          {/* Barra Desplegable Táctil */}
+          <button
+            type="button"
+            onClick={() => setIsPaymentSelectorOpen(!isPaymentSelectorOpen)}
+            className="w-full p-3 rounded-2xl border-2 border-primary/40 bg-card hover:bg-slate-50 dark:hover:bg-slate-900 text-foreground flex items-center justify-between shadow-xs transition-all btn-haptic"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shadow-xs ${currentOption.badgeClass}`}>
+                <CurrentIcon size={18} />
+              </div>
+              <div className="text-left">
+                <span className="font-black text-sm text-slate-900 dark:text-white block leading-tight">
+                  {currentOption.label}
+                </span>
+                <span className="text-[10px] text-slate-500 font-bold block">
+                  {currentOption.sublabel}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-slate-400">
+              <span className="text-xs font-bold text-primary">{isPaymentSelectorOpen ? 'Cerrar' : 'Elegir'}</span>
+              <ChevronDown size={16} className={`transition-transform duration-200 text-primary ${isPaymentSelectorOpen ? 'rotate-180' : ''}`} />
+            </div>
+          </button>
+
+          {/* Opciones desplegadas al tocar la barra */}
+          {isPaymentSelectorOpen && (
+            <div className="grid grid-cols-2 gap-2 pt-2 animate-in fade-in zoom-in-95 duration-150">
+              {paymentOptions.map((opt) => {
+                const isSelected = paymentMethod === opt.id;
+                const OptIcon = opt.icon;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethod(opt.id);
+                      setIsPaymentSelectorOpen(false);
+                      if (opt.id === 'cash_usd') {
+                        setCashTenderedUSD(totalUSD.toFixed(2));
+                      } else if (opt.id === 'cash_ves') {
+                        setCashTenderedVES(totalVES.toFixed(2));
+                      } else if (opt.id === 'mixed') {
+                        if (setMixedPayments && (!mixedPayments.cash && !mixedPayments.card && !mixedPayments.transfer && !mixedPayments.credit)) {
+                          const half = Math.round((totalUSD / 2) * 100) / 100;
+                          setMixedPayments({ cash: half, card: 0, transfer: 0, credit: Math.round((totalUSD - half) * 100) / 100 });
+                        }
+                      }
+                    }}
+                    className={`p-3 rounded-xl border font-bold text-xs flex items-center gap-2 transition-all btn-haptic text-left ${
+                      opt.id === 'mixed' ? 'col-span-2' : ''
+                    } ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground border-primary shadow-xs'
+                        : 'bg-card text-foreground border-border hover:bg-slate-50 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <OptIcon size={16} className={isSelected ? 'text-primary-foreground' : 'text-slate-500'} />
+                    <div className="truncate">
+                      <span className="block truncate">{opt.label}</span>
+                      <span className={`text-[10px] block truncate font-normal ${isSelected ? 'opacity-90' : 'text-slate-400'}`}>
+                        {opt.sublabel}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* 2B. GESTIÓN DE CLIENTE SI HAY CRÉDITO O DEUDA */}

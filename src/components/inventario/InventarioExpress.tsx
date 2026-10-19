@@ -6,6 +6,7 @@ import {
   Package, 
   Search, 
   Plus, 
+  Minus,
   ShoppingCart,
   PackagePlus,
   Eye,
@@ -276,28 +277,78 @@ export function InventarioExpress({
                   </div>
                 </div>
 
-                {/* Columna Derecha: Stock Claro y Precio Prominente */}
-                <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                {/* Columna Derecha: Stock con Stepper Rápido Táctil y Precio Prominente */}
+                <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                  <span className="font-mono font-black text-base text-slate-900 dark:text-white leading-tight">
+                    ${price.toFixed(2)}
+                  </span>
+
                   {!isService ? (
-                    <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                        isOut
-                          ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                          : isLow
-                          ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                          : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                      }`}
-                    >
-                      {isOut ? 'Agotado' : `${stock} disp.`}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {onStockChange ? (
+                        <div 
+                          onClick={(e) => e.stopPropagation()} 
+                          className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-border shadow-2xs"
+                        >
+                          <button
+                            type="button"
+                            disabled={stock <= 0}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onStockChange(item, Math.max(0, stock - 1));
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-card disabled:opacity-30 disabled:pointer-events-none active:scale-90 transition-transform btn-haptic"
+                            title="Restar 1 unidad"
+                          >
+                            <Minus size={11} strokeWidth={3} />
+                          </button>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenAdjustmentModal(item.id);
+                            }}
+                            className={`px-1.5 text-[11px] font-black font-mono cursor-pointer hover:underline ${
+                              isOut
+                                ? 'text-rose-600 dark:text-rose-400'
+                                : isLow
+                                ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-emerald-600 dark:text-emerald-400'
+                            }`}
+                            title="Toca para ajustar existencias con motivo"
+                          >
+                            {stock}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onStockChange(item, stock + 1);
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-card active:scale-90 transition-transform btn-haptic"
+                            title="Sumar 1 unidad"
+                          >
+                            <Plus size={11} strokeWidth={3} />
+                          </button>
+                        </div>
+                      ) : (
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                            isOut
+                              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
+                              : isLow
+                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                          }`}
+                        >
+                          {isOut ? 'Agotado' : `${stock} disp.`}
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
                       Servicio
                     </span>
                   )}
-                  <span className="font-mono font-black text-base text-slate-900 dark:text-white leading-tight">
-                    ${price.toFixed(2)}
-                  </span>
                 </div>
               </div>
             );

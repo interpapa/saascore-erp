@@ -2838,16 +2838,31 @@ function CajaPageContent() {
                 </span>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setIsMobileTicketOpen(false);
-                setIsCustomerModalOpen(true);
-              }}
-              className="text-xs font-bold text-primary hover:underline px-2.5 py-1 rounded-lg bg-primary/10"
-            >
-              Cambiar
-            </button>
+            <div className="flex items-center gap-1.5">
+              {heldTickets.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileTicketOpen(false);
+                    setIsHeldModalOpen(true);
+                  }}
+                  className="text-[11px] font-black text-amber-700 dark:text-amber-400 px-2 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center gap-1"
+                >
+                  <Pause size={11} />
+                  <span>{heldTickets.length} en espera</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileTicketOpen(false);
+                  setIsCustomerModalOpen(true);
+                }}
+                className="text-xs font-bold text-primary hover:underline px-2.5 py-1 rounded-lg bg-primary/10"
+              >
+                Cambiar
+              </button>
+            </div>
           </div>
 
           {loadedConsultationInfo && (
@@ -3057,9 +3072,23 @@ function CajaPageContent() {
                   type="button"
                   onClick={clearCart}
                   className="px-3 py-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 font-bold text-xs transition-colors flex items-center gap-1.5"
+                  title="Vaciar ticket"
                 >
                   <Trash2 size={14} />
                   <span>Vaciar</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    holdCurrentTicket();
+                    setIsMobileTicketOpen(false);
+                  }}
+                  className="px-3 py-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/20 font-bold text-xs transition-colors flex items-center gap-1.5 btn-haptic"
+                  title="Pausar ticket en espera"
+                >
+                  <Pause size={14} />
+                  <span>Pausar</span>
                 </button>
 
                 <button
@@ -3144,7 +3173,7 @@ function CajaPageContent() {
             <div className="space-y-2.5 max-h-60 overflow-y-auto pr-1">
               {bankAccounts.length === 0 ? (
                 <div className="text-center py-8 text-slate-400 text-xs">
-                  No hay cuentas registradas aún. Agrega tu primera cuenta abajo.
+                  No hay cuentas registradas aún. Configúralas centralizadamente desde Ajustes &gt; Cuentas Bancarias.
                 </div>
               ) : (
                 bankAccounts.map((acc) => (

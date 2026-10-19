@@ -63,10 +63,22 @@ export function CatalogDrawer({ item, isOpen, onClose, onEdit, onDelete, onQuick
           {/* Banner de Cabecera */}
           <div className={`h-28 w-full relative ${isProduct ? 'bg-gradient-to-r from-primary/20 via-blue-500/15 to-teal-500/20' : 'bg-gradient-to-r from-fuchsia-500/20 via-pink-500/15 to-rose-500/20'}`} />
 
-          {/* Icono & Título Flotante */}
+          {/* Icono / Foto & Título Flotante */}
           <div className="flex flex-col items-center -mt-10 mb-5 px-6 relative z-10">
-            <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white shadow-lg border-4 border-card ${isProduct ? 'bg-primary' : 'bg-fuchsia-600'}`}>
-              {isProduct ? <Package size={36} /> : <Check size={36} />}
+            <div className={`w-24 h-24 rounded-3xl flex items-center justify-center text-white shadow-lg border-4 border-card overflow-hidden bg-slate-100 dark:bg-slate-800 ${!(item.metadata?.image_url || (item as any).image_url) ? (isProduct ? 'bg-primary' : 'bg-fuchsia-600') : ''}`}>
+              {(item.metadata?.image_url || (item as any).image_url) ? (
+                <img
+                  src={item.metadata?.image_url || (item as any).image_url}
+                  alt={item.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const parent = (e.target as HTMLElement).parentElement;
+                    if (parent) parent.innerHTML = '<div class="text-3xl">📦</div>';
+                  }}
+                />
+              ) : (
+                isProduct ? <Package size={40} className="text-white" /> : <Check size={40} className="text-white" />
+              )}
             </div>
             <div className="text-center mt-3">
               <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
@@ -113,8 +125,8 @@ export function CatalogDrawer({ item, isOpen, onClose, onEdit, onDelete, onQuick
               </div>
             )}
 
-            {/* Análisis Financiero y de Costeo Odoo */}
-            <div className="bg-slate-50/80 dark:bg-slate-800/40 p-5 rounded-2xl border border-border space-y-4">
+            {/* Análisis Financiero y de Costeo Odoo (Oculto en móvil pequeño para evitar sobrecarga visual) */}
+            <div className="hidden sm:block bg-slate-50/80 dark:bg-slate-800/40 p-5 rounded-2xl border border-border space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-2">
                   <DollarSign size={15} className="text-primary" />
