@@ -1584,20 +1584,20 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
 
                     {form.bookable && (
                       <div className="space-y-4">
-                        {/* SECCIÓN 1: SERVICIO GENERAL VINCULADO AL HORARIO */}
+                        {/* SECCIÓN 1: CONSULTA GENERAL / RAMA ESTÁNDAR */}
                         <div className="p-4 border-2 border-indigo-200/80 dark:border-indigo-800/80 rounded-2xl bg-indigo-50/30 dark:bg-indigo-950/20 space-y-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="bg-indigo-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Servicio General
+                                  Consulta Estándar
                                 </span>
                                 <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                                  Atención General (Bloque Estándar)
+                                  Consulta General del Especialista (Sin Procedimientos)
                                 </h4>
                               </div>
                               <p className="text-[11px] text-slate-500 mt-1">
-                                Utiliza el bloque general configurado en horarios (<strong>{form.defaultSlotMinutes} min</strong>). Ideal para consultas médicas generales o atenciones estándar.
+                                Activa esto únicamente si el profesional solo atiende una consulta estándar de <strong>{form.defaultSlotMinutes} min</strong>. <em>Si vas a agregar procedimientos o sub-ramas abajo (ej: Ecografía, Citología), deja esto desactivado para no duplicar un botón genérico en la web.</em>
                               </p>
                             </div>
 
@@ -1605,7 +1605,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                               type="button"
                               onClick={() => setForm({ ...form, generalServiceEnabled: !form.generalServiceEnabled })}
                               className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${form.generalServiceEnabled ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
-                              title={form.generalServiceEnabled ? 'Desactivar servicio general' : 'Activar servicio general'}
+                              title={form.generalServiceEnabled ? 'Desactivar consulta general' : 'Activar consulta general'}
                             >
                               <span
                                 aria-hidden="true"
@@ -1618,11 +1618,11 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-indigo-100 dark:border-indigo-900/60">
                               <div className="sm:col-span-2 space-y-1">
                                 <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                                  Nombre del Servicio General
+                                  Nombre de la Consulta General
                                 </label>
                                 <input
                                   type="text"
-                                  placeholder={form.roleTitle ? `Consulta / ${form.roleTitle}` : 'Consulta General'}
+                                  placeholder={form.roleTitle ? `Consulta de ${form.roleTitle}` : 'Consulta General'}
                                   value={form.generalServiceName}
                                   onChange={(e) => setForm({ ...form, generalServiceName: e.target.value })}
                                   className="w-full text-xs px-3 py-2 rounded-xl border border-border bg-background outline-none text-foreground focus:border-indigo-500 font-medium"
@@ -1650,20 +1650,20 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                           )}
                         </div>
 
-                        {/* SECCIÓN 2: SERVICIOS PARTICULARES O ESPECIALIZADOS */}
+                        {/* SECCIÓN 2: SUB-RAMAS Y PROCEDIMIENTOS ESPECÍFICOS */}
                         <div className="p-4 border border-border rounded-2xl bg-card space-y-3">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="bg-purple-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
-                                  Particulares
+                                  Sub-Ramas / Procedimientos
                                 </span>
                                 <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
-                                  Servicios Particulares (Duración & Precio Individual)
+                                  Sub-Ramas y Procedimientos de la Especialidad
                                 </h4>
                               </div>
                               <p className="text-[11px] text-slate-500 mt-0.5">
-                                Agrega procedimientos específicos que requieran tiempos propios (ej: 15, 30, 45, 90, 120 min) sin romper el horario.
+                                Agrega los procedimientos que componen la rama (ej: <em>Control Prenatal, Ecografía Pélvica, Citología</em>). En la web pública y en el módulo clínico se agruparán organizadamente bajo su especialidad.
                               </p>
                             </div>
                             <button
@@ -1683,7 +1683,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
                               })}
                               className="px-3 py-1.5 bg-purple-500/10 text-purple-600 dark:text-purple-400 rounded-xl text-xs font-bold hover:bg-purple-500/20 transition-colors flex items-center gap-1.5 uppercase shrink-0"
                             >
-                              <Plus size={14} /> Añadir Particular
+                              <Plus size={14} /> + Agregar Sub-Rama
                             </button>
                           </div>
                           

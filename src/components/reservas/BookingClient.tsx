@@ -769,6 +769,29 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
               {displayedServices.length === 0 && (
                 <p className="text-center text-slate-400 mt-10 text-lg">No hay servicios disponibles en esta categoría.</p>
               )}
+
+              {/* Título de Rama / Especialidad Activa */}
+              {selectedCategory !== 'all' && (
+                <div className="mb-4 flex items-center justify-between pb-2.5 border-b border-slate-200/80">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">
+                      {selectedCategory === 'Ginecología' ? '👶' : selectedCategory === 'Odontología' ? '🦷' : selectedCategory === 'Cardiología' ? '🫀' : selectedCategory === 'Pediatría' ? '🧸' : selectedCategory === 'Barbería' ? '💈' : selectedCategory === 'Peluquería Canina' ? '🐩' : '🩺'}
+                    </span>
+                    <div>
+                      <h3 className="text-sm md:text-base font-black text-slate-800">Rama: {selectedCategory}</h3>
+                      <p className="text-xs text-slate-500">Procedimientos y sub-ramas disponibles:</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors px-2.5 py-1 rounded-lg hover:bg-slate-100"
+                  >
+                    Mostrar Todo
+                  </button>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {displayedServices.map((service, idx) => (
                   <button
