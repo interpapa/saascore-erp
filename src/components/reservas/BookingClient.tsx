@@ -251,7 +251,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   const resourceName = settings.resourceName;
 
   const [step, setStep] = useState(1);
-  const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean, icon?: string} | null>(null);
+  const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean, icon?: string, category?: string} | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   const [selectedBarberPrice, setSelectedBarberPrice] = useState<number | undefined>(undefined);
 
@@ -344,10 +345,15 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           branchName = dentistRole;
         } else if (barberRole) {
           branchName = barberRole;
-        } else if (groomerRole) {
-          branchName = groomerRole;
+        } else if (customGeneralName) {
+          branchName = customGeneralName;
         } else if (!svcs || svcs.length === 0) {
           branchName = 'Atención General';
+        } else {
+          // Si el colaborador ya tiene procedimientos particulares detallados (ej: Ecografía, Control Prenatal, etc.)
+          // y no se configuró un nombre de servicio general explícito, la rama/especialidad actúa como categoría organizadora,
+          // no como un servicio duplicado suelto en la lista.
+          branchName = '';
         }
 
         if (branchName) {
@@ -396,6 +402,20 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         }
       }
 
+      // Detectar categoría o especialidad clínica
+      const domain = detectClinicalDomain(s.name);
+      let category = 'General';
+      if (domain === 'ginecologia') category = 'Ginecología';
+      else if (domain === 'odontologia') category = 'Odontología';
+      else if (domain === 'cardiologia') category = 'Cardiología';
+      else if (domain === 'pediatria') category = 'Pediatría';
+      else if (domain === 'dermatologia') category = 'Dermatología';
+      else if (domain === 'traumatologia') category = 'Traumatología';
+      else if (domain === 'oftalmologia') category = 'Oftalmología';
+      else if (domain === 'barberia') category = 'Barbería';
+      else if (domain === 'grooming') category = 'Peluquería Canina';
+      else if (domain === 'med_general') category = 'Medicina General';
+
       return {
         name: s.name,
         durationMinutes: s.durationMinutes,
@@ -403,9 +423,27 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         priceText: priceText,
         isCustomPrice: s.hasHidden || s.prices.length === 0,
         icon,
+        category,
       };
     });
   }, [employees, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
+
+  // Categorías de especialidad detectadas (ej. Ginecología, Odontología, Barbería, etc.)
+  const availableCategories = useMemo(() => {
+    const cats = new Set<string>();
+    uniqueServices.forEach((s: any) => {
+      if (s.category && s.category !== 'General') {
+        cats.add(s.category);
+      }
+    });
+    return Array.from(cats);
+  }, [uniqueServices]);
+
+  // Servicios filtrados por la categoría seleccionada
+  const displayedServices = useMemo(() => {
+    if (selectedCategory === 'all') return uniqueServices;
+    return uniqueServices.filter((s: any) => s.category === selectedCategory);
+  }, [uniqueServices, selectedCategory]);
 
   // Si todos los colaboradores hacen lo mismo o solo existe 1 rama en la empresa,
   // no hace falta preguntarle al cliente qué quiere: se preselecciona la rama y se va directo al Paso 2
@@ -691,11 +729,48 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           {/* Service Cards */}
           <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
             <div className="max-w-5xl mx-auto">
-              {uniqueServices.length === 0 && (
-                <p className="text-center text-slate-400 mt-10 text-lg">No hay servicios disponibles en este momento.</p>
+              {/* Selector de Categoría / Especialidad (Ginecología, Odontología, etc.) */}
+              {availableCategories.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 scrollbar-none">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('all')}
+                    className={`px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs ${
+                      selectedCategory === 'all'
+                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                    }`}
+                  >
+                    🌟 Todos ({uniqueServices.length})
+                  </button>
+                  {availableCategories.map((cat) => {
+                    const count = uniqueServices.filter((s: any) => s.category === cat).length;
+                    const catIcon = cat === 'Ginecología' ? '👶' : cat === 'Odontología' ? '🦷' : cat === 'Cardiología' ? '🫀' : cat === 'Pediatría' ? '🧸' : cat === 'Barbería' ? '💈' : cat === 'Peluquería Canina' ? '🐩' : '🩺';
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={`px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs flex items-center gap-1.5 ${
+                          selectedCategory === cat
+                            ? 'bg-[color:var(--theme-btn)] text-white shadow-md'
+                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
+                        }`}
+                      >
+                        <span>{catIcon}</span>
+                        <span>{cat}</span>
+                        <span className="opacity-75 text-[11px] ml-0.5">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {displayedServices.length === 0 && (
+                <p className="text-center text-slate-400 mt-10 text-lg">No hay servicios disponibles en esta categoría.</p>
               )}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {uniqueServices.map((service, idx) => (
+                {displayedServices.map((service, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleServiceSelect(service)}

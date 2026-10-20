@@ -425,10 +425,37 @@ export default function GinecologiaPage() {
         }
       }
 
-      if (itemsRes.success && itemsRes.items) {
-        const merged = mergeTenantGinecoServices(itemsRes.items as any[]);
-        setCatalogProcedures(merged);
+      // Extraer servicios configurados en los colaboradores/médicos en Citas/Equipo
+      const employeeServices: any[] = [];
+      if (employeesRes.success && employeesRes.entities) {
+        employeesRes.entities.forEach((emp: any) => {
+          const svcs = emp.metadata?.services;
+          if (Array.isArray(svcs)) {
+            svcs.forEach((s: any) => {
+              if (s && s.name && s.name.trim()) {
+                employeeServices.push({
+                  id: s.id || `emp-svc-${s.name.toLowerCase().replace(/\s+/g, '-')}`,
+                  name: s.name.trim(),
+                  base_price: s.price !== undefined && s.price !== null ? Number(s.price) : 50,
+                  metadata: {
+                    specialty: 'ginecologia',
+                    source_module: 'ginecologia',
+                    category: 'procedimientos',
+                    duration_minutes: s.durationMinutes || 45,
+                  },
+                });
+              }
+            });
+          }
+        });
       }
+
+      const allItems = [
+        ...(itemsRes.success && itemsRes.items ? itemsRes.items : []),
+        ...employeeServices,
+      ];
+      const merged = mergeTenantGinecoServices(allItems as any[]);
+      setCatalogProcedures(merged);
 
       if (apptRes.success && apptRes.appointments) {
         const todayStr = new Date().toISOString().split('T')[0];
