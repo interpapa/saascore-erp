@@ -243,7 +243,7 @@ export async function getSubscriptionsAction(
         entity:entities (id, name, phone, email)
       `)
       .eq('tenant_id', tenantId)
-      .eq('type', 'subscription')
+      .or('type.eq.subscription,metadata->>actual_type.eq.subscription')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -253,7 +253,10 @@ export async function getSubscriptionsAction(
     const subscriptions: Subscription[] = (docs || []).map((d: any) => {
       const client = d.entity || {};
       const meta = d.metadata || {};
-      let calculatedStatus: SubscriptionStatus = d.status as SubscriptionStatus;
+      let calculatedStatus: SubscriptionStatus = (meta.status || meta.subscription_status || d.status) as SubscriptionStatus;
+      if (!['active', 'due', 'paused', 'cancelled'].includes(calculatedStatus)) {
+        calculatedStatus = 'active';
+      }
 
       // Actualizar automáticamente a 'due' si la fecha de corte ya pasó y no está pausada/cancelada
       if (calculatedStatus === 'active' && meta.next_billing_date && meta.next_billing_date < todayStr) {
@@ -351,47 +354,80 @@ export async function createSubscriptionAction(
     const priceUSD = input.price_usd !== undefined ? Number(input.price_usd) : plan.price_usd;
 
     const docNumber = `SUB-${Date.now().toString().slice(-6)}`;
+    const safeEntityId = input.client_id && isValidUUID(input.client_id) && !isTemporaryId(input.client_id)
+      ? input.client_id
+      : null;
 
-    const { data: newDoc, error: docError } = await supabaseAdmin
+    const initialMetadata = {
+      plan_id: plan.id,
+      plan_name: plan.name,
+      frequency: plan.frequency,
+      start_date: startDate,
+      next_billing_date: nextBillingDate,
+      last_payment_date: startDate,
+      price_usd: priceUSD,
+      sessions_used: 0,
+      max_sessions: plan.max_sessions_per_cycle,
+      client_name: clientName,
+      client_phone: clientPhone,
+      client_email: clientEmail,
+      client_id: input.client_id,
+      actual_type: 'subscription',
+      subscription_status: 'active',
+      status: 'active',
+      payment_history: [
+        {
+          id: `pay-${Date.now()}`,
+          amount_usd: priceUSD,
+          date: new Date().toISOString(),
+          method: 'Inicial / Alta',
+          notes: 'Pago de cuota inicial al suscribirse'
+        }
+      ]
+    };
+
+    let { data: newDoc, error: docError } = await supabaseAdmin
       .from('documents')
       .insert({
         tenant_id: tenantId,
-        entity_id: input.client_id,
+        entity_id: safeEntityId,
         type: 'subscription',
-        status: 'active',
+        status: 'in_progress',
         document_number: docNumber,
         subtotal_amount: priceUSD,
         tax_amount: 0,
         total_amount: priceUSD,
         notes: input.notes || null,
-        metadata: {
-          plan_id: plan.id,
-          plan_name: plan.name,
-          frequency: plan.frequency,
-          start_date: startDate,
-          next_billing_date: nextBillingDate,
-          last_payment_date: startDate,
-          price_usd: priceUSD,
-          sessions_used: 0,
-          max_sessions: plan.max_sessions_per_cycle,
-          client_name: clientName,
-          client_phone: clientPhone,
-          client_email: clientEmail,
-          payment_history: [
-            {
-              id: `pay-${Date.now()}`,
-              amount_usd: priceUSD,
-              date: new Date().toISOString(),
-              method: 'Inicial / Alta',
-              notes: 'Pago de cuota inicial al suscribirse'
-            }
-          ]
-        }
+        metadata: initialMetadata
       })
       .select()
       .single();
 
-    if (docError) throw docError;
+    if (docError && (docError.message.includes('type') || docError.message.includes('check') || docError.message.includes('constraint') || docError.message.includes('status'))) {
+      const fallback = await supabaseAdmin
+        .from('documents')
+        .insert({
+          tenant_id: tenantId,
+          entity_id: safeEntityId,
+          type: 'work_order',
+          status: 'in_progress',
+          document_number: docNumber,
+          subtotal_amount: priceUSD,
+          tax_amount: 0,
+          total_amount: priceUSD,
+          notes: input.notes || null,
+          metadata: initialMetadata
+        })
+        .select()
+        .single();
+      newDoc = fallback.data;
+      docError = fallback.error;
+    }
+
+    if (docError || !newDoc) {
+      console.error('[createSubscriptionAction docError]:', docError);
+      throw new Error(docError?.message || 'Error al guardar el contrato de suscripción en base de datos.');
+    }
 
     await writeAuditLog({
       tenant_id: tenantId,
@@ -484,10 +520,10 @@ export async function recordSubscriptionPaymentAction(
     const { error: updateErr } = await supabaseAdmin
       .from('documents')
       .update({
-        status: 'active',
         metadata: {
           ...meta,
           status: 'active',
+          subscription_status: 'active',
           next_billing_date: newNextBillingDate,
           last_payment_date: new Date().toISOString().slice(0, 10),
           payment_history: updatedHistory
@@ -544,10 +580,10 @@ export async function updateSubscriptionStatusAction(
     const { error } = await supabaseAdmin
       .from('documents')
       .update({
-        status: newStatus,
         metadata: {
           ...currentMeta,
           status: newStatus,
+          subscription_status: newStatus,
           status_changed_at: new Date().toISOString()
         }
       })

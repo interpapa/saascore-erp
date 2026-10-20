@@ -590,20 +590,57 @@ export function AppointmentDetailsModal({
                       No hay alumnos inscritos en esta clase.
                     </p>
                   ) : (
-                    attendees.map(a => (
-                      <div key={a.id} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 shadow-sm">
-                        <span className="text-sm font-semibold text-foreground">{a.name}</span>
-                        <button
-                          disabled={isUpdating}
-                          onClick={() => handleRemoveAttendee(a.id)}
-                          className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors"
-                          title="Remover alumno"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    ))
+                    attendees.map(a => {
+                      const clientData = clients.find(c => c.id === a.id);
+                      const debt = Number(clientData?.metadata?.debt_balance ?? clientData?.metadata?.current_debt ?? 0);
+                      const hasDebt = debt > 0;
+                      return (
+                        <div key={a.id} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 shadow-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-foreground">{a.name}</span>
+                            {hasDebt ? (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
+                                Debe ${debt.toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
+                                Al Día
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            disabled={isUpdating}
+                            onClick={() => handleRemoveAttendee(a.id)}
+                            className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                            title="Remover alumno"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
+                </div>
+
+                {/* Material y Equipamiento de la Clase */}
+                <div className="pt-2 border-t border-fuchsia-200/50">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                    <span>🎾 Material & Equipamiento Asignado:</span>
+                  </div>
+                  <input
+                    type="text"
+                    defaultValue={appointment.metadata?.equipment || 'Carro de 72 pelotas presurizadas · Set de conos y escaleras'}
+                    onBlur={(e) => {
+                      if (onUpdateMetadata) {
+                        onUpdateMetadata(appointment.id, {
+                          ...appointment.metadata,
+                          equipment: e.target.value
+                        });
+                      }
+                    }}
+                    placeholder="Ej. Carro de pelotas, 8 conos, palas de test..."
+                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white dark:bg-slate-900 focus:outline-none focus:border-fuchsia-400 font-medium text-slate-700 dark:text-slate-200"
+                  />
                 </div>
 
                 {attendees.length < maxCapacity ? (

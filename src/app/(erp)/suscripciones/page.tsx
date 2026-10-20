@@ -35,7 +35,7 @@ import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
-import { getEntitiesAction, ActionActor } from '@/app/actions/entities';
+import { getEntitiesAction, createEntityAction, ActionActor } from '@/app/actions/entities';
 import { 
   getSubscriptionPlansAction, 
   saveSubscriptionPlanAction, 
@@ -110,6 +110,12 @@ export default function SuscripcionesPage() {
   const [newSubStartDate, setNewSubStartDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [newSubPrice, setNewSubPrice] = useState<string>('');
   const [newSubNotes, setNewSubNotes] = useState<string>('');
+
+  // Creación rápida de cliente/alumno dentro del modal
+  const [isQuickClientOpen, setIsQuickClientOpen] = useState<boolean>(false);
+  const [quickClientName, setQuickClientName] = useState<string>('');
+  const [quickClientPhone, setQuickClientPhone] = useState<string>('');
+  const [creatingClient, setCreatingClient] = useState<boolean>(false);
 
   // Formulario nuevo plan
   const [editingPlan, setEditingPlan] = useState<Partial<SubscriptionPlan>>({
@@ -389,6 +395,43 @@ export default function SuscripcionesPage() {
       showToast('Ocurrió un error al crear la suscripción', 'error');
     } finally {
       setProcessing(false);
+    }
+  };
+
+  // Creación rápida de cliente/alumno
+  const handleQuickCreateClient = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickClientName.trim() || !currentTenant?.id) {
+      showToast('Ingresa el nombre del cliente o alumno', 'warning');
+      return;
+    }
+    setCreatingClient(true);
+    const safeActor: ActionActor = actor || { email: 'admin@rendo.com', role: 'owner' };
+    try {
+      const res = await createEntityAction(
+        currentTenant.id,
+        {
+          type: 'customer',
+          name: quickClientName.trim(),
+          phone: quickClientPhone.trim() || undefined,
+          status: 'active'
+        },
+        safeActor
+      );
+      if (res.success && res.entity) {
+        setClients(prev => [res.entity, ...prev]);
+        setNewSubClientId(res.entity.id);
+        setIsQuickClientOpen(false);
+        setQuickClientName('');
+        setQuickClientPhone('');
+        showToast('¡Alumno registrado y seleccionado!', 'success');
+      } else {
+        showToast(res.error || 'Error al crear cliente', 'error');
+      }
+    } catch {
+      showToast('Error de red al crear cliente', 'error');
+    } finally {
+      setCreatingClient(false);
     }
   };
 
@@ -1010,22 +1053,73 @@ export default function SuscripcionesPage() {
             <form onSubmit={handleCreateSubscription} className="mt-4 space-y-4">
               {/* Cliente */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Cliente del Directorio *
-                </label>
-                <select
-                  value={newSubClientId}
-                  onChange={e => setNewSubClientId(e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
-                >
-                  <option value="">-- Seleccionar Cliente --</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.phone ? `(${c.phone})` : ''}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Cliente / Alumno del Directorio *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickClientOpen(!isQuickClientOpen)}
+                    className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" />
+                    <span>{isQuickClientOpen ? 'Volver a la lista' : '+ Nuevo Alumno'}</span>
+                  </button>
+                </div>
+
+                {isQuickClientOpen ? (
+                  <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-900/60 space-y-2 animate-in fade-in">
+                    <p className="text-[11px] font-semibold text-indigo-900 dark:text-indigo-200">
+                      Crear Alumno Rápido:
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Nombre y Apellido del Alumno *"
+                      value={quickClientName}
+                      onChange={e => setQuickClientName(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-indigo-500"
+                    />
+                    <input
+                      type="tel"
+                      placeholder="Teléfono / WhatsApp (ej: 0414-1234567)"
+                      value={quickClientPhone}
+                      onChange={e => setQuickClientPhone(e.target.value)}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:border-indigo-500"
+                    />
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickClientOpen(false)}
+                        className="px-2.5 py-1 text-xs text-slate-500 hover:text-slate-700"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={creatingClient || !quickClientName.trim()}
+                        onClick={handleQuickCreateClient}
+                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-lg text-xs font-bold transition flex items-center gap-1"
+                      >
+                        {creatingClient ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                        <span>Guardar Alumno</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    value={newSubClientId}
+                    onChange={e => setNewSubClientId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">-- Seleccionar Cliente ({clients.length} disponibles) --</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} {c.phone ? `(${c.phone})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               {/* Plan */}
