@@ -145,6 +145,7 @@ export async function getAppointmentsAction(
           status: a.status,
           notes: a.notes,
           price: a.price,
+          location: a.location || a.metadata?.location || a.metadata?.court_name || null,
           metadata: a.metadata,
           created_at: a.created_at,
           updated_at: a.updated_at,
@@ -189,6 +190,7 @@ export async function getAppointmentsAction(
           status: mapDocStatusToApptStatus(doc.status),
           notes: doc.notes,
           price: doc.total_amount || 0,
+          location: doc.metadata?.location || doc.metadata?.court_name || null,
           metadata: doc.metadata || {},
           created_at: doc.created_at,
           updated_at: doc.updated_at,
@@ -231,8 +233,8 @@ export async function createAppointmentAction(
     const calculatedEndTime = payload.end_time || 
       new Date(new Date(payload.start_time).getTime() + (payload.duration_minutes || 60) * 60000).toISOString();
 
-    // Prevención de colisión defensiva: verificar que el especialista no tenga otra cita activa en ese rango horario
-    if (payload.employee_id && payload.status !== 'cancelled') {
+    // Prevención de colisión defensiva 1: verificar que el especialista/coach no tenga otra cita activa en ese rango horario
+    if (payload.employee_id && payload.status !== 'cancelled' && !payload.metadata?.is_slot_freed) {
       try {
         const { data: overlapping } = await supabaseAdmin
           .from('appointments')
@@ -249,11 +251,44 @@ export async function createAppointmentAction(
         if (overlapping && overlapping.length > 0) {
           return {
             success: false,
-            error: `El colaborador ya tiene una cita agendada en ese horario ("${overlapping[0].title || 'Cita'}"). Por favor selecciona otro turno o especialista.`
+            error: `El profesional/coach ya tiene una actividad en ese horario ("${overlapping[0].title || 'Cita'}"). Por favor selecciona otro turno o especialista.`
           };
         }
       } catch {
         // En caso de tabla appointments no disponible, el fallback se encargará
+      }
+    }
+
+    // Prevención de colisión defensiva 2: verificar que la pista/cancha física no esté ocupada
+    const courtTarget = (payload.location || (payload.metadata?.court_name as string) || (payload.metadata?.court_id as string) || '').trim();
+    if (courtTarget && payload.status !== 'cancelled' && !payload.metadata?.is_slot_freed) {
+      try {
+        const { data: overlappingCourts } = await supabaseAdmin
+          .from('appointments')
+          .select('id, title, start_time, end_time, location, metadata')
+          .eq('tenant_id', tenantId)
+          .neq('status', 'cancelled')
+          .neq('status', 'no_show')
+          .neq('status', 'completed')
+          .lt('start_time', calculatedEndTime)
+          .gt('end_time', payload.start_time);
+
+        if (overlappingCourts && overlappingCourts.length > 0) {
+          const conflict = overlappingCourts.find((a: any) => {
+            if (a.metadata?.is_slot_freed) return false;
+            const aLoc = (a.location || a.metadata?.court_name || a.metadata?.court_id || '').trim().toLowerCase();
+            return aLoc === courtTarget.toLowerCase();
+          });
+
+          if (conflict) {
+            return {
+              success: false,
+              error: `La Pista "${courtTarget}" ya está ocupada en ese horario por "${conflict.title || 'otra actividad'}". Por favor selecciona otra pista u horario.`
+            };
+          }
+        }
+      } catch {
+        // En caso de tabla appointments no disponible, continuar con fallback
       }
     }
 
@@ -267,11 +302,19 @@ export async function createAppointmentAction(
       .insert([{
         tenant_id: tenantId,
         title: payload.title,
-        metadata: { ...(payload.metadata || {}), title: payload.title },
+        metadata: {
+          ...(payload.metadata || {}),
+          title: payload.title,
+          location: courtTarget || payload.location || null,
+          court_name: courtTarget || null,
+          court_id: (payload.metadata?.court_id as string) || null,
+          is_fixed_class: !!payload.metadata?.is_fixed_class,
+        },
         description: payload.description || null,
         client_id: safeClientId,
         service_id: safeServiceId,
         employee_id: safeEmployeeId,
+        location: courtTarget || payload.location || null,
         start_time: payload.start_time,
         end_time: calculatedEndTime,
         status: payload.status || 'scheduled',
@@ -343,6 +386,10 @@ export async function createAppointmentAction(
             created_by: actor.email,
             issue_date: payload.start_time,
             due_date: calculatedEndTime,
+            location: courtTarget || payload.location || null,
+            court_name: courtTarget || null,
+            court_id: (payload.metadata?.court_id as string) || null,
+            is_fixed_class: !!payload.metadata?.is_fixed_class,
             ...payload.metadata,
           },
         }])
@@ -370,6 +417,10 @@ export async function createAppointmentAction(
               employee_id: safeEmployeeId || payload.employee_id,
               duration_minutes: payload.duration_minutes || 60,
               price: payload.price || 0,
+              location: courtTarget || payload.location || null,
+              court_name: courtTarget || null,
+              court_id: (payload.metadata?.court_id as string) || null,
+              is_fixed_class: !!payload.metadata?.is_fixed_class,
               created_by: actor.email,
               issue_date: payload.start_time,
               due_date: calculatedEndTime,
@@ -583,6 +634,239 @@ export async function updateAppointmentPriceAction(
     return { success: true, price: cleanPrice };
   } catch (err: any) {
     console.error('[updateAppointmentPriceAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Reagenda o mueve una cita/clase verificando anti-colisión dual (Coach y Pista/Cancha).
+ * Permite cambiar hora, fecha, entrenador o pista asegurando que no haya choques.
+ */
+export async function rescheduleOrMoveAppointmentAction(
+  id: string,
+  tenantId: string,
+  updates: {
+    start_time: string;
+    end_time?: string;
+    duration_minutes?: number;
+    employee_id?: string | null;
+    employee_name?: string | null;
+    location?: string | null;
+    court_name?: string | null;
+    court_id?: string | null;
+    metadata?: Record<string, any>;
+  },
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    const moduleCheck = await assertCalendarOrDentalEnabled(tenantId);
+    if (!moduleCheck.authorized) {
+      return { success: false, error: moduleCheck.error || 'El módulo de citas está desactivado.' };
+    }
+
+    if (!id || !tenantId || !updates.start_time) {
+      throw new Error('ID, Empresa y nueva hora de inicio son requeridos.');
+    }
+
+    const calculatedEndTime = updates.end_time || 
+      new Date(new Date(updates.start_time).getTime() + (updates.duration_minutes || 60) * 60000).toISOString();
+
+    // 1. Anti-colisión de Coach (si viene employee_id)
+    if (updates.employee_id) {
+      const { data: overlappingEmp } = await supabaseAdmin
+        .from('appointments')
+        .select('id, title, start_time, end_time')
+        .eq('tenant_id', tenantId)
+        .eq('employee_id', updates.employee_id)
+        .neq('id', id)
+        .neq('status', 'cancelled')
+        .neq('status', 'no_show')
+        .neq('status', 'completed')
+        .lt('start_time', calculatedEndTime)
+        .gt('end_time', updates.start_time)
+        .limit(1);
+
+      if (overlappingEmp && overlappingEmp.length > 0) {
+        return {
+          success: false,
+          error: `El coach ya tiene otra clase/actividad en ese horario ("${overlappingEmp[0].title || 'Cita'}"). Elige otro horario o entrenador.`
+        };
+      }
+    }
+
+    // 2. Anti-colisión de Pista / Cancha (si viene location o court_name)
+    const courtTarget = (updates.location || updates.court_name || (updates.metadata?.court_name as string) || '').trim();
+    if (courtTarget) {
+      const { data: overlappingCourts } = await supabaseAdmin
+        .from('appointments')
+        .select('id, title, start_time, end_time, location, metadata')
+        .eq('tenant_id', tenantId)
+        .neq('id', id)
+        .neq('status', 'cancelled')
+        .neq('status', 'no_show')
+        .neq('status', 'completed')
+        .lt('start_time', calculatedEndTime)
+        .gt('end_time', updates.start_time);
+
+      if (overlappingCourts && overlappingCourts.length > 0) {
+        const conflict = overlappingCourts.find((a: any) => {
+          if (a.metadata?.is_slot_freed) return false;
+          const aLoc = (a.location || a.metadata?.court_name || a.metadata?.court_id || '').trim().toLowerCase();
+          return aLoc === courtTarget.toLowerCase();
+        });
+
+        if (conflict) {
+          return {
+            success: false,
+            error: `La Pista "${courtTarget}" ya está ocupada en ese horario por "${conflict.title || 'otra actividad'}". Elige otra pista o franja.`
+          };
+        }
+      }
+    }
+
+    // 3. Obtener metadata actual para fusionar
+    const { data: currentAppt } = await supabaseAdmin
+      .from('appointments')
+      .select('*')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const mergedMetadata = {
+      ...(typeof currentAppt?.metadata === 'object' && currentAppt?.metadata !== null ? currentAppt.metadata : {}),
+      ...(updates.metadata || {}),
+      location: courtTarget || updates.location || currentAppt?.location || null,
+      court_name: courtTarget || updates.court_name || null,
+      ...(updates.employee_name ? { employee_name: updates.employee_name } : {}),
+      is_slot_freed: false,
+    };
+
+    const updatePayload: Record<string, any> = {
+      start_time: updates.start_time,
+      end_time: calculatedEndTime,
+      metadata: mergedMetadata,
+    };
+    if (updates.employee_id !== undefined) updatePayload.employee_id = sanitizeUUID(updates.employee_id) || null;
+    if (courtTarget) updatePayload.location = courtTarget;
+
+    const { error: updateErr } = await supabaseAdmin
+      .from('appointments')
+      .update(updatePayload)
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (updateErr) {
+      if (updateErr.code === '42P01') {
+        const { error: docErr } = await supabaseAdmin
+          .from('documents')
+          .update({
+            metadata: {
+              ...mergedMetadata,
+              issue_date: updates.start_time,
+              due_date: calculatedEndTime,
+              location: courtTarget || null,
+              court_name: courtTarget || null,
+            }
+          })
+          .eq('id', id)
+          .eq('tenant_id', tenantId);
+        if (docErr) throw docErr;
+      } else {
+        throw updateErr;
+      }
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.updated',
+      target_type: 'appointment',
+      target_id: id,
+      metadata: { action: 'appointment_rescheduled', new_start: updates.start_time, court: courtTarget },
+    });
+
+    safeRevalidate('/calendario', tenantId);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[rescheduleOrMoveAppointmentAction Error]:', (err as Error).message);
+    return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Libera temporalmente una cancha/pista o slot para una fecha concreta (Ceder Pista).
+ * Permite que una clase fija o reserva libere el espacio para que recepción pueda
+ * agendar una clase particular o alquiler libre sin borrar el histórico.
+ */
+export async function freeAppointmentSlotAction(
+  id: string,
+  tenantId: string,
+  reason: string,
+  actor: ActionActor
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!id || !tenantId) throw new Error('ID y Empresa requeridos.');
+
+    const { data: currentAppt } = await supabaseAdmin
+      .from('appointments')
+      .select('metadata, title, location')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const mergedMeta = {
+      ...(currentAppt?.metadata || {}),
+      is_slot_freed: true,
+      freed_at: new Date().toISOString(),
+      freed_by: actor.email,
+      freed_reason: reason || 'Liberada temporalmente por aviso de alumnos',
+    };
+
+    const { error } = await supabaseAdmin
+      .from('appointments')
+      .update({
+        status: 'cancelled',
+        metadata: mergedMeta,
+      })
+      .eq('id', id)
+      .eq('tenant_id', tenantId);
+
+    if (error && error.code === '42P01') {
+      await supabaseAdmin
+        .from('documents')
+        .update({
+          status: 'cancelled',
+          metadata: mergedMeta,
+        })
+        .eq('id', id)
+        .eq('tenant_id', tenantId);
+    }
+
+    await writeAuditLog({
+      tenant_id: tenantId,
+      actor_email: actor.email,
+      actor_role: actor.role,
+      action: 'entity.updated',
+      target_type: 'appointment',
+      target_id: id,
+      metadata: { action: 'appointment_slot_freed', reason },
+    });
+
+    safeRevalidate('/calendario', tenantId);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[freeAppointmentSlotAction Error]:', (err as Error).message);
     return { success: false, error: (err as Error).message };
   }
 }

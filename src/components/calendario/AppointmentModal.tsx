@@ -6,7 +6,7 @@ import {
   FileText, Check, Lock, CalendarRange, Building, Palmtree, Coffee, 
   Wrench, ShieldAlert, Sparkles, CheckCircle2 
 } from 'lucide-react';
-import { CreateAppointmentInput, BlockInput, Employee, Service, AppointmentStatus } from '@/types/calendario';
+import { CreateAppointmentInput, BlockInput, Employee, Service, AppointmentStatus, CourtResource, DEFAULT_SPORTS_COURTS } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
 import { AGENDA_20_COLORS, DEFAULT_AGENDA_COLOR } from '@/lib/calendario/calendarColors';
 import { matchesEmployeeService } from '@/lib/services/serviceMatching';
@@ -20,9 +20,11 @@ export interface AppointmentModalProps {
   employees: Employee[];
   services: Service[];
   clients: Entity[];
+  courts?: CourtResource[];
   initialDate?: Date | null;
   initialTime?: string | null;
   initialClientId?: string | null;
+  initialLocation?: string | null;
 }
 
 export const BLOCK_PRESETS = [
@@ -52,9 +54,11 @@ export function AppointmentModal({
   employees,
   services,
   clients,
+  courts,
   initialDate,
   initialTime,
   initialClientId,
+  initialLocation,
 }: AppointmentModalProps) {
   const [title, setTitle] = useState('');
   const [serviceId, setServiceId] = useState('');
@@ -71,6 +75,9 @@ export function AppointmentModal({
   const [isGroupClass, setIsGroupClass] = useState(false);
   const [customClientName, setCustomClientName] = useState('');
   const [color, setColor] = useState(DEFAULT_AGENDA_COLOR);
+  const [location, setLocation] = useState(initialLocation || '');
+  const [customLocation, setCustomLocation] = useState('');
+  const [isFixedClass, setIsFixedClass] = useState(false);
 
   // Estados dedicados para Bloqueo / Mantenimiento
   const [blockMode, setBlockMode] = useState<'hours' | 'full_day' | 'multi_day'>('full_day');
@@ -85,6 +92,9 @@ export function AppointmentModal({
       const dateFormatted = toYYYYMMDD(d);
       setDateStr(dateFormatted);
       setTimeStr(initialTime || '09:00');
+      setLocation(initialLocation || '');
+      setCustomLocation('');
+      setIsFixedClass(false);
       
       setServiceId('');
       setClientId(initialClientId || '');
@@ -299,15 +309,22 @@ export function AppointmentModal({
       const startTimeISO = startDateTime.toISOString();
       const endTimeISO = new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString();
 
+      const courtLocation = location === 'custom' ? customLocation.trim() : location.trim();
+
       let appointmentMetadata: Record<string, unknown> = {
         color: color || DEFAULT_AGENDA_COLOR,
+        location: courtLocation || null,
+        court_name: courtLocation || null,
+        is_fixed_class: isFixedClass,
       };
-      if (isGroupClass) {
+      if (isGroupClass || isFixedClass) {
         const s = services.find((srv) => srv.id === serviceId);
         appointmentMetadata.is_group_class = true;
-        appointmentMetadata.max_capacity = s?.metadata?.max_capacity || 10;
+        appointmentMetadata.max_capacity = s?.metadata?.max_capacity || 4;
         appointmentMetadata.attendees = [];
-      } else if (customClientName.trim()) {
+        appointmentMetadata.equipment = 'Carro de 72 pelotas presurizadas · Set de conos y escaleras';
+      }
+      if (customClientName.trim()) {
         appointmentMetadata.client_name = customClientName.trim();
       }
 
@@ -316,6 +333,7 @@ export function AppointmentModal({
         service_id: serviceId || null,
         client_id: (isGroupClass || clientId === 'manual') ? null : (clientId || null),
         employee_id: employeeId || null,
+        location: courtLocation || null,
         start_time: startTimeISO,
         end_time: endTimeISO,
         duration_minutes: durationMinutes,
@@ -832,6 +850,62 @@ export function AppointmentModal({
                     })}
                   </select>
                 </div>
+              </div>
+
+              {/* Cancha / Pista (Recurso Físico) & Modalidad de Clase Fija */}
+              <div className="bg-slate-50 dark:bg-slate-900/60 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    🎾 Pista / Cancha Asignada
+                  </label>
+                  {isFixedClass && (
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
+                      Clase Fija Semanal
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <select
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 font-medium"
+                  >
+                    <option value="">-- Sin Cancha Específica --</option>
+                    {(courts && courts.length > 0 ? courts : DEFAULT_SPORTS_COURTS).map((c) => (
+                      <option key={c.id} value={c.name}>
+                        {c.name} {c.type ? `(${c.type})` : ''}
+                      </option>
+                    ))}
+                    <option value="custom">✏️ Escribir otra pista o ubicación...</option>
+                  </select>
+
+                  {location === 'custom' ? (
+                    <input
+                      type="text"
+                      placeholder="Ej: Pista Central Exterior..."
+                      value={customLocation}
+                      onChange={(e) => setCustomLocation(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
+                  ) : (
+                    <div className="text-[11px] text-slate-400 flex items-center px-1">
+                      {location ? `Asignada a ${location}` : 'Selecciona una pista para evitar choques.'}
+                    </div>
+                  )}
+                </div>
+
+                <label className="flex items-center gap-2 cursor-pointer pt-1">
+                  <input
+                    type="checkbox"
+                    checked={isFixedClass}
+                    onChange={(e) => setIsFixedClass(e.target.checked)}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Marcar como Clase Fija Recurrente (Bloquea la pista para los mismos alumnos semanalmente)
+                  </span>
+                </label>
               </div>
 
               {/* Date & Time Row (Duración automática según procedimiento/especialista) */}

@@ -13,6 +13,7 @@ import {
   SubscriptionFrequency,
   CreateSubscriptionInput 
 } from '@/types/subscriptions';
+import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 
 function safeRevalidate(tenantId?: string) {
   try {

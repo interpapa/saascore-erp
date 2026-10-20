@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { CalendarDays, Clock, User, Plus } from 'lucide-react';
-import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
+import { Appointment, AppointmentStatus, Employee, CourtResource, DEFAULT_SPORTS_COURTS } from '@/types/calendario';
 import { EmptyState } from '@/components/core/EmptyState';
 import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
 
@@ -11,9 +11,10 @@ export interface CalendarGridProps {
   currentDate: Date;
   appointments: Appointment[];
   employees?: Employee[];
+  courts?: CourtResource[];
   isLoading: boolean;
   onSelectAppointment: (appt: Appointment) => void;
-  onSelectDateSlot: (date: Date, timeStr?: string) => void;
+  onSelectDateSlot: (date: Date, timeStr?: string, prefillCourt?: string) => void;
   onOpenCreateModal: (type?: 'appointment' | 'block') => void;
   onDrillDown?: (date: Date, mode: 'day' | 'week' | 'month') => void;
 }
@@ -75,12 +76,15 @@ export function CalendarGrid({
   currentDate,
   appointments,
   employees = [],
+  courts,
   isLoading,
   onSelectAppointment,
   onSelectDateSlot,
   onOpenCreateModal,
   onDrillDown,
 }: CalendarGridProps) {
+  const [resourceDimension, setResourceDimension] = useState<'courts' | 'employees'>('courts');
+
   if (isLoading) {
     return (
       <div className="bg-card border border-border rounded-3xl p-16 flex items-center justify-center min-h-[400px]">
@@ -105,7 +109,7 @@ export function CalendarGrid({
   };
 
   // -------------------------
-  // RENDER: DAY VIEW (RESOURCE)
+  // RENDER: DAY VIEW (RESOURCE & COURTS DUAL MODE)
   // -------------------------
   const renderDayView = () => {
     // Generar horas desde 08:00 hasta 20:30 (intervalos de 30 min)
@@ -118,132 +122,205 @@ export function CalendarGrid({
     const activeEmployees = employees.filter(e => e.is_active);
     const dayAppts = getAppointmentsForDate(currentDate);
 
-    // Calculamos un ancho mínimo dependiendo de los empleados para forzar el scroll horizontal en móviles
-    const minWidthClass = activeEmployees.length > 2 ? 'min-w-[800px]' : 'min-w-[600px]';
+    // Canchas activas (de configuración o por defecto)
+    const activeCourts: CourtResource[] = (courts && courts.length > 0)
+      ? courts.filter(c => c.is_active)
+      : DEFAULT_SPORTS_COURTS;
+
+    const columns = resourceDimension === 'courts'
+      ? activeCourts.map(c => ({ id: c.id, name: c.name, color: c.color || '#10b981', type: 'court' as const, sub: c.type || 'Pista' }))
+      : activeEmployees.map(e => ({ id: e.id, name: e.name, color: (e.metadata?.color as string) || '#3b82f6', type: 'employee' as const, sub: e.role || 'Staff' }));
+
+    const minWidthClass = columns.length > 2 ? 'min-w-[800px]' : 'min-w-[600px]';
 
     return (
-      <div className="flex flex-col h-[700px] overflow-auto bg-white dark:bg-slate-950 rounded-2xl border border-border hide-scrollbar shadow-sm relative">
-        <div className={`flex flex-col ${minWidthClass} sm:min-w-full relative h-full`}>
-          {/* Cabecera (Barberos) Fija */}
-          <div className="flex sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-sm">
-            <div className="w-16 shrink-0 border-r border-border p-2 flex items-center justify-center sticky left-0 z-40 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md">
-               <Clock size={16} className="text-slate-400" />
-            </div>
-            {activeEmployees.length === 0 ? (
-               <div className="flex-1 p-4 text-center text-sm font-bold text-slate-500">Sin empleados activos</div>
-            ) : (
-                activeEmployees.map(emp => {
-                  const empColor = (emp.metadata?.color as string) || '#3b82f6';
-                  return (
-                    <div key={emp.id} className="flex-1 min-w-[150px] border-r border-border p-3 text-center border-t-4" style={{ borderTopColor: empColor }}>
-                      <span className="text-sm font-black text-foreground">{emp.name}</span>
-                    </div>
-                  );
-                })
-            )}
+      <div className="flex flex-col gap-3">
+        {/* Selector de Dimensión: Pistas / Canchas vs Coaches / Especialistas */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border">
+          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 p-1 rounded-xl border border-border shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setResourceDimension('courts')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                resourceDimension === 'courts'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
+            >
+              🎾 Ver por Canchas / Pistas ({activeCourts.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setResourceDimension('employees')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                resourceDimension === 'employees'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
+            >
+              👤 Ver por Coaches / Staff ({activeEmployees.length})
+            </button>
           </div>
-          
-          {/* Cuerpo del Grid */}
-          <div className="flex relative bg-slate-50/30 dark:bg-slate-900/10 flex-1">
-             {/* Columna de Horas */}
-             <div className="w-16 shrink-0 border-r border-border bg-slate-50/90 dark:bg-slate-900/90 sticky left-0 z-20 backdrop-blur-md shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
-               {hours.map(time => (
-                 <div key={time} className="h-16 border-b border-border/50 text-right pr-2 pt-1">
-                    <span className="text-[10px] font-bold text-slate-400">{time}</span>
+          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>
+              {resourceDimension === 'courts'
+                ? 'Monitoreo de ocupación física de canchas (anti-choque)'
+                : 'Monitoreo de carga horaria por entrenador'}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col h-[700px] overflow-auto bg-white dark:bg-slate-950 rounded-2xl border border-border hide-scrollbar shadow-sm relative">
+          <div className={`flex flex-col ${minWidthClass} sm:min-w-full relative h-full`}>
+            {/* Cabecera Fija */}
+            <div className="flex sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-border shadow-sm">
+              <div className="w-16 shrink-0 border-r border-border p-2 flex items-center justify-center sticky left-0 z-40 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-md">
+                 <Clock size={16} className="text-slate-400" />
+              </div>
+              {columns.length === 0 ? (
+                 <div className="flex-1 p-4 text-center text-sm font-bold text-slate-500">
+                   {resourceDimension === 'courts' ? 'Sin canchas disponibles' : 'Sin empleados activos'}
                  </div>
-               ))}
-             </div>
-             
-             {/* Columnas de Empleados */}
-             <div className="flex flex-1">
-               {activeEmployees.map(emp => {
-                  const empAppts = dayAppts.filter(a => a.employee_id === emp.id || (!a.employee_id && a.metadata?.is_block));
-                  
-                  return (
-                    <div key={emp.id} className="flex-1 min-w-[150px] border-r border-border relative">
-                      {/* Celdas de Fondo para clics */}
-                      {hours.map(time => (
-                        <div 
-                          key={time} 
-                          className="h-16 border-b border-border/30 cursor-pointer hover:bg-primary/5 transition-colors"
-                          onClick={() => onSelectDateSlot(currentDate, time)}
-                        />
-                      ))}
-                      
-                      {/* Citas Superpuestas */}
-                      {empAppts.map(appt => {
-                         const isBlock = !!appt.metadata?.is_block;
-                         const isAllDay = !!appt.metadata?.all_day;
-
-                         // 1 slot = 30 mins = h-16 (64px) -> 1 min = 64/30 px = 2.133px
-                         const pixelsPerMin = 64 / 30;
-                         let topPx: number;
-                         let heightPx: number;
-
-                         if (isAllDay) {
-                           topPx = 0;
-                           // 13 horas (8:00 a 21:00) = 780 mins
-                           heightPx = 780 * pixelsPerMin;
-                         } else {
-                           const startD = new Date(appt.start_time);
-                           const endD = appt.end_time ? new Date(appt.end_time) : new Date(startD.getTime() + 45*60000);
-                           
-                           const startMins = startD.getHours() * 60 + startD.getMinutes();
-                           const endMins = endD.getHours() * 60 + endD.getMinutes();
-                           
-                           const topMins = startMins - (8 * 60);
-                           const durationMins = endMins - startMins;
-                           
-                           topPx = topMins * pixelsPerMin;
-                           heightPx = Math.max(15, durationMins) * pixelsPerMin;
-
-                           if (topMins < 0) return null;
-                         }
-
-                         const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
-                         const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || visual.color || '#6366f1';
-                         const cardBorderColor = isBlock ? '#f43f5e' : (visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor));
-
-                         return (
-                           <div 
-                             key={appt.id}
-                             onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
-                             className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${visual.bg}`}
-                             style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: cardBorderColor }}
-                           >
-                             <div className="flex items-center justify-between gap-1">
-                               <span className="text-xs font-black leading-tight truncate">
-                                 {isBlock ? `🔒 ${appt.title}` : (appt.client_name || appt.title)}
-                               </span>
-                               {visual.isPendingPayment && (
-                                 <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200 shrink-0">
-                                   Pago Pend.
-                                 </span>
-                               )}
-                               {isBlock && isAllDay && (
-                                 <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-rose-500/25 text-rose-900 dark:text-rose-200 shrink-0">
-                                   Día Completo
-                                 </span>
-                               )}
-                             </div>
-                             {heightPx >= 50 && (
-                               <span className="text-[10px] font-medium leading-tight truncate opacity-80">
-                                 {isBlock ? String(appt.metadata?.block_type || 'Mantenimiento') : (appt.service_name || appt.title)}
-                               </span>
-                             )}
-                             <div className="mt-auto flex items-center justify-between">
-                                <span className="text-[10px] font-bold opacity-75">
-                                  {isAllDay ? 'Jornada Completa' : formatTime(appt.start_time)}
-                                </span>
-                                <div className={`w-2 h-2 rounded-full ${visual.dot}`} />
-                             </div>
-                           </div>
-                         );
-                      })}
+              ) : (
+                  columns.map(col => (
+                    <div key={col.id} className="flex-1 min-w-[170px] border-r border-border p-2.5 text-center border-t-4" style={{ borderTopColor: col.color }}>
+                      <span className="text-sm font-black text-foreground block truncate">{col.name}</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{col.sub}</span>
                     </div>
-                  )
-               })}
-             </div>
+                  ))
+              )}
+            </div>
+            
+            {/* Cuerpo del Grid */}
+            <div className="flex relative bg-slate-50/30 dark:bg-slate-900/10 flex-1">
+               {/* Columna de Horas */}
+               <div className="w-16 shrink-0 border-r border-border bg-slate-50/90 dark:bg-slate-900/90 sticky left-0 z-20 backdrop-blur-md shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                 {hours.map(time => (
+                   <div key={time} className="h-16 border-b border-border/50 text-right pr-2 pt-1">
+                      <span className="text-[10px] font-bold text-slate-400">{time}</span>
+                   </div>
+                 ))}
+               </div>
+               
+               {/* Columnas de Recursos */}
+               <div className="flex flex-1">
+                 {columns.map(col => {
+                    const colAppts = resourceDimension === 'courts'
+                      ? dayAppts.filter(a => {
+                          const loc = String(a.location || a.metadata?.court_name || a.metadata?.court_id || '').toLowerCase();
+                          return loc.includes(col.name.toLowerCase()) || loc === col.id.toLowerCase() || (columns.length > 0 && !loc && col.id === columns[0].id);
+                        })
+                      : dayAppts.filter(a => a.employee_id === col.id || (!a.employee_id && a.metadata?.is_block));
+                    
+                    return (
+                      <div key={col.id} className="flex-1 min-w-[170px] border-r border-border relative">
+                        {/* Celdas de Fondo para clics */}
+                        {hours.map(time => (
+                          <div 
+                            key={time} 
+                            className="h-16 border-b border-border/30 cursor-pointer hover:bg-primary/5 transition-colors"
+                            onClick={() => onSelectDateSlot(currentDate, time, col.type === 'court' ? col.name : undefined)}
+                          />
+                        ))}
+                        
+                        {/* Citas Superpuestas */}
+                        {colAppts.map(appt => {
+                           const isBlock = !!appt.metadata?.is_block;
+                           const isAllDay = !!appt.metadata?.all_day;
+                           const isFixedClass = !!appt.metadata?.is_fixed_class;
+                           const isFreed = !!appt.metadata?.is_slot_freed;
+                           const attendeesCount = Array.isArray(appt.metadata?.attendees) ? appt.metadata.attendees.length : 0;
+
+                           const pixelsPerMin = 64 / 30;
+                           let topPx: number;
+                           let heightPx: number;
+
+                           if (isAllDay) {
+                             topPx = 0;
+                             heightPx = 780 * pixelsPerMin;
+                           } else {
+                             const startD = new Date(appt.start_time);
+                             const endD = appt.end_time ? new Date(appt.end_time) : new Date(startD.getTime() + 45*60000);
+                             
+                             const startMins = startD.getHours() * 60 + startD.getMinutes();
+                             const endMins = endD.getHours() * 60 + endD.getMinutes();
+                             
+                             const topMins = startMins - (8 * 60);
+                             const durationMins = endMins - startMins;
+                             
+                             topPx = topMins * pixelsPerMin;
+                             heightPx = Math.max(15, durationMins) * pixelsPerMin;
+
+                             if (topMins < 0) return null;
+                           }
+
+                           const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
+                           const apptColor = (appt.metadata?.color as string) || (employees.find(e => e.id === appt.employee_id)?.metadata?.color as string) || visual.color || '#6366f1';
+                           const cardBorderColor = isBlock ? '#f43f5e' : (visual.isPendingPayment ? '#f59e0b' : (visual.isPaid ? '#10b981' : apptColor));
+
+                           return (
+                             <div 
+                               key={appt.id}
+                               onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
+                               className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${visual.bg}`}
+                               style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: cardBorderColor }}
+                             >
+                               <div className="flex items-center justify-between gap-1">
+                                 <span className="text-xs font-black leading-tight truncate">
+                                   {isBlock ? `🔒 ${appt.title}` : (appt.title || appt.client_name)}
+                                 </span>
+                                 <div className="flex items-center gap-1 shrink-0">
+                                   {isFixedClass && (
+                                     <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-emerald-500/25 text-emerald-900 dark:text-emerald-200">
+                                       🎾 Fija
+                                     </span>
+                                   )}
+                                   {isFreed && (
+                                     <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-sky-500/25 text-sky-900 dark:text-sky-200">
+                                       Libre
+                                     </span>
+                                   )}
+                                   {visual.isPendingPayment && (
+                                     <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200">
+                                       Pago Pend.
+                                     </span>
+                                   )}
+                                 </div>
+                               </div>
+                               {heightPx >= 48 && (
+                                 <div className="flex flex-col text-[10px] font-medium leading-tight truncate opacity-85 mt-0.5">
+                                   {resourceDimension === 'courts' && appt.employee_name && (
+                                     <span className="text-slate-600 dark:text-slate-300 font-semibold truncate">
+                                       👤 {appt.employee_name}
+                                     </span>
+                                   )}
+                                   {resourceDimension === 'employees' && (appt.location || (appt.metadata?.court_name as string)) && (
+                                     <span className="text-emerald-600 dark:text-emerald-400 font-semibold truncate">
+                                       🎾 {appt.location || String(appt.metadata?.court_name || '')}
+                                     </span>
+                                   )}
+                                   {attendeesCount > 0 && (
+                                     <span className="text-purple-600 dark:text-purple-300 font-bold truncate">
+                                       👥 {attendeesCount} alumno{attendeesCount > 1 ? 's' : ''}
+                                     </span>
+                                   )}
+                                 </div>
+                               )}
+                               <div className="mt-auto flex items-center justify-between pt-1">
+                                  <span className="text-[10px] font-bold opacity-75">
+                                    {isAllDay ? 'Jornada Completa' : formatTime(appt.start_time)}
+                                  </span>
+                                  <div className={`w-2 h-2 rounded-full ${visual.dot}`} />
+                               </div>
+                             </div>
+                           );
+                        })}
+                      </div>
+                    );
+                 })}
+               </div>
+            </div>
           </div>
         </div>
       </div>

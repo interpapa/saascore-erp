@@ -409,13 +409,13 @@ export default function SuscripcionesPage() {
     const safeActor: ActionActor = actor || { email: 'admin@rendo.com', role: 'owner' };
     try {
       const res = await createEntityAction(
-        currentTenant.id,
         {
           type: 'customer',
           name: quickClientName.trim(),
           phone: quickClientPhone.trim() || undefined,
           status: 'active'
         },
+        currentTenant.id,
         safeActor
       );
       if (res.success && res.entity) {

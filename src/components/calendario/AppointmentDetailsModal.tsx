@@ -31,7 +31,8 @@ import { logExternalWhatsAppMessageAction } from '@/app/actions/whatsapp';
 import { 
   addAttendeeToAppointmentAction, 
   removeAttendeeFromAppointmentAction,
-  updateAppointmentPriceAction 
+  updateAppointmentPriceAction,
+  freeAppointmentSlotAction
 } from '@/app/actions/appointments';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 
@@ -441,6 +442,23 @@ export function AppointmentDetailsModal({
                 </div>
               )}
 
+              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                <span className="text-sm">🎾</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>Pista: <strong className="text-foreground">{appointment.location || (appointment.metadata as any)?.court_name || 'Sin Pista Asignada'}</strong></span>
+                  {Boolean(appointment.metadata?.is_fixed_class) && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
+                      Clase Fija
+                    </span>
+                  )}
+                  {Boolean(appointment.metadata?.is_slot_freed) && (
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200">
+                      Pista Liberada
+                    </span>
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 sm:col-span-2">
                 <Briefcase size={14} className="text-slate-400 shrink-0" />
                 <div className="flex-1 flex items-center justify-between gap-2 flex-wrap">
@@ -629,7 +647,7 @@ export function AppointmentDetailsModal({
                   </div>
                   <input
                     type="text"
-                    defaultValue={appointment.metadata?.equipment || 'Carro de 72 pelotas presurizadas · Set de conos y escaleras'}
+                    defaultValue={(appointment.metadata?.equipment as string) || 'Carro de 72 pelotas presurizadas · Set de conos y escaleras'}
                     onBlur={(e) => {
                       if (onUpdateMetadata) {
                         onUpdateMetadata(appointment.id, {
@@ -734,6 +752,31 @@ export function AppointmentDetailsModal({
                   className="px-3 py-2 rounded-xl text-xs font-bold border border-rose-500/30 text-rose-700 dark:text-rose-300 hover:bg-rose-500/10 transition-all flex items-center justify-center gap-1.5"
                 >
                   <XCircle size={14} /> Cancelar
+                </button>
+              )}
+
+              {/* Botón Liberar Cancha (Ceder Turno para esta fecha) */}
+              {appointment.status !== 'cancelled' && (
+                <button
+                  disabled={isUpdating}
+                  onClick={async () => {
+                    const ok = window.confirm('¿Deseas liberar esta cancha para esta fecha? El espacio quedará disponible para agendar otra clase particular o alquiler libre.');
+                    if (!ok || !currentTenant?.id || !actor) return;
+                    try {
+                      setIsUpdating(true);
+                      await freeAppointmentSlotAction(appointment.id, currentTenant.id, 'Liberada por aviso de inasistencia', actor);
+                      await onUpdateStatus(appointment.id, 'cancelled');
+                      onClose();
+                    } catch (e: any) {
+                      alert(e?.message || 'Error al liberar cancha');
+                    } finally {
+                      setIsUpdating(false);
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-black border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1 shadow-2xs"
+                  title="Libera la pista inmediatamente para alquiler o particular"
+                >
+                  🎾 Liberar Cancha (Ceder Turno)
                 </button>
               )}
 

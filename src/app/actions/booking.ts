@@ -494,6 +494,10 @@ export async function updateBookingConfigAction(tenantId: string, settings: any,
       ...(tenant.metadata || {}),
       booking_settings: bookingSettings
     };
+
+    if (settings.courts && Array.isArray(settings.courts)) {
+      newMetadata.courts = settings.courts;
+    }
     
     if (bookingSettings.logoUrl) {
       newMetadata.logo_url = bookingSettings.logoUrl;

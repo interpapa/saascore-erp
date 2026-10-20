@@ -69,6 +69,8 @@ export default function CalendarioPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [createModalType, setCreateModalType] = useState<'appointment' | 'block'>('appointment');
   const [selectedDateForCreate, setSelectedDateForCreate] = useState<Date | null>(null);
+  const [selectedTimeForCreate, setSelectedTimeForCreate] = useState<string | null>(null);
+  const [selectedCourtForCreate, setSelectedCourtForCreate] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   
@@ -374,8 +376,11 @@ export default function CalendarioPage() {
   };
 
   // Open Create Modal for a specific date slot
-  const handleSelectDateSlot = (date: Date) => {
+  const handleSelectDateSlot = (date: Date, timeStr?: string, prefillCourt?: string) => {
     setSelectedDateForCreate(date);
+    setSelectedTimeForCreate(timeStr || null);
+    setSelectedCourtForCreate(prefillCourt || null);
+    setCreateModalType('appointment');
     setIsCreateModalOpen(true);
   };
 
@@ -560,6 +565,7 @@ export default function CalendarioPage() {
             currentDate={currentDate}
             appointments={appointments}
             employees={filterState.employee_id !== 'all' ? bookableEmployees.filter(e => e.id === filterState.employee_id) : bookableEmployees}
+            courts={currentTenant?.metadata?.courts as any}
             isLoading={isLoading}
             onSelectAppointment={handleSelectAppointment}
             onSelectDateSlot={handleSelectDateSlot}
@@ -569,6 +575,8 @@ export default function CalendarioPage() {
             }}
             onOpenCreateModal={(type = 'appointment') => {
               setSelectedDateForCreate(null);
+              setSelectedTimeForCreate(null);
+              setSelectedCourtForCreate(null);
               setCreateModalType(type);
               setIsCreateModalOpen(true);
             }}
@@ -584,14 +592,19 @@ export default function CalendarioPage() {
         onClose={() => {
           setIsCreateModalOpen(false);
           setSelectedDateForCreate(null);
+          setSelectedTimeForCreate(null);
+          setSelectedCourtForCreate(null);
         }}
         onSave={handleCreateAppointment}
         onSaveBlock={handleSaveBlock}
         employees={bookableEmployees}
         services={services}
         clients={clients}
+        courts={currentTenant?.metadata?.courts as any}
         initialDate={selectedDateForCreate}
+        initialTime={selectedTimeForCreate}
         initialClientId={clientParam}
+        initialLocation={selectedCourtForCreate}
       />
 
       {/* Appointment Details & Status Transition Modal */}

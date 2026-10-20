@@ -119,3 +119,19 @@ export interface BlockInput {
   notes?: string;
   color?: string;
 }
+
+export interface CourtResource {
+  id: string;
+  name: string;
+  type?: 'cristal' | 'panoramica' | 'individual' | 'standard' | string;
+  is_active: boolean;
+  color?: string;
+}
+
+export const DEFAULT_SPORTS_COURTS: CourtResource[] = [
+  { id: 'court-1', name: 'Pista 1 (Cristal Pro)', type: 'cristal', is_active: true, color: '#3b82f6' },
+  { id: 'court-2', name: 'Pista 2 (Panorámica)', type: 'panoramica', is_active: true, color: '#10b981' },
+  { id: 'court-3', name: 'Pista 3 (Central)', type: 'cristal', is_active: true, color: '#8b5cf6' },
+  { id: 'court-4', name: 'Pista 4 (Individual/Entrenamiento)', type: 'individual', is_active: true, color: '#f59e0b' },
+];
+
