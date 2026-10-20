@@ -363,9 +363,9 @@ export async function assertModuleEnabled(
     }
 
     const isTargetEnabled = enabledList.includes(moduleId) || 
-      (moduleId === 'clinica' && enabledList.some(m => m.startsWith('med_'))) ||
-      (moduleId === 'ginecologia' && enabledList.includes('med_ginecologia')) ||
-      (moduleId === 'med_ginecologia' && enabledList.includes('ginecologia')) ||
+      (moduleId === 'clinica' && (enabledList.some(m => m.startsWith('med_')) || enabledList.includes('ginecologia'))) ||
+      (moduleId === 'ginecologia' && (enabledList.includes('med_ginecologia') || enabledList.includes('clinica'))) ||
+      (moduleId === 'med_ginecologia' && (enabledList.includes('ginecologia') || enabledList.includes('clinica'))) ||
       (moduleId === 'inventario' && enabledList.includes('catalogo')) || 
       (moduleId === 'catalogo' && enabledList.includes('inventario'));
 

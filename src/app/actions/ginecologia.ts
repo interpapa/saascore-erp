@@ -188,8 +188,9 @@ export async function getGinecoPatientRecordAction(
       patologiasCronicas: meta.conditions || meta.medical_profile?.chronicConditions || '',
     };
 
-    // 2. Obtener consultas ginecológicas previas desde entity_records
-    const { data: records, error: rErr } = await supabaseAdmin
+    // 2. Obtener consultas ginecológicas previas desde entity_records y entities.metadata
+    const metaEncounters = Array.isArray(meta.gineco_encounters) ? meta.gineco_encounters : [];
+    const { data: records } = await supabaseAdmin
       .from('entity_records')
       .select('id, record_type, title, body, metadata, created_at')
       .eq('entity_id', patientId)
@@ -198,13 +199,34 @@ export async function getGinecoPatientRecordAction(
       .order('created_at', { ascending: false })
       .limit(30);
 
-    const encounters = (records || []).map((r: any) => ({
+    const dbEncounters = (records || []).map((r: any) => ({
       id: r.id,
       title: r.title,
       content: r.body || r.content || '',
       createdAt: r.created_at,
       metadata: r.metadata,
     }));
+
+    // Fusionar y desduplicar por ID
+    const encounterMap = new Map<string, any>();
+    for (const e of [...metaEncounters, ...dbEncounters]) {
+      if (e && (e.id || e._id)) {
+        const id = String(e.id || e._id);
+        if (!encounterMap.has(id)) {
+          encounterMap.set(id, {
+            id,
+            title: e.title || 'Consulta Médica',
+            content: e.content || e.body || '',
+            createdAt: e.createdAt || e.created_at || new Date().toISOString(),
+            metadata: e.metadata || e,
+          });
+        }
+      }
+    }
+
+    const encounters = Array.from(encounterMap.values()).sort(
+      (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     return { success: true, profile, encounters };
   } catch (err: unknown) {
@@ -275,23 +297,6 @@ export async function saveGinecoEncounterAction(
       });
     }
 
-    // Guardar en entities.metadata
-    const updatedMeta = {
-      ...currentMeta,
-      gineco_profile: updatedProfile,
-      has_history: true,
-      has_clinical_history: true,
-      vitals_history: vitalsHistory.slice(0, 30),
-      last_gineco_visit: nowIso,
-    };
-
-    await supabaseAdmin
-      .from('entities')
-      .update({ metadata: updatedMeta })
-      .eq('id', patientId)
-      .eq('tenant_id', tenantId);
-
-    // 2. Insertar registro de consulta en entity_records
     const titleType =
       payload.encounterType === 'prenatal'
         ? `Control Prenatal (${payload.obstetricExam?.gestationalWeeks || 0} sem)`
@@ -301,27 +306,63 @@ export async function saveGinecoEncounterAction(
         ? 'Procedimiento Ginecológico'
         : 'Consulta Ginecológica';
 
-    const { data: record, error: recErr } = await supabaseAdmin
-      .from('entity_records')
-      .insert({
-        tenant_id: tenantId,
-        entity_id: patientId,
-        record_type: 'gineco_encounter',
-        title: `${titleType} — ${new Date().toLocaleDateString()}`,
-        body: payload.soap.assessment || payload.chiefComplaint || 'Consulta Gineco-Obstétrica',
-        metadata: {
-          ...payload,
-          doctorName: payload.doctorName,
-          doctorId: payload.doctorId,
-          date: nowIso,
-          source_module: 'ginecologia',
-        },
-      })
-      .select('id')
-      .single();
+    const encounterId = crypto.randomUUID();
+    const newEncounterRecord = {
+      id: encounterId,
+      record_type: 'gineco_encounter',
+      title: `${titleType} — ${new Date().toLocaleDateString('es-VE')}`,
+      body: payload.soap.assessment || payload.chiefComplaint || 'Consulta Gineco-Obstétrica',
+      createdAt: nowIso,
+      created_at: nowIso,
+      metadata: {
+        ...payload,
+        doctorName: payload.doctorName,
+        doctorId: payload.doctorId,
+        date: nowIso,
+        source_module: 'ginecologia',
+      },
+    };
 
-    if (recErr) {
-      return { success: false, error: recErr.message };
+    const existingMetaEncounters = Array.isArray(currentMeta.gineco_encounters)
+      ? currentMeta.gineco_encounters
+      : [];
+
+    // Guardar en entities.metadata (resiliencia absoluta)
+    const updatedMeta = {
+      ...currentMeta,
+      gineco_profile: updatedProfile,
+      has_history: true,
+      has_clinical_history: true,
+      vitals_history: vitalsHistory.slice(0, 30),
+      gineco_encounters: [newEncounterRecord, ...existingMetaEncounters].slice(0, 50),
+      last_gineco_visit: nowIso,
+    };
+
+    const { error: updErr } = await supabaseAdmin
+      .from('entities')
+      .update({ metadata: updatedMeta })
+      .eq('id', patientId)
+      .eq('tenant_id', tenantId);
+
+    if (updErr) {
+      return { success: false, error: updErr.message };
+    }
+
+    // 2. Insertar también en entity_records como tabla relacional
+    try {
+      await supabaseAdmin
+        .from('entity_records')
+        .insert({
+          id: encounterId,
+          tenant_id: tenantId,
+          entity_id: patientId,
+          record_type: 'gineco_encounter',
+          title: newEncounterRecord.title,
+          body: newEncounterRecord.body,
+          metadata: newEncounterRecord.metadata,
+        });
+    } catch (erErr) {
+      console.warn('[saveGinecoEncounterAction] Warning al insertar en entity_records:', erErr);
     }
 
     await writeAuditLog({
@@ -330,11 +371,11 @@ export async function saveGinecoEncounterAction(
       actor_role: actor.role,
       action: 'ginecologia.encounter_saved',
       target_type: 'entity_record',
-      target_id: record.id,
+      target_id: encounterId,
       metadata: { patientId, patientName: patient.name, encounterType: payload.encounterType },
     });
 
-    return { success: true, encounterId: record.id };
+    return { success: true, encounterId };
   } catch (err: unknown) {
     return { success: false, error: (err as Error).message };
   }

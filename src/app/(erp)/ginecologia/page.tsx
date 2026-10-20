@@ -42,7 +42,10 @@ import {
   Phone,
   QrCode,
   Share2,
-  Download
+  Download,
+  ChevronDown,
+  ChevronUp,
+  Eye
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -92,7 +95,18 @@ import { GinecoExamsModal, GinecoExamsData } from '@/components/ginecologia/Gine
 import { GinecoLabPanelModal, GinecoLabRecord } from '@/components/ginecologia/GinecoLabPanelModal';
 import { GinecoSurgeriesModal, SurgicalInterventionRecord } from '@/components/ginecologia/GinecoSurgeriesModal';
 import { GinecoDocumentsModal } from '@/components/ginecologia/GinecoDocumentsModal';
+import { GinecoEncounterDetailModal } from '@/components/ginecologia/GinecoEncounterDetailModal';
 import { calculateBMI } from '@/lib/medical/clinicalCalculators';
+
+export interface ObstetricDeliveryItem {
+  id: string;
+  gestationNumber: number;
+  deliveryType: 'Parto Vaginal' | 'Parto Distócico' | 'Cesárea' | 'Aborto' | 'Ectópico';
+  year?: string;
+  sex?: 'Varón' | 'Hembra' | 'No especificado';
+  weightGrams?: number;
+  indicationOrNotes?: string;
+}
 
 type PatientChartTab = 'paciente' | 'conyugue' | 'antecedentes_fp' | 'ant_gin' | 'ant_obs';
 
@@ -126,7 +140,12 @@ export default function GinecologiaPage() {
 
   // Estado del Centro de Mando
   const [isConsulting, setIsConsulting] = useState(false);
+  const [isChartExpanded, setIsChartExpanded] = useState(true);
   const [patientChartTab, setPatientChartTab] = useState<PatientChartTab>('paciente');
+
+  // Detalle de consulta previa en historial
+  const [selectedHistoryEncounter, setSelectedHistoryEncounter] = useState<any>(null);
+  const [isHistoryDetailOpen, setIsHistoryDetailOpen] = useState(false);
 
   // Modal para nueva paciente rápida
   const [isNewPatientModalOpen, setIsNewPatientModalOpen] = useState(false);
@@ -211,7 +230,26 @@ export default function GinecologiaPage() {
   });
 
   // Ant Obs ampliados Himego
-  const [extendedObstetrics, setExtendedObstetrics] = useState({
+  const [extendedObstetrics, setExtendedObstetrics] = useState<{
+    partosEutocicos: number;
+    partosDistocicos: number;
+    cesareaReason: string;
+    cesareaNotes: string;
+    abortoType: string;
+    abortoResolution: string;
+    abortoNotes: string;
+    hijosVarones: number;
+    hijosHembras: number;
+    pesoMaxFetalGrams: number;
+    pesoMinFetalGrams: number;
+    firstDeliveryDate: string;
+    lastDeliveryDate: string;
+    isPregnant: boolean;
+    fppNaegele: string;
+    plannedDeliveryPlace: string;
+    complicationsPrev: string;
+    deliveries: ObstetricDeliveryItem[];
+  }>({
     partosEutocicos: 0,
     partosDistocicos: 0,
     cesareaReason: 'ESTRECHA',
@@ -229,6 +267,7 @@ export default function GinecologiaPage() {
     fppNaegele: '',
     plannedDeliveryPlace: 'Clínica Privada',
     complicationsPrev: '',
+    deliveries: [],
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -452,7 +491,13 @@ export default function GinecologiaPage() {
       }
       if (meta.spouse_data) setSpouseData((prev) => ({ ...prev, ...meta.spouse_data }));
       if (meta.medical_antecedents) setMedicalAntecedents((prev) => ({ ...prev, ...meta.medical_antecedents }));
-      if (meta.extended_obstetrics) setExtendedObstetrics((prev) => ({ ...prev, ...meta.extended_obstetrics }));
+      if (meta.extended_obstetrics) {
+        setExtendedObstetrics((prev) => ({
+          ...prev,
+          ...meta.extended_obstetrics,
+          deliveries: Array.isArray(meta.extended_obstetrics.deliveries) ? meta.extended_obstetrics.deliveries : [],
+        }));
+      }
     }
   }, [selectedPatientId, currentTenant?.id, actor, patients]);
 
@@ -977,25 +1022,77 @@ export default function GinecologiaPage() {
             </div>
           </div>
 
+          {/* CINTILLO RESUMEN CUANDO LA FICHA MÉDICA ESTÁ PLEGADA */}
+          {!isChartExpanded && (
+            <div className="bg-card border border-border/80 rounded-2xl p-3.5 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 bg-gradient-to-r from-pink-50/50 via-card to-card dark:from-pink-950/20">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 text-xs font-black text-pink-600">
+                  <User size={15} />
+                  <span>Ficha Médica Permanente (Plegada)</span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap text-[11px]">
+                  <span className="px-2 py-0.5 rounded-lg bg-pink-100 dark:bg-pink-950/50 text-pink-700 dark:text-pink-300 font-bold">
+                    Rh: {demographics.bloodTypeRh || 'O+'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono font-bold">
+                    GPCAE: G{profile.gestas} P{profile.partos} C{profile.cesareas} A{profile.abortos} E{profile.ectopicos}
+                  </span>
+                  {profile.fum && (
+                    <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono">
+                      FUM: {profile.fum}
+                    </span>
+                  )}
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                    MAC: {profile.metodoAnticonceptivo || 'Ninguno'}
+                  </span>
+                  {medicalAntecedents.personalAllergies && (
+                    <span className="px-2 py-0.5 rounded-lg bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300 font-bold">
+                      Alergias: {medicalAntecedents.personalAllergies}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChartExpanded(true)}
+                className="px-3 py-1.5 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black transition-all flex items-center gap-1.5 shrink-0 shadow-xs btn-haptic"
+              >
+                <ChevronDown size={14} />
+                <span>Desplegar Ficha (5 Pestañas)</span>
+              </button>
+            </div>
+          )}
+
           {/* EL COCKPIT: DISTRIBUCIÓN EN 3 PANELES */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                 PANEL IZQUIERDO (4/12 = 33%): LA FICHA BIOLÓGICA PERMANENTE (5 PESTAÑAS HIMEGO)
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-            <div className="lg:col-span-4 bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
-              <div className="flex items-center justify-between border-b border-border/60 pb-3">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                  <User size={15} className="text-pink-500" /> Ficha Médica Permanente
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleSaveBiologicalChart}
-                  disabled={isSavingChart}
-                  className="px-2.5 py-1 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-600 hover:text-white text-[11px] font-black transition-all disabled:opacity-50"
-                >
-                  {isSavingChart ? 'Guardando...' : 'Guardar Ficha'}
-                </button>
-              </div>
+            {isChartExpanded && (
+              <div className="lg:col-span-4 bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
+                <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                    <User size={15} className="text-pink-500" /> Ficha Médica Permanente
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveBiologicalChart}
+                      disabled={isSavingChart}
+                      className="px-2.5 py-1 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-600 hover:text-white text-[11px] font-black transition-all disabled:opacity-50"
+                    >
+                      {isSavingChart ? 'Guardando...' : 'Guardar Ficha'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsChartExpanded(false)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      title="Plegar Ficha Médica"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                  </div>
+                </div>
 
               {/* Selector de Pestaña de Ficha */}
               <div className="flex bg-slate-100 dark:bg-slate-900 p-1 rounded-2xl gap-1 text-[11px] font-bold overflow-x-auto">
@@ -1747,14 +1844,163 @@ export default function GinecologiaPage() {
                       </div>
                     </div>
 
-                    {/* Desplegables de Cesárea y Aborto */}
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Causa de Cesárea Previa</label>
+                    {/* Historial Individual de Gestaciones / Partos */}
+                    <div className="pt-2 border-t border-border/60 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
+                          <Baby size={13} className="text-pink-500" />
+                          Historial por Cada Parto / Gestación
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const currentList = extendedObstetrics.deliveries || [];
+                            const nextNum = currentList.length + 1;
+                            const newDelivery: ObstetricDeliveryItem = {
+                              id: `del-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                              gestationNumber: nextNum,
+                              deliveryType: 'Parto Vaginal',
+                              year: new Date().getFullYear().toString(),
+                              sex: 'No especificado',
+                              weightGrams: 3200,
+                              indicationOrNotes: '',
+                            };
+                            setExtendedObstetrics({
+                              ...extendedObstetrics,
+                              deliveries: [...currentList, newDelivery],
+                            });
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-pink-500/10 hover:bg-pink-500 text-pink-600 hover:text-white text-[10px] font-bold transition-all flex items-center gap-1"
+                        >
+                          <Plus size={11} /> Agregar Gestación
+                        </button>
+                      </div>
+
+                      {(!extendedObstetrics.deliveries || extendedObstetrics.deliveries.length === 0) ? (
+                        <p className="text-[10px] text-slate-400 italic bg-slate-50 dark:bg-slate-900/40 p-2.5 rounded-xl border border-dashed border-border/80 text-center">
+                          No se han registrado gestaciones separadas. Haz clic en &quot;+ Agregar Gestación&quot; para detallar cada parto, cesárea o aborto de forma individual.
+                        </p>
+                      ) : (
+                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                          {extendedObstetrics.deliveries.map((del, idx) => (
+                            <div key={del.id || idx} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-black text-pink-600">
+                                  Gestación #{del.gestationNumber || idx + 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const updated = (extendedObstetrics.deliveries || []).filter((_, i) => i !== idx);
+                                    setExtendedObstetrics({ ...extendedObstetrics, deliveries: updated });
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                                  title="Eliminar este parto"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Tipo de Evento</label>
+                                  <select
+                                    value={del.deliveryType || 'Parto Vaginal'}
+                                    onChange={(e) => {
+                                      const updated = [...(extendedObstetrics.deliveries || [])];
+                                      updated[idx] = { ...updated[idx], deliveryType: e.target.value as any };
+                                      setExtendedObstetrics({ ...extendedObstetrics, deliveries: updated });
+                                    }}
+                                    className="w-full p-1.5 rounded-lg bg-card border border-border text-[11px] font-semibold"
+                                  >
+                                    <option value="Parto Vaginal">Parto Vaginal Eutócico</option>
+                                    <option value="Parto Distócico">Parto Vaginal Distócico</option>
+                                    <option value="Cesárea">Cesárea</option>
+                                    <option value="Aborto">Aborto</option>
+                                    <option value="Ectópico">Embarazo Ectópico</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Año / Fecha</label>
+                                  <input
+                                    type="text"
+                                    value={del.year || ''}
+                                    onChange={(e) => {
+                                      const updated = [...(extendedObstetrics.deliveries || [])];
+                                      updated[idx] = { ...updated[idx], year: e.target.value };
+                                      setExtendedObstetrics({ ...extendedObstetrics, deliveries: updated });
+                                    }}
+                                    placeholder="Ej: 2021"
+                                    className="w-full p-1.5 rounded-lg bg-card border border-border text-[11px] font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Sexo del Recién Nacido</label>
+                                  <select
+                                    value={del.sex || 'No especificado'}
+                                    onChange={(e) => {
+                                      const updated = [...(extendedObstetrics.deliveries || [])];
+                                      updated[idx] = { ...updated[idx], sex: e.target.value as any };
+                                      setExtendedObstetrics({ ...extendedObstetrics, deliveries: updated });
+                                    }}
+                                    className="w-full p-1.5 rounded-lg bg-card border border-border text-[11px]"
+                                  >
+                                    <option value="No especificado">No especificado</option>
+                                    <option value="Varón">Varón</option>
+                                    <option value="Hembra">Hembra</option>
+                                  </select>
+                                </div>
+
+                                <div>
+                                  <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Peso al Nacer (g)</label>
+                                  <input
+                                    type="number"
+                                    value={del.weightGrams || ''}
+                                    onChange={(e) => {
+                                      const updated = [...(extendedObstetrics.deliveries || [])];
+                                      updated[idx] = { ...updated[idx], weightGrams: Number(e.target.value) };
+                                      setExtendedObstetrics({ ...extendedObstetrics, deliveries: updated });
+                                    }}
+                                    placeholder="Ej: 3200"
+                                    className="w-full p-1.5 rounded-lg bg-card border border-border text-[11px] font-mono"
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="text-[9px] font-bold text-slate-400 block mb-0.5">Indicación / Causa / Complicaciones</label>
+                                <input
+                                  type="text"
+                                  value={del.indicationOrNotes || ''}
+                                  onChange={(e) => {
+                                    const updated = [...(extendedObstetrics.deliveries || [])];
+                                    updated[idx] = { ...updated[idx], indicationOrNotes: e.target.value };
+                                    setExtendedObstetrics({ ...extendedObstetrics, deliveries: updated });
+                                  }}
+                                  placeholder={del.deliveryType === 'Cesárea' ? 'Causa de cesárea (ej: Desproporción feto-pélvica)...' : 'Evolución, complicaciones o detalles...'}
+                                  className="w-full p-1.5 rounded-lg bg-card border border-border text-[11px]"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Causa de Cesárea: solo si profile.cesareas > 0 o si hay cesáreas registradas */}
+                    {(Number(profile.cesareas) > 0 || extendedObstetrics.deliveries?.some((d) => d.deliveryType === 'Cesárea')) && (
+                      <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-1.5">
+                        <label className="text-[10px] font-black text-amber-700 dark:text-amber-400 uppercase block">
+                          Causa Principal de Cesárea Previa
+                        </label>
                         <select
                           value={extendedObstetrics.cesareaReason}
                           onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, cesareaReason: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-semibold"
+                          className="w-full p-2 rounded-xl bg-card border border-border text-[11px] font-semibold"
                         >
                           {CESAREAN_REASON_PRESETS.map((reason) => (
                             <option key={reason} value={reason}>
@@ -1763,60 +2009,82 @@ export default function GinecologiaPage() {
                           ))}
                           <option value="OTRA">OTRA (No listada)</option>
                         </select>
+                        <input
+                          type="text"
+                          value={extendedObstetrics.cesareaNotes || ''}
+                          onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, cesareaNotes: e.target.value })}
+                          placeholder="Notas adicionales sobre cesárea..."
+                          className="w-full p-2 rounded-xl bg-card border border-border text-[11px]"
+                        />
                       </div>
+                    )}
 
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Tipo de Aborto</label>
-                        <select
-                          value={extendedObstetrics.abortoType}
-                          onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, abortoType: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-semibold"
-                        >
-                          {ABORTION_TYPE_PRESETS.map((ab) => (
-                            <option key={ab} value={ab}>
-                              {ab}
-                            </option>
-                          ))}
-                        </select>
+                    {/* Tipo de Aborto y Resolución: solo si profile.abortos > 0 o si hay abortos registrados */}
+                    {(Number(profile.abortos) > 0 || extendedObstetrics.deliveries?.some((d) => d.deliveryType === 'Aborto')) && (
+                      <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-2">
+                        <label className="text-[10px] font-black text-rose-700 dark:text-rose-400 uppercase block">
+                          Detalles de Aborto Previo
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 block mb-1">Tipo de Aborto</label>
+                            <select
+                              value={extendedObstetrics.abortoType}
+                              onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, abortoType: e.target.value })}
+                              className="w-full p-2 rounded-xl bg-card border border-border text-[11px] font-semibold"
+                            >
+                              {ABORTION_TYPE_PRESETS.map((ab) => (
+                                <option key={ab} value={ab}>
+                                  {ab}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="text-[9px] font-bold text-slate-400 block mb-1">Resolución de Aborto</label>
+                            <select
+                              value={extendedObstetrics.abortoResolution || 'AMEU'}
+                              onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, abortoResolution: e.target.value })}
+                              className="w-full p-2 rounded-xl bg-card border border-border text-[11px] font-semibold"
+                            >
+                              {ABORTION_RESOLUTION_PRESETS.map((res) => (
+                                <option key={res} value={res}>
+                                  {res}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Resolución de Aborto y Peso Fetal */}
-                    <div className="grid grid-cols-2 gap-2">
+                    {/* Peso Fetal Mayor */}
+                    <div className="p-2.5 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-border/80 flex items-center justify-between">
                       <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Resolución de Aborto</label>
-                        <select
-                          value={extendedObstetrics.abortoResolution || 'AMEU'}
-                          onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, abortoResolution: e.target.value })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-semibold"
-                        >
-                          {ABORTION_RESOLUTION_PRESETS.map((res) => (
-                            <option key={res} value={res}>
-                              {res}
-                            </option>
-                          ))}
-                        </select>
+                        <label className="text-[10px] font-black text-slate-500 uppercase block">Peso Fetal Mayor Previo</label>
+                        <span className="text-[9px] text-slate-400">Peso en gramos del hijo más grande</span>
                       </div>
-
-                      <div>
-                        <label className="text-[10px] font-bold text-slate-400 block mb-1">Peso Fetal Mayor (g)</label>
+                      <div className="flex items-center gap-1.5">
                         <input
                           type="number"
                           value={extendedObstetrics.pesoMaxFetalGrams || 3500}
                           onChange={(e) => setExtendedObstetrics({ ...extendedObstetrics, pesoMaxFetalGrams: Number(e.target.value) })}
-                          className="w-full p-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-border text-[11px] font-mono"
+                          className="w-24 p-1.5 rounded-xl bg-card border border-border text-xs font-mono font-bold text-right"
                         />
+                        <span className="text-xs font-bold text-slate-400">g</span>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
             </div>
+            )}
 
             {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                PANEL CENTRAL (5/12 = 42%): LÍNEA DE TIEMPO CLÍNICA O CONSULTA ACTIVA DE HOY
+                PANEL CENTRAL (LÍNEA DE TIEMPO CLÍNICA O CONSULTA ACTIVA DE HOY)
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-            <div className="lg:col-span-5 space-y-4">
+            <div className={`${isChartExpanded ? 'lg:col-span-5' : 'lg:col-span-8'} space-y-4`}>
               {!isConsulting ? (
                 /* VISTA REPOSO: HISTORIAL CRONOLÓGICO Y TIMELINE */
                 <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-4">
@@ -1851,9 +2119,19 @@ export default function GinecologiaPage() {
                   ) : (
                     <div className="space-y-3 max-h-[550px] overflow-y-auto pr-1">
                       {encountersHistory.map((enc) => (
-                        <div key={enc.id} className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-border/70 space-y-2">
+                        <div
+                          key={enc.id}
+                          onClick={() => {
+                            setSelectedHistoryEncounter(enc);
+                            setIsHistoryDetailOpen(true);
+                          }}
+                          className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-900/50 hover:bg-pink-500/5 hover:border-pink-500/30 border border-border/70 space-y-2 cursor-pointer transition-all group"
+                        >
                           <div className="flex items-center justify-between text-xs font-black">
-                            <span className="text-foreground">{enc.title}</span>
+                            <span className="text-foreground group-hover:text-pink-600 transition-colors flex items-center gap-1.5">
+                              <FileText size={13} className="text-pink-500" />
+                              {enc.title}
+                            </span>
                             <span className="text-[10px] text-slate-400 font-mono">
                               {enc.createdAt ? new Date(enc.createdAt).toLocaleDateString() : 'Fecha'}
                             </span>
@@ -1861,13 +2139,19 @@ export default function GinecologiaPage() {
                           <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                             {enc.content || enc.metadata?.soap?.assessment || 'Sin notas'}
                           </p>
-                          {enc.metadata?.vitals && (
-                            <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono pt-1 border-t border-border/40">
-                              <span>TA: {enc.metadata.vitals.bloodPressure || '—'}</span>
-                              <span>·</span>
-                              <span>Peso: {enc.metadata.vitals.weightKg ? `${enc.metadata.vitals.weightKg} kg` : '—'}</span>
+                          <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1 border-t border-border/40">
+                            <div className="flex items-center gap-2">
+                              {enc.metadata?.vitals?.bloodPressure && (
+                                <span>TA: {enc.metadata.vitals.bloodPressure}</span>
+                              )}
+                              {enc.metadata?.vitals?.weightKg && (
+                                <span>· Peso: {enc.metadata.vitals.weightKg} kg</span>
+                              )}
                             </div>
-                          )}
+                            <span className="text-pink-600 font-bold flex items-center gap-0.5 group-hover:translate-x-0.5 transition-transform">
+                              <Eye size={12} /> Ver Registro Completo ↗
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -2021,9 +2305,9 @@ export default function GinecologiaPage() {
             </div>
 
             {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                PANEL DERECHO (3/12 = 25%): GABINETE DE ESTUDIOS ESPECIALIZADOS & COBRANZA
+                PANEL DERECHO: GABINETE DE ESTUDIOS ESPECIALIZADOS & COBRANZA
                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-            <div className="lg:col-span-3 space-y-4">
+            <div className={`${isChartExpanded ? 'lg:col-span-3' : 'lg:col-span-4'} space-y-4`}>
               {/* Suite de Estudios Himego */}
               <div className="bg-card border border-border/80 rounded-3xl p-5 shadow-sm space-y-3">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -2359,6 +2643,21 @@ export default function GinecologiaPage() {
           instructions: prescriptionInstructions,
           labOrders: prescriptionLabOrders,
         }}
+        clinicName={currentTenant?.name || 'CENTRO GINECOLÓGICO & OBSTÉTRICO'}
+      />
+
+      <GinecoEncounterDetailModal
+        isOpen={isHistoryDetailOpen}
+        onClose={() => {
+          setIsHistoryDetailOpen(false);
+          setSelectedHistoryEncounter(null);
+        }}
+        encounter={selectedHistoryEncounter}
+        patientName={activePatient?.name || 'Paciente'}
+        patientTaxId={activePatient?.tax_id}
+        patientPhone={activePatient?.phone}
+        doctorName={selectedHistoryEncounter?.metadata?.doctor_name || activeDoctor?.name || 'Ginecólogo/a Tratante'}
+        doctorLicense={activeDoctor?.metadata?.license_number || activeDoctor?.metadata?.mpps}
         clinicName={currentTenant?.name || 'CENTRO GINECOLÓGICO & OBSTÉTRICO'}
       />
 
