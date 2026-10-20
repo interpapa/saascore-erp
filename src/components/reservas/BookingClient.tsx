@@ -62,6 +62,91 @@ const getServiceIcon = (serviceName: string, customIcon?: string) => {
   return <ChevronRight size={20} className="text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform" />;
 };
 
+const SPECIALTY_META: Record<string, { icon: string; description: string; badge: string }> = {
+  'Ginecología y Obstetricia': {
+    icon: '👶',
+    description: 'Controles prenatales, ecografías obstétricas y pélvicas, citologías, colposcopia y salud integral femenina.',
+    badge: 'Salud de la Mujer',
+  },
+  'Odontología': {
+    icon: '🦷',
+    description: 'Limpiezas dentales, ortodoncia, endodoncia, restauraciones, extracciones y estética dental.',
+    badge: 'Salud Bucal',
+  },
+  'Cardiología': {
+    icon: '🫀',
+    description: 'Electrocardiogramas, evaluación cardiovascular, control de tensión arterial y riesgo coronario.',
+    badge: 'Cardiovascular',
+  },
+  'Pediatría': {
+    icon: '🧸',
+    description: 'Control de niño sano, esquema de vacunas, crecimiento, desarrollo y consultas pediátricas.',
+    badge: 'Atención Infantil',
+  },
+  'Dermatología': {
+    icon: '🧴',
+    description: 'Diagnóstico de piel, tratamiento de acné, revisión de lunares y procedimientos dermatológicos.',
+    badge: 'Cuidado Cutáneo',
+  },
+  'Traumatología': {
+    icon: '🦴',
+    description: 'Dolores articulares y musculares, fracturas, esguinces y terapia física de rehabilitación.',
+    badge: 'Aparato Locomotor',
+  },
+  'Oftalmología': {
+    icon: '👁️',
+    description: 'Examen de agudeza visual, fondo de ojo, tonometría intraocular y fórmula de lentes.',
+    badge: 'Salud Visual',
+  },
+  'Barbería': {
+    icon: '💈',
+    description: 'Cortes clásicos, degradados fade, perfilado de barba, afeitado con toalla caliente y estilismo.',
+    badge: 'Estilismo Masculino',
+  },
+  'Peluquería Canina': {
+    icon: '🐩',
+    description: 'Baño medicado, corte a tijera, desparasitación y cuidado integral para mascotas.',
+    badge: 'Cuidado Animal',
+  },
+  'Medicina General': {
+    icon: '🩺',
+    description: 'Consultas preventivas, chequeos integrales, triaje y certificados médicos de salud.',
+    badge: 'Atención Primaria',
+  },
+};
+
+const getSpecialtyMeta = (catName: string) => {
+  if (SPECIALTY_META[catName]) return SPECIALTY_META[catName];
+  const norm = (catName || '').toLowerCase();
+  for (const [key, val] of Object.entries(SPECIALTY_META)) {
+    if (norm.includes(key.toLowerCase()) || key.toLowerCase().includes(norm)) {
+      return val;
+    }
+  }
+  return {
+    icon: '🏥',
+    description: `Servicios y procedimientos de atención en ${catName}.`,
+    badge: 'Especialidad',
+  };
+};
+
+const resolveCategoryName = (domain: string | null, customFallback?: string): string => {
+  if (domain === 'ginecologia') return 'Ginecología y Obstetricia';
+  if (domain === 'odontologia') return 'Odontología';
+  if (domain === 'cardiologia') return 'Cardiología';
+  if (domain === 'pediatria') return 'Pediatría';
+  if (domain === 'dermatologia') return 'Dermatología';
+  if (domain === 'traumatologia') return 'Traumatología';
+  if (domain === 'oftalmologia') return 'Oftalmología';
+  if (domain === 'barberia') return 'Barbería';
+  if (domain === 'grooming') return 'Peluquería Canina';
+  if (domain === 'med_general') return 'Medicina General';
+  if (customFallback && customFallback !== 'Especialista' && customFallback !== 'Espacio / Recurso') {
+    return customFallback;
+  }
+  return 'General';
+};
+
 const toLocalDateString = (d: Date): string => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -252,7 +337,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
 
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean, icon?: string, category?: string} | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   const [selectedBarberPrice, setSelectedBarberPrice] = useState<number | undefined>(undefined);
 
@@ -288,15 +373,17 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       hasFrom: boolean;
       hasHidden: boolean;
       basePrice?: number;
+      category: string;
     }
     const allServices = new Map<string, ServiceAgg>();
     
     employees.forEach(emp => {
       if (!emp.is_active) return;
+      const empDomain = getEmployeePrimaryDomain(emp);
+      const empRole = (emp.metadata?.role_title || emp.role || '').trim();
       const svcs = emp.metadata?.services as any[];
       const defaultSlot = Number(emp.metadata?.default_slot_minutes || emp.metadata?.general_slot_minutes || 60);
       const isGeneralEnabled = emp.metadata?.general_service_enabled !== false;
-      const generalName = (emp.metadata?.general_service_name?.trim() || emp.role || 'Servicio General').trim();
       const generalPrice = emp.metadata?.general_service_price !== undefined ? Number(emp.metadata?.general_service_price) : undefined;
 
       // 1. Servicios Particulares o Especializados creados por el negocio en "Funciones y Servicios"
@@ -304,6 +391,9 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         svcs.forEach(s => {
           if (!s.name || !s.name.trim()) return;
           const key = s.name.trim().toLowerCase();
+          const detectedDomain = detectClinicalDomain(s.name) || empDomain;
+          const cat = resolveCategoryName(detectedDomain, empRole);
+
           if (!allServices.has(key)) {
             allServices.set(key, {
               name: s.name.trim(),
@@ -312,6 +402,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
               hasFrom: false,
               hasHidden: false,
               basePrice: s.price !== undefined && Number(s.price) > 0 ? Number(s.price) : undefined,
+              category: cat,
             });
           }
           const entry = allServices.get(key)!;
@@ -345,8 +436,6 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           branchName = dentistRole;
         } else if (barberRole) {
           branchName = barberRole;
-        } else if (customGeneralName) {
-          branchName = customGeneralName;
         } else if (!svcs || svcs.length === 0) {
           branchName = 'Atención General';
         } else {
@@ -358,6 +447,9 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
 
         if (branchName) {
           const key = branchName.toLowerCase();
+          const detectedBranch = detectClinicalDomain(branchName) || empDomain;
+          const cat = resolveCategoryName(detectedBranch, empRole);
+
           if (!allServices.has(key)) {
             allServices.set(key, {
               name: branchName,
@@ -366,6 +458,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
               hasFrom: false,
               hasHidden: false,
               basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
+              category: cat,
             });
           }
           const entry = allServices.get(key)!;
@@ -402,20 +495,6 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         }
       }
 
-      // Detectar categoría o especialidad clínica
-      const domain = detectClinicalDomain(s.name);
-      let category = 'General';
-      if (domain === 'ginecologia') category = 'Ginecología';
-      else if (domain === 'odontologia') category = 'Odontología';
-      else if (domain === 'cardiologia') category = 'Cardiología';
-      else if (domain === 'pediatria') category = 'Pediatría';
-      else if (domain === 'dermatologia') category = 'Dermatología';
-      else if (domain === 'traumatologia') category = 'Traumatología';
-      else if (domain === 'oftalmologia') category = 'Oftalmología';
-      else if (domain === 'barberia') category = 'Barbería';
-      else if (domain === 'grooming') category = 'Peluquería Canina';
-      else if (domain === 'med_general') category = 'Medicina General';
-
       return {
         name: s.name,
         durationMinutes: s.durationMinutes,
@@ -423,12 +502,12 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         priceText: priceText,
         isCustomPrice: s.hasHidden || s.prices.length === 0,
         icon,
-        category,
+        category: s.category || 'General',
       };
     });
   }, [employees, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
 
-  // Categorías de especialidad detectadas (ej. Ginecología, Odontología, Barbería, etc.)
+  // Categorías de especialidad detectadas (ej. Ginecología y Obstetricia, Odontología, etc.)
   const availableCategories = useMemo(() => {
     const cats = new Set<string>();
     uniqueServices.forEach((s: any) => {
@@ -439,9 +518,58 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     return Array.from(cats);
   }, [uniqueServices]);
 
+  // Auto-detectar especialidad desde URL (?especialidad=... o ?rama=...) o preseleccionar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const spec = params.get('especialidad') || params.get('rama') || params.get('specialty') || params.get('cat');
+      if (spec) {
+        const normSpec = spec.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const match = availableCategories.find(c => {
+          const normC = c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+          return normC.includes(normSpec) || normSpec.includes(normC);
+        });
+        if (match) {
+          setSelectedCategory(match);
+          return;
+        }
+      }
+    }
+    // Si la empresa solo tiene 1 especialidad o departamento, ir directo a sus servicios sin pantalla intermedia
+    if (availableCategories.length === 1 && selectedCategory === null) {
+      setSelectedCategory(availableCategories[0]);
+    } else if (availableCategories.length === 0 && selectedCategory === null) {
+      setSelectedCategory('all');
+    }
+  }, [availableCategories, selectedCategory]);
+
+  const handleSelectSpecialty = (cat: string) => {
+    setSelectedCategory(cat);
+    if (typeof window !== 'undefined' && window.history) {
+      const url = new URL(window.location.href);
+      if (cat === 'all') {
+        url.searchParams.delete('especialidad');
+        url.searchParams.delete('rama');
+      } else {
+        url.searchParams.set('especialidad', cat.toLowerCase());
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
+  const handleBackToSpecialties = () => {
+    setSelectedCategory(null);
+    if (typeof window !== 'undefined' && window.history) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('especialidad');
+      url.searchParams.delete('rama');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
   // Servicios filtrados por la categoría seleccionada
   const displayedServices = useMemo(() => {
-    if (selectedCategory === 'all') return uniqueServices;
+    if (!selectedCategory || selectedCategory === 'all') return uniqueServices;
     return uniqueServices.filter((s: any) => s.category === selectedCategory);
   }, [uniqueServices, selectedCategory]);
 
@@ -716,118 +844,258 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                 </div>
               )}
               <div>
-                <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
-                  {settings.headerTitle}
-                </h1>
-                <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
-                  {settings.headerSubtitle}
-                </p>
+                {availableCategories.length > 1 && selectedCategory && selectedCategory !== 'all' ? (
+                  <>
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest opacity-85 mb-1.5" style={{ color: btnTextColor }}>
+                      <span>{settings.headerTitle}</span>
+                      <span>›</span>
+                      <span>Especialidad Médica</span>
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight flex items-center gap-3" style={{ color: btnTextColor }}>
+                      <span className="text-3xl md:text-4xl">{getSpecialtyMeta(selectedCategory).icon}</span>
+                      <span>{selectedCategory}</span>
+                    </h1>
+                    <p className="text-sm md:text-base max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                      {getSpecialtyMeta(selectedCategory).description}
+                    </p>
+                  </>
+                ) : availableCategories.length > 1 && !selectedCategory ? (
+                  <>
+                    <div className="inline-block px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-2 border border-white/25" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}>
+                      Paso 1 de 3 · Directorio de Especialidades
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
+                      {settings.headerTitle}
+                    </h1>
+                    <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                      Selecciona una especialidad médica o departamento para ver sus consultas y procedimientos disponibles.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
+                      {settings.headerTitle}
+                    </h1>
+                    <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                      {settings.headerSubtitle}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
           
-          {/* Service Cards */}
+          {/* Main Content Area */}
           <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
             <div className="max-w-5xl mx-auto">
-              {/* Selector de Categoría / Especialidad (Ginecología, Odontología, etc.) */}
-              {availableCategories.length > 0 && (
-                <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-6 scrollbar-none">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory('all')}
-                    className={`px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs ${
-                      selectedCategory === 'all'
-                        ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                        : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-                    }`}
-                  >
-                    🌟 Todos ({uniqueServices.length})
-                  </button>
-                  {availableCategories.map((cat) => {
-                    const count = uniqueServices.filter((s: any) => s.category === cat).length;
-                    const catIcon = cat === 'Ginecología' ? '👶' : cat === 'Odontología' ? '🦷' : cat === 'Cardiología' ? '🫀' : cat === 'Pediatría' ? '🧸' : cat === 'Barbería' ? '💈' : cat === 'Peluquería Canina' ? '🐩' : '🩺';
-                    return (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setSelectedCategory(cat)}
-                        className={`px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs flex items-center gap-1.5 ${
-                          selectedCategory === cat
-                            ? 'bg-[color:var(--theme-btn)] text-white shadow-md'
-                            : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'
-                        }`}
-                      >
-                        <span>{catIcon}</span>
-                        <span>{cat}</span>
-                        <span className="opacity-75 text-[11px] ml-0.5">({count})</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {displayedServices.length === 0 && (
-                <p className="text-center text-slate-400 mt-10 text-lg">No hay servicios disponibles en esta categoría.</p>
-              )}
-
-              {/* Título de Rama / Especialidad Activa */}
-              {selectedCategory !== 'all' && (
-                <div className="mb-4 flex items-center justify-between pb-2.5 border-b border-slate-200/80">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-2xl">
-                      {selectedCategory === 'Ginecología' ? '👶' : selectedCategory === 'Odontología' ? '🦷' : selectedCategory === 'Cardiología' ? '🫀' : selectedCategory === 'Pediatría' ? '🧸' : selectedCategory === 'Barbería' ? '💈' : selectedCategory === 'Peluquería Canina' ? '🐩' : '🩺'}
-                    </span>
+              
+              {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                  VISTA A: DIRECTORIO DE ESPECIALIDADES / RAMAS MÉDICAS
+                  (Se muestra cuando el centro tiene múltiples especialidades y el paciente no ha elegido una)
+                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
+              {availableCategories.length > 1 && !selectedCategory ? (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200/80">
                     <div>
-                      <h3 className="text-sm md:text-base font-black text-slate-800">Rama: {selectedCategory}</h3>
-                      <p className="text-xs text-slate-500">Procedimientos y sub-ramas disponibles:</p>
+                      <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                        Especialidades Médicas Disponibles
+                      </h2>
+                      <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+                        Toca una especialidad para ver sus médicos, estudios y procedimientos:
+                      </p>
                     </div>
+                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full self-start sm:self-auto">
+                      {availableCategories.length} departamentos activos
+                    </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory('all')}
-                    className="text-xs font-bold text-slate-400 hover:text-slate-700 transition-colors px-2.5 py-1 rounded-lg hover:bg-slate-100"
-                  >
-                    Mostrar Todo
-                  </button>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {availableCategories.map((cat) => {
+                      const meta = getSpecialtyMeta(cat);
+                      const catServices = uniqueServices.filter((s: any) => s.category === cat);
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => handleSelectSpecialty(cat)}
+                          className="group bg-white rounded-3xl p-6 text-left border-2 border-slate-200/80 hover:border-[color:var(--theme-btn)] hover:shadow-xl transition-all duration-200 active:scale-[0.98] flex flex-col justify-between relative overflow-hidden shadow-xs hover:-translate-y-0.5"
+                        >
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-3xl shadow-xs group-hover:scale-110 transition-transform">
+                                {meta.icon}
+                              </div>
+                              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80">
+                                {meta.badge}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="text-lg md:text-xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors">
+                                {cat}
+                              </h3>
+                              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed line-clamp-3">
+                                {meta.description}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-400">
+                              {catServices.length} {catServices.length === 1 ? 'procedimiento' : 'procedimientos'}
+                            </span>
+                            <div className="flex items-center gap-1.5 text-xs font-black text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform">
+                              <span>Ver Servicios</span>
+                              <ChevronRight size={16} />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-center pt-8 border-t border-slate-200/60">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectSpecialty('all')}
+                      className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-4 transition-colors p-2"
+                    >
+                      O ver el catálogo general con todos los servicios ({uniqueServices.length})
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    VISTA B: LISTA DE PROCEDIMIENTOS DE LA ESPECIALIDAD
+                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  
+                  {/* Barra de Navegación y Retorno a Especialidades */}
+                  {availableCategories.length > 1 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                      <button
+                        type="button"
+                        onClick={handleBackToSpecialties}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs font-black text-slate-700 transition-all shadow-xs active:scale-95"
+                      >
+                        <ArrowLeft size={15} />
+                        <span>← Volver a Todas las Especialidades</span>
+                      </button>
+
+                      {selectedCategory && selectedCategory !== 'all' && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[color:var(--theme-btn)]/10 text-[color:var(--theme-btn)] text-xs font-black">
+                          <span>{getSpecialtyMeta(selectedCategory).icon}</span>
+                          <span>Especialidad: {selectedCategory}</span>
+                        </div>
+                      )}
+
+                      {selectedCategory === 'all' && (
+                        <span className="text-xs font-bold text-slate-400">
+                          Catálogo General ({uniqueServices.length} servicios)
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Selector de Pestañas Rápidas cuando se visualizan todos los servicios */}
+                  {selectedCategory === 'all' && availableCategories.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCategory('all')}
+                        className="px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs bg-slate-900 text-white"
+                      >
+                        🌟 Todos ({uniqueServices.length})
+                      </button>
+                      {availableCategories.map((cat) => {
+                        const count = uniqueServices.filter((s: any) => s.category === cat).length;
+                        const catMeta = getSpecialtyMeta(cat);
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => handleSelectSpecialty(cat)}
+                            className="px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs flex items-center gap-1.5 bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                          >
+                            <span>{catMeta.icon}</span>
+                            <span>{cat}</span>
+                            <span className="opacity-75 text-[11px] ml-0.5">({count})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {displayedServices.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8">
+                      <p className="text-slate-400 text-base font-medium">No hay servicios o procedimientos registrados para esta especialidad.</p>
+                      {availableCategories.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={handleBackToSpecialties}
+                          className="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black"
+                        >
+                          Ver Otras Especialidades
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-4">
+                        <h2 className="text-lg md:text-xl font-black text-slate-900">
+                          {selectedCategory && selectedCategory !== 'all' ? `Procedimientos de ${selectedCategory}` : 'Procedimientos y Servicios Disponibles'}
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Selecciona el servicio o estudio que deseas agendar con nuestros especialistas:
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {displayedServices.map((service, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleServiceSelect(service)}
+                            className="group bg-white rounded-2xl overflow-hidden shadow-xs border border-slate-200 hover:border-slate-400 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                          >
+                            <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
+                              <div className="pr-3">
+                                <h3 className="text-lg md:text-xl font-black leading-snug" style={{ color: appliedBtn }}>
+                                  {service.name}
+                                </h3>
+                                {service.category && service.category !== 'General' && (
+                                  <span className="text-[10px] font-bold text-slate-400 block mt-1">
+                                    {service.category}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-xs shrink-0">
+                                {getServiceIcon(service.name, service.icon)}
+                              </div>
+                            </div>
+                            <div className="p-4 flex items-center justify-between w-full bg-white">
+                              <div className="flex items-center gap-2.5 text-slate-500">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                  <Clock size={14} className="text-slate-400" />
+                                  <span>{service.durationMinutes} min</span>
+                                </div>
+                                {settings.showPrices && service.priceText && (
+                                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                                    service.isCustomPrice 
+                                      ? 'bg-slate-100 text-slate-600 border border-slate-200' 
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  }`}>
+                                    {service.priceText}
+                                  </span>
+                                )}
+                              </div>
+                              <ChevronRight size={18} className="text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {displayedServices.map((service, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleServiceSelect(service)}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:border-slate-400 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
-                  >
-                    <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
-                      <div>
-                        <h2 className="text-xl md:text-2xl font-black" style={{ color: appliedBtn }}>{service.name}</h2>
-                      </div>
-                      <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-sm shrink-0">
-                         {getServiceIcon(service.name, service.icon)}
-                      </div>
-                    </div>
-                    <div className="p-4 flex items-center justify-between w-full bg-white">
-                      <div className="flex items-center gap-2.5 text-slate-500">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold">
-                          <Clock size={14} className="text-slate-400" />
-                          <span>{service.durationMinutes} min</span>
-                        </div>
-                        {settings.showPrices && service.priceText && (
-                          <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                            service.isCustomPrice 
-                              ? 'bg-slate-100 text-slate-600 border border-slate-200' 
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          }`}>
-                            {service.priceText}
-                          </span>
-                        )}
-                      </div>
-                      <ChevronRight size={18} className="text-[color:var(--theme-btn)] transition-colors" />
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
           </div>
         </div>

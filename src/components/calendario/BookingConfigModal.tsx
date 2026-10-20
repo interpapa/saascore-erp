@@ -325,6 +325,67 @@ export function BookingConfigModal({
                   <strong>Tip:</strong> Puedes descargar la imagen PNG para mandar a imprimir un exhibidor de acrílico en la recepción para agilizar el ingreso de los pacientes.
                 </span>
               </div>
+
+              {/* Enlaces Directos por Especialidad / Rama */}
+              <div className="bg-card p-4 rounded-3xl border border-border space-y-3">
+                <div>
+                  <h4 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🔗</span> Enlaces Directos por Especialidad
+                  </h4>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    Comparte un enlace específico para que el paciente entre directamente a ver los servicios de esa especialidad sin pasar por la lista general:
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-1">
+                  {[
+                    { id: 'ginecologia', name: 'Ginecología y Obstetricia', icon: '👶' },
+                    { id: 'odontologia', name: 'Odontología & Salud Dental', icon: '🦷' },
+                    { id: 'cardiologia', name: 'Cardiología & Cardiovascular', icon: '🫀' },
+                    { id: 'pediatria', name: 'Pediatría & Puericultura', icon: '🧸' },
+                    { id: 'dermatologia', name: 'Dermatología & Estética', icon: '🧴' },
+                    { id: 'traumatologia', name: 'Traumatología & Fisioterapia', icon: '🦴' },
+                    { id: 'oftalmologia', name: 'Oftalmología & Salud Visual', icon: '👁️' },
+                    { id: 'med_general', name: 'Medicina General', icon: '🩺' },
+                  ]
+                    .filter(spec => {
+                      const activeMods = tenant?.active_modules || [];
+                      if (!activeMods || activeMods.length === 0) return true;
+                      return activeMods.includes(spec.id) || activeMods.includes(`med_${spec.id}`) || activeMods.includes('clinica');
+                    })
+                    .map((item) => {
+                      const specUrl = `${bookingPublicUrl}?especialidad=${item.id}`;
+                      return (
+                        <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border/80 text-xs gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base">{item.icon}</span>
+                            <span className="font-bold text-foreground truncate">{item.name}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(specUrl);
+                                toast({ variant: 'success', title: '¡Enlace Copiado!', description: `Link directo de ${item.name} listo para compartir.` });
+                              }}
+                              className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-foreground font-bold rounded-lg border border-border shadow-2xs text-[11px] transition-colors"
+                            >
+                              Copiar Link
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => window.open(specUrl, '_blank')}
+                              className="p-1 text-slate-400 hover:text-foreground transition-colors"
+                              title="Abrir enlace en nueva pestaña"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
             </div>
           )}
 

@@ -854,6 +854,24 @@ export default function GinecologiaPage() {
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
+                onClick={() => {
+                  const ginecoUrl = `${bookingPublicUrl}?especialidad=ginecologia`;
+                  navigator.clipboard.writeText(ginecoUrl);
+                  toast({
+                    variant: 'success',
+                    title: '¡Enlace de Reservas Copiado!',
+                    description: 'Tus pacientes ingresarán directamente a agendar citas de Ginecología y Obstetricia.'
+                  });
+                }}
+                className="px-3.5 py-2.5 rounded-2xl bg-pink-500/10 hover:bg-pink-500/20 text-pink-600 dark:text-pink-400 border border-pink-500/20 text-xs font-bold transition-all flex items-center gap-2 btn-haptic"
+                title="Copiar enlace directo de citas online de Ginecología"
+              >
+                <Share2 size={15} />
+                <span className="hidden sm:inline">Link Reservas</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setIsGuideOpen(true)}
                 className="px-3.5 py-2.5 rounded-2xl bg-card border border-border hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-300 transition-all flex items-center gap-2 btn-haptic"
               >
