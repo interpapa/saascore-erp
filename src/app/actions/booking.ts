@@ -23,6 +23,8 @@ const bookingSchema = z.object({
   timezoneOffset: z.string().regex(/^[+-]\d{2}:\d{2}$/).optional(),
   price: z.number().optional(),
   serviceName: z.string().optional(),
+  isGroupClass: z.boolean().optional(),
+  maxCapacity: z.number().optional(),
 });
 
 function parseOffsetToMs(offsetStr?: string): number {
@@ -84,74 +86,7 @@ export async function processBookingAction(formData: unknown) {
     const duration = cleanData.durationMinutes || 60;
     const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
-    let finalBarberId = cleanData.barberId;
-    let finalBarberName = cleanData.barberName;
-
-    if (finalBarberId === 'any') {
-      const { data: employees } = await supabaseAdmin
-        .from('entities')
-        .select('id, name, metadata, role')
-        .eq('tenant_id', cleanData.tenantId)
-        .eq('type', 'employee')
-        .eq('status', 'active');
-        
-      if (employees && employees.length > 0) {
-        // Revisar si los empleados tienen cita activa en ese rango horario
-        const { data: busyApps } = await supabaseAdmin
-          .from('appointments')
-          .select('employee_id')
-          .eq('tenant_id', cleanData.tenantId)
-          .neq('status', 'cancelled')
-          .neq('status', 'no_show')
-          .neq('status', 'completed')
-          .lt('start_time', endDateTime.toISOString())
-          .gt('end_time', startDateTime.toISOString());
-          
-        const busyIds = new Set((busyApps || []).map(a => a.employee_id));
-        const availableEmployees = employees.filter(emp => !busyIds.has(emp.id) && emp.metadata?.bookable !== false);
-
-        if (availableEmployees.length > 0) {
-          // Priorizar especialista que coincida con el servicio seleccionado (ej. Cardiología)
-          let candidatePool = availableEmployees;
-          if (cleanData.serviceName) {
-            const matchedSpecialists = availableEmployees.filter(emp => matchesEmployeeService(emp, cleanData.serviceName!));
-            if (matchedSpecialists.length > 0) {
-              candidatePool = matchedSpecialists;
-            }
-          }
-          const chosenEmp = candidatePool[Math.floor(Math.random() * candidatePool.length)];
-          finalBarberId = chosenEmp.id;
-          finalBarberName = chosenEmp.name;
-        } else {
-          return { success: false, error: 'Todos los profesionales están ocupados en este horario exacto. Por favor elige otra hora.' };
-        }
-      } else {
-        return { success: false, error: 'No hay profesionales disponibles en este momento.' };
-      }
-    } else {
-      // Prevención de colisión defensiva para empleado específico
-      const { data: overlapping } = await supabaseAdmin
-        .from('appointments')
-        .select('id, title')
-        .eq('tenant_id', cleanData.tenantId)
-        .eq('employee_id', finalBarberId)
-        .neq('status', 'cancelled')
-        .neq('status', 'no_show')
-        .neq('status', 'completed')
-        .lt('start_time', endDateTime.toISOString())
-        .gt('end_time', startDateTime.toISOString())
-        .limit(1);
-
-      if (overlapping && overlapping.length > 0) {
-        return {
-          success: false,
-          error: 'Lo sentimos, este turno ya está reservado para este profesional. Por favor elige otro horario.',
-        };
-      }
-    }
-
-    // Unificación de Contactos (Estilo Odoo res.partner):
-    // Vincular o crear automáticamente al cliente en la tabla central 'entities'
+    // 1. Unificación y Creación de Contacto del Alumno (Estilo Odoo res.partner)
     let entityClientId: string | null = null;
     try {
       let query = supabaseAdmin
@@ -192,6 +127,169 @@ export async function processBookingAction(formData: unknown) {
       console.warn('[Booking] Entity lookup/create warning (non-blocking):', e);
     }
 
+    let finalBarberId = cleanData.barberId;
+    let finalBarberName = cleanData.barberName;
+
+    if (finalBarberId === 'any') {
+      const { data: employees } = await supabaseAdmin
+        .from('entities')
+        .select('id, name, metadata, role')
+        .eq('tenant_id', cleanData.tenantId)
+        .eq('type', 'employee')
+        .eq('status', 'active');
+        
+      if (employees && employees.length > 0) {
+        // Revisar si los empleados tienen cita activa en ese rango horario
+        const { data: busyApps } = await supabaseAdmin
+          .from('appointments')
+          .select('id, employee_id, metadata')
+          .eq('tenant_id', cleanData.tenantId)
+          .neq('status', 'cancelled')
+          .neq('status', 'no_show')
+          .neq('status', 'completed')
+          .lt('start_time', endDateTime.toISOString())
+          .gt('end_time', startDateTime.toISOString());
+          
+        const busyIds = new Set(
+          (busyApps || [])
+            .filter(a => {
+              const meta = a.metadata || {};
+              const isGroup = Boolean(meta.is_group_class || meta.is_fixed_class || (meta.max_capacity && Number(meta.max_capacity) > 1));
+              if (isGroup) {
+                const maxCap = Number(meta.max_capacity) || 4;
+                const count = Array.isArray(meta.attendees) ? meta.attendees.length : 1;
+                return count >= maxCap; // Solo ocupa si está lleno
+              }
+              return true;
+            })
+            .map(a => a.employee_id)
+        );
+        const availableEmployees = employees.filter(emp => !busyIds.has(emp.id) && emp.metadata?.bookable !== false);
+
+        if (availableEmployees.length > 0) {
+          let candidatePool = availableEmployees;
+          if (cleanData.serviceName) {
+            const matchedSpecialists = availableEmployees.filter(emp => matchesEmployeeService(emp, cleanData.serviceName!));
+            if (matchedSpecialists.length > 0) {
+              candidatePool = matchedSpecialists;
+            }
+          }
+          const chosenEmp = candidatePool[Math.floor(Math.random() * candidatePool.length)];
+          finalBarberId = chosenEmp.id;
+          finalBarberName = chosenEmp.name;
+        } else {
+          return { success: false, error: 'Todos los profesionales están ocupados en este horario exacto. Por favor elige otra hora.' };
+        }
+      } else {
+        return { success: false, error: 'No hay profesionales disponibles en este momento.' };
+      }
+    } else {
+      // Prevención de colisión y Soporte de Clases Grupales Compartidas (Multi-Alumno)
+      const { data: overlapping } = await supabaseAdmin
+        .from('appointments')
+        .select('id, title, metadata, client_id, start_time, end_time')
+        .eq('tenant_id', cleanData.tenantId)
+        .eq('employee_id', finalBarberId)
+        .neq('status', 'cancelled')
+        .neq('status', 'no_show')
+        .neq('status', 'completed')
+        .lt('start_time', endDateTime.toISOString())
+        .gt('end_time', startDateTime.toISOString())
+        .limit(1);
+
+      if (overlapping && overlapping.length > 0) {
+        const existingAppt = overlapping[0];
+        const existingMeta = (existingAppt.metadata as Record<string, any>) || {};
+        const isGroupClass = Boolean(
+          existingMeta.is_group_class ||
+          existingMeta.is_fixed_class ||
+          (existingMeta.max_capacity && Number(existingMeta.max_capacity) > 1) ||
+          cleanData.isGroupClass ||
+          (cleanData.serviceName && (
+            cleanData.serviceName.toLowerCase().includes('grupal') ||
+            cleanData.serviceName.toLowerCase().includes('padel') ||
+            cleanData.serviceName.toLowerCase().includes('pádel') ||
+            cleanData.serviceName.toLowerCase().includes('clase')
+          ))
+        );
+
+        if (!isGroupClass) {
+          return {
+            success: false,
+            error: 'Lo sentimos, este turno ya está reservado para este profesional. Por favor elige otro horario.',
+          };
+        }
+
+        const maxCapacity = Number(existingMeta.max_capacity) || 4;
+        let attendees: Array<{ id: string; name: string; phone?: string; payment_status?: string; joined_at?: string }> = 
+          Array.isArray(existingMeta.attendees) ? [...existingMeta.attendees] : [];
+
+        if (attendees.length === 0 && existingAppt.client_id) {
+          attendees.push({
+            id: existingAppt.client_id,
+            name: existingMeta.client_name || existingAppt.title || 'Alumno 1',
+            phone: existingMeta.client_phone || '',
+            payment_status: 'confirmed',
+            joined_at: existingAppt.start_time
+          });
+        }
+
+        if (attendees.length >= maxCapacity) {
+          return {
+            success: false,
+            error: `Esta clase grupal ya está completa (${maxCapacity}/${maxCapacity} cupos ocupados). Por favor selecciona otro horario.`,
+          };
+        }
+
+        // El alumno se une a la clase grupal existente
+        const attendeeRecord = {
+          id: entityClientId || crypto.randomUUID(),
+          name: fullName,
+          phone: cleanData.phone || '',
+          payment_status: 'pending',
+          joined_at: new Date().toISOString()
+        };
+        attendees.push(attendeeRecord);
+
+        const updatedMetadata = {
+          ...existingMeta,
+          attendees,
+          is_group_class: true,
+          max_capacity: maxCapacity
+        };
+
+        const shortNames = attendees.map(a => a.name.split(' ')[0]).join(', ');
+        await supabaseAdmin
+          .from('appointments')
+          .update({
+            metadata: updatedMetadata,
+            title: `🎾 Clase Grupal (${attendees.length}/${maxCapacity}) - ${shortNames}`
+          })
+          .eq('id', existingAppt.id);
+
+        await eventBus.emit('appointment.booked', {
+          appointmentId: existingAppt.id,
+          tenantId: cleanData.tenantId,
+          customerName: fullName,
+          customerPhone: cleanData.phone || undefined,
+          barberId: finalBarberId,
+          date: cleanData.date,
+          time: cleanData.time,
+          durationMinutes: duration,
+          timestamp: new Date().toISOString(),
+        });
+
+        return {
+          success: true,
+          message: `¡Cupo reservado con éxito! (Cupo ${attendees.length} de ${maxCapacity})`,
+          assignedBarberName: finalBarberName,
+          isGroupJoin: true,
+          spotNumber: attendees.length,
+          maxCapacity
+        };
+      }
+    }
+
     // Obtener color asignado al profesional para la agenda
     let staffColor = '#6366f1';
     if (finalBarberId) {
@@ -209,9 +307,27 @@ export async function processBookingAction(formData: unknown) {
       }
     }
 
+    // Detección de si el servicio reservado es una clase grupal (ej. Pádel, Tenis)
+    const isGroupClass = Boolean(
+      cleanData.isGroupClass ||
+      (cleanData.serviceName && (
+        cleanData.serviceName.toLowerCase().includes('grupal') ||
+        cleanData.serviceName.toLowerCase().includes('padel') ||
+        cleanData.serviceName.toLowerCase().includes('pádel') ||
+        cleanData.serviceName.toLowerCase().includes('clase')
+      ))
+    );
+    const maxCapacity = cleanData.maxCapacity || (isGroupClass ? 4 : 1);
+    const initialAttendees = isGroupClass
+      ? [{ id: entityClientId || crypto.randomUUID(), name: fullName, phone: cleanData.phone || '', payment_status: 'pending', joined_at: new Date().toISOString() }]
+      : undefined;
+
     // INSERCIÓN REAL EN LA BASE DE DATOS
-    // Intento 1: Insertar en 'appointments' con todas las columnas
     let createdApptId: string = crypto.randomUUID();
+    const apptTitle = isGroupClass
+      ? `🎾 Clase Grupal (1/${maxCapacity}) - ${fullName.split(' ')[0]}`
+      : (cleanData.serviceName ? `Cita: ${cleanData.serviceName} - ${fullName}` : `Cita Web - ${fullName}`);
+
     const { data: insertedAppt, error } = await supabaseAdmin
       .from('appointments')
       .insert({
@@ -219,7 +335,7 @@ export async function processBookingAction(formData: unknown) {
         tenant_id: cleanData.tenantId,
         client_id: entityClientId,
         employee_id: finalBarberId,
-        title: cleanData.serviceName ? `Cita: ${cleanData.serviceName} - ${fullName}` : `Cita Web - ${fullName}`,
+        title: apptTitle,
         price: cleanData.price || 0,
         metadata: { 
           client_name: fullName, 
@@ -229,6 +345,9 @@ export async function processBookingAction(formData: unknown) {
           service_name: cleanData.serviceName || undefined,
           price: cleanData.price || 0,
           color: staffColor,
+          is_group_class: isGroupClass,
+          max_capacity: maxCapacity,
+          attendees: initialAttendees
         },
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
@@ -361,6 +480,7 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
     if (error) throw error;
 
     const bookedTimesSet = new Set<string>();
+    const groupSlotsInfo: Record<string, { spotsTaken: number; maxCapacity: number; remainingSpots: number }> = {};
 
     if (employeeId === 'any') {
       // Si es "Cualquiera", debemos contar cuántos empleados reservables activos hay en la empresa.
@@ -384,6 +504,12 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
         
         if (isNaN(current) || isNaN(rawEnd) || current >= rawEnd) return;
         const end = Math.min(rawEnd, current + 24 * 60 * 60 * 1000);
+
+        const meta = r.metadata || {};
+        const isGroup = Boolean(meta.is_group_class || meta.is_fixed_class || (meta.max_capacity && Number(meta.max_capacity) > 1));
+        const maxCap = Number(meta.max_capacity) || 4;
+        const attendeesCount = Array.isArray(meta.attendees) ? meta.attendees.length : (r.client_id ? 1 : 0);
+        const hasFreeSpots = isGroup && attendeesCount < maxCap;
         
         while (current < end) {
           const localD = new Date(current + offsetMs);
@@ -394,14 +520,22 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
             const mm = localD.getUTCMinutes().toString().padStart(2, '0');
             const timeKey = `${hh}:${mm}`;
             
-            if (!timeSlotOccupancy.has(timeKey)) {
-              timeSlotOccupancy.set(timeKey, new Set());
-            }
-            if (r.employee_id) {
-              timeSlotOccupancy.get(timeKey)!.add(r.employee_id);
+            if (hasFreeSpots) {
+              groupSlotsInfo[timeKey] = {
+                spotsTaken: attendeesCount,
+                maxCapacity: maxCap,
+                remainingSpots: maxCap - attendeesCount
+              };
             } else {
-              // Bloqueo general del negocio: ocupa a todos los profesionales
-              allStaffIds.forEach(id => timeSlotOccupancy.get(timeKey)!.add(id));
+              if (!timeSlotOccupancy.has(timeKey)) {
+                timeSlotOccupancy.set(timeKey, new Set());
+              }
+              if (r.employee_id) {
+                timeSlotOccupancy.get(timeKey)!.add(r.employee_id);
+              } else {
+                // Bloqueo general del negocio: ocupa a todos los profesionales
+                allStaffIds.forEach(id => timeSlotOccupancy.get(timeKey)!.add(id));
+              }
             }
           }
           current += 15 * 60000;
@@ -416,13 +550,19 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
       }
 
     } else {
-      // Lógica para un solo empleado
+      // Lógica para un solo empleado / coach
       (appointments || []).forEach((r: any) => {
          let current = new Date(r.start_time).getTime();
          const rawEnd = new Date(r.end_time || (current + 45 * 60000)).getTime();
          
          if (isNaN(current) || isNaN(rawEnd) || current >= rawEnd) return;
          const end = Math.min(rawEnd, current + 24 * 60 * 60 * 1000);
+
+         const meta = r.metadata || {};
+         const isGroup = Boolean(meta.is_group_class || meta.is_fixed_class || (meta.max_capacity && Number(meta.max_capacity) > 1));
+         const maxCap = Number(meta.max_capacity) || 4;
+         const attendeesCount = Array.isArray(meta.attendees) ? meta.attendees.length : (r.client_id ? 1 : 0);
+         const hasFreeSpots = isGroup && attendeesCount < maxCap;
          
          while (current < end) {
            const localD = new Date(current + offsetMs);
@@ -430,14 +570,28 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
            if (localDateStr === date) {
              const hh = localD.getUTCHours().toString().padStart(2, '0');
              const mm = localD.getUTCMinutes().toString().padStart(2, '0');
-             bookedTimesSet.add(`${hh}:${mm}`);
+             const timeKey = `${hh}:${mm}`;
+
+             if (hasFreeSpots) {
+               groupSlotsInfo[timeKey] = {
+                 spotsTaken: attendeesCount,
+                 maxCapacity: maxCap,
+                 remainingSpots: maxCap - attendeesCount
+               };
+             } else {
+               bookedTimesSet.add(timeKey);
+             }
            }
            current += 15 * 60000;
          }
       });
     }
 
-    return { success: true, bookedTimes: Array.from(bookedTimesSet) };
+    return { 
+      success: true, 
+      bookedTimes: Array.from(bookedTimesSet),
+      groupSlots: groupSlotsInfo
+    };
   } catch (error) {
     console.error('Error fetching booked times:', error);
     return { success: false, bookedTimes: [] };

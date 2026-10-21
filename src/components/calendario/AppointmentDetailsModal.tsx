@@ -21,7 +21,11 @@ import {
   Unlock,
   Trash2,
   Building,
-  ShieldAlert
+  ShieldAlert,
+  QrCode,
+  Share2,
+  Copy,
+  UserCheck
 } from 'lucide-react';
 import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
@@ -31,6 +35,7 @@ import { logExternalWhatsAppMessageAction } from '@/app/actions/whatsapp';
 import { 
   addAttendeeToAppointmentAction, 
   removeAttendeeFromAppointmentAction,
+  reassignAttendeeInAppointmentAction,
   updateAppointmentPriceAction,
   freeAppointmentSlotAction
 } from '@/app/actions/appointments';
@@ -116,6 +121,10 @@ export function AppointmentDetailsModal({
   const [isUpdating, setIsUpdating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [selectedClientToAdd, setSelectedClientToAdd] = useState('');
+  const [reassigningAttendeeId, setReassigningAttendeeId] = useState<string | null>(null);
+  const [newClientForReassign, setNewClientForReassign] = useState<string>('');
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
   const [isEditingPrice, setIsEditingPrice] = useState(false);
   const [editedPrice, setEditedPrice] = useState<number>(appointment?.price || 0);
   const [currentPrice, setCurrentPrice] = useState<number>(appointment?.price || 0);
@@ -252,6 +261,36 @@ export function AppointmentDetailsModal({
       }
     } catch (err: any) {
       console.error(err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleReassignAttendee = async (oldAttendeeId: string) => {
+    if (!newClientForReassign || !currentTenant || !actor) return;
+    const client = clients.find(c => c.id === newClientForReassign);
+    if (!client) return;
+
+    try {
+      setIsUpdating(true);
+      const res = await reassignAttendeeInAppointmentAction(
+        appointment.id,
+        oldAttendeeId,
+        { id: client.id, name: client.name, phone: client.phone || '' },
+        currentTenant.id,
+        actor
+      );
+      if (res.success && res.attendees) {
+        if (onUpdateMetadata) {
+          await onUpdateMetadata(appointment.id, { ...appointment.metadata, attendees: res.attendees });
+        }
+        setReassigningAttendeeId(null);
+        setNewClientForReassign('');
+      } else {
+        alert(res.error || 'No se pudo reasignar el cupo.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error al reasignar participante.');
     } finally {
       setIsUpdating(false);
     }
@@ -597,12 +636,22 @@ export function AppointmentDetailsModal({
                   <h4 className="text-sm font-bold text-fuchsia-900 dark:text-fuchsia-300 flex items-center gap-2">
                     <Users size={16} /> Alumnos Inscritos
                   </h4>
-                  <span className="text-xs font-semibold px-2 py-1 bg-white dark:bg-slate-900 rounded-md border border-slate-200">
-                    {attendees.length} / {maxCapacity}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsQrModalOpen(true)}
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-1.5 transition-all btn-haptic"
+                      title="Compartir link por WhatsApp o mostrar código QR"
+                    >
+                      <QrCode size={13} /> Compartir / QR
+                    </button>
+                    <span className="text-xs font-semibold px-2 py-1 bg-white dark:bg-slate-900 rounded-md border border-slate-200">
+                      {attendees.length} / {maxCapacity}
+                    </span>
+                  </div>
                 </div>
 
-                <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2">
+                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-2">
                   {attendees.length === 0 ? (
                     <p className="text-xs text-slate-500 text-center py-4 bg-white/50 rounded-xl border border-dashed border-slate-300">
                       No hay alumnos inscritos en esta clase.
@@ -613,27 +662,72 @@ export function AppointmentDetailsModal({
                       const debt = Number(clientData?.metadata?.debt_balance ?? clientData?.metadata?.current_debt ?? 0);
                       const hasDebt = debt > 0;
                       return (
-                        <div key={a.id} className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 shadow-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold text-foreground">{a.name}</span>
-                            {hasDebt ? (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
-                                Debe ${debt.toFixed(2)}
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
-                                Al Día
-                              </span>
-                            )}
+                        <div key={a.id} className="flex flex-col gap-1.5 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 shadow-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-foreground">{a.name}</span>
+                              {hasDebt ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200">
+                                  Debe ${debt.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
+                                  Al Día
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                disabled={isUpdating}
+                                onClick={() => setReassigningAttendeeId(reassigningAttendeeId === a.id ? null : a.id)}
+                                className={`p-1 rounded-lg transition-colors text-[11px] flex items-center gap-0.5 ${
+                                  reassigningAttendeeId === a.id 
+                                    ? 'bg-indigo-100 text-indigo-700 font-bold' 
+                                    : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                }`}
+                                title="Reasignar cupo a otro alumno (por si reservó un amigo/familiar)"
+                              >
+                                <UserCheck size={14} />
+                              </button>
+                              <button
+                                disabled={isUpdating}
+                                onClick={() => handleRemoveAttendee(a.id)}
+                                className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors"
+                                title="Remover alumno de la clase"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
                           </div>
-                          <button
-                            disabled={isUpdating}
-                            onClick={() => handleRemoveAttendee(a.id)}
-                            className="text-slate-400 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50 transition-colors"
-                            title="Remover alumno"
-                          >
-                            <X size={14} />
-                          </button>
+
+                          {/* Selector de Reasignación en línea */}
+                          {reassigningAttendeeId === a.id && (
+                            <div className="flex items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs animate-in fade-in">
+                              <select
+                                value={newClientForReassign}
+                                onChange={(e) => setNewClientForReassign(e.target.value)}
+                                className="flex-1 px-2 py-1 text-xs rounded-lg border border-slate-200 bg-slate-50 dark:bg-slate-800 text-foreground"
+                              >
+                                <option value="">-- Seleccionar alumno real --</option>
+                                {clients.filter(c => c.id !== a.id).map(c => (
+                                  <option key={c.id} value={c.id}>{c.name}</option>
+                                ))}
+                              </select>
+                              <button
+                                disabled={!newClientForReassign || isUpdating}
+                                onClick={() => handleReassignAttendee(a.id)}
+                                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white rounded-lg font-bold text-xs shadow-xs"
+                              >
+                                Reasignar
+                              </button>
+                              <button
+                                onClick={() => { setReassigningAttendeeId(null); setNewClientForReassign(''); }}
+                                className="px-2 py-1 text-slate-500 hover:bg-slate-100 rounded-lg text-xs"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          )}
                         </div>
                       );
                     })
@@ -891,6 +985,106 @@ export function AppointmentDetailsModal({
           </div>
         </div>
       </div>
+
+      {/* Modal Emergente de Código QR & Compartir en WhatsApp */}
+      {isQrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-sm font-bold flex items-center gap-1.5 text-foreground">
+                <QrCode size={18} className="text-emerald-600" /> Código QR & Link de la Clase
+              </span>
+              <button 
+                onClick={() => setIsQrModalOpen(false)} 
+                className="text-slate-400 hover:text-foreground p-1 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl inline-block border border-slate-200 dark:border-slate-700 mx-auto shadow-inner">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
+                  typeof window !== 'undefined' 
+                    ? `${window.location.origin}/reservas/${currentTenant?.id || ''}`
+                    : `https://saascore.app/reservas/${currentTenant?.id || ''}`
+                )}`}
+                alt="QR de Reserva de Clase"
+                className="w-48 h-48 mx-auto object-contain rounded-xl"
+              />
+            </div>
+
+            <div className="space-y-1 text-left bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 p-3 rounded-xl text-xs">
+              <p className="font-bold text-emerald-900 dark:text-emerald-200">
+                🎾 {appointment.location || (appointment.metadata?.court_name as string) || 'Cancha'}
+              </p>
+              <p className="text-slate-600 dark:text-slate-300 text-[11px]">
+                {Math.max(0, maxCapacity - attendees.length)} cupo{Math.max(0, maxCapacity - attendees.length) !== 1 ? 's' : ''} libre{Math.max(0, maxCapacity - attendees.length) !== 1 ? 's' : ''} de {maxCapacity} disponibles
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={async () => {
+                  const shareUrl = typeof window !== 'undefined' 
+                    ? `${window.location.origin}/reservas/${currentTenant?.id || ''}`
+                    : `https://saascore.app/reservas/${currentTenant?.id || ''}`;
+                  const startD = new Date(appointment.start_time);
+                  const fDate = startD.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' });
+                  const fTime = startD.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
+                  const cName = appointment.location || (appointment.metadata?.court_name as string) || 'Cancha';
+                  const rem = Math.max(0, maxCapacity - attendees.length);
+
+                  const msg = `🎾 *¡CLASE GRUPAL DE PÁDEL / TENIS!*
+📅 *Día:* ${fDate}
+⏰ *Hora:* ${fTime}
+📍 *Lugar:* ${cName}
+👥 *Cupos Disponibles:* ${rem} de ${maxCapacity}
+📲 *Aparta tu cupo aquí:* ${shareUrl}
+
+¡Nos vemos en la cancha! 🏆`;
+
+                  try {
+                    await navigator.clipboard.writeText(msg);
+                    setCopiedText(true);
+                    setTimeout(() => setCopiedText(false), 2500);
+                  } catch {}
+                }}
+                className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition-all btn-haptic"
+              >
+                {copiedText ? (
+                  <>
+                    <Check size={16} /> ¡Texto Copiado para WhatsApp!
+                  </>
+                ) : (
+                  <>
+                    <Share2 size={16} /> Copiar Mensaje para Grupo de WhatsApp
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const shareUrl = typeof window !== 'undefined' 
+                    ? `${window.location.origin}/reservas/${currentTenant?.id || ''}`
+                    : `https://saascore.app/reservas/${currentTenant?.id || ''}`;
+                  try {
+                    await navigator.clipboard.writeText(shareUrl);
+                    setCopiedText(true);
+                    setTimeout(() => setCopiedText(false), 2500);
+                  } catch {}
+                }}
+                className="w-full py-2 px-4 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+              >
+                <Copy size={14} /> Copiar Solo el Link Directo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

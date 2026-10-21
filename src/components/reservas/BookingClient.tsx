@@ -640,6 +640,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [groupSlots, setGroupSlots] = useState<Record<string, { spotsTaken: number; maxCapacity: number; remainingSpots: number }>>({});
   const [isLoadingTimes, setIsLoadingTimes] = useState(false);
   
   const [customerFullName, setCustomerFullName] = useState('');
@@ -685,6 +686,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       const result = await getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
       if (!isCancelled && result.success) {
         setBookedTimes(result.bookedTimes);
+        setGroupSlots((result as any).groupSlots || {});
       }
       if (!isCancelled) {
         setIsLoadingTimes(false);
@@ -739,6 +741,14 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     setErrorMessage('');
 
     try {
+      const isGroupSvc = Boolean(
+        selectedService?.name?.toLowerCase().includes('grupal') ||
+        selectedService?.name?.toLowerCase().includes('padel') ||
+        selectedService?.name?.toLowerCase().includes('pádel') ||
+        selectedService?.name?.toLowerCase().includes('clase') ||
+        (selectedTime && groupSlots[selectedTime])
+      );
+
       const result = await processBookingAction({
         tenantId: tenant.id,
         barberId: selectedBarber.id,
@@ -752,6 +762,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         timezoneOffset: clientTzOffset,
         price: selectedBarberPrice || selectedService?.basePrice || 0,
         serviceName: selectedService?.name,
+        isGroupClass: isGroupSvc,
+        maxCapacity: 4,
       });
 
       setIsSubmitting(false);
@@ -769,7 +781,10 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         localStorage.setItem('rendo_client_phone', customerPhone);
       }
 
-      setSuccessMessage('¡Reserva confirmada con éxito!');
+      const confirmationMsg = (result as any).isGroupJoin 
+        ? ((result as any).message || `¡Cupo reservado con éxito! (Cupo ${(result as any).spotNumber || 1} de ${(result as any).maxCapacity || 4})`)
+        : '¡Reserva confirmada con éxito!';
+      setSuccessMessage(confirmationMsg);
       
       // WhatsApp Redirection: Enrutamiento Inteligente (Al empleado o a Central de Recepción)
       const routingMode = tenant.metadata?.booking_settings?.whatsappRoutingMode || 'employee_first';
@@ -1396,13 +1411,14 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                     {allTimes.map((time, i) => {
                       const isSelected = selectedTime === time.value24;
                       const isAvailable = isSlotAvailable(time.value24, slotInterval, bookedTimes, selectedDate);
+                      const groupSlot = groupSlots[time.value24];
                       
                       return (
                         <button
                           key={i}
                           disabled={!isAvailable || isLoadingTimes}
                           onClick={() => setSelectedTime(time.value24)}
-                          className={`py-3 rounded-xl text-sm font-bold border-2 transition-all ${
+                          className={`py-2.5 sm:py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center ${
                             !isAvailable 
                               ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
                               : isSelected 
@@ -1411,7 +1427,12 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                           }`}
                           style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
                         >
-                          {time.label12}
+                          <span>{time.label12}</span>
+                          {groupSlot && groupSlot.remainingSpots > 0 && (
+                            <span className={`text-[9px] font-black uppercase mt-0.5 tracking-tighter ${isSelected ? 'opacity-90 text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              🎾 {groupSlot.remainingSpots} cupo{groupSlot.remainingSpots > 1 ? 's' : ''}
+                            </span>
+                          )}
                         </button>
                       )
                     })}

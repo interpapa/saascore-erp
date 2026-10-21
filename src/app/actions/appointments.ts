@@ -1215,6 +1215,71 @@ export async function removeAttendeeFromAppointmentAction(
 }
 
 /**
+ * Reasigna o sustituye un participante en una clase (ej. cuando alguien reservó por un amigo/familiar).
+ */
+export async function reassignAttendeeInAppointmentAction(
+  appointmentId: string,
+  oldAttendeeId: string,
+  newClient: { id: string; name: string; phone?: string },
+  tenantId: string,
+  actor: ActionActor
+): Promise<{ success: boolean; attendees?: Array<{ id: string; name: string; phone?: string; payment_status?: string }>; error?: string }> {
+  try {
+    const securityCheck = await validateUserTenantAccess(actor, tenantId);
+    if (!securityCheck.authorized) {
+      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+    }
+
+    if (!appointmentId || !oldAttendeeId || !newClient?.id) {
+      return { success: false, error: 'ID de cita, participante previo y nuevo cliente son requeridos.' };
+    }
+
+    if (isTemporaryId(appointmentId) || !isValidUUID(appointmentId)) {
+      return { success: true, attendees: [{ id: newClient.id, name: newClient.name, phone: newClient.phone }], localOnly: true } as any;
+    }
+
+    const { data: appt, error } = await supabaseAdmin
+      .from('appointments')
+      .select('id, metadata')
+      .eq('id', appointmentId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!error && appt) {
+      const metadata = appt.metadata || {};
+      const currentAttendees: Array<{ id: string; name: string; phone?: string; payment_status?: string }> = 
+        Array.isArray(metadata.attendees) ? metadata.attendees : [];
+      
+      const updatedAttendees = currentAttendees.map(a => {
+        if (a.id === oldAttendeeId) {
+          return {
+            ...a,
+            id: newClient.id,
+            name: newClient.name,
+            phone: newClient.phone || a.phone || '',
+          };
+        }
+        return a;
+      });
+
+      await supabaseAdmin
+        .from('appointments')
+        .update({ metadata: { ...metadata, attendees: updatedAttendees }, updated_at: new Date().toISOString() })
+        .eq('id', appointmentId)
+        .eq('tenant_id', tenantId);
+
+      safeRevalidate('/calendario');
+      return { success: true, attendees: updatedAttendees };
+    }
+
+    return { success: false, error: 'Cita no encontrada.' };
+  } catch (err: any) {
+    console.error('[reassignAttendeeInAppointmentAction Error]:', err.message);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
  * Elimina una cita de forma segura o descarta citas locales/temporales sin error.
  */
 export async function deleteAppointmentAction(
