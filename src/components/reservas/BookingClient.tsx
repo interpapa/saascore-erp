@@ -314,6 +314,12 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     || (tenant as any)?.phone 
     || '';
 
+  const hasCourts = Boolean(
+    tenant?.metadata?.sports_courts && 
+    Array.isArray(tenant.metadata.sports_courts) && 
+    tenant.metadata.sports_courts.length > 0
+  );
+
   const settings = {
     openDays: tenant.metadata?.booking_settings?.openDays || [1, 2, 3, 4, 5, 6],
     startHour: tenant.metadata?.booking_settings?.startHour || '09:00',
@@ -741,13 +747,13 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     setErrorMessage('');
 
     try {
+      const svcNameLower = (selectedService?.name || '').toLowerCase();
+      const isSportsSvc = svcNameLower.includes('padel') || svcNameLower.includes('pádel') || svcNameLower.includes('tenis') || hasCourts;
       const isGroupSvc = Boolean(
-        selectedService?.name?.toLowerCase().includes('grupal') ||
-        selectedService?.name?.toLowerCase().includes('padel') ||
-        selectedService?.name?.toLowerCase().includes('pádel') ||
-        selectedService?.name?.toLowerCase().includes('clase') ||
-        (selectedTime && groupSlots[selectedTime])
+        (isSportsSvc && (svcNameLower.includes('grupal') || svcNameLower.includes('grupo'))) ||
+        (selectedTime && groupSlots[selectedTime] && Number(groupSlots[selectedTime].maxCapacity || 0) > 1)
       );
+      const slotMaxCapacity = (selectedTime && groupSlots[selectedTime]?.maxCapacity) || (isGroupSvc ? 4 : 1);
 
       const result = await processBookingAction({
         tenantId: tenant.id,
@@ -763,7 +769,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         price: selectedBarberPrice || selectedService?.basePrice || 0,
         serviceName: selectedService?.name,
         isGroupClass: isGroupSvc,
-        maxCapacity: 4,
+        maxCapacity: slotMaxCapacity,
       });
 
       setIsSubmitting(false);
@@ -1428,9 +1434,10 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
                           style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
                         >
                           <span>{time.label12}</span>
-                          {groupSlot && groupSlot.remainingSpots > 0 && (
+                          {groupSlot && Number(groupSlot.maxCapacity || 0) > 1 && groupSlot.remainingSpots > 0 && (
                             <span className={`text-[9px] font-black uppercase mt-0.5 tracking-tighter ${isSelected ? 'opacity-90 text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                              🎾 {groupSlot.remainingSpots} cupo{groupSlot.remainingSpots > 1 ? 's' : ''}
+                              {(hasCourts || (selectedService?.name?.toLowerCase().includes('padel') || selectedService?.name?.toLowerCase().includes('tenis'))) ? '🎾 ' : '👥 '}
+                              {groupSlot.remainingSpots} cupo{groupSlot.remainingSpots > 1 ? 's' : ''}
                             </span>
                           )}
                         </button>

@@ -134,6 +134,19 @@ export function AppointmentDetailsModal({
   const activeModules = currentTenant?.active_modules || (currentTenant?.metadata as any)?.active_modules;
   const isCajaEnabled = isModuleActive(activeModules, 'caja');
 
+  const sportsCourtsList = (currentTenant?.metadata as any)?.sports_courts;
+  const hasCourts = Boolean(
+    (Array.isArray(sportsCourtsList) && sportsCourtsList.length > 0) ||
+    (appointment?.metadata as any)?.court_name
+  );
+  const isSportsAppt = Boolean(
+    appointment?.title?.includes('🎾') ||
+    (appointment as any)?.service_name?.toLowerCase().includes('padel') ||
+    (appointment as any)?.service_name?.toLowerCase().includes('pádel') ||
+    (appointment as any)?.service_name?.toLowerCase().includes('tenis') ||
+    hasCourts
+  );
+
   React.useEffect(() => {
     if (appointment) {
       setCurrentPrice(appointment.price || 0);
@@ -481,22 +494,29 @@ export function AppointmentDetailsModal({
                 </div>
               )}
 
-              <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
-                <span className="text-sm">🎾</span>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span>Pista: <strong className="text-foreground">{appointment.location || (appointment.metadata as any)?.court_name || 'Sin Pista Asignada'}</strong></span>
-                  {Boolean(appointment.metadata?.is_fixed_class) && (
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
-                      Clase Fija
+              {(hasCourts || appointment.location || (appointment.metadata as any)?.court_name) && (
+                <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                  <span className="text-sm">{isSportsAppt ? '🎾' : '📍'}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>
+                      {hasCourts ? 'Pista: ' : 'Ubicación: '}
+                      <strong className="text-foreground">
+                        {appointment.location || (appointment.metadata as any)?.court_name || (hasCourts ? 'Sin Pista Asignada' : 'General')}
+                      </strong>
                     </span>
-                  )}
-                  {Boolean(appointment.metadata?.is_slot_freed) && (
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200">
-                      Pista Liberada
-                    </span>
-                  )}
+                    {Boolean(appointment.metadata?.is_fixed_class) && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200">
+                        {isSportsAppt ? 'Clase Fija' : 'Turno Fijo'}
+                      </span>
+                    )}
+                    {Boolean(appointment.metadata?.is_slot_freed) && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-sky-100 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200">
+                        {hasCourts ? 'Pista Liberada' : 'Turno Liberado'}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 sm:col-span-2">
                 <Briefcase size={14} className="text-slate-400 shrink-0" />
@@ -734,26 +754,28 @@ export function AppointmentDetailsModal({
                   )}
                 </div>
 
-                {/* Material y Equipamiento de la Clase */}
-                <div className="pt-2 border-t border-fuchsia-200/50">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
-                    <span>🎾 Material & Equipamiento Asignado:</span>
+                {/* Material y Equipamiento de la Clase (Solo si es deporte o tiene equipamiento configurado) */}
+                {(isSportsAppt || Boolean(appointment.metadata?.equipment)) && (
+                  <div className="pt-2 border-t border-fuchsia-200/50">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 mb-1">
+                      <span>{isSportsAppt ? '🎾 Material & Equipamiento Asignado:' : '📦 Material & Equipamiento:'}</span>
+                    </div>
+                    <input
+                      type="text"
+                      defaultValue={(appointment.metadata?.equipment as string) || (isSportsAppt ? 'Carro de 72 pelotas presurizadas · Set de conos y escaleras' : '')}
+                      onBlur={(e) => {
+                        if (onUpdateMetadata) {
+                          onUpdateMetadata(appointment.id, {
+                            ...appointment.metadata,
+                            equipment: e.target.value
+                          });
+                        }
+                      }}
+                      placeholder={isSportsAppt ? "Ej. Carro de pelotas, 8 conos, palas de test..." : "Material o insumos asignados..."}
+                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white dark:bg-slate-900 focus:outline-none focus:border-fuchsia-400 font-medium text-slate-700 dark:text-slate-200"
+                    />
                   </div>
-                  <input
-                    type="text"
-                    defaultValue={(appointment.metadata?.equipment as string) || 'Carro de 72 pelotas presurizadas · Set de conos y escaleras'}
-                    onBlur={(e) => {
-                      if (onUpdateMetadata) {
-                        onUpdateMetadata(appointment.id, {
-                          ...appointment.metadata,
-                          equipment: e.target.value
-                        });
-                      }
-                    }}
-                    placeholder="Ej. Carro de pelotas, 8 conos, palas de test..."
-                    className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 bg-white dark:bg-slate-900 focus:outline-none focus:border-fuchsia-400 font-medium text-slate-700 dark:text-slate-200"
-                  />
-                </div>
+                )}
 
                 {attendees.length < maxCapacity ? (
                   <div className="flex items-center gap-2 pt-2 border-t border-fuchsia-200/50">
@@ -854,7 +876,10 @@ export function AppointmentDetailsModal({
                 <button
                   disabled={isUpdating}
                   onClick={async () => {
-                    const ok = window.confirm('¿Deseas liberar esta cancha para esta fecha? El espacio quedará disponible para agendar otra clase particular o alquiler libre.');
+                    const confirmMsg = hasCourts
+                      ? '¿Deseas liberar esta cancha para esta fecha? El espacio quedará disponible para agendar otra clase particular o alquiler libre.'
+                      : '¿Deseas liberar este turno fijo para esta fecha? El horario quedará disponible para agendar otra cita.';
+                    const ok = window.confirm(confirmMsg);
                     if (!ok || !currentTenant?.id || !actor) return;
                     try {
                       setIsUpdating(true);
@@ -862,15 +887,15 @@ export function AppointmentDetailsModal({
                       await onUpdateStatus(appointment.id, 'cancelled');
                       onClose();
                     } catch (e: any) {
-                      alert(e?.message || 'Error al liberar cancha');
+                      alert(e?.message || (hasCourts ? 'Error al liberar cancha' : 'Error al liberar turno'));
                     } finally {
                       setIsUpdating(false);
                     }
                   }}
                   className="px-3 py-2 rounded-xl text-xs font-black border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1 shadow-2xs"
-                  title="Libera la pista inmediatamente para alquiler o particular"
+                  title={hasCourts ? "Libera la pista inmediatamente para alquiler o particular" : "Libera el turno para otra reserva"}
                 >
-                  🎾 Liberar Cancha (Ceder Turno)
+                  {hasCourts ? '🎾 Liberar Cancha (Ceder Turno)' : '🔓 Liberar Turno Fijo'}
                 </button>
               )}
 
@@ -1017,7 +1042,7 @@ export function AppointmentDetailsModal({
 
             <div className="space-y-1 text-left bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 p-3 rounded-xl text-xs">
               <p className="font-bold text-emerald-900 dark:text-emerald-200">
-                🎾 {appointment.location || (appointment.metadata?.court_name as string) || 'Cancha'}
+                {isSportsAppt ? '🎾 ' : '👥 '}{appointment.location || (appointment.metadata?.court_name as string) || (hasCourts ? 'Cancha' : 'Espacio')}
               </p>
               <p className="text-slate-600 dark:text-slate-300 text-[11px]">
                 {Math.max(0, maxCapacity - attendees.length)} cupo{Math.max(0, maxCapacity - attendees.length) !== 1 ? 's' : ''} libre{Math.max(0, maxCapacity - attendees.length) !== 1 ? 's' : ''} de {maxCapacity} disponibles
@@ -1034,17 +1059,26 @@ export function AppointmentDetailsModal({
                   const startD = new Date(appointment.start_time);
                   const fDate = startD.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' });
                   const fTime = startD.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
-                  const cName = appointment.location || (appointment.metadata?.court_name as string) || 'Cancha';
+                  const cName = appointment.location || (appointment.metadata?.court_name as string) || (hasCourts ? 'Cancha' : 'Ubicación');
                   const rem = Math.max(0, maxCapacity - attendees.length);
 
-                  const msg = `🎾 *¡CLASE GRUPAL DE PÁDEL / TENIS!*
+                  const msg = isSportsAppt
+                    ? `🎾 *¡CLASE GRUPAL DE PÁDEL / TENIS!*
 📅 *Día:* ${fDate}
 ⏰ *Hora:* ${fTime}
 📍 *Lugar:* ${cName}
 👥 *Cupos Disponibles:* ${rem} de ${maxCapacity}
 📲 *Aparta tu cupo aquí:* ${shareUrl}
 
-¡Nos vemos en la cancha! 🏆`;
+¡Nos vemos en la cancha! 🏆`
+                    : `👥 *¡SESIÓN GRUPAL!*
+📅 *Día:* ${fDate}
+⏰ *Hora:* ${fTime}
+📍 *Lugar:* ${cName}
+👥 *Cupos Disponibles:* ${rem} de ${maxCapacity}
+📲 *Aparta tu cupo aquí:* ${shareUrl}
+
+¡Te esperamos! ✨`;
 
                   try {
                     await navigator.clipboard.writeText(msg);

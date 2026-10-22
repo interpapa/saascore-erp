@@ -83,7 +83,7 @@ export function CalendarGrid({
   onOpenCreateModal,
   onDrillDown,
 }: CalendarGridProps) {
-  const [resourceDimension, setResourceDimension] = useState<'courts' | 'employees'>('courts');
+  const [resourceDimension, setResourceDimension] = useState<'courts' | 'employees'>('employees');
 
   if (isLoading) {
     return (
@@ -122,12 +122,12 @@ export function CalendarGrid({
     const activeEmployees = employees.filter(e => e.is_active);
     const dayAppts = getAppointmentsForDate(currentDate);
 
-    // Canchas activas (de configuración o por defecto)
-    const activeCourts: CourtResource[] = (courts && courts.length > 0)
-      ? courts.filter(c => c.is_active)
-      : DEFAULT_SPORTS_COURTS;
+    // Canchas activas (solo si la empresa tiene pistas/canchas configuradas)
+    const hasCourts = Boolean(courts && courts.length > 0);
+    const activeCourts: CourtResource[] = hasCourts && courts ? courts.filter(c => c.is_active) : [];
+    const effectiveDimension = hasCourts ? resourceDimension : 'employees';
 
-    const columns = resourceDimension === 'courts'
+    const columns = effectiveDimension === 'courts'
       ? activeCourts.map(c => ({ id: c.id, name: c.name, color: c.color || '#10b981', type: 'court' as const, sub: c.type || 'Pista' }))
       : activeEmployees.map(e => ({ id: e.id, name: e.name, color: (e.metadata?.color as string) || '#3b82f6', type: 'employee' as const, sub: e.role || 'Staff' }));
 
@@ -135,41 +135,43 @@ export function CalendarGrid({
 
     return (
       <div className="flex flex-col gap-3">
-        {/* Selector de Dimensión: Pistas / Canchas vs Coaches / Especialistas */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border">
-          <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 p-1 rounded-xl border border-border shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setResourceDimension('courts')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                resourceDimension === 'courts'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-foreground'
-              }`}
-            >
-              🎾 Ver por Canchas / Pistas ({activeCourts.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setResourceDimension('employees')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                resourceDimension === 'employees'
-                  ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-500 hover:text-foreground'
-              }`}
-            >
-              👤 Ver por Coaches / Staff ({activeEmployees.length})
-            </button>
+        {/* Selector de Dimensión: Solo se muestra si la empresa tiene Canchas / Pistas configuradas */}
+        {hasCourts && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 p-1 rounded-xl border border-border shadow-2xs">
+              <button
+                type="button"
+                onClick={() => setResourceDimension('courts')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  effectiveDimension === 'courts'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-foreground'
+                }`}
+              >
+                🎾 Ver por Canchas / Pistas ({activeCourts.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setResourceDimension('employees')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  effectiveDimension === 'employees'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-foreground'
+                }`}
+              >
+                👤 Ver por Personal / Staff ({activeEmployees.length})
+              </button>
+            </div>
+            <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>
+                {effectiveDimension === 'courts'
+                  ? 'Monitoreo de ocupación física de canchas (anti-choque)'
+                  : 'Monitoreo de carga horaria por profesional'}
+              </span>
+            </div>
           </div>
-          <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>
-              {resourceDimension === 'courts'
-                ? 'Monitoreo de ocupación física de canchas (anti-choque)'
-                : 'Monitoreo de carga horaria por entrenador'}
-            </span>
-          </div>
-        </div>
+        )}
 
         <div className="flex flex-col h-[700px] overflow-auto bg-white dark:bg-slate-950 rounded-2xl border border-border hide-scrollbar shadow-sm relative">
           <div className={`flex flex-col ${minWidthClass} sm:min-w-full relative h-full`}>
@@ -273,7 +275,7 @@ export function CalendarGrid({
                                  <div className="flex items-center gap-1 shrink-0">
                                    {isFixedClass && (
                                      <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-emerald-500/25 text-emerald-900 dark:text-emerald-200">
-                                       🎾 Fija
+                                       Fija
                                      </span>
                                    )}
                                    {isFreed && (
@@ -290,14 +292,14 @@ export function CalendarGrid({
                                </div>
                                {heightPx >= 48 && (
                                  <div className="flex flex-col text-[10px] font-medium leading-tight truncate opacity-85 mt-0.5">
-                                   {resourceDimension === 'courts' && appt.employee_name && (
+                                   {effectiveDimension === 'courts' && appt.employee_name && (
                                      <span className="text-slate-600 dark:text-slate-300 font-semibold truncate">
                                        👤 {appt.employee_name}
                                      </span>
                                    )}
-                                   {resourceDimension === 'employees' && (appt.location || (appt.metadata?.court_name as string)) && (
+                                   {effectiveDimension === 'employees' && (appt.location || (appt.metadata?.court_name as string)) && (
                                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold truncate">
-                                       🎾 {appt.location || String(appt.metadata?.court_name || '')}
+                                       📍 {appt.location || String(appt.metadata?.court_name || '')}
                                      </span>
                                    )}
                                    {attendeesCount > 0 && (

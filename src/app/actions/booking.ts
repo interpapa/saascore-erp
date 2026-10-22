@@ -201,16 +201,8 @@ export async function processBookingAction(formData: unknown) {
         const existingAppt = overlapping[0];
         const existingMeta = (existingAppt.metadata as Record<string, any>) || {};
         const isGroupClass = Boolean(
-          existingMeta.is_group_class ||
-          existingMeta.is_fixed_class ||
-          (existingMeta.max_capacity && Number(existingMeta.max_capacity) > 1) ||
-          cleanData.isGroupClass ||
-          (cleanData.serviceName && (
-            cleanData.serviceName.toLowerCase().includes('grupal') ||
-            cleanData.serviceName.toLowerCase().includes('padel') ||
-            cleanData.serviceName.toLowerCase().includes('pádel') ||
-            cleanData.serviceName.toLowerCase().includes('clase')
-          ))
+          existingMeta.is_group_class === true &&
+          Number(existingMeta.max_capacity || 0) > 1
         );
 
         if (!isGroupClass) {
@@ -258,12 +250,17 @@ export async function processBookingAction(formData: unknown) {
           max_capacity: maxCapacity
         };
 
+        const isSports = (existingAppt.title || '').includes('🎾') || (cleanData.serviceName || '').toLowerCase().includes('padel') || (cleanData.serviceName || '').toLowerCase().includes('tenis');
         const shortNames = attendees.map(a => a.name.split(' ')[0]).join(', ');
+        const updatedTitle = isSports
+          ? `🎾 Clase Grupal (${attendees.length}/${maxCapacity}) - ${shortNames}`
+          : `Sesión Grupal (${attendees.length}/${maxCapacity}) - ${shortNames}`;
+
         await supabaseAdmin
           .from('appointments')
           .update({
             metadata: updatedMetadata,
-            title: `🎾 Clase Grupal (${attendees.length}/${maxCapacity}) - ${shortNames}`
+            title: updatedTitle
           })
           .eq('id', existingAppt.id);
 
@@ -307,15 +304,12 @@ export async function processBookingAction(formData: unknown) {
       }
     }
 
-    // Detección de si el servicio reservado es una clase grupal (ej. Pádel, Tenis)
+    // Detección estricta: solo es clase grupal si se solicita explícitamente con aforo > 1 o servicio de pádel/tenis grupal
+    const serviceNorm = (cleanData.serviceName || '').toLowerCase();
+    const isSportsService = serviceNorm.includes('padel') || serviceNorm.includes('pádel') || serviceNorm.includes('tenis');
     const isGroupClass = Boolean(
-      cleanData.isGroupClass ||
-      (cleanData.serviceName && (
-        cleanData.serviceName.toLowerCase().includes('grupal') ||
-        cleanData.serviceName.toLowerCase().includes('padel') ||
-        cleanData.serviceName.toLowerCase().includes('pádel') ||
-        cleanData.serviceName.toLowerCase().includes('clase')
-      ))
+      (cleanData.isGroupClass && Number(cleanData.maxCapacity || 0) > 1) ||
+      (isSportsService && (serviceNorm.includes('grupal') || serviceNorm.includes('grupo')))
     );
     const maxCapacity = cleanData.maxCapacity || (isGroupClass ? 4 : 1);
     const initialAttendees = isGroupClass
@@ -324,9 +318,14 @@ export async function processBookingAction(formData: unknown) {
 
     // INSERCIÓN REAL EN LA BASE DE DATOS
     let createdApptId: string = crypto.randomUUID();
-    const apptTitle = isGroupClass
-      ? `🎾 Clase Grupal (1/${maxCapacity}) - ${fullName.split(' ')[0]}`
-      : (cleanData.serviceName ? `Cita: ${cleanData.serviceName} - ${fullName}` : `Cita Web - ${fullName}`);
+    let apptTitle: string;
+    if (isGroupClass) {
+      apptTitle = isSportsService 
+        ? `🎾 Clase Grupal (1/${maxCapacity}) - ${fullName.split(' ')[0]}`
+        : `Sesión Grupal (1/${maxCapacity}) - ${fullName.split(' ')[0]}`;
+    } else {
+      apptTitle = cleanData.serviceName ? `Cita: ${cleanData.serviceName} - ${fullName}` : `Cita Web - ${fullName}`;
+    }
 
     const { data: insertedAppt, error } = await supabaseAdmin
       .from('appointments')
@@ -506,10 +505,10 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
         const end = Math.min(rawEnd, current + 24 * 60 * 60 * 1000);
 
         const meta = r.metadata || {};
-        const isGroup = Boolean(meta.is_group_class || meta.is_fixed_class || (meta.max_capacity && Number(meta.max_capacity) > 1));
-        const maxCap = Number(meta.max_capacity) || 4;
+        const isGroup = Boolean(meta.is_group_class === true && Number(meta.max_capacity || 0) > 1);
+        const maxCap = Number(meta.max_capacity || 0);
         const attendeesCount = Array.isArray(meta.attendees) ? meta.attendees.length : (r.client_id ? 1 : 0);
-        const hasFreeSpots = isGroup && attendeesCount < maxCap;
+        const hasFreeSpots = isGroup && maxCap > 1 && attendeesCount < maxCap;
         
         while (current < end) {
           const localD = new Date(current + offsetMs);
@@ -559,10 +558,10 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
          const end = Math.min(rawEnd, current + 24 * 60 * 60 * 1000);
 
          const meta = r.metadata || {};
-         const isGroup = Boolean(meta.is_group_class || meta.is_fixed_class || (meta.max_capacity && Number(meta.max_capacity) > 1));
-         const maxCap = Number(meta.max_capacity) || 4;
+         const isGroup = Boolean(meta.is_group_class === true && Number(meta.max_capacity || 0) > 1);
+         const maxCap = Number(meta.max_capacity || 0);
          const attendeesCount = Array.isArray(meta.attendees) ? meta.attendees.length : (r.client_id ? 1 : 0);
-         const hasFreeSpots = isGroup && attendeesCount < maxCap;
+         const hasFreeSpots = isGroup && maxCap > 1 && attendeesCount < maxCap;
          
          while (current < end) {
            const localD = new Date(current + offsetMs);
