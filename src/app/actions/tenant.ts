@@ -679,14 +679,30 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       .from('user_tenants')
       .select('tenant_id, role, created_at')
       .ilike('user_email', cleanEmail)
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .order('created_at', { ascending: false });
 
     const userTenants = userTenantsRes.data;
     const utError = userTenantsRes.error;
 
     if (utError || !userTenants || userTenants.length === 0) {
       if (isSuperAdmin) {
+        // Fallback defensivo: conectar a la empresa principal si es superadmin
+        const { data: primaryTenant } = await db
+          .from('tenants')
+          .select('*')
+          .eq('id', '31ec279c-4216-48e1-905c-fbf4ea398e04')
+          .maybeSingle();
+
+        if (primaryTenant) {
+          return {
+            success: true,
+            tenant: sanitizeTenantPayload(primaryTenant),
+            role: 'superadmin' as UserRole,
+            allowedModules: primaryTenant.active_modules,
+            operationalPermissions: []
+          };
+        }
+
         return { success: true, tenant: null, role: 'superadmin' };
       }
 
@@ -694,7 +710,8 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       return { success: true, tenant: null, role: 'owner' as UserRole };
     }
 
-    const membership = userTenants[0];
+    // Preferir la empresa principal 'rendo CORP' si el usuario tiene múltiples asociaciones
+    const membership = userTenants.find(m => m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04') || userTenants[0];
 
     // 2. Traer información del Tenant
     const { data: tenant, error: tenantError } = await db

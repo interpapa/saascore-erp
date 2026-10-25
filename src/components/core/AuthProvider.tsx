@@ -64,28 +64,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, darle acceso global
+      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa principal
       if (isSuper) {
         setSession({
           userEmail: cleanEmail,
           role: 'superadmin',
-          tenantId: 'global-admin',
+          tenantId: PRIMARY_DEFAULT_TENANT_ID,
           token: accessToken
         });
         setCurrentTenant({
-          id: 'global-admin',
-          name: 'Superadmin Console',
+          id: PRIMARY_DEFAULT_TENANT_ID,
+          name: 'rendo CORP',
           blocked: false,
-          active_modules: ['admin', 'config', 'estadisticas']
+          active_modules: DEFAULT_ENABLED_MODULES
         });
         return;
       }
 
-      // Si getUserTenant no devolvió tenant, verificar si el store ya tiene un tenant y sesión activos
+      // Si getUserTenant no devolvió tenant, verificar si el store ya tiene un tenant y sesión activos válidos
       const existingSession = useERPStore.getState().session;
       const existingTenant = useERPStore.getState().currentTenant;
 
-      if (existingSession?.tenantId && existingTenant?.id && existingSession.userEmail === cleanEmail) {
+      const isDummyOrStaleTenant = !existingTenant?.id 
+        || existingTenant.id === 'global-admin' 
+        || existingTenant.id === '8636dbc1-ca83-4b92-a56b-52992959c289' 
+        || existingTenant.id === '757c19e1-67bf-474b-88b3-4063b617dc10';
+
+      if (!isDummyOrStaleTenant && existingSession?.tenantId && existingTenant?.id && existingSession.userEmail === cleanEmail) {
         setSession({
           ...existingSession,
           userEmail: cleanEmail,
