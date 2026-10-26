@@ -1078,6 +1078,13 @@ function CajaPageContent() {
           return desc.includes('abono') || desc.includes('liquidación de deuda') || desc.includes('liquidacion de deuda') || desc.includes('pago de deuda');
         }) || Boolean(debtClientParam);
 
+        const activeBank = bankAccounts.find(a => a.id === selectedBankAccountId)
+          || (paymentMethod === 'binance' ? bankAccounts.find(a => a.account_type === 'binance' || a.bank_name?.toLowerCase().includes('binance')) : undefined)
+          || (paymentMethod === 'zelle' ? bankAccounts.find(a => a.account_type === 'zelle' || a.email) : undefined)
+          || (paymentMethod === 'pago_movil' ? bankAccounts.find(a => a.account_type === 'pago_movil' || a.phone) : undefined)
+          || bankAccounts.find(a => a.account_type === paymentMethod)
+          || (['transfer', 'card'].includes(paymentMethod) ? bankAccounts[0] : undefined);
+
         const extraMeta = {
           ...(loadedConsultationInfo ? {
             source: loadedConsultationInfo.source || 'odontologia',
@@ -1090,7 +1097,11 @@ function CajaPageContent() {
           ...(isDebtPaymentCart ? {
             is_debt_payment: true,
             debt_payment_amount: total,
-          } : {})
+          } : {}),
+          bank_account_id: activeBank?.id || selectedBankAccountId || null,
+          bank_name: activeBank?.bank_name || (paymentMethod === 'binance' ? 'Binance Pay' : paymentMethod === 'zelle' ? 'Zelle' : undefined),
+          bank_account_holder: activeBank?.holder_name || undefined,
+          bank_account_number: activeBank?.account_number || activeBank?.phone || activeBank?.email || undefined,
         };
 
         const result = await processSecureCheckout(

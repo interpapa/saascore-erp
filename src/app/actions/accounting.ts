@@ -92,6 +92,51 @@ function isMissingTableError(error: any): boolean {
  * Retrieves NIIF General Journal entries for a given tenant and period,
  * with automatic fallback synthesis from operational documents if needed.
  */
+function getFormattedPaymentMethod(method?: string, bankName?: string): { code: string; label: string; bank?: string } {
+  const m = String(method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
+  let label = 'Efectivo ($ USD)';
+  let code = 'cash_usd';
+
+  if (m === 'binance' || m === 'binance_pay' || m === 'usdt' || m === 'crypto') {
+    code = 'binance';
+    label = 'Binance Pay (USDT)';
+  } else if (m === 'zelle') {
+    code = 'zelle';
+    label = 'Zelle';
+  } else if (m === 'pago_movil' || m === 'pagomovil') {
+    code = 'pago_movil';
+    label = 'Pago Móvil';
+  } else if (m === 'card' || m === 'tarjeta' || m === 'pos' || m === 'punto') {
+    code = 'card';
+    label = 'Punto POS / Tarjeta';
+  } else if (m === 'transfer' || m === 'transferencia' || m === 'bank') {
+    code = 'transfer';
+    label = 'Transferencia Bancaria';
+  } else if (m === 'cash_ves') {
+    code = 'cash_ves';
+    label = 'Efectivo (Bs)';
+  } else if (m === 'credit' || m === 'credito') {
+    code = 'credit';
+    label = 'Crédito (CxC)';
+  } else if (m === 'mixed' || m === 'mixto') {
+    code = 'mixed';
+    label = 'Pago Dividido';
+  } else if (m === 'cash' || m === 'cash_usd' || m === 'efectivo') {
+    code = 'cash_usd';
+    label = 'Efectivo ($ USD)';
+  } else if (method) {
+    code = m;
+    label = method;
+  }
+
+  const cleanBank = bankName ? String(bankName).trim() : undefined;
+  const fullLabel = cleanBank && !label.toLowerCase().includes(cleanBank.toLowerCase())
+    ? `${label} · ${cleanBank}`
+    : label;
+
+  return { code, label: fullLabel, bank: cleanBank };
+}
+
 export async function getJournalEntriesAction(
   tenantId: string,
   filter: FiscalPeriodFilter | undefined | null,
@@ -122,30 +167,39 @@ export async function getJournalEntriesAction(
     const entriesList = dbEntries as unknown[] | null;
 
     if (!error && entriesList && entriesList.length > 0) {
-      const formatted: JournalEntry[] = entriesList.map((e: any) => ({
-        id: e.id,
-        tenant_id: e.tenant_id,
-        document_id: e.document_id,
-        entry_number: e.entry_number || `AS-${e.id.slice(0, 6)}`,
-        entry_date: e.entry_date,
-        description: e.description || 'Asiento Contable NIIF',
-        total_debit: Number(e.total_debit || 0),
-        total_credit: Number(e.total_credit || 0),
-        status: e.status || 'posted',
-        lines: (e.lines || []).map((l: any) => ({
-          id: l.id,
-          journal_entry_id: l.journal_entry_id,
-          account_code: l.account_code,
-          account_name: l.account_name || getAccountName(l.account_code),
-          debit: Number(l.debit || 0),
-          credit: Number(l.credit || 0),
-          description: l.description,
-        })),
-        created_at: e.created_at,
-        products: Array.isArray(e.metadata?.products)
-          ? e.metadata.products
-          : (e.lines || []).map((l: any) => l.description).filter(Boolean),
-      }));
+      const formatted: JournalEntry[] = entriesList.map((e: any) => {
+        const methodInfo = getFormattedPaymentMethod(
+          e.metadata?.payment_method || e.payment_method,
+          e.metadata?.bank_name || e.bank_name
+        );
+        return {
+          id: e.id,
+          tenant_id: e.tenant_id,
+          document_id: e.document_id,
+          entry_number: e.entry_number || `AS-${e.id.slice(0, 6)}`,
+          entry_date: e.entry_date,
+          description: e.description || 'Asiento Contable NIIF',
+          total_debit: Number(e.total_debit || 0),
+          total_credit: Number(e.total_credit || 0),
+          status: e.status || 'posted',
+          lines: (e.lines || []).map((l: any) => ({
+            id: l.id,
+            journal_entry_id: l.journal_entry_id,
+            account_code: l.account_code,
+            account_name: l.account_name || getAccountName(l.account_code),
+            debit: Number(l.debit || 0),
+            credit: Number(l.credit || 0),
+            description: l.description,
+          })),
+          created_at: e.created_at,
+          products: Array.isArray(e.metadata?.products)
+            ? e.metadata.products
+            : (e.lines || []).map((l: any) => l.description).filter(Boolean),
+          payment_method: methodInfo.code,
+          bank_name: methodInfo.bank,
+          payment_method_label: methodInfo.label,
+        };
+      });
 
       return { success: true, data: filterEntries(formatted, filter as any), totalCount: formatted.length };
     }
@@ -163,6 +217,29 @@ export async function getJournalEntriesAction(
 
       const { data: docs } = await docQuery;
 
+      // Index all invoices by ID and document_number for fast linking
+      const invoiceDocMap = new Map<string, any>();
+      const invoiceNumMap = new Map<string, any>();
+      (docs || []).forEach((d: any) => {
+        if (d.type === 'invoice' || d.type === 'sale') {
+          invoiceDocMap.set(d.id, d);
+          if (d.document_number) invoiceNumMap.set(d.document_number, d);
+        }
+      });
+
+      // Keep track of invoice IDs that have a corresponding journal_entry document
+      const coveredInvoiceIds = new Set<string>();
+      (docs || []).forEach((d: any) => {
+        if (d.type === 'journal_entry') {
+          const srcId = d.metadata?.source_document_id;
+          if (srcId) coveredInvoiceIds.add(srcId);
+          const srcRef = d.metadata?.source_document_ref;
+          if (srcRef && invoiceNumMap.has(srcRef)) {
+            coveredInvoiceIds.add(invoiceNumMap.get(srcRef).id);
+          }
+        }
+      });
+
       const synthesized: JournalEntry[] = [];
       let entryIdx = 1;
 
@@ -171,7 +248,6 @@ export async function getJournalEntriesAction(
         if (doc.type === 'quote' || doc.type === 'appointment' || doc.type === 'work_order') return;
 
         // Normalización Multimoneda a Moneda Base Funcional NIIF (USD):
-        // Si el documento se originó expresado en Bs (VES), se convierte a USD dividiendo entre su tasa oficial registrada.
         const docRate = Number(doc.metadata?.exchange_rate || 0);
         const isDocInVES = doc.metadata?.currency === 'VES' || doc.currency === 'VES' || (doc.metadata?.is_in_ves === true);
 
@@ -188,7 +264,20 @@ export async function getJournalEntriesAction(
         const dateStr = doc.issue_date || doc.created_at || new Date().toISOString();
         const lines: JournalLine[] = [];
 
+        let docPaymentMethod = '';
+        let docBankName = '';
+        let docMethodLabel = '';
+        let linkedInvoice: any = null;
+
         if (doc.type === 'journal_entry' && Array.isArray(doc.metadata?.journal_lines) && doc.metadata.journal_lines.length > 0) {
+          linkedInvoice = invoiceDocMap.get(doc.metadata?.source_document_id) || invoiceNumMap.get(doc.metadata?.source_document_ref);
+          const rawMethod = doc.metadata?.payment_method || linkedInvoice?.metadata?.payment_method || '';
+          const rawBank = doc.metadata?.bank_name || linkedInvoice?.metadata?.bank_name || '';
+          const methodInfo = getFormattedPaymentMethod(rawMethod, rawBank);
+          docPaymentMethod = methodInfo.code;
+          docBankName = methodInfo.bank || '';
+          docMethodLabel = methodInfo.label;
+
           // Asiento explícito registrado (Extorno, Arqueo, etc.)
           doc.metadata.journal_lines.forEach((jl: any) => {
             lines.push({
@@ -200,22 +289,31 @@ export async function getJournalEntriesAction(
             });
           });
         } else if (doc.type === 'invoice' || doc.type === 'sale') {
+          // Si este invoice ya tiene un journal_entry formal en documents, evitar duplicación en el Libro Diario
+          if (coveredInvoiceIds.has(doc.id)) return;
+
+          const rawMethod = doc.metadata?.payment_method || '';
+          const rawBank = doc.metadata?.bank_name || '';
+          const methodInfo = getFormattedPaymentMethod(rawMethod, rawBank);
+          docPaymentMethod = methodInfo.code;
+          docBankName = methodInfo.bank || '';
+          docMethodLabel = methodInfo.label;
+
           // Discriminar Venta a Crédito (AR) vs Venta Cobrada al Contado (Caja o Banco) o Pago Mixto
-          const rawMethod = String(doc.metadata?.payment_method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
-          const isCredit = rawMethod === 'credit' || rawMethod === 'credito';
-          const isBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'pos', 'bank', 'punto'].includes(rawMethod);
+          const isCredit = methodInfo.code === 'credit';
+          const isBank = ['card', 'transfer', 'pago_movil', 'zelle', 'binance'].includes(methodInfo.code);
           const payments = Array.isArray(doc.metadata?.payments) ? doc.metadata.payments : null;
 
-          if (rawMethod === 'mixed' && payments && payments.length > 0) {
+          if (methodInfo.code === 'mixed' && payments && payments.length > 0) {
             for (const p of payments) {
               const pAmount = Number(p.amount || 0);
               if (pAmount <= 0) continue;
               const pMethod = String(p.method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
               const pIsCredit = pMethod === 'credit' || pMethod === 'credito';
-              const pIsBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'pos', 'bank', 'punto'].includes(pMethod);
+              const pIsBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'binance', 'usdt', 'pos', 'bank', 'punto'].includes(pMethod);
               lines.push({
                 account_code: pIsCredit ? '1.1.02.01' : (pIsBank ? '1.1.01.02' : '1.1.01.01'),
-                account_name: pIsCredit ? 'Clientes Nacionales (AR)' : (pIsBank ? 'Banco y Cuentas Operativas' : 'Caja Principal (Efectivo)'),
+                account_name: pIsCredit ? 'Clientes Nacionales (Crédito / CxC)' : (pIsBank ? 'Banco y Cuentas Operativas' : 'Caja Principal (Efectivo)'),
                 debit: pAmount,
                 credit: 0,
                 description: `Cobro parcial en ${p.method || 'Caja'} ${doc.document_number}`,
@@ -224,7 +322,7 @@ export async function getJournalEntriesAction(
           } else if (isCredit) {
             lines.push({
               account_code: '1.1.02.01',
-              account_name: 'Clientes Nacionales (AR)',
+              account_name: 'Clientes Nacionales (Crédito / CxC)',
               debit: total,
               credit: 0,
               description: `Venta a Crédito ${doc.document_number}`,
@@ -232,10 +330,10 @@ export async function getJournalEntriesAction(
           } else {
             lines.push({
               account_code: isBank ? '1.1.01.02' : '1.1.01.01',
-              account_name: isBank ? 'Banco y Cuentas Operativas' : 'Caja Principal (Efectivo)',
+              account_name: isBank ? `Banco y Cuentas Operativas (${docMethodLabel})` : 'Caja Principal (Efectivo)',
               debit: total,
               credit: 0,
-              description: `Cobro en ${doc.metadata?.payment_method || 'Caja'} ${doc.document_number}`,
+              description: `Cobro en ${docMethodLabel} ${doc.document_number}`,
             });
           }
 
@@ -257,6 +355,8 @@ export async function getJournalEntriesAction(
             });
           }
         } else if (doc.type === 'purchase' || doc.type === 'purchase_order') {
+          docPaymentMethod = 'purchase';
+          docMethodLabel = 'Gasto / Compra Proveedor';
           lines.push({
             account_code: '5.1',
             account_name: 'Costo de Ventas',
@@ -281,6 +381,8 @@ export async function getJournalEntriesAction(
             description: `Pasivo por Pagar Proveedor ${doc.document_number}`,
           });
         } else {
+          docPaymentMethod = 'service';
+          docMethodLabel = 'Servicios';
           lines.push({
             account_code: '1.1.01.01',
             account_name: 'Caja Principal (Efectivo)',
@@ -301,7 +403,7 @@ export async function getJournalEntriesAction(
         const totalCredit = lines.reduce((sum, l) => sum + l.credit, 0);
 
         const docProducts: string[] = [];
-        const rawLines = doc.metadata?.cart_lines || doc.lines || doc.metadata?.items || [];
+        const rawLines = doc.metadata?.cart_lines || linkedInvoice?.metadata?.cart_lines || doc.lines || doc.metadata?.items || [];
         if (Array.isArray(rawLines)) {
           rawLines.forEach((l: any) => {
             const pName = l.description || l.name || l.title || l.item_name;
@@ -312,20 +414,30 @@ export async function getJournalEntriesAction(
           });
         }
 
+        const sourceRef = linkedInvoice?.document_number || doc.metadata?.source_document_ref || doc.document_number;
+        const entryDescription = doc.metadata?.notes || doc.notes || (
+          doc.type === 'purchase' || doc.type === 'purchase_order' 
+            ? `Compra / Gasto ${sourceRef}`
+            : `Venta ${sourceRef} · ${docMethodLabel || 'Contado'}`
+        );
+
         synthesized.push({
           id: doc.id,
           tenant_id: tenantId,
           document_id: doc.id,
           entry_number: `NIIF-${String(entryIdx++).padStart(4, '0')}`,
           entry_date: dateStr,
-          description: doc.notes || `Asiento NIIF Documento ${doc.document_number || doc.id}`,
+          description: entryDescription,
           total_debit: Math.round(totalDebit * 100) / 100,
           total_credit: Math.round(totalCredit * 100) / 100,
           status: doc.status === 'annulled' ? 'annulled' : 'posted',
           lines,
           created_at: doc.created_at,
-          source_document_ref: doc.document_number,
+          source_document_ref: sourceRef,
           products: docProducts,
+          payment_method: docPaymentMethod || undefined,
+          bank_name: docBankName || undefined,
+          payment_method_label: docMethodLabel || undefined,
         });
       });
 

@@ -14,6 +14,14 @@ import {
   Package,
   Clock,
   Trash2,
+  Smartphone,
+  CreditCard,
+  Coins,
+  Building2,
+  Landmark,
+  DollarSign,
+  Wallet,
+  Split,
 } from 'lucide-react';
 import { voidSaleAction } from '@/app/actions/cashRegister';
 import { useToast } from '@/components/core/ToastProvider';
@@ -25,6 +33,66 @@ interface GeneralJournalTableProps {
   tenantId?: string;
   actor?: any;
   onRefresh?: () => void;
+}
+
+function PaymentMethodBadge({
+  method,
+  label,
+  bank,
+}: {
+  method?: string;
+  label?: string;
+  bank?: string;
+}) {
+  const m = (method || '').toLowerCase().trim();
+  let bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+  let Icon = Wallet;
+  let text = label || 'Efectivo';
+
+  if (m.includes('binance') || m.includes('usdt')) {
+    bgClass = 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
+    Icon = Coins;
+    text = label || 'Binance Pay (USDT)';
+  } else if (m.includes('pago_movil') || m.includes('pagomovil')) {
+    bgClass = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/30';
+    Icon = Smartphone;
+    text = label || (bank ? `Pago Móvil · ${bank}` : 'Pago Móvil');
+  } else if (m.includes('zelle')) {
+    bgClass = 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30';
+    Icon = Landmark;
+    text = label || 'Zelle';
+  } else if (m.includes('card') || m.includes('tarjeta') || m.includes('pos') || m.includes('punto')) {
+    bgClass = 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30';
+    Icon = CreditCard;
+    text = label || (bank ? `Punto · ${bank}` : 'Punto POS / Tarjeta');
+  } else if (m.includes('transfer') || m.includes('bank')) {
+    bgClass = 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/30';
+    Icon = Building2;
+    text = label || (bank ? `Transf. · ${bank}` : 'Transferencia Bancaria');
+  } else if (m.includes('ves')) {
+    bgClass = 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30';
+    Icon = Coins;
+    text = label || 'Efectivo (Bs)';
+  } else if (m.includes('credit')) {
+    bgClass = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30';
+    Icon = Clock;
+    text = label || 'Crédito (CxC)';
+  } else if (m.includes('mixed')) {
+    bgClass = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
+    Icon = Split;
+    text = label || 'Pago Dividido';
+  } else if (m.includes('cash') || m.includes('efectivo')) {
+    bgClass = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+    Icon = DollarSign;
+    text = label || 'Efectivo ($ USD)';
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border ${bgClass} shadow-2xs`}>
+      <Icon size={12} className="shrink-0" />
+      <span className="truncate max-w-[150px]">{text}</span>
+    </span>
+  );
 }
 
 export function GeneralJournalTable({
@@ -77,6 +145,9 @@ export function GeneralJournalTable({
       (e.entry_number && e.entry_number.toLowerCase().includes(query)) ||
       e.description.toLowerCase().includes(query) ||
       (e.source_document_ref && e.source_document_ref.toLowerCase().includes(query)) ||
+      (e.payment_method && e.payment_method.toLowerCase().includes(query)) ||
+      (e.bank_name && e.bank_name.toLowerCase().includes(query)) ||
+      (e.payment_method_label && e.payment_method_label.toLowerCase().includes(query)) ||
       (e.products && e.products.some((p) => p.toLowerCase().includes(query))) ||
       e.lines.some(
         (l) =>
@@ -172,6 +243,7 @@ export function GeneralJournalTable({
                 <th className="py-3 px-3 w-10"></th>
                 <th className="py-3 px-3">Asiento #</th>
                 <th className="py-3 px-3">Fecha y Hora</th>
+                <th className="py-3 px-3">Método / Banco</th>
                 <th className="py-3 px-3">Descripción / Productos</th>
                 <th className="py-3 px-3">Ref. Doc</th>
                 <th className="py-3 px-3 text-right">Débito Total</th>
@@ -209,6 +281,13 @@ export function GeneralJournalTable({
                             <span>{dt.time}</span>
                           </div>
                         )}
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <PaymentMethodBadge
+                          method={entry.payment_method}
+                          label={entry.payment_method_label}
+                          bank={entry.bank_name}
+                        />
                       </td>
                       <td className="py-3 px-3 max-w-xs">
                         <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
@@ -268,7 +347,7 @@ export function GeneralJournalTable({
                     {/* Expandable Journal Lines Sub-Table */}
                     {isExpanded && (
                       <tr className="bg-slate-50/70 dark:bg-slate-800/50">
-                        <td colSpan={8} className="p-3 sm:p-4">
+                        <td colSpan={9} className="p-3 sm:p-4">
                           <div className="pl-6 border-l-2 border-primary/50 space-y-3">
                             <div className="flex items-center justify-between text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                               <span>Movimientos de Partida Doble ({entry.lines.length} líneas)</span>

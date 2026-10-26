@@ -39,6 +39,9 @@ export interface JournalEntry {
   created_at?: string;
   source_document_ref?: string;
   products?: string[];
+  payment_method?: string;
+  bank_name?: string;
+  payment_method_label?: string;
 }
 
 export interface TrialBalanceRow {

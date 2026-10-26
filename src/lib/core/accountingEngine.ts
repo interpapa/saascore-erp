@@ -18,6 +18,7 @@ export interface JournalEntryLine {
 export function buildInvoiceJournalLines(invoice: Document): JournalEntryLine[] {
   const meta = (invoice.metadata as any) || {};
   const paymentMethod = String(meta.payment_method || (invoice as any).payment_method || '').toLowerCase().trim();
+  const bankName = meta.bank_name ? String(meta.bank_name).trim() : '';
   let payments = Array.isArray(meta.payments) ? meta.payments : null;
   if (!payments && meta.payment_breakdown && typeof meta.payment_breakdown === 'object') {
     const bd = meta.payment_breakdown as Record<string, number>;
@@ -29,12 +30,30 @@ export function buildInvoiceJournalLines(invoice: Document): JournalEntryLine[] 
   const getFundAccount = (method: string) => {
     const m = (method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
     if (m === 'credit' || m === 'credito') {
-      return { account_code: '1.1.02.01', account_name: 'Clientes Nacionales (AR)' };
+      return { account_code: '1.1.02.01', account_name: 'Clientes Nacionales (Crédito / CxC)' };
     }
-    if (['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'binance', 'usdt', 'crypto', 'cripto', 'pos', 'bank', 'punto'].includes(m)) {
-      return { account_code: '1.1.01.02', account_name: 'Bancos y Billeteras Digitales (Binance/Zelle)' };
+    if (['binance', 'usdt', 'crypto', 'cripto'].includes(m)) {
+      return { account_code: '1.1.01.02', account_name: 'Billetera Digital - Binance Pay (USDT)' };
     }
-    return { account_code: '1.1.01.01', account_name: 'Caja Principal (Efectivo)' };
+    if (['zelle'].includes(m)) {
+      return { account_code: '1.1.01.02', account_name: 'Cuenta Digital - Zelle (USD)' };
+    }
+    if (['pago_movil', 'pagomovil'].includes(m)) {
+      const bankSuffix = bankName ? ` (${bankName})` : '';
+      return { account_code: '1.1.01.02', account_name: `Banco - Pago Móvil${bankSuffix}` };
+    }
+    if (['card', 'tarjeta', 'pos', 'punto'].includes(m)) {
+      const bankSuffix = bankName ? ` (${bankName})` : '';
+      return { account_code: '1.1.01.02', account_name: `Banco - Punto POS / Tarjeta${bankSuffix}` };
+    }
+    if (['transfer', 'transferencia', 'bank'].includes(m)) {
+      const bankSuffix = bankName ? ` (${bankName})` : '';
+      return { account_code: '1.1.01.02', account_name: `Banco - Transferencia${bankSuffix}` };
+    }
+    if (m === 'cash_ves') {
+      return { account_code: '1.1.01.01', account_name: 'Caja Principal - Efectivo (Bs)' };
+    }
+    return { account_code: '1.1.01.01', account_name: 'Caja Principal - Efectivo ($ USD)' };
   };
 
   const debitLines: JournalEntryLine[] = [];
@@ -164,6 +183,26 @@ export function buildInvoiceJournalLines(invoice: Document): JournalEntryLine[] 
 export async function generateJournalEntryForInvoice(invoice: Document, tenantId: string) {
   const lines = buildInvoiceJournalLines(invoice);
   const totalDebit = lines.reduce((acc, line) => acc.plus(new Decimal(line.debit)), new Decimal(0));
+  const meta = (invoice.metadata as any) || {};
+  const paymentMethod = meta.payment_method || (invoice as any).payment_method || 'cash_usd';
+  const bankName = meta.bank_name ? String(meta.bank_name).trim() : '';
+
+  const getMethodReadable = (m: string) => {
+    const raw = (m || '').toLowerCase().trim();
+    if (raw.includes('binance') || raw.includes('usdt')) return 'Binance Pay (USDT)';
+    if (raw.includes('zelle')) return 'Zelle';
+    if (raw.includes('pago_movil') || raw.includes('pagomovil')) return 'Pago Móvil';
+    if (raw.includes('card') || raw.includes('tarjeta') || raw.includes('punto')) return 'Punto POS / Tarjeta';
+    if (raw.includes('transfer')) return 'Transferencia Bancaria';
+    if (raw.includes('ves')) return 'Efectivo (Bs)';
+    if (raw.includes('credit')) return 'Crédito (CxC)';
+    if (raw.includes('mixed')) return 'Pago Dividido';
+    return 'Efectivo ($ USD)';
+  };
+
+  const methodText = getMethodReadable(paymentMethod);
+  const paymentChannel = bankName ? `${methodText} · ${bankName}` : methodText;
+  const description = `Venta ${invoice.document_number} · ${paymentChannel}`;
 
   // Registro Primario en Ledger Kernel
   let kernelCreated = false;
@@ -173,7 +212,7 @@ export async function generateJournalEntryForInvoice(invoice: Document, tenantId
       tenant_id: tenantId,
       document_id: invoice.id,
       entry_date: invoice.issue_date || new Date().toISOString(),
-      description: `Asiento contable por venta ${invoice.document_number}`,
+      description,
       lines
     });
     if (res?.success) {
@@ -212,8 +251,15 @@ export async function generateJournalEntryForInvoice(invoice: Document, tenantId
       tax_amount: 0,
       total_amount: totalDebit.toNumber(),
       metadata: {
-        notes: `Asiento contable por venta ${invoice.document_number}`,
+        notes: description,
         source_document_id: invoice.id,
+        source_document_ref: invoice.document_number,
+        payment_method: paymentMethod,
+        payment_method_label: paymentChannel,
+        bank_name: bankName || null,
+        bank_account_id: meta.bank_account_id || null,
+        customer_name: meta.customer_snapshot?.name || null,
+        cart_lines: meta.cart_lines || [],
         journal_lines: lines,
         timestamp: new Date().toISOString()
       }

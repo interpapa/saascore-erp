@@ -170,10 +170,14 @@ export default function ContabilidadPage() {
           `libro_diario_${new Date().toISOString().slice(0, 10)}`,
           [
             { header: 'ID Asiento', accessor: (r: any) => r.id },
-            { header: 'Fecha', accessor: (r: any) => new Date(r.date).toLocaleDateString() },
-            { header: 'Número Doc', accessor: (r: any) => r.document_number || '' },
-            { header: 'Referencia', accessor: (r: any) => r.reference || '' },
-            { header: 'Concepto / Glosa', accessor: (r: any) => r.concept },
+            { header: 'Fecha', accessor: (r: any) => new Date(r.created_at || r.entry_date || r.date).toLocaleDateString() },
+            { header: 'Número Asiento', accessor: (r: any) => r.entry_number || '' },
+            { header: 'Referencia Doc', accessor: (r: any) => r.source_document_ref || r.reference || '' },
+            { header: 'Método de Pago', accessor: (r: any) => r.payment_method_label || r.payment_method || '' },
+            { header: 'Banco', accessor: (r: any) => r.bank_name || '' },
+            { header: 'Concepto / Glosa', accessor: (r: any) => r.description || r.concept },
+            { header: 'Débito Total ($)', accessor: (r: any) => r.total_debit },
+            { header: 'Crédito Total ($)', accessor: (r: any) => r.total_credit },
           ],
           journalEntries
         );

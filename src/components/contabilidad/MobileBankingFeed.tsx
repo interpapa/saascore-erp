@@ -169,30 +169,42 @@ export function MobileBankingFeed({
       const isInflow = netCash > 0 || (netCash === 0 && conceptStr.toLowerCase().includes('venta'));
       const amount = Math.abs(netCash) > 0 ? Math.abs(netCash) : otherTotal || lines.reduce((acc, l) => acc + Number(l.debit || 0), 0);
 
-      // Determinar icono del método
+      // Determinar icono y método de pago / banco
+      const pm = (entry.payment_method || (entry as any).metadata?.payment_method || '').toLowerCase().trim();
+      const bn = entry.bank_name || (entry as any).metadata?.bank_name || '';
+      const pml = entry.payment_method_label || (entry as any).metadata?.payment_method_label || '';
       const lowerConcept = conceptStr.toLowerCase();
       const lowerRef = refStr.toLowerCase();
       let methodIcon = 'receipt';
-      let methodLabel = 'Venta / Factura';
+      let methodLabel = pml || 'Venta / Factura';
 
-      if (lowerConcept.includes('pago móvil') || lowerConcept.includes('pagomovil') || lowerRef.includes('pago móvil')) {
-        methodIcon = 'phone';
-        methodLabel = 'Pago Móvil';
-      } else if (lowerConcept.includes('zelle') || lowerRef.includes('zelle')) {
-        methodIcon = 'zelle';
-        methodLabel = 'Zelle';
-      } else if (lowerConcept.includes('binance') || lowerRef.includes('binance') || lowerConcept.includes('usdt')) {
+      if (pm.includes('binance') || pm.includes('usdt') || lowerConcept.includes('binance') || lowerRef.includes('binance') || lowerConcept.includes('usdt')) {
         methodIcon = 'binance';
-        methodLabel = 'Binance Pay (USDT)';
-      } else if (lowerConcept.includes('tarjeta') || lowerConcept.includes('punto') || lowerConcept.includes('pos')) {
+        methodLabel = pml || 'Binance Pay (USDT)';
+      } else if (pm.includes('pago_movil') || pm.includes('pagomovil') || lowerConcept.includes('pago móvil') || lowerConcept.includes('pagomovil') || lowerRef.includes('pago móvil')) {
+        methodIcon = 'phone';
+        methodLabel = pml || (bn ? `Pago Móvil · ${bn}` : 'Pago Móvil');
+      } else if (pm.includes('zelle') || lowerConcept.includes('zelle') || lowerRef.includes('zelle')) {
+        methodIcon = 'zelle';
+        methodLabel = pml || 'Zelle';
+      } else if (pm.includes('card') || pm.includes('tarjeta') || pm.includes('pos') || pm.includes('punto') || lowerConcept.includes('tarjeta') || lowerConcept.includes('punto') || lowerConcept.includes('pos')) {
         methodIcon = 'card';
-        methodLabel = 'Punto de Venta';
-      } else if (lowerConcept.includes('efectivo') || lowerConcept.includes('caja')) {
-        methodIcon = 'cash';
-        methodLabel = 'Efectivo';
-      } else if (lowerConcept.includes('transferencia') || lowerConcept.includes('banco')) {
+        methodLabel = pml || (bn ? `Punto · ${bn}` : 'Punto de Venta');
+      } else if (pm.includes('transfer') || lowerConcept.includes('transferencia') || lowerConcept.includes('banco')) {
         methodIcon = 'bank';
-        methodLabel = 'Transferencia';
+        methodLabel = pml || (bn ? `Transf. · ${bn}` : 'Transferencia Bancaria');
+      } else if (pm.includes('ves') || lowerConcept.includes('bolívar') || lowerConcept.includes('bolivar')) {
+        methodIcon = 'cash';
+        methodLabel = pml || 'Efectivo (Bs)';
+      } else if (pm.includes('cash') || pm.includes('efectivo') || lowerConcept.includes('efectivo') || lowerConcept.includes('caja')) {
+        methodIcon = 'cash';
+        methodLabel = pml || 'Efectivo ($ USD)';
+      } else if (pm.includes('credit') || lowerConcept.includes('crédito') || lowerConcept.includes('credito')) {
+        methodIcon = 'credit';
+        methodLabel = pml || 'Crédito (CxC)';
+      } else if (pm.includes('mixed') || lowerConcept.includes('mixto')) {
+        methodIcon = 'mixed';
+        methodLabel = pml || 'Pago Dividido';
       } else if (lowerConcept.includes('compra') || lowerConcept.includes('proveedor') || lowerConcept.includes('gasto')) {
         methodIcon = 'expense';
         methodLabel = 'Gasto / Compra';
@@ -380,11 +392,11 @@ export function MobileBankingFeed({
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
-                    <span className="font-bold text-slate-600 dark:text-slate-400">
+                  <div className="flex items-center gap-1.5 mt-1 text-xs">
+                    <span className="font-bold text-primary dark:text-primary-foreground/90 bg-primary/10 px-2 py-0.5 rounded-lg border border-primary/20 text-[10px]">
                       {tx.methodLabel}
                     </span>
-                    <span>•</span>
+                    <span className="text-slate-400">•</span>
                     <span className="text-[11px] text-slate-400 font-mono">
                       {tx.timeLabel}
                     </span>
@@ -439,6 +451,25 @@ export function MobileBankingFeed({
                 <X size={16} />
               </button>
             </div>
+
+            {/* Método de Pago y Banco Destacado */}
+            {((selectedEntry as any).payment_method_label || (selectedEntry as any).methodLabel) && (
+              <div className="p-3 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">
+                    Método de Pago / Banco
+                  </span>
+                  <span className="font-bold text-foreground text-sm">
+                    {(selectedEntry as any).payment_method_label || (selectedEntry as any).methodLabel}
+                  </span>
+                </div>
+                {(selectedEntry as any).bank_name && (
+                  <span className="px-2.5 py-1 rounded-xl bg-card border border-border text-foreground text-xs font-black shadow-2xs">
+                    {(selectedEntry as any).bank_name}
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Productos si los tiene */}
             {(selectedEntry as any).products && (selectedEntry as any).products.length > 0 && (
