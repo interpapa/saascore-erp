@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setSession({
           userEmail: cleanEmail,
-          role: isSuper ? 'superadmin' : ((result.role as any) || 'owner'),
+          role: isSuper ? 'superadmin' : (result.role === 'superadmin' ? 'owner' : ((result.role as any) || 'owner')),
           tenantId: result.tenant.id,
           token: accessToken
         });

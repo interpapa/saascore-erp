@@ -115,7 +115,7 @@ export default function LoginPage() {
 
         useERPStore.getState().setSession({
           userEmail: cleanEmail,
-          role: isSuper ? 'superadmin' : userRole,
+          role: isSuper ? 'superadmin' : (userRole === 'superadmin' ? 'owner' : userRole),
           tenantId: tenantId,
           token: signInData.session?.access_token,
         });
@@ -124,7 +124,7 @@ export default function LoginPage() {
         return;
       }
 
-      if (isSuper || userRole === 'superadmin') {
+      if (isSuper) {
         // Superadmin global sin empresa vinculada -> Consola maestra
         useERPStore.getState().setSession({
           userEmail: cleanEmail,
