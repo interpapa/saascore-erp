@@ -1013,14 +1013,25 @@ function CajaPageContent() {
           type: (l.item.type as 'product' | 'service') || 'product',
         }));
 
-        const extraMeta = loadedConsultationInfo ? {
-          source: loadedConsultationInfo.source || 'odontologia',
-          doctor_id: loadedConsultationInfo.doctorId,
-          doctor_name: loadedConsultationInfo.doctorName,
-          doctor_commission_percent: loadedConsultationInfo.doctorCommissionPercent,
-          patient_name: loadedConsultationInfo.patientName,
-          linked_consultation_doc_id: linkedDentalDocId,
-        } : undefined;
+        const isDebtPaymentCart = ticketLines.some((l) => {
+          const desc = (l.item.name || '').toLowerCase();
+          return desc.includes('abono') || desc.includes('liquidación de deuda') || desc.includes('liquidacion de deuda') || desc.includes('pago de deuda');
+        }) || Boolean(debtClientParam);
+
+        const extraMeta = {
+          ...(loadedConsultationInfo ? {
+            source: loadedConsultationInfo.source || 'odontologia',
+            doctor_id: loadedConsultationInfo.doctorId,
+            doctor_name: loadedConsultationInfo.doctorName,
+            doctor_commission_percent: loadedConsultationInfo.doctorCommissionPercent,
+            patient_name: loadedConsultationInfo.patientName,
+            linked_consultation_doc_id: linkedDentalDocId,
+          } : {}),
+          ...(isDebtPaymentCart ? {
+            is_debt_payment: true,
+            debt_payment_amount: total,
+          } : {})
+        };
 
         const result = await processSecureCheckout(
           cartPayload,

@@ -392,6 +392,41 @@ export async function processSecureCheckout(
       }
     }
 
+    // Si la venta es un abono o liquidación de deuda (o extraMetadata?.debt_payment_amount / is_debt_payment), rebajar automáticamente la deuda en el CRM
+    const isDebtPayment = Boolean(
+      (extraMetadata as any)?.is_debt_payment ||
+      (extraMetadata as any)?.debt_payment_amount ||
+      documentLines.some((l: any) => {
+        const desc = String(l.description || '').toLowerCase();
+        return desc.includes('abono') || desc.includes('liquidación de deuda') || desc.includes('pago de deuda') || desc.includes('liquidacion de deuda');
+      })
+    );
+
+    if (isDebtPayment && entityData?.id && isValidUUID(entityData.id) && !isTemporaryId(entityData.id)) {
+      try {
+        const amountPaidToDebt = Number((extraMetadata as any)?.debt_payment_amount ?? taxResult.total);
+        if (amountPaidToDebt > 0) {
+          const currentDebt = Number(entityData.metadata?.total_debt || 0);
+          const updatedDebt = Math.max(0, Math.round((currentDebt - amountPaidToDebt) * 100) / 100);
+          await supabaseAdmin
+            .from('entities')
+            .update({
+              metadata: {
+                ...(entityData.metadata || {}),
+                total_debt: updatedDebt
+              },
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', entityData.id)
+            .eq('tenant_id', tenantId);
+
+          entityData.metadata = { ...(entityData.metadata || {}), total_debt: updatedDebt };
+        }
+      } catch (debtErr) {
+        console.warn('[checkout.ts] Advertencia al rebajar deuda de cliente:', debtErr);
+      }
+    }
+
     // Si la venta está vinculada a una cita de la agenda, marcarla automáticamente como pagada
     if (appointmentId) {
       try {

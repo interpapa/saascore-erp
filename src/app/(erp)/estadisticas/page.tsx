@@ -163,9 +163,14 @@ function isDateInPeriod(
   }
   if (period === 'custom') {
     if (!customStart || !customEnd) return true;
-    const start = new Date(customStart + 'T00:00:00');
-    const end = new Date(customEnd + 'T23:59:59');
-    return d >= start && d <= end;
+    const toYMD = (date: Date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+    const itemYMD = toYMD(d);
+    return itemYMD >= customStart && itemYMD <= customEnd;
   }
   return true;
 }
@@ -406,6 +411,20 @@ export default function EstadisticasPage() {
       return sum + (isNaN(amt) ? 0 : amt);
     }, 0);
     const todayPurchasesCount = todayPOs.length;
+
+    // Compras del período seleccionado
+    const periodPOs = rawPOs.filter((po) =>
+      isDateInPeriod(po.issue_date || po.created_at, period, customStartDate, customEndDate) && po.status !== 'annulled'
+    );
+    const periodSpent = periodPOs.reduce((sum, po) => {
+      const linesTotal = (po.lines || []).reduce(
+        (acc: number, l: any) => acc + (Number(l.quantity) || 0) * (Number(l.unit_price) || 0),
+        0
+      );
+      const amt = linesTotal > 0 ? linesTotal : Number(po.total_amount || 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+    const periodPurchasesCount = periodPOs.length;
 
     // 1. Facturas y Ventas del período seleccionado
     const periodInvoices = rawInvoices.filter((inv) =>
@@ -787,6 +806,8 @@ export default function EstadisticasPage() {
       todaySalesCount,
       todaySpent,
       todayPurchasesCount,
+      periodSpent,
+      periodPurchasesCount,
       periodInvoicesCount: periodInvoices.length,
       validInvoicesCount: validInvoices.length,
       totalRevenue,
@@ -1117,13 +1138,25 @@ export default function EstadisticasPage() {
       ───────────────────────────────────────────── */}
       {activeTab === 'overview' && (
         <section className="space-y-6">
-          {/* Fila 1: Rendimiento Comercial de HOY (Vendido Hoy y Gastado Hoy de primero) */}
+          {/* Fila 1: Rendimiento Comercial según el Período Seleccionado */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KPICard
-              label="Vendido Hoy"
-              value={fmt(metrics.todayRevenue)}
-              subValue={`${metrics.todaySalesCount} venta(s) cobradas hoy`}
-              trend={metrics.todayRevenue > 0 ? 'up' : 'neutral'}
+              label={
+                period === 'today'
+                  ? 'Vendido Hoy'
+                  : period === 'week'
+                  ? 'Ventas (Últimos 7 Días)'
+                  : period === 'month'
+                  ? 'Ventas del Mes'
+                  : period === 'year'
+                  ? 'Ventas del Año'
+                  : period === 'custom'
+                  ? 'Ventas en Rango'
+                  : 'Ventas Totales'
+              }
+              value={fmt(period === 'today' ? metrics.todayRevenue : metrics.totalRevenue)}
+              subValue={`${period === 'today' ? metrics.todaySalesCount : metrics.validInvoicesCount} venta(s) cobradas`}
+              trend={metrics.totalRevenue > 0 ? 'up' : 'neutral'}
               icon={<DollarSign size={20} />}
               accentColor="var(--success)"
               accentBg="var(--success-50)"
@@ -1131,10 +1164,22 @@ export default function EstadisticasPage() {
               linkLabel={hasCaja ? 'Ver Caja POS' : undefined}
             />
             <KPICard
-              label="Gastado Hoy"
-              value={fmt(metrics.todaySpent)}
-              subValue={`${metrics.todayPurchasesCount} compra(s) registradas hoy`}
-              trend={metrics.todaySpent > 0 ? 'down' : 'neutral'}
+              label={
+                period === 'today'
+                  ? 'Gastado Hoy'
+                  : period === 'week'
+                  ? 'Compras (Últimos 7 Días)'
+                  : period === 'month'
+                  ? 'Compras del Mes'
+                  : period === 'year'
+                  ? 'Compras del Año'
+                  : period === 'custom'
+                  ? 'Gastos en Rango'
+                  : 'Compras Totales'
+              }
+              value={fmt(period === 'today' ? metrics.todaySpent : metrics.periodSpent)}
+              subValue={`${period === 'today' ? metrics.todayPurchasesCount : metrics.periodPurchasesCount} compra(s) registradas`}
+              trend={metrics.periodSpent > 0 ? 'down' : 'neutral'}
               icon={<ShoppingCart size={20} />}
               accentColor="#ef4444"
               accentBg="rgba(239, 68, 68, 0.1)"
