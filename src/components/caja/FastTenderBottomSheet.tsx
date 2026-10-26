@@ -47,6 +47,7 @@ interface FastTenderBottomSheetProps {
   setSelectedCustomer?: (customerId: string) => void;
   customers?: any[];
   onOpenCustomerModal?: () => void;
+  onAdjustTicketTotal?: (newTotal: number) => void;
 }
 
 export function FastTenderBottomSheet({
@@ -73,6 +74,7 @@ export function FastTenderBottomSheet({
   setSelectedCustomer,
   customers = [],
   onOpenCustomerModal,
+  onAdjustTicketTotal,
 }: FastTenderBottomSheetProps) {
   const isCashUSD = paymentMethod === 'cash_usd';
   const isCashVES = paymentMethod === 'cash_ves';
@@ -414,6 +416,28 @@ export function FastTenderBottomSheet({
                 </button>
               ))}
             </div>
+
+            {/* Alerta inteligente si el monto ingresado es menor al total del ticket */}
+            {Number(cashTenderedUSD) > 0 && Number(cashTenderedUSD) < totalUSD && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2 animate-in fade-in">
+                <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-bold text-xs">
+                  <AlertCircle size={15} className="shrink-0 text-amber-600" />
+                  <span>Faltan ${(totalUSD - Number(cashTenderedUSD)).toFixed(2)} para los ${totalUSD.toFixed(2)}</span>
+                </div>
+                <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                  Si acordaste vender al mayor o dar un precio especial por <b>${Number(cashTenderedUSD).toFixed(2)} USD</b>, ajusta el total de la venta para que la factura y contabilidad cuadren exacto:
+                </p>
+                {onAdjustTicketTotal && (
+                  <button
+                    type="button"
+                    onClick={() => onAdjustTicketTotal(Number(cashTenderedUSD))}
+                    className="w-full py-2 px-3 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-black text-xs flex items-center justify-center gap-1.5 btn-haptic shadow-xs transition-all"
+                  >
+                    <span>⚡ Aplicar y Cambiar Total a ${Number(cashTenderedUSD).toFixed(2)} USD</span>
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Vuelto a Entregar */}
             {changeDueUSD > 0 && (

@@ -56,7 +56,10 @@ import {
   Play,
   ArrowDownUp,
   Clock,
-  CalendarDays
+  CalendarDays,
+  AlertTriangle,
+  Zap,
+  Percent
 } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -139,6 +142,8 @@ function CajaPageContent() {
   const [ticketLines, setTicketLines] = useState<{ item: any; quantity: number }[]>([]);
   const [editingPriceItemId, setEditingPriceItemId] = useState<string | null>(null);
   const [tempPriceValue, setTempPriceValue] = useState<string>('');
+  const [isAdjustingTicketTotal, setIsAdjustingTicketTotal] = useState(false);
+  const [customTotalInput, setCustomTotalInput] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>(clientParam || 'generic_counter_customer');
   const [docType, setDocType] = useState<'delivery_order' | 'fiscal_invoice'>('delivery_order');
   const [paymentMethod, setPaymentMethod] = useState<'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'mixed' | 'credit'>('cash_usd');
@@ -736,6 +741,61 @@ function CajaPageContent() {
     );
     setEditingPriceItemId(null);
     toast({ variant: 'success', title: 'Precio Modificado', description: `Precio unitario fijado a mano en $${numPrice.toFixed(2)} USD` });
+  };
+
+  // Ajuste global del total del ticket (ej: precio mayorista acordado o descuento al ticket)
+  const handleAdjustTicketTotal = (targetTotal: number) => {
+    if (isNaN(targetTotal) || targetTotal <= 0 || ticketLines.length === 0) return;
+    const currentSubtotal = ticketLines.reduce((acc, l) => acc + (l.item.base_price || 0) * l.quantity, 0);
+    if (currentSubtotal <= 0) return;
+
+    const ratio = targetTotal / currentSubtotal;
+    let distributedSum = 0;
+
+    const updated = ticketLines.map((l, idx) => {
+      const originalPrice = l.item._originalPrice ?? l.item._retailPrice ?? l.item.base_price ?? 0;
+      if (idx === ticketLines.length - 1) {
+        // La última línea absorbe cualquier residuo de centavos
+        const targetLineTotal = Math.max(0, targetTotal - distributedSum);
+        const unitP = l.quantity > 0 ? Math.round((targetLineTotal / l.quantity) * 100) / 100 : 0;
+        return {
+          ...l,
+          item: {
+            ...l.item,
+            _retailPrice: l.item._retailPrice ?? originalPrice,
+            _originalPrice: originalPrice,
+            base_price: unitP,
+            _priceManuallyEdited: true,
+            _pricingMode: 'manual' as const,
+          }
+        };
+      } else {
+        const lineTotal = (l.item.base_price || 0) * l.quantity;
+        const adjustedLineTotal = Math.round(lineTotal * ratio * 100) / 100;
+        distributedSum += adjustedLineTotal;
+        const unitP = l.quantity > 0 ? Math.round((adjustedLineTotal / l.quantity) * 100) / 100 : 0;
+        return {
+          ...l,
+          item: {
+            ...l.item,
+            _retailPrice: l.item._retailPrice ?? originalPrice,
+            _originalPrice: originalPrice,
+            base_price: unitP,
+            _priceManuallyEdited: true,
+            _pricingMode: 'manual' as const,
+          }
+        };
+      }
+    });
+
+    setTicketLines(updated);
+    setCashTenderedUSD(targetTotal.toFixed(2));
+    setIsAdjustingTicketTotal(false);
+    toast({
+      variant: 'success',
+      title: 'Total de Venta Reajustado',
+      description: `El ticket ahora suma $${targetTotal.toFixed(2)} USD. La factura y contabilidad registrarán exactamente este monto.`,
+    });
   };
 
   const clearCart = () => {
@@ -2375,6 +2435,27 @@ function CajaPageContent() {
                   </button>
                 </div>
 
+                {/* Alerta inteligente si el monto recibido en USD es menor al total */}
+                {numericCashUSD > 0 && numericCashUSD < total && (
+                  <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/50 space-y-1.5 animate-in fade-in">
+                    <div className="flex items-center gap-1.5 text-amber-800 dark:text-amber-200 font-bold text-xs">
+                      <AlertTriangle size={14} className="shrink-0 text-amber-600" />
+                      <span>Faltan ${(total - numericCashUSD).toFixed(2)} para completar los ${total.toFixed(2)}</span>
+                    </div>
+                    <p className="text-[11px] text-amber-700/90 dark:text-amber-300/80 leading-tight">
+                      Si acordaste vender al mayor o dar un precio especial por <b>${numericCashUSD.toFixed(2)} USD</b>, debes ajustar el total del ticket para que contabilidad registre ${numericCashUSD.toFixed(2)}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustTicketTotal(numericCashUSD)}
+                      className="w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs btn-haptic"
+                    >
+                      <Zap size={13} />
+                      <span>Cambiar total del ticket a ${numericCashUSD.toFixed(2)} USD</span>
+                    </button>
+                  </div>
+                )}
+
                 {/* Vuelto en USD y en Bolívares */}
                 {numericCashUSD > 0 && (
                   <div className="pt-2 border-t border-emerald-500/20 flex justify-between items-center">
@@ -2678,7 +2759,23 @@ function CajaPageContent() {
               )}
 
               <div className="flex justify-between items-baseline pt-2 border-t border-border">
-                <span className="text-sm font-black text-foreground">Total a Cobrar:</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-black text-foreground">Total a Cobrar:</span>
+                  {ticketLines.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdjustingTicketTotal(!isAdjustingTicketTotal);
+                        setCustomTotalInput(total > 0 ? total.toFixed(2) : '');
+                      }}
+                      className="text-[11px] font-bold text-primary hover:underline flex items-center gap-1 px-1.5 py-0.5 rounded-md hover:bg-primary/10 transition-colors"
+                      title="Fijar precio especial mayorista o descuento global para todo el ticket"
+                    >
+                      <Edit3 size={11} />
+                      <span>Ajustar Total</span>
+                    </button>
+                  )}
+                </div>
                 <div className="text-right">
                   <span className="text-2xl font-black text-primary font-mono block">
                     ${total.toFixed(2)} USD
@@ -2688,6 +2785,66 @@ function CajaPageContent() {
                   </span>
                 </div>
               </div>
+
+              {/* Editor en Vivo del Total del Ticket (Mayorista / Descuento) */}
+              {isAdjustingTicketTotal && ticketLines.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-primary/40 space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                    <span>Fijar Total Acordado (Mayor / Negociado):</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAdjustingTicketTotal(false)}
+                      className="text-slate-400 hover:text-foreground text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        autoFocus
+                        value={customTotalInput}
+                        onChange={(e) => setCustomTotalInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAdjustTicketTotal(parseFloat(customTotalInput));
+                          else if (e.key === 'Escape') setIsAdjustingTicketTotal(false);
+                        }}
+                        placeholder="0.00"
+                        className="w-full bg-background border border-border rounded-lg pl-6 pr-2 py-1 text-xs font-black text-foreground font-mono focus:ring-2 focus:ring-primary/20"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustTicketTotal(parseFloat(customTotalInput))}
+                      className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold btn-haptic"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                  {/* Atajos Rápidos */}
+                  <div className="flex items-center gap-1 pt-0.5 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-bold">Atajos:</span>
+                    {[5, 10, 15, 20, 30].map((pct) => (
+                      <button
+                        key={pct}
+                        type="button"
+                        onClick={() => {
+                          const target = Math.max(0, Math.round(total * (1 - pct / 100) * 100) / 100);
+                          setCustomTotalInput(target.toFixed(2));
+                          handleAdjustTicketTotal(target);
+                        }}
+                        className="px-2 py-0.5 rounded-md bg-card border border-border text-[10px] font-bold text-foreground hover:border-primary transition-colors"
+                      >
+                        -{pct}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Botones de Acción: Guardar Cotización vs Cobrar */}
@@ -3065,9 +3222,21 @@ function CajaPageContent() {
               )}
               <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-between">
                 <div>
-                  <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 block">
-                    Total a Cobrar
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 block">
+                      Total a Cobrar
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAdjustingTicketTotal(!isAdjustingTicketTotal);
+                        setCustomTotalInput(total > 0 ? total.toFixed(2) : '');
+                      }}
+                      className="text-[10px] font-bold text-primary underline"
+                    >
+                      Ajustar
+                    </button>
+                  </div>
                   <span className="text-[10px] text-slate-500 font-mono">
                     ≈ Bs. {totalVES.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
@@ -3076,6 +3245,44 @@ function CajaPageContent() {
                   ${total.toFixed(2)} USD
                 </span>
               </div>
+
+              {/* Editor Móvil de Total Acordado */}
+              {isAdjustingTicketTotal && (
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-primary/40 space-y-2 animate-in fade-in">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-500">
+                    <span>Fijar Total Acordado (Mayor / Descuento):</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsAdjustingTicketTotal(false)}
+                      className="text-slate-400 text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <span className="absolute left-2.5 top-1.5 text-xs text-slate-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        autoFocus
+                        value={customTotalInput}
+                        onChange={(e) => setCustomTotalInput(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-background border border-border rounded-lg pl-6 pr-2 py-1 text-xs font-black text-foreground font-mono"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleAdjustTicketTotal(parseFloat(customTotalInput))}
+                      className="px-3 py-1 bg-emerald-600 text-white rounded-lg text-xs font-bold btn-haptic"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Botones de acción */}
               <div className="flex gap-2 pt-1">
@@ -3153,6 +3360,7 @@ function CajaPageContent() {
         setSelectedCustomer={setSelectedCustomer}
         customers={customers}
         onOpenCustomerModal={() => setIsCustomerModalOpen(true)}
+        onAdjustTicketTotal={handleAdjustTicketTotal}
       />
 
       {/* ─────────────────────────────────────────────────────────────
