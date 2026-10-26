@@ -932,14 +932,15 @@ export async function voidSaleAction(
         await supabaseAdmin.from('documents').insert([{
           tenant_id: tenantId,
           entity_id: invoice.entity_id,
-          type: 'invoice',
-          status: 'invoiced',
+          type: 'journal_entry',
+          status: 'posted',
           document_number: `JE-EXT-${invoice.document_number}`,
           subtotal_amount: invTotal,
           tax_amount: 0,
           total_amount: invTotal,
           metadata: {
             actual_type: 'journal_entry',
+            is_extorno: true,
             notes: `Extorno por Anulación de Factura ${invoice.document_number}: ${reason.trim()}`,
             source_document_id: invoice.id,
             reversal_of: invoice.document_number,

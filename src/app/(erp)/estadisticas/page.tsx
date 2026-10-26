@@ -380,24 +380,44 @@ export default function EstadisticasPage() {
 
   useEffect(() => {
     load();
+    const handleFocus = () => load();
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, [load]);
 
   /* ─────────────────────────────────────────────
      Cálculos Fácticos y Análisis de Negocio (Zero-Fake)
   ───────────────────────────────────────────── */
   const metrics = useMemo(() => {
+    // Filtro defensivo: descartar asientos o documentos internos que no sean ventas reales
+    const isRealSalesDoc = (inv: any) => {
+      if (!inv) return false;
+      if (inv.document_number?.startsWith('JE-')) return false;
+      if (inv.metadata?.actual_type === 'journal_entry') return false;
+      if (inv.type === 'journal_entry') return false;
+      return true;
+    };
+
     // 0. Métricas de HOY (Facturación de Hoy vs Compras/Gastos de Hoy)
     const todayInvoices = rawInvoices.filter((inv) =>
-      isDateInPeriod(inv.issue_date || inv.created_at, 'today')
+      isRealSalesDoc(inv) && isDateInPeriod(inv.issue_date || inv.created_at, 'today')
     );
     const validTodayInvoices = todayInvoices.filter(
       (inv) => inv.status === 'invoiced' || inv.status === 'paid'
+    );
+    const annulledTodayInvoices = todayInvoices.filter(
+      (inv) => inv.status === 'annulled' || inv.status === 'voided'
     );
     const todayRevenue = validTodayInvoices.reduce((sum, inv) => {
       const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
       return sum + (isNaN(amt) ? 0 : amt);
     }, 0);
     const todaySalesCount = validTodayInvoices.length;
+    const todayAnnulledCount = annulledTodayInvoices.length;
+    const todayAnnulledRevenue = annulledTodayInvoices.reduce((sum, inv) => {
+      const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
 
     const todayPOs = rawPOs.filter((po) =>
       isDateInPeriod(po.issue_date || po.created_at, 'today') && po.status !== 'annulled'
@@ -428,10 +448,13 @@ export default function EstadisticasPage() {
 
     // 1. Facturas y Ventas del período seleccionado
     const periodInvoices = rawInvoices.filter((inv) =>
-      isDateInPeriod(inv.issue_date || inv.created_at, period, customStartDate, customEndDate)
+      isRealSalesDoc(inv) && isDateInPeriod(inv.issue_date || inv.created_at, period, customStartDate, customEndDate)
     );
     const validInvoices = periodInvoices.filter(
       (inv) => inv.status === 'invoiced' || inv.status === 'paid'
+    );
+    const annulledInvoices = periodInvoices.filter(
+      (inv) => inv.status === 'annulled' || inv.status === 'voided'
     );
     const pendingInvoices = periodInvoices.filter(
       (inv) => inv.status === 'in_progress' || inv.status === 'draft'
@@ -441,6 +464,12 @@ export default function EstadisticasPage() {
       const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
       return sum + (isNaN(amt) ? 0 : amt);
     }, 0);
+
+    const annulledRevenue = annulledInvoices.reduce((sum, inv) => {
+      const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
+      return sum + (isNaN(amt) ? 0 : amt);
+    }, 0);
+    const annulledCount = annulledInvoices.length;
 
     const pendingRevenue = pendingInvoices.reduce((sum, inv) => {
       const amt = Number(inv.total_amount ?? inv.subtotal_amount ?? 0);
@@ -804,12 +833,16 @@ export default function EstadisticasPage() {
     return {
       todayRevenue,
       todaySalesCount,
+      todayAnnulledRevenue,
+      todayAnnulledCount,
       todaySpent,
       todayPurchasesCount,
       periodSpent,
       periodPurchasesCount,
       periodInvoicesCount: periodInvoices.length,
       validInvoicesCount: validInvoices.length,
+      annulledRevenue,
+      annulledCount,
       totalRevenue,
       pendingRevenue,
       pendingInvoicesCount: pendingInvoices.length,
@@ -956,24 +989,29 @@ export default function EstadisticasPage() {
           </p>
         </div>
 
-        {/* Acciones de Cabecera (Solo visibles en PC para mantener móvil limpio) */}
-        <div className="hidden md:flex flex-wrap items-center gap-2.5">
+        {/* Acciones de Cabecera: botón de refrescar visible tanto en móvil como en PC */}
+        <div className="flex items-center gap-2">
           <button
-            onClick={handleExportCSV}
-            className="btn-base btn-secondary btn-haptic flex items-center gap-2 text-xs py-2 px-3"
-            title="Exportar métricas fácticas a CSV"
-          >
-            <Download size={15} />
-            Exportar CSV
-          </button>
-          <button
+            type="button"
             onClick={load}
-            className="btn-base btn-secondary btn-haptic flex items-center gap-2 text-xs py-2 px-3"
-            title="Recargar datos directamente desde Supabase"
+            disabled={isLoading}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-card border border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-bold transition-all btn-haptic disabled:opacity-50 shadow-2xs"
+            title="Sincronizar y recargar datos de Supabase"
           >
-            <RefreshCw size={15} />
-            Actualizar
+            <RefreshCw size={14} className={isLoading ? 'animate-spin text-primary' : 'text-slate-400'} />
+            <span>Actualizar</span>
           </button>
+          
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              onClick={handleExportCSV}
+              className="btn-base btn-secondary btn-haptic flex items-center gap-2 text-xs py-2 px-3"
+              title="Exportar métricas fácticas a CSV"
+            >
+              <Download size={15} />
+              Exportar CSV
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1143,19 +1181,23 @@ export default function EstadisticasPage() {
             <KPICard
               label={
                 period === 'today'
-                  ? 'Vendido Hoy'
+                  ? 'Vendido Hoy (Neto)'
                   : period === 'week'
-                  ? 'Ventas (Últimos 7 Días)'
+                  ? 'Ventas Netas (7D)'
                   : period === 'month'
-                  ? 'Ventas del Mes'
+                  ? 'Ventas Netas del Mes'
                   : period === 'year'
-                  ? 'Ventas del Año'
+                  ? 'Ventas Netas del Año'
                   : period === 'custom'
-                  ? 'Ventas en Rango'
-                  : 'Ventas Totales'
+                  ? 'Ventas Netas en Rango'
+                  : 'Ventas Netas Totales'
               }
               value={fmt(period === 'today' ? metrics.todayRevenue : metrics.totalRevenue)}
-              subValue={`${period === 'today' ? metrics.todaySalesCount : metrics.validInvoicesCount} venta(s) cobradas`}
+              subValue={
+                (period === 'today' ? metrics.todayAnnulledCount : metrics.annulledCount) > 0
+                  ? `${period === 'today' ? metrics.todaySalesCount : metrics.validInvoicesCount} cobradas · ${period === 'today' ? metrics.todayAnnulledCount : metrics.annulledCount} extornadas (-${fmt(period === 'today' ? metrics.todayAnnulledRevenue : metrics.annulledRevenue)})`
+                  : `${period === 'today' ? metrics.todaySalesCount : metrics.validInvoicesCount} venta(s) cobradas`
+              }
               trend={metrics.totalRevenue > 0 ? 'up' : 'neutral'}
               icon={<DollarSign size={20} />}
               accentColor="var(--success)"
