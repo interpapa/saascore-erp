@@ -179,6 +179,7 @@ export function generateEscPosBuffer(
     card: 'Tarjeta / Punto de Venta',
     transfer: 'Transferencia Bancaria',
     zelle: 'Zelle ($)',
+    binance: 'Binance Pay (USDT)',
     mixed: 'Pago Combinado / Mixto',
     credit: 'Venta a Crédito (Por Cobrar)',
     cash: 'Efectivo',

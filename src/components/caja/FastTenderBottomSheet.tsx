@@ -90,6 +90,7 @@ export function FastTenderBottomSheet({
     { id: 'pago_movil', label: 'Pago Móvil', sublabel: 'Transferencia interbancaria Bs.', icon: Smartphone, badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' },
     { id: 'card', label: 'Punto Débito / Tarjeta', sublabel: 'Terminal POS bancario', icon: CreditCard, badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20' },
     { id: 'zelle', label: 'Zelle', sublabel: 'Transferencia USD en línea', icon: Landmark, badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20' },
+    { id: 'binance', label: 'Binance Pay (USDT)', sublabel: 'Criptoactivos / USDT en línea', icon: Coins, badgeClass: 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 border border-yellow-500/20' },
     { id: 'cash_ves', label: 'Efectivo Bs.', sublabel: 'Bolívares en efectivo', icon: Coins, badgeClass: 'bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20' },
     { id: 'credit', label: 'Crédito (Deuda Total)', sublabel: 'Cuenta por Cobrar (CxC)', icon: FileText, badgeClass: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20' },
     { id: 'mixed', label: 'Pago Dividido / Abono', sublabel: 'Varios métodos o parte a crédito', icon: Split, badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20' },

@@ -554,6 +554,9 @@ export default function ConfiguracionPage() {
                     {acc.email && (
                       <p className="font-mono text-purple-600 dark:text-purple-400 text-[11px]">✉️ Zelle/Email: {acc.email}</p>
                     )}
+                    {acc.account_type === 'binance' && (
+                      <p className="font-mono text-yellow-600 dark:text-yellow-400 text-[11px]">🟡 Binance Pay ID: {acc.account_number || acc.email || acc.holder_name}</p>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -750,6 +753,7 @@ export default function ConfiguracionPage() {
                 >
                   <option value="pago_movil">📱 Pago Móvil</option>
                   <option value="zelle">📱 Zelle ($)</option>
+                  <option value="binance">🟡 Binance Pay (USDT / Crypto)</option>
                   <option value="corriente">🏦 Cuenta Corriente</option>
                   <option value="ahorro">🏦 Cuenta de Ahorro</option>
                   <option value="otro">💳 Otro Método</option>
@@ -804,10 +808,10 @@ export default function ConfiguracionPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-foreground mb-1">Número de Cuenta (20 dígitos o últimos 4)</label>
+                <label className="block font-bold text-foreground mb-1">Número de Cuenta (o Binance Pay ID)</label>
                 <input
                   type="text"
-                  placeholder="01340000000000000000"
+                  placeholder="01340000000000000000 o Pay ID 12345678"
                   value={newAccount.account_number}
                   onChange={e => setNewAccount({ ...newAccount, account_number: e.target.value })}
                   className="w-full bg-background border border-input rounded-xl px-3 py-2 text-foreground font-mono"
@@ -815,7 +819,7 @@ export default function ConfiguracionPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-foreground mb-1">Correo Electrónico (Zelle / PayPal)</label>
+                <label className="block font-bold text-foreground mb-1">Correo Electrónico (Zelle / Binance / PayPal)</label>
                 <input
                   type="email"
                   placeholder="pagos@empresa.com"

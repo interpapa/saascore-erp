@@ -15,7 +15,7 @@ export interface HeldTicket {
   customerName: string;
   lines: HeldTicketLine[];
   docType: 'delivery_order' | 'fiscal_invoice';
-  paymentMethod: 'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'mixed' | 'credit';
+  paymentMethod: 'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'binance' | 'mixed' | 'credit';
   totalUSD: number;
   totalVES: number;
 }

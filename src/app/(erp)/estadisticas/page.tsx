@@ -672,6 +672,8 @@ export default function EstadisticasPage() {
           ? 'Transferencia Bancaria'
           : k === 'zelle'
           ? 'Zelle'
+          : k === 'binance' || k === 'binance_pay'
+          ? 'Binance Pay (USDT)'
           : k === 'mixed'
           ? 'Cobro Mixto / Combinado'
           : k === 'no_especificado'

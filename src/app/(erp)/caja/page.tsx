@@ -74,7 +74,7 @@ interface HeldTicket {
   customerName: string;
   lines: { item: any; quantity: number }[];
   docType: 'delivery_order' | 'fiscal_invoice';
-  paymentMethod: 'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'mixed' | 'credit';
+  paymentMethod: 'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'binance' | 'mixed' | 'credit';
   totalUSD: number;
   totalVES: number;
 }
@@ -146,7 +146,7 @@ function CajaPageContent() {
   const [customTotalInput, setCustomTotalInput] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>(clientParam || 'generic_counter_customer');
   const [docType, setDocType] = useState<'delivery_order' | 'fiscal_invoice'>('delivery_order');
-  const [paymentMethod, setPaymentMethod] = useState<'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'mixed' | 'credit'>('cash_usd');
+  const [paymentMethod, setPaymentMethod] = useState<'cash_usd' | 'cash_ves' | 'pago_movil' | 'card' | 'transfer' | 'zelle' | 'binance' | 'mixed' | 'credit'>('cash_usd');
   
   // Calculadoras de Efectivo
   const [cashTenderedUSD, setCashTenderedUSD] = useState<string>('');
@@ -2313,7 +2313,7 @@ function CajaPageContent() {
             </div>
 
             {/* Fila Secundaria de Métodos */}
-            <div className="grid grid-cols-4 gap-1 text-[11px]">
+            <div className="grid grid-cols-5 gap-1 text-[11px]">
               <button
                 type="button"
                 onClick={() => setPaymentMethod('transfer')}
@@ -2336,6 +2336,18 @@ function CajaPageContent() {
                 }`}
               >
                 <span>📱 Zelle ($)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('binance')}
+                className={`py-1.5 rounded-xl font-bold transition-all text-center btn-haptic ${
+                  paymentMethod === 'binance'
+                    ? 'bg-yellow-500 text-slate-950 shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-900 text-slate-600 dark:text-slate-400 hover:text-foreground'
+                }`}
+              >
+                <span>🟡 Binance</span>
               </button>
 
               <button
@@ -2593,6 +2605,51 @@ function CajaPageContent() {
                     ))}
                   </select>
                 )}
+              </div>
+            )}
+
+            {/* Detalle para Binance Pay (USDT) */}
+            {paymentMethod === 'binance' && (
+              <div className="p-3 bg-yellow-500/10 dark:bg-yellow-500/10 border border-yellow-500/20 rounded-2xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-yellow-800 dark:text-yellow-400">🟡 Binance Pay (USDT):</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsBankModalOpen(true)}
+                    className="text-yellow-600 dark:text-yellow-400 hover:underline text-[11px] font-bold"
+                  >
+                    Ver Cuentas
+                  </button>
+                </div>
+                <div className="text-center py-1.5 bg-background rounded-xl border border-border">
+                  <span className="text-lg font-black text-yellow-600 dark:text-yellow-400 font-mono">
+                    ${total.toFixed(2)} USDT
+                  </span>
+                </div>
+                {(() => {
+                  const binanceAcc = bankAccounts.find(
+                    (a) => a.account_type === 'binance' || a.bank_name?.toLowerCase().includes('binance')
+                  );
+                  if (binanceAcc) {
+                    return (
+                      <div className="flex justify-between items-center text-[11px] text-slate-600 dark:text-slate-300 bg-slate-100/50 dark:bg-slate-800/40 p-2 rounded-xl">
+                        <span>Pay ID: <b>{binanceAcc.account_number || binanceAcc.email || binanceAcc.holder_name}</b></span>
+                        <button
+                          type="button"
+                          onClick={() => copyBankData(binanceAcc)}
+                          className="text-yellow-600 hover:underline font-bold"
+                        >
+                          Copiar
+                        </button>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-slate-500">
+                      Recibe el pago en USDT mediante Binance Pay. Configura tu Pay ID en Ajustes &gt; Cuentas Bancarias.
+                    </p>
+                  );
+                })()}
               </div>
             )}
 

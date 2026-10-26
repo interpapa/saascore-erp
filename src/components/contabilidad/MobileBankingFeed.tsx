@@ -181,6 +181,9 @@ export function MobileBankingFeed({
       } else if (lowerConcept.includes('zelle') || lowerRef.includes('zelle')) {
         methodIcon = 'zelle';
         methodLabel = 'Zelle';
+      } else if (lowerConcept.includes('binance') || lowerRef.includes('binance') || lowerConcept.includes('usdt')) {
+        methodIcon = 'binance';
+        methodLabel = 'Binance Pay (USDT)';
       } else if (lowerConcept.includes('tarjeta') || lowerConcept.includes('punto') || lowerConcept.includes('pos')) {
         methodIcon = 'card';
         methodLabel = 'Punto de Venta';
@@ -339,6 +342,7 @@ export function MobileBankingFeed({
                   {tx.methodIcon === 'cash' && <Coins size={20} />}
                   {tx.methodIcon === 'bank' && <Building2 size={20} />}
                   {tx.methodIcon === 'zelle' && <span className="font-black text-xs">Z</span>}
+                  {tx.methodIcon === 'binance' && <Coins size={20} className="text-yellow-500" />}
                   {tx.methodIcon === 'expense' && <ShoppingBag size={20} />}
                   {tx.methodIcon === 'receipt' && <Receipt size={20} />}
                 </div>

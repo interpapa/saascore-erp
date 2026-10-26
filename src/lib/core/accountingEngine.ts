@@ -31,8 +31,8 @@ export function buildInvoiceJournalLines(invoice: Document): JournalEntryLine[] 
     if (m === 'credit' || m === 'credito') {
       return { account_code: '1.1.02.01', account_name: 'Clientes Nacionales (AR)' };
     }
-    if (['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'pos', 'bank', 'punto'].includes(m)) {
-      return { account_code: '1.1.01.02', account_name: 'Bancos e Instituciones Financieras' };
+    if (['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'binance', 'usdt', 'crypto', 'cripto', 'pos', 'bank', 'punto'].includes(m)) {
+      return { account_code: '1.1.01.02', account_name: 'Bancos y Billeteras Digitales (Binance/Zelle)' };
     }
     return { account_code: '1.1.01.01', account_name: 'Caja Principal (Efectivo)' };
   };

@@ -119,6 +119,7 @@ export function ReceiptModal({ isOpen, onClose, saleData }: ReceiptModalProps) {
       card: 'Tarjeta / Punto de Venta',
       transfer: 'Transferencia Bancaria',
       zelle: 'Zelle ($)',
+      binance: 'Binance Pay (USDT)',
       mixed: 'Pago Combinado / Mixto',
       cash: 'Efectivo',
       credit: 'Venta a Crédito (Cta. por Cobrar)',
