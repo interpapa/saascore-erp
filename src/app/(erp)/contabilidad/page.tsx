@@ -237,6 +237,8 @@ export default function ContabilidadPage() {
           incomeStatement={incomeStatement}
           isLoading={isLoading}
           onRefresh={fetchAccountingData}
+          tenantId={currentTenant?.id}
+          actor={actor}
         />
       </div>
 
@@ -304,6 +306,9 @@ export default function ContabilidadPage() {
             }
             isLoading={isLoading}
             onNewEntry={() => setIsCreateModalOpen(true)}
+            tenantId={currentTenant?.id}
+            actor={actor}
+            onRefresh={fetchAccountingData}
           />
         </div>
       )}

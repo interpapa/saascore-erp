@@ -13,21 +13,58 @@ import {
   Ban,
   Package,
   Clock,
+  Trash2,
 } from 'lucide-react';
+import { voidSaleAction } from '@/app/actions/cashRegister';
+import { useToast } from '@/components/core/ToastProvider';
 
 interface GeneralJournalTableProps {
   entries: JournalEntry[];
   isLoading?: boolean;
   onNewEntry?: () => void;
+  tenantId?: string;
+  actor?: any;
+  onRefresh?: () => void;
 }
 
 export function GeneralJournalTable({
   entries = [],
   isLoading = false,
   onNewEntry,
+  tenantId,
+  actor,
+  onRefresh,
 }: GeneralJournalTableProps) {
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
   const [expandedEntries, setExpandedEntries] = useState<Record<string, boolean>>({});
+  const [isVoiding, setIsVoiding] = useState<string | null>(null);
+
+  const handleVoid = async (entry: JournalEntry) => {
+    if (!tenantId || !actor) {
+      toast({ variant: 'error', title: 'Error', description: 'No se identificó el inquilino o usuario.' });
+      return;
+    }
+    const confirm = window.confirm(`¿Confirmas la anulación del asiento ${entry.entry_number || entry.id}? Se generará el extorno contable y se revertirá el stock/saldo.`);
+    if (!confirm) return;
+
+    const docId = entry.document_id || (entry.id.startsWith('JE-DOC-') ? entry.id.replace('JE-DOC-', '') : entry.id);
+
+    try {
+      setIsVoiding(entry.id);
+      const res = await voidSaleAction(docId, 'Anulación desde Libro Diario', tenantId, actor);
+      if (res.success) {
+        toast({ variant: 'success', title: 'Asiento Anulado', description: 'Se generó la contrapartida contable con éxito.' });
+        if (onRefresh) onRefresh();
+      } else {
+        toast({ variant: 'error', title: 'No se pudo anular', description: res.error || 'Error al revertir asiento.' });
+      }
+    } catch (err: any) {
+      toast({ variant: 'error', title: 'Error de servidor', description: err.message });
+    } finally {
+      setIsVoiding(null);
+    }
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedEntries((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -283,6 +320,29 @@ export function GeneralJournalTable({
                                 ))}
                               </tbody>
                             </table>
+
+                            {/* Anular Asiento / Extorno */}
+                            {entry.status === 'annulled' ? (
+                              <div className="p-2 rounded-lg bg-rose-500/10 text-rose-600 text-[11px] font-bold flex items-center gap-1.5 w-fit">
+                                <Ban className="w-3.5 h-3.5" />
+                                <span>Este asiento ya fue anulado / extornado</span>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end pt-1">
+                                <button
+                                  type="button"
+                                  disabled={isVoiding === entry.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleVoid(entry);
+                                  }}
+                                  className="px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 text-xs font-bold transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>{isVoiding === entry.id ? 'Anulando...' : 'Anular Asiento (Extorno)'}</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>

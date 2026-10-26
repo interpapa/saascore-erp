@@ -21,8 +21,13 @@ import {
   ChevronRight,
   FileText,
   Package,
-  Clock
+  Clock,
+  Trash2,
+  AlertCircle,
+  Ban
 } from 'lucide-react';
+import { voidSaleAction } from '@/app/actions/cashRegister';
+import { useToast } from '@/components/core/ToastProvider';
 
 interface MobileBankingFeedProps {
   journalEntries: JournalEntry[];
@@ -30,6 +35,8 @@ interface MobileBankingFeedProps {
   incomeStatement?: IncomeStatementReport;
   isLoading: boolean;
   onRefresh: () => void;
+  tenantId?: string;
+  actor?: any;
 }
 
 function getEntryConcept(e: any): string {
@@ -50,8 +57,53 @@ export function MobileBankingFeed({
   incomeStatement,
   isLoading,
   onRefresh,
+  tenantId,
+  actor,
 }: MobileBankingFeedProps) {
+  const { toast } = useToast();
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null);
+  const [isConfirmingVoid, setIsConfirmingVoid] = useState(false);
+  const [voidReason, setVoidReason] = useState('Anulación solicitada desde el feed móvil');
+  const [isVoiding, setIsVoiding] = useState(false);
+
+  const handleVoidEntry = async () => {
+    if (!selectedEntry) return;
+    if (!tenantId || !actor) {
+      toast({ variant: 'error', title: 'Error de permisos', description: 'No se pudo identificar la empresa o usuario actual.' });
+      return;
+    }
+
+    const docId = selectedEntry.document_id || (selectedEntry.id.startsWith('JE-DOC-') ? selectedEntry.id.replace('JE-DOC-', '') : selectedEntry.id);
+
+    try {
+      setIsVoiding(true);
+      const res = await voidSaleAction(docId, voidReason.trim() || 'Anulación desde móvil', tenantId, actor);
+      if (res.success) {
+        toast({
+          variant: 'success',
+          title: 'Movimiento Anulado',
+          description: 'Se generó la contrapartida contable y se restauró el stock en inventario.',
+        });
+        setSelectedEntry(null);
+        setIsConfirmingVoid(false);
+        onRefresh();
+      } else {
+        toast({
+          variant: 'error',
+          title: 'No se pudo anular',
+          description: res.error || 'Error al procesar la contrapartida.',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        variant: 'error',
+        title: 'Error de servidor',
+        description: err.message || 'Fallo inesperado al anular.',
+      });
+    } finally {
+      setIsVoiding(false);
+    }
+  };
 
   // Extraer saldos de cuentas de efectivo y bancos del Balance de Comprobación
   const bankAccounts = useMemo(() => {
@@ -294,9 +346,14 @@ export function MobileBankingFeed({
                 {/* Concepto, Productos y Método */}
                 <div className="flex-1 min-w-0 pr-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="font-black text-slate-900 dark:text-white text-sm truncate">
+                    <span className={`font-black text-slate-900 dark:text-white text-sm truncate ${tx.status === 'annulled' ? 'line-through opacity-60' : ''}`}>
                       {tx.concept}
                     </span>
+                    {tx.status === 'annulled' && (
+                      <span className="px-1.5 py-0.2 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-black uppercase border border-rose-500/20">
+                        Anulado
+                      </span>
+                    )}
                   </div>
 
                   {/* Pills de Productos de la Venta/Compra */}
@@ -334,7 +391,9 @@ export function MobileBankingFeed({
                 <div className="text-right shrink-0 flex items-center gap-1">
                   <div>
                     <span className={`font-mono font-black text-base block leading-tight ${
-                      tx.isInflow 
+                      tx.status === 'annulled'
+                        ? 'line-through opacity-50 text-slate-400'
+                        : tx.isInflow 
                         ? 'text-emerald-700 dark:text-emerald-400' 
                         : 'text-rose-700 dark:text-rose-400'
                     }`}>
@@ -434,10 +493,79 @@ export function MobileBankingFeed({
               </div>
             </div>
 
-            <div className="pt-2 border-t border-border flex justify-end">
+            {/* Acciones de Anulación / Contrapartida */}
+            {selectedEntry.status === 'annulled' ? (
+              <div className="p-3 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
+                <Ban size={16} className="shrink-0" />
+                <span className="font-bold">Este movimiento ya fue anulado / extornado previamente.</span>
+              </div>
+            ) : (
+              <div className="pt-2 border-t border-border space-y-2">
+                {isConfirmingVoid ? (
+                  <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-2.5 animate-in fade-in">
+                    <div className="flex items-center gap-1.5 text-rose-700 dark:text-rose-400 font-bold text-xs">
+                      <AlertCircle size={15} className="shrink-0" />
+                      <span>¿Confirmas la anulación de este movimiento?</span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-snug">
+                      Se generará la <b>contrapartida contable (extorno)</b>, se devolverán los productos al inventario y se revertirá el saldo de caja o deuda.
+                    </p>
+                    <input
+                      type="text"
+                      placeholder="Motivo (ej: Error en precio mayorista)..."
+                      value={voidReason}
+                      onChange={(e) => setVoidReason(e.target.value)}
+                      className="w-full bg-background border border-border rounded-xl px-3 py-1.5 text-xs text-foreground placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-rose-500/30 font-medium"
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={isVoiding}
+                        onClick={handleVoidEntry}
+                        className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black btn-haptic disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        {isVoiding ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 size={13} />
+                            <span>Sí, Anular y Extornar</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isVoiding}
+                        onClick={() => setIsConfirmingVoid(false)}
+                        className="px-3 py-2.5 bg-slate-100 dark:bg-slate-800 text-foreground rounded-xl text-xs font-bold"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsConfirmingVoid(true);
+                      setVoidReason('Anulación solicitada desde el feed móvil');
+                    }}
+                    className="w-full py-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 font-black text-xs flex items-center justify-center gap-2 transition-colors btn-haptic"
+                  >
+                    <Trash2 size={14} />
+                    <span>Anular Movimiento (Contrapartida)</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="pt-1 flex justify-end">
               <button
                 type="button"
-                onClick={() => setSelectedEntry(null)}
+                onClick={() => {
+                  setSelectedEntry(null);
+                  setIsConfirmingVoid(false);
+                }}
                 className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-foreground font-bold text-xs hover:bg-slate-200 transition-colors"
               >
                 Cerrar Detalle
