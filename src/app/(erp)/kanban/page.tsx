@@ -176,7 +176,7 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="h-full flex flex-col p-4 md:p-8">
+    <div className="h-full flex flex-col p-4 md:p-8 min-w-0 max-w-full">
       {/* Header */}
       <div className="flex justify-between items-start mb-6 shrink-0 gap-4 flex-wrap">
         <div>
@@ -243,7 +243,7 @@ export default function KanbanPage() {
       })()}
 
       {/* Board */}
-      <div className="flex-1 overflow-x-auto">
+      <div className="flex-1 overflow-x-auto w-full min-w-0">
         <div className="flex gap-6 h-full min-w-max pb-4">
           {COLUMNS.map(col => {
             const colTickets = ticketsByStatus(col.id);

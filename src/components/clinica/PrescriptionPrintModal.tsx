@@ -281,7 +281,8 @@ export function PrescriptionPrintModal({
                 </span>
               </div>
 
-              <table className="w-full text-xs border-collapse bg-white rounded-lg overflow-hidden">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-xs border-collapse bg-white rounded-lg min-w-[650px]">
                 <thead>
                   <tr className="bg-cyan-900/10 text-slate-700 border-b border-slate-200">
                     <th className="py-1.5 px-3 text-left">Ojo</th>
@@ -321,6 +322,7 @@ export function PrescriptionPrintModal({
                   </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 

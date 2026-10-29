@@ -784,8 +784,8 @@ export function PurchaseOrderTab({
 
               {/* Tabla de Líneas Agregadas */}
               {poLines.length > 0 && (
-                <div className="border border-border rounded-2xl overflow-hidden">
-                  <table className="w-full text-xs text-left">
+                <div className="border border-border rounded-2xl overflow-x-auto">
+                  <table className="w-full text-xs text-left min-w-[550px]">
                     <thead className="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
                       <tr>
                         <th className="p-3">Descripción</th>
@@ -981,8 +981,8 @@ export function PurchaseOrderTab({
               </h4>
 
               {Array.isArray(selectedPoForView.lines) && selectedPoForView.lines.length > 0 ? (
-                <div className="border border-border rounded-2xl overflow-hidden">
-                  <table className="w-full text-xs text-left">
+                <div className="border border-border rounded-2xl overflow-x-auto">
+                  <table className="w-full text-xs text-left min-w-[550px]">
                     <thead className="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold">
                       <tr>
                         <th className="p-3">Descripción</th>

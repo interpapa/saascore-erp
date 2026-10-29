@@ -381,11 +381,21 @@ body {
 }
 
 
-/* UTILIDADES MÓVILES */
-.no-scrollbar::-webkit-scrollbar {
+/* UTILIDADES MÓVILES & DESPLAZAMIENTO HORIZONTAL (TOUCH SCROLL) */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+  overscroll-behavior-x: contain;
+}
+
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar,
+.scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
-.no-scrollbar {
+.no-scrollbar,
+.scrollbar-none,
+.scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }

@@ -69,7 +69,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background text-foreground relative selection:bg-primary/20 selection:text-primary font-sans">
       <AmbientBackground />
 
-      <main className="relative z-10 pt-3 sm:pt-6 pb-32 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full overflow-x-hidden">
+      <main className="relative z-10 pt-3 sm:pt-6 pb-32 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
         {/* Barra superior de navegación unificada del Módulo SaaS Admin */}
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-8 pb-4 sm:pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border shadow-xs">
           {/* Fila Superior: Título de Rendo Hub + Modo Oscuro + Botón de Salida */}

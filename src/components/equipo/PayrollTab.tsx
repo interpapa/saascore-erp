@@ -264,7 +264,7 @@ export function PayrollTab({ employees, tenantId }: PayrollTabProps) {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left min-w-[700px]">
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold border-b border-border">
                   <tr>
                     <th className="p-4">Colaborador / Puesto</th>
@@ -407,7 +407,7 @@ export function PayrollTab({ employees, tenantId }: PayrollTabProps) {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left min-w-[700px]">
                 <thead className="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold border-b border-border">
                   <tr>
                     <th className="p-3">N° Recibo</th>

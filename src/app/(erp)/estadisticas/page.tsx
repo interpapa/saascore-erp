@@ -1807,8 +1807,8 @@ export default function EstadisticasPage() {
                 No hay facturas emitidas en este período.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left text-xs min-w-[650px]">
                   <thead>
                     <tr className="border-b border-border/60 text-muted-foreground">
                       <th className="py-2 font-medium">N° Factura</th>
@@ -1923,8 +1923,8 @@ export default function EstadisticasPage() {
                 No hay productos registrados en el inventario.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left text-xs min-w-[650px]">
                   <thead>
                     <tr className="border-b border-border/60 text-muted-foreground">
                       <th className="py-2 font-medium">Categoría</th>

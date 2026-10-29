@@ -716,8 +716,8 @@ export default function SuscripcionesPage() {
                 <p className="text-xs text-slate-400 mt-1">Registra nuevos clientes haciendo clic en "Nueva Suscripción".</p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left text-xs min-w-[800px]">
                   <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-800">
                     <tr>
                       <th className="py-3 px-4">Suscriptor</th>

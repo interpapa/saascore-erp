@@ -227,7 +227,7 @@ export function EndodonticsSheet({ patientId, patientName }: EndodonticsSheetPro
             </div>
 
             <div className="overflow-x-auto border border-border rounded-xl">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[520px]">
                 <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-border text-[11px] font-bold text-slate-500 uppercase">
                   <tr>
                     <th className="p-2.5">Conducto</th>

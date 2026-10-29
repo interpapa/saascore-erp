@@ -236,8 +236,8 @@ export function GeneralJournalTable({
           }
         />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse text-xs min-w-[850px]">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider">
                 <th className="py-3 px-3 w-10"></th>
@@ -367,38 +367,40 @@ export function GeneralJournalTable({
                               </div>
                             )}
 
-                            <table className="w-full text-xs">
-                              <thead>
-                                <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-700/60 pb-1 text-[11px]">
-                                  <th className="py-1 px-2">Código Cuenta</th>
-                                  <th className="py-1 px-2">Nombre de Cuenta</th>
-                                  <th className="py-1 px-2">Detalle / Glosa</th>
-                                  <th className="py-1 px-2 text-right">Débito</th>
-                                  <th className="py-1 px-2 text-right">Crédito</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-200/50 dark:divide-slate-700/40">
-                                {entry.lines.map((line, idx) => (
-                                  <tr key={line.id || idx} className="hover:bg-slate-100/50 dark:hover:bg-slate-700/30">
-                                    <td className="py-2 px-2 font-mono font-bold text-slate-900 dark:text-slate-100">
-                                      {line.account_code}
-                                    </td>
-                                    <td className="py-2 px-2 font-medium text-slate-700 dark:text-slate-300">
-                                      {line.account_name}
-                                    </td>
-                                    <td className="py-2 px-2 text-slate-500 dark:text-slate-400 italic">
-                                      {line.description || entry.description}
-                                    </td>
-                                    <td className="py-2 px-2 text-right font-mono font-semibold text-slate-900 dark:text-white">
-                                      {line.debit > 0 ? formatCurrency(line.debit) : '-'}
-                                    </td>
-                                    <td className="py-2 px-2 text-right font-mono font-semibold text-slate-900 dark:text-white">
-                                      {line.credit > 0 ? formatCurrency(line.credit) : '-'}
-                                    </td>
+                            <div className="overflow-x-auto w-full">
+                              <table className="w-full text-xs min-w-[550px]">
+                                <thead>
+                                  <tr className="text-slate-400 border-b border-slate-200 dark:border-slate-700/60 pb-1 text-[11px]">
+                                    <th className="py-1 px-2">Código Cuenta</th>
+                                    <th className="py-1 px-2">Nombre de Cuenta</th>
+                                    <th className="py-1 px-2">Detalle / Glosa</th>
+                                    <th className="py-1 px-2 text-right">Débito</th>
+                                    <th className="py-1 px-2 text-right">Crédito</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-200/50 dark:divide-slate-700/40">
+                                  {entry.lines.map((line, idx) => (
+                                    <tr key={line.id || idx} className="hover:bg-slate-100/50 dark:hover:bg-slate-700/30">
+                                      <td className="py-2 px-2 font-mono font-bold text-slate-900 dark:text-slate-100">
+                                        {line.account_code}
+                                      </td>
+                                      <td className="py-2 px-2 font-medium text-slate-700 dark:text-slate-300">
+                                        {line.account_name}
+                                      </td>
+                                      <td className="py-2 px-2 text-slate-500 dark:text-slate-400 italic">
+                                        {line.description || entry.description}
+                                      </td>
+                                      <td className="py-2 px-2 text-right font-mono font-semibold text-slate-900 dark:text-white">
+                                        {line.debit > 0 ? formatCurrency(line.debit) : '-'}
+                                      </td>
+                                      <td className="py-2 px-2 text-right font-mono font-semibold text-slate-900 dark:text-white">
+                                        {line.credit > 0 ? formatCurrency(line.credit) : '-'}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
 
                             {/* Anular Asiento / Extorno */}
                             {entry.status === 'annulled' ? (

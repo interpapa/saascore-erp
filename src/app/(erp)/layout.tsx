@@ -108,7 +108,7 @@ export default function ERPLayout({
     <div className="min-h-screen text-foreground overflow-x-hidden selection:bg-primary/30 relative">
       <AmbientBackground />
 
-      <div className="relative z-10 flex flex-col min-h-screen">
+      <div className="relative z-10 flex flex-col min-h-screen min-w-0 max-w-full">
         {isSuper && impersonatedTenant && (
           <div className="bg-gradient-to-r from-amber-600 via-rose-600 to-indigo-600 text-white text-xs py-2 px-4 sticky top-0 z-50 flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-2 font-bold truncate">
@@ -131,7 +131,7 @@ export default function ERPLayout({
           </div>
         )}
         <FloatingHeader />
-        <main className="flex-1 w-full pt-20 pb-24 md:pb-6">
+        <main className="flex-1 w-full min-w-0 max-w-full pt-20 pb-24 md:pb-6">
           {isModuleDisabled ? (
             <div className="w-full max-w-xl mx-auto px-6 py-20 text-center space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center border border-amber-500/20 mx-auto shadow-sm">

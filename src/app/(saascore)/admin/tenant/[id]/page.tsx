@@ -514,7 +514,7 @@ export default function TenantAdminPage() {
         ) : (
           <>
             <div className="hidden md:block overflow-x-auto">
-              <table className="w-full text-left text-xs">
+              <table className="w-full text-left text-xs min-w-[550px]">
                 <thead className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold border-b border-border/60">
                   <tr>
                     <th className="pb-2">Usuario (Email / ID)</th>

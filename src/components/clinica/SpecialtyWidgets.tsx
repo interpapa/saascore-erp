@@ -1945,8 +1945,8 @@ export function SpecialtyWidgets({
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs border-collapse">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-xs border-collapse min-w-[700px]">
             <thead>
               <tr className="border-b border-[var(--border-color)] text-[var(--text-secondary)]">
                 <th className="py-2 px-2 text-left">Ojo</th>
