@@ -222,7 +222,17 @@ export default function TenantAdminPage() {
       active_modules: activeModules,
       metadata: { ...(tenant.metadata || {}), features: featureFlags },
     });
-    const target = modId === 'catalogo' ? '/inventario' : modId === 'config' ? '/configuracion' : modId.startsWith('med_') ? '/clinica' : `/${modId}`;
+    const getModuleRoute = (mId: string) => {
+      if (mId === 'catalogo') return '/inventario';
+      if (mId === 'config') return '/configuracion';
+      if (mId === 'ginecologia') return '/ginecologia';
+      if (mId.startsWith('med_')) return `/clinica?spec=${mId.replace('med_', '')}`;
+      if (['cardiologia', 'pediatria', 'dermatologia', 'traumatologia', 'oftalmologia', 'general'].includes(mId)) {
+        return `/clinica?spec=${mId}`;
+      }
+      return `/${mId}`;
+    };
+    const target = getModuleRoute(modId);
     toast({
       variant: 'success',
       title: 'Acceso Directo al Módulo',

@@ -28,7 +28,10 @@ import {
   ArrowRight,
   Sparkles,
   ChevronRight,
-  Factory
+  Factory,
+  Heart,
+  Eye,
+  Bone
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { hasPermission } from '@/lib/rbac';
@@ -63,6 +66,11 @@ const ALL_ERP_MODULES: DockItem[] = [
   { id: 'odontologia', label: 'Dental', href: '/odontologia', icon: Stethoscope, category: 'salud' },
   { id: 'ginecologia', label: 'Gineco', href: '/ginecologia', icon: Baby, category: 'salud' },
   { id: 'clinica', label: 'Clínica', href: '/clinica', icon: HeartPulse, category: 'salud' },
+  { id: 'cardiologia', label: 'Cardio', href: '/clinica?spec=cardiologia', icon: Heart, category: 'salud' },
+  { id: 'pediatria', label: 'Pediatría', href: '/clinica?spec=pediatria', icon: Baby, category: 'salud' },
+  { id: 'dermatologia', label: 'Derma', href: '/clinica?spec=dermatologia', icon: Sparkles, category: 'salud' },
+  { id: 'traumatologia', label: 'Trauma', href: '/clinica?spec=traumatologia', icon: Bone, category: 'salud' },
+  { id: 'oftalmologia', label: 'Oftalmo', href: '/clinica?spec=oftalmologia', icon: Eye, category: 'salud' },
 
   // Servicios & Especialidades
   { id: 'barberia', label: 'Barbería', href: '/barberia', icon: Scissors, category: 'servicios' },
@@ -115,12 +123,28 @@ export function MobileDock() {
     return ALL_ERP_MODULES.filter(item => {
       // Regla de activación en la empresa
       let isActive = false;
+      const SPECIALTY_ALIASES: Record<string, string> = {
+        ginecologia: 'med_ginecologia',
+        med_ginecologia: 'ginecologia',
+        cardiologia: 'med_cardiologia',
+        med_cardiologia: 'cardiologia',
+        pediatria: 'med_pediatria',
+        med_pediatria: 'pediatria',
+        dermatologia: 'med_dermatologia',
+        med_dermatologia: 'dermatologia',
+        traumatologia: 'med_traumatologia',
+        med_traumatologia: 'traumatologia',
+        oftalmologia: 'med_oftalmologia',
+        med_oftalmologia: 'oftalmologia',
+      };
+      const companion = SPECIALTY_ALIASES[item.id];
+
       if (item.id === 'config') {
         isActive = isSuper || isOwner || session?.role === 'manager';
       } else if (item.id === 'clinica') {
-        isActive = enabledModules.includes('clinica') || enabledModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
-      } else if (item.id === 'ginecologia') {
-        isActive = enabledModules.includes('ginecologia') || enabledModules.includes('med_ginecologia');
+        isActive = enabledModules.includes('clinica');
+      } else if (companion) {
+        isActive = enabledModules.includes(item.id) || enabledModules.includes(companion);
       } else {
         isActive = enabledModules.includes(item.id);
       }
@@ -130,10 +154,10 @@ export function MobileDock() {
       // Regla de permisos de usuario (asignación explícita o RBAC)
       if (userAllowed) {
         if (item.id === 'clinica') {
-          return userAllowed.includes('clinica') || userAllowed.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
+          return userAllowed.includes('clinica');
         }
-        if (item.id === 'ginecologia') {
-          return userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia');
+        if (companion) {
+          return userAllowed.includes(item.id) || userAllowed.includes(companion);
         }
         return userAllowed.includes(item.id);
       } else if (!isSuper && !isOwner && session?.role) {

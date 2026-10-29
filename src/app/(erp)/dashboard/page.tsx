@@ -26,7 +26,10 @@ import {
   Dog,
   Baby,
   CreditCard,
-  Factory
+  Factory,
+  Heart,
+  Eye,
+  Bone
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -154,6 +157,41 @@ export default function LauncherPage() {
       icon: <HeartPulse className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
     },
     { 
+      id: 'cardiologia', 
+      name: 'Cardiología', 
+      href: '/clinica?spec=cardiologia',
+      gradient: 'from-rose-600 to-red-700',
+      icon: <Heart className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
+      id: 'pediatria', 
+      name: 'Pediatría', 
+      href: '/clinica?spec=pediatria',
+      gradient: 'from-amber-400 to-orange-500',
+      icon: <Baby className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
+      id: 'dermatologia', 
+      name: 'Dermatología', 
+      href: '/clinica?spec=dermatologia',
+      gradient: 'from-purple-400 to-pink-500',
+      icon: <Sparkles className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
+      id: 'traumatologia', 
+      name: 'Traumatología', 
+      href: '/clinica?spec=traumatologia',
+      gradient: 'from-blue-600 to-indigo-700',
+      icon: <Bone className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
+      id: 'oftalmologia', 
+      name: 'Oftalmología', 
+      href: '/clinica?spec=oftalmologia',
+      gradient: 'from-teal-500 to-emerald-700',
+      icon: <Eye className="w-9 h-9 text-white transition-transform duration-350 ease-out group-hover:scale-110" />
+    },
+    { 
       id: 'suscripciones', 
       name: 'Suscripciones', 
       href: '/suscripciones',
@@ -200,24 +238,51 @@ export default function LauncherPage() {
     if (app.id === 'config') return isSuper || isOwner || session?.role === 'manager';
 
     // 1. Debe estar activo en la empresa
-    const isClinica = app.id === 'clinica';
-    const isGineco = app.id === 'ginecologia';
-    const isTenantActive = isClinica
-      ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
-      : isGineco
-        ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
+    const SPECIALTY_ALIASES: Record<string, string> = {
+      ginecologia: 'med_ginecologia',
+      med_ginecologia: 'ginecologia',
+      cardiologia: 'med_cardiologia',
+      med_cardiologia: 'cardiologia',
+      pediatria: 'med_pediatria',
+      med_pediatria: 'pediatria',
+      dermatologia: 'med_dermatologia',
+      med_dermatologia: 'dermatologia',
+      traumatologia: 'med_traumatologia',
+      med_traumatologia: 'traumatologia',
+      oftalmologia: 'med_oftalmologia',
+      med_oftalmologia: 'oftalmologia',
+    };
+    const companion = SPECIALTY_ALIASES[app.id];
+
+    const isTenantActive = app.id === 'clinica'
+      ? tenantModules.includes('clinica')
+      : companion
+        ? (tenantModules.includes(app.id) || tenantModules.includes(companion))
+
         : tenantModules.includes(app.id);
+
+
+
+
 
     if (!isTenantActive) return false;
 
     // 2. Si el usuario tiene lista manual de módulos permitidos (desde Rendo Hub), respetarla estrictamente
     if (userAllowed) {
-      if (isClinica) {
-        return userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_'));
+      if (app.id === 'clinica') {
+        return userAllowed.includes('clinica');
       }
-      if (isGineco) {
-        return userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia');
+
+      if (companion) {
+        return userAllowed.includes(app.id) || userAllowed.includes(companion);
       }
+
+
+
+
+
+
+
       return userAllowed.includes(app.id);
     }
 

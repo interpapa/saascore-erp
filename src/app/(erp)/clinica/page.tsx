@@ -36,7 +36,7 @@ import {
   Smile,
   Image as ImageIcon,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   MedicalSpecialtyId,
   MedicalProcedureDefinition,
@@ -95,6 +95,8 @@ interface SessionOrderItem {
 
 export default function ClinicaMultiEspecialidadPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const specParam = searchParams?.get('spec');
   const currentTenant = useTenantResolver();
   const session = useERPStore((s) => s.session);
   const actor = useActionActor();
@@ -137,13 +139,20 @@ export default function ClinicaMultiEspecialidadPage() {
   const [activeSpecialtyId, setActiveSpecialtyId] = useState<MedicalSpecialtyId>('med_general');
 
   useEffect(() => {
+    if (specParam) {
+      const normalized = (specParam.startsWith('med_') ? specParam : `med_${specParam}`) as MedicalSpecialtyId;
+      if (MEDICAL_SPECIALTIES_MAP[normalized]) {
+        setActiveSpecialtyId(normalized);
+        return;
+      }
+    }
     if (
       enabledSpecialties.length > 0 &&
       !enabledSpecialties.some((s) => s.id === activeSpecialtyId)
     ) {
       setActiveSpecialtyId(enabledSpecialties[0].id);
     }
-  }, [enabledSpecialties, activeSpecialtyId]);
+  }, [enabledSpecialties, activeSpecialtyId, specParam]);
 
   const activeSpecialtyConfig =
     MEDICAL_SPECIALTIES_MAP[activeSpecialtyId] || MEDICAL_SPECIALTIES_MAP.med_general;

@@ -234,9 +234,17 @@ export default function AdminTenantsPage() {
       active_modules: tenant.active_modules,
       metadata: tenant.metadata,
     });
-    const target = moduleId 
-      ? (moduleId === 'catalogo' ? '/inventario' : moduleId === 'config' ? '/configuracion' : moduleId.startsWith('med_') ? '/clinica' : `/${moduleId}`) 
-      : '/dashboard';
+    const getModuleRoute = (mId: string) => {
+      if (mId === 'catalogo') return '/inventario';
+      if (mId === 'config') return '/configuracion';
+      if (mId === 'ginecologia') return '/ginecologia';
+      if (mId.startsWith('med_')) return `/clinica?spec=${mId.replace('med_', '')}`;
+      if (['cardiologia', 'pediatria', 'dermatologia', 'traumatologia', 'oftalmologia', 'general'].includes(mId)) {
+        return `/clinica?spec=${mId}`;
+      }
+      return `/${mId}`;
+    };
+    const target = moduleId ? getModuleRoute(moduleId) : '/dashboard';
     toast({
       variant: 'success',
       title: 'Accediendo al Módulo',
@@ -335,6 +343,14 @@ export default function AdminTenantsPage() {
             } 
           : t
       ));
+      const currentStoreTenant = useERPStore.getState().currentTenant;
+      if (currentStoreTenant && currentStoreTenant.id === selectedTenantForModules.id) {
+        useERPStore.getState().setCurrentTenant({
+          ...currentStoreTenant,
+          active_modules: finalModules,
+          metadata: { ...(currentStoreTenant.metadata || {}), active_modules: finalModules }
+        });
+      }
       setSelectedTenantForModules(null);
     } else {
       toast({

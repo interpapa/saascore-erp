@@ -29,6 +29,11 @@ const routeToModuleId: Record<string, string> = {
   '/integraciones': 'integraciones',
   '/odontologia': 'odontologia',
   '/ginecologia': 'ginecologia',
+  '/cardiologia': 'cardiologia',
+  '/pediatria': 'pediatria',
+  '/dermatologia': 'dermatologia',
+  '/traumatologia': 'traumatologia',
+  '/oftalmologia': 'oftalmologia',
   '/clinica': 'clinica',
   '/barberia': 'barberia',
   '/grooming': 'grooming',
@@ -75,11 +80,26 @@ export default function ERPLayout({
 
   let isModuleDisabled = false;
   if (targetModule) {
+    const SPECIALTY_ALIASES: Record<string, string> = {
+      ginecologia: 'med_ginecologia',
+      med_ginecologia: 'ginecologia',
+      cardiologia: 'med_cardiologia',
+      med_cardiologia: 'cardiologia',
+      pediatria: 'med_pediatria',
+      med_pediatria: 'pediatria',
+      dermatologia: 'med_dermatologia',
+      med_dermatologia: 'dermatologia',
+      traumatologia: 'med_traumatologia',
+      med_traumatologia: 'traumatologia',
+      oftalmologia: 'med_oftalmologia',
+      med_oftalmologia: 'oftalmologia',
+    };
+    const companion = SPECIALTY_ALIASES[targetModule];
     // A. Verificar si está activo en el tenant
     const isTenantActive = targetModule === 'clinica'
       ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia'))
-      : targetModule === 'ginecologia'
-        ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
+      : companion
+        ? (tenantModules.includes(targetModule) || tenantModules.includes(companion))
         : targetModule === 'inventario'
           ? tenantModules.includes('inventario')
           : tenantModules.includes(targetModule);
@@ -90,8 +110,10 @@ export default function ERPLayout({
       // B. Si el usuario tiene asignación manual de módulos desde Rendo Hub
       const isUserAllowed = targetModule === 'clinica'
         ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia'))
-        : targetModule === 'ginecologia'
-          ? (userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia'))
+        : companion
+        ? (userAllowed.includes(targetModule) || userAllowed.includes(companion))
+
+
           : targetModule === 'inventario'
             ? userAllowed.includes('inventario')
             : userAllowed.includes(targetModule);
