@@ -430,9 +430,19 @@ export async function assertModuleEnabled(
     }
 
     const isTargetEnabled = enabledList.includes(moduleId) || 
-      (moduleId === 'clinica' && (enabledList.some(m => m.startsWith('med_')) || enabledList.includes('ginecologia'))) ||
-      (moduleId === 'ginecologia' && (enabledList.includes('med_ginecologia') || enabledList.includes('clinica'))) ||
-      (moduleId === 'med_ginecologia' && (enabledList.includes('ginecologia') || enabledList.includes('clinica'))) ||
+      (moduleId === 'clinica' && (enabledList.some(m => m.startsWith('med_')) || enabledList.includes('ginecologia') || enabledList.includes('cardiologia'))) ||
+      (moduleId === 'ginecologia' && enabledList.includes('med_ginecologia')) ||
+      (moduleId === 'med_ginecologia' && enabledList.includes('ginecologia')) ||
+      (moduleId === 'cardiologia' && enabledList.includes('med_cardiologia')) ||
+      (moduleId === 'med_cardiologia' && enabledList.includes('cardiologia')) ||
+      (moduleId === 'pediatria' && enabledList.includes('med_pediatria')) ||
+      (moduleId === 'med_pediatria' && enabledList.includes('pediatria')) ||
+      (moduleId === 'dermatologia' && enabledList.includes('med_dermatologia')) ||
+      (moduleId === 'med_dermatologia' && enabledList.includes('dermatologia')) ||
+      (moduleId === 'traumatologia' && enabledList.includes('med_traumatologia')) ||
+      (moduleId === 'med_traumatologia' && enabledList.includes('traumatologia')) ||
+      (moduleId === 'oftalmologia' && enabledList.includes('med_oftalmologia')) ||
+      (moduleId === 'med_oftalmologia' && enabledList.includes('oftalmologia')) ||
       (moduleId === 'inventario' && enabledList.includes('catalogo')) || 
       (moduleId === 'catalogo' && enabledList.includes('inventario'));
 

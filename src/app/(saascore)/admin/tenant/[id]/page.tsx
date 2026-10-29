@@ -298,13 +298,10 @@ export default function TenantAdminPage() {
       setActiveModules(activeModules.filter(m => m !== modId && m !== companion));
       if (expandedModule === modId) setExpandedModule(null);
     } else {
-      // Activar: agregar modId (y clinica si es especialidad medica)
+      // Activar: agregar modId (de forma independiente)
       const next = [...activeModules, modId];
       if (companion && !next.includes(companion)) {
         next.push(companion);
-      }
-      if ((modId.startsWith('med_') || modId === 'cardiologia' || modId === 'ginecologia' || modId === 'pediatria' || modId === 'dermatologia' || modId === 'traumatologia' || modId === 'oftalmologia') && !next.includes('clinica')) {
-        next.push('clinica');
       }
       setActiveModules(Array.from(new Set(next)));
       setExpandedModule(modId); // Expandir automáticamente al activarlo
@@ -328,14 +325,7 @@ export default function TenantAdminPage() {
     }
     const activeActor = actor || { email: email || 'admin@rendo.com', role: 'superadmin' as const, token };
     
-    const isAnyMed = activeModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
-    const finalModules = isAnyMed && !activeModules.includes('clinica')
-      ? [...activeModules, 'clinica']
-      : activeModules;
-
-    if (finalModules.length !== activeModules.length) {
-      setActiveModules(finalModules);
-    }
+    const finalModules = activeModules;
 
     const newMetadata = {
       ...(tenant.metadata || {}),

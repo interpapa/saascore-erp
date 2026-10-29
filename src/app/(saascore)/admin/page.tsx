@@ -285,9 +285,6 @@ export default function AdminTenantsPage() {
       if (companion && !next.includes(companion)) {
         next.push(companion);
       }
-      if ((modId.startsWith('med_') || modId === 'cardiologia' || modId === 'ginecologia' || modId === 'pediatria' || modId === 'dermatologia' || modId === 'traumatologia' || modId === 'oftalmologia') && !next.includes('clinica')) {
-        next.push('clinica');
-      }
       setTenantActiveModules(Array.from(new Set(next)));
     }
   };
@@ -315,10 +312,7 @@ export default function AdminTenantsPage() {
     }
     const activeActor = actor || { email: email || 'admin@rendo.com', role: 'superadmin' as const, token };
 
-    const isAnyMed = tenantActiveModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
-    const finalModules = isAnyMed && !tenantActiveModules.includes('clinica')
-      ? [...tenantActiveModules, 'clinica']
-      : tenantActiveModules;
+    const finalModules = tenantActiveModules;
 
     const result = await updateTenantAdminAction(
       selectedTenantForModules.id,
