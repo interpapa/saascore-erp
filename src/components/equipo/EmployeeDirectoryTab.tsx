@@ -164,7 +164,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   // Paleta de Íconos / Emojis Universales para cualquier industria
   const ROLE_ICONS_LIST = [
     // Salud & Clínica
-    '🩺', '🫀', '👶', '🦷', '👁️', '🦴', '🔬', '💉', '💊',
+    '🩺', '❤️', '👶', '🦷', '👁️', '🦴', '🔬', '💉', '💊',
     // Belleza & Cuidado
     '💈', '✂️', '🧖', '💅', '💄', '🧴',
     // Servicios Profesionales & Oficina
@@ -183,7 +183,7 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
 
   const inferDefaultIcon = (name: string): string => {
     const norm = name.toLowerCase();
-    if (norm.includes('cardio') || norm.includes('corazon')) return '🫀';
+    if (norm.includes('cardio') || norm.includes('corazon')) return '❤️';
     if (norm.includes('gineco') || norm.includes('obstetr') || norm.includes('prenatal') || norm.includes('pediatr')) return '👶';
     if (norm.includes('odont') || norm.includes('dent') || norm.includes('bracket') || norm.includes('muela')) return '🦷';
     if (norm.includes('medic') || norm.includes('doctor') || norm.includes('salud') || norm.includes('clinica')) return '🩺';

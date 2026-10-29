@@ -1853,7 +1853,7 @@ export default function ClinicaMultiEspecialidadPage() {
                 Seleccionar Emoji Rápido
               </label>
               <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)]">
-                {['🩺', '👶', '🌸', '✨', '🦴', '👁️', '🔬', '💉', '💊', '🧠', '🫀', '🦷', '🧬', '🏥', '⚕️', '🩹', '🧪', '🚑', '🤰', '🤍'].map((emo) => (
+                {['🩺', '👶', '🌸', '✨', '🦴', '👁️', '🔬', '💉', '💊', '🧠', '❤️', '🦷', '🧬', '🏥', '⚕️', '🩹', '🧪', '🚑', '🤰', '🤍'].map((emo) => (
                   <button
                     key={emo}
                     type="button"

@@ -33,7 +33,7 @@ const getServiceIcon = (serviceName: string, customIcon?: string) => {
   }
   const norm = (serviceName || '').toLowerCase();
   if (norm.includes('cardio') || norm.includes('corazon') || norm.includes('ecg') || norm.includes('tension')) {
-    return <span className="text-2xl select-none leading-none">🫀</span>;
+    return <span className="text-2xl select-none leading-none">❤️</span>;
   }
   if (norm.includes('gineco') || norm.includes('ginelco') || norm.includes('obstetr') || norm.includes('prenatal') || norm.includes('embarazo')) {
     return <span className="text-2xl select-none leading-none">👶</span>;
@@ -74,7 +74,7 @@ const SPECIALTY_META: Record<string, { icon: string; description: string; badge:
     badge: 'Salud Bucal',
   },
   'Cardiología': {
-    icon: '🫀',
+    icon: '❤️',
     description: 'Electrocardiogramas, evaluación cardiovascular, control de tensión arterial y riesgo coronario.',
     badge: 'Cardiovascular',
   },

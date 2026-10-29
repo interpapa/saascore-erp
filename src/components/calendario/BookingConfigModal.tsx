@@ -362,7 +362,7 @@ export function BookingConfigModal({
                   {[
                     { id: 'ginecologia', name: 'Ginecología y Obstetricia', icon: '👶' },
                     { id: 'odontologia', name: 'Odontología & Salud Dental', icon: '🦷' },
-                    { id: 'cardiologia', name: 'Cardiología & Cardiovascular', icon: '🫀' },
+                    { id: 'cardiologia', name: 'Cardiología & Cardiovascular', icon: '❤️' },
                     { id: 'pediatria', name: 'Pediatría & Puericultura', icon: '🧸' },
                     { id: 'dermatologia', name: 'Dermatología & Estética', icon: '🧴' },
                     { id: 'traumatologia', name: 'Traumatología & Fisioterapia', icon: '🦴' },
