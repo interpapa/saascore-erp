@@ -141,7 +141,13 @@ const resolveCategoryName = (domain: string | null, customFallback?: string): st
   if (domain === 'barberia') return 'Barbería';
   if (domain === 'grooming') return 'Peluquería Canina';
   if (domain === 'med_general') return 'Medicina General';
-  if (customFallback && customFallback !== 'Especialista' && customFallback !== 'Espacio / Recurso') {
+  if (
+    customFallback && 
+    customFallback !== 'Especialista' && 
+    customFallback !== 'Espacio / Recurso' && 
+    customFallback !== 'Profesional' &&
+    customFallback !== 'Colaborador'
+  ) {
     return customFallback;
   }
   return 'General';
@@ -434,7 +440,13 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         let branchName = '';
         if (customGeneralName) {
           branchName = customGeneralName;
-        } else if (roleTitle && roleTitle !== 'Espacio / Recurso' && roleTitle !== 'Especialista') {
+        } else if (
+          roleTitle && 
+          roleTitle !== 'Espacio / Recurso' && 
+          roleTitle !== 'Especialista' &&
+          roleTitle !== 'Profesional' &&
+          roleTitle !== 'Colaborador'
+        ) {
           branchName = roleTitle;
         } else if (docRole) {
           branchName = docRole;
@@ -442,7 +454,9 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
           branchName = dentistRole;
         } else if (barberRole) {
           branchName = barberRole;
-        } else if (!svcs || svcs.length === 0) {
+        } else if (groomerRole) {
+          branchName = groomerRole;
+        } else if ((!svcs || svcs.length === 0) && (empDomain || emp.metadata?.is_doctor || emp.metadata?.doctor_config)) {
           branchName = 'Atención General';
         } else {
           // Si el colaborador ya tiene procedimientos particulares detallados (ej: Ecografía, Control Prenatal, etc.)
@@ -513,15 +527,44 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     });
   }, [employees, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
 
-  // Categorías de especialidad detectadas (ej. Ginecología y Obstetricia, Odontología, etc.)
+  // Categorías de especialidad detectadas y ordenadas canónicamente (ej. Medicina General, Odontología, Ginecología, etc.)
   const availableCategories = useMemo(() => {
+    const invalidCategories = new Set([
+      'General',
+      'Profesional',
+      'Especialista',
+      'Colaborador',
+      'Espacio / Recurso',
+      'software developer',
+    ]);
     const cats = new Set<string>();
+
     uniqueServices.forEach((s: any) => {
-      if (s.category && s.category !== 'General') {
-        cats.add(s.category);
+      const cat = (s.category || '').trim();
+      if (cat && !invalidCategories.has(cat)) {
+        cats.add(cat);
       }
     });
-    return Array.from(cats);
+
+    const canonicalOrder: Record<string, number> = {
+      'Medicina General': 1,
+      'Odontología': 2,
+      'Ginecología y Obstetricia': 3,
+      'Pediatría': 4,
+      'Cardiología': 5,
+      'Dermatología': 6,
+      'Traumatología': 7,
+      'Oftalmología': 8,
+      'Barbería': 9,
+      'Peluquería Canina': 10,
+    };
+
+    return Array.from(cats).sort((a, b) => {
+      const orderA = canonicalOrder[a] ?? 99;
+      const orderB = canonicalOrder[b] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.localeCompare(b, 'es');
+    });
   }, [uniqueServices]);
 
   // Auto-detectar especialidad desde URL (?especialidad=... o ?rama=...) o preseleccionar

@@ -52,11 +52,40 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
   }
 
   const employees = (employeesData || [])
-    .filter(e => e.metadata?.bookable !== false)
+    .filter(e => {
+      // 1. Si el registro está explícitamente excluido de reservas públicas
+      if (e.metadata?.bookable === false) return false;
+
+      // 2. Blindaje anti-contaminación: descartar entidades dummy de pruebas automatizadas (QA)
+      const name = (e.name || '').trim();
+      if (/^(Colaborador|Especialista|Usuario|Doctor)\s+QA\b/i.test(name)) return false;
+
+      // 3. Filtrar recursos físicos (canchas, cabinas, salas) sin servicios configurados
+      const isPhysicalResource = e.metadata?.is_resource === true || e.metadata?.role_title === 'Espacio / Recurso';
+      const svcs = Array.isArray(e.metadata?.services) ? e.metadata.services : [];
+      if (isPhysicalResource && svcs.length === 0) return false;
+
+      // 4. Excluir registros huérfanos sin rol, sin servicios y sin configuración explícita
+      const hasServices = svcs.length > 0;
+      const hasClinicalConfig = Boolean(
+        e.metadata?.role_title ||
+        e.metadata?.doctor_config?.specialty ||
+        e.metadata?.doctor_config?.role ||
+        e.metadata?.dentist_config?.role ||
+        e.metadata?.barber_config?.role
+      );
+      const isExplicitlyBookable = e.metadata?.bookable === true;
+
+      if (!isExplicitlyBookable && !hasServices && !hasClinicalConfig) {
+        return false;
+      }
+
+      return true;
+    })
     .map(e => ({
       id: e.id,
       name: e.name,
-      role: e.metadata?.role_title || e.metadata?.role || 'Profesional',
+      role: e.metadata?.role_title || e.metadata?.doctor_config?.specialty || e.metadata?.doctor_config?.role || e.metadata?.dentist_config?.role || e.metadata?.role || 'Profesional',
       is_active: e.status === 'active',
       metadata: e.metadata
     }));
