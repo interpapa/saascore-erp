@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
@@ -119,6 +119,30 @@ export default function TenantAdminPage() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('seller');
   const [isSubmittingUser, setIsSubmittingUser] = useState(false);
+
+  // Detección reactiva de cambios pendientes para barra de confirmación inmediata
+  const hasUnsavedChanges = useMemo(() => {
+    if (!tenant) return false;
+    if (name !== (tenant.name || '')) return true;
+    if (subscriptionPlan !== (tenant.subscription_plan || tenant.metadata?.plan || 'basic')) return true;
+    const initialStatus = tenant.status === 'suspended' ? 'suspended' : 'active';
+    if (status !== initialStatus) return true;
+    
+    const initialModules = Array.isArray(tenant.active_modules) ? tenant.active_modules.filter((m: string) => m !== 'catalogo') : [];
+    const currentSorted = [...activeModules].sort().join(',');
+    const initialSorted = [...initialModules].sort().join(',');
+    if (currentSorted !== initialSorted) return true;
+
+    const initialFeatures = tenant.metadata?.features || {
+      use_inventory_recipes: true,
+      use_calendar_employees: true,
+      use_pos_discounts: true,
+      use_calendar_whatsapp: true
+    };
+    if (JSON.stringify(featureFlags) !== JSON.stringify(initialFeatures)) return true;
+
+    return false;
+  }, [tenant, name, subscriptionPlan, status, activeModules, featureFlags]);
 
   useEffect(() => {
     if ((session?.userEmail || actor?.email) && id) {
@@ -341,7 +365,7 @@ export default function TenantAdminPage() {
   }
 
   return (
-    <div className="w-full max-w-5xl mx-auto space-y-6 pb-24 animate-in fade-in">
+    <div className="w-full max-w-5xl mx-auto space-y-6 pb-32 animate-in fade-in">
       {/* Header Unificado */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/80 pb-5">
         <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -352,7 +376,7 @@ export default function TenantAdminPage() {
             <ArrowLeft size={18} />
           </Link>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-3xl font-black text-foreground tracking-tight truncate">
+            <h1 className="text-lg sm:text-2xl font-black text-foreground tracking-tight break-words leading-tight">
               {tenant.name}
             </h1>
             <p className="text-muted-foreground font-mono text-[10px] sm:text-xs mt-0.5 truncate">ID: {tenant.id}</p>
@@ -528,13 +552,24 @@ export default function TenantAdminPage() {
 
       {/* Arquitectura Modular */}
       <div className="bg-card border border-border rounded-2xl shadow-xs overflow-hidden">
-        <div className="p-5 sm:p-6 border-b border-border/60 bg-muted/20">
-          <h3 className="font-bold text-foreground flex items-center gap-2 text-lg">
-            <LayoutTemplate size={20} className="text-primary"/> Configuración de Módulos
-          </h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Enciende o apaga aplicaciones completas. Expande un módulo encendido para ajustar sus opciones finas.
-          </p>
+        <div className="p-4 sm:p-6 border-b border-border/60 bg-muted/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-foreground flex items-center gap-2 text-base sm:text-lg">
+              <LayoutTemplate size={20} className="text-primary"/> Configuración de Módulos
+            </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Enciende o apaga aplicaciones completas. Expande un módulo encendido para ajustar sus opciones finas.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs btn-haptic shrink-0"
+          >
+            <Save size={15} />
+            <span>{isSaving ? 'Guardando...' : 'Guardar Módulos'}</span>
+          </button>
         </div>
         
         {/* Filtros de Categorías y Acciones Rápidas */}
@@ -565,7 +600,7 @@ export default function TenantAdminPage() {
             <button
               type="button"
               onClick={() => setActiveModules(ALL_MODULES.map(m => m.id))}
-              className="text-xs font-bold text-primary hover:underline px-2 py-1"
+              className="text-xs font-bold text-primary hover:underline px-2 py-1 btn-haptic"
             >
               Activar Todos
             </button>
@@ -573,7 +608,7 @@ export default function TenantAdminPage() {
             <button
               type="button"
               onClick={() => setActiveModules([])}
-              className="text-xs font-bold text-muted-foreground hover:text-destructive hover:underline px-2 py-1"
+              className="text-xs font-bold text-muted-foreground hover:text-destructive hover:underline px-2 py-1 btn-haptic"
             >
               Desactivar Todos
             </button>
@@ -607,7 +642,7 @@ export default function TenantAdminPage() {
                     ) : (
                       <div className="w-4 shrink-0" />
                     )}
-                    <span className={`font-bold text-xs sm:text-base truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <span className={`font-bold text-xs sm:text-base leading-snug break-words ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {mod.name}
                     </span>
                     {hasFeatures && (
@@ -677,6 +712,27 @@ export default function TenantAdminPage() {
               </div>
             )
           })}
+        </div>
+
+        {/* Footer de Configuración de Módulos */}
+        <div className="p-4 sm:p-5 bg-muted/20 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="text-xs font-bold text-muted-foreground text-center sm:text-left">
+            <span className="text-primary font-black">{activeModules.length}</span> de {ALL_MODULES.length} módulos habilitados
+            {hasUnsavedChanges && (
+              <span className="block sm:inline sm:ml-2 text-emerald-500 font-extrabold mt-1 sm:mt-0">
+                • Cambios pendientes por guardar
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs btn-haptic shrink-0"
+          >
+            <Save size={16} />
+            <span>{isSaving ? 'Guardando...' : 'Confirmar y Guardar Módulos'}</span>
+          </button>
         </div>
       </div>
 
@@ -764,6 +820,27 @@ export default function TenantAdminPage() {
             </form>
           </div>
         </div>
+      )}
+      {/* Barra Flotante Sticky de Confirmación de Cambios */}
+      {hasUnsavedChanges && (
+        <aside 
+          aria-label="Confirmación de cambios pendientes"
+          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-md bg-emerald-600/95 backdrop-blur-xl text-white p-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 animate-in slide-in-from-bottom-4 duration-200 border border-emerald-400/50"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse shrink-0" />
+            <span className="text-xs font-bold truncate">Tienes cambios sin guardar</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="bg-white text-emerald-700 hover:bg-emerald-50 px-4 py-2 rounded-xl text-xs font-black shrink-0 shadow-sm flex items-center gap-1.5 btn-haptic cursor-pointer"
+          >
+            <Save size={14} />
+            <span>{isSaving ? 'Guardando...' : 'Confirmar y Guardar'}</span>
+          </button>
+        </aside>
       )}
     </div>
   );

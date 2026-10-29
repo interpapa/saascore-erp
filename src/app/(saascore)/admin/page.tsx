@@ -999,7 +999,7 @@ export default function AdminTenantsPage() {
       {/* Modal Control Rápido de Módulos */}
       {selectedTenantForModules && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
-          <div className="bg-card border border-border rounded-3xl w-full max-w-4xl p-4 sm:p-6 shadow-2xl relative max-h-[92vh] flex flex-col overflow-hidden">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-4xl p-4 sm:p-6 shadow-2xl relative max-h-[90dvh] sm:max-h-[85vh] flex flex-col overflow-hidden">
             <button
               onClick={() => setSelectedTenantForModules(null)}
               className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors btn-haptic z-10"
@@ -1008,22 +1008,22 @@ export default function AdminTenantsPage() {
               <X size={20} />
             </button>
 
-            <div className="flex items-center gap-3 mb-4 pr-10">
+            <div className="flex items-center gap-3 mb-3 pr-10 shrink-0">
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary shrink-0">
                 <SlidersHorizontal size={20} />
               </div>
-              <div>
-                <h3 className="text-base sm:text-lg font-black text-foreground tracking-tight">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-black text-foreground tracking-tight truncate">
                   Módulos de {selectedTenantForModules.name}
                 </h3>
-                <p className="text-xs text-muted-foreground font-medium">
-                  Activa o desactiva qué secciones y especialidades puede ver y operar este tenant en el ERP.
+                <p className="text-xs text-muted-foreground font-medium truncate">
+                  Activa o desactiva qué aplicaciones y especialidades operan en esta empresa.
                 </p>
               </div>
             </div>
 
             {/* Pestañas de Categoría */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2 border-b border-border/70 -mx-1 px-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2 border-b border-border/70 -mx-1 px-1 shrink-0">
               <button
                 type="button"
                 onClick={() => setModulesCategoryFilter('all')}
@@ -1082,9 +1082,9 @@ export default function AdminTenantsPage() {
             </div>
 
             {/* Contador y Acciones Rápidas */}
-            <div className="flex items-center justify-between pb-2 mb-2 text-xs">
+            <div className="flex items-center justify-between pb-2 mb-2 text-xs shrink-0">
               <span className="font-bold text-muted-foreground">
-                <b className="text-primary">{tenantActiveModules.length}</b> de {ALL_SYSTEM_MODULES.length} módulos habilitados
+                <b className="text-primary font-black">{tenantActiveModules.length}</b> de {ALL_SYSTEM_MODULES.length} habilitados
               </span>
               <div className="flex items-center gap-3">
                 <button
@@ -1124,7 +1124,7 @@ export default function AdminTenantsPage() {
                     >
                       <div className="pr-3 flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <span className="font-bold text-xs sm:text-sm text-foreground">
+                          <span className="font-bold text-xs sm:text-sm text-foreground leading-snug">
                             {mod.name}
                           </span>
                         </div>
@@ -1153,11 +1153,11 @@ export default function AdminTenantsPage() {
             </div>
 
             {/* Footer Fijo */}
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-border mt-3">
+            <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-3 border-t border-border mt-2 shrink-0 bg-card">
               <button
                 type="button"
                 onClick={() => setSelectedTenantForModules(null)}
-                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all btn-haptic"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-all btn-haptic text-center"
               >
                 Cancelar
               </button>
@@ -1165,10 +1165,10 @@ export default function AdminTenantsPage() {
                 type="button"
                 onClick={handleSaveTenantModules}
                 disabled={isSavingModules}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 btn-haptic"
+                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-50 btn-haptic"
               >
                 <Save size={16} />
-                {isSavingModules ? 'Guardando...' : 'Guardar Módulos'}
+                <span>{isSavingModules ? 'Guardando...' : 'Confirmar y Guardar Módulos'}</span>
               </button>
             </div>
           </div>

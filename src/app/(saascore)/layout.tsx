@@ -9,8 +9,8 @@ import { useERPStore } from '@/store/useERPStore';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useRouter, usePathname } from 'next/navigation';
 import { getSystemHealthAdminAction } from '@/app/actions/tenant';
-import { FloatingHeader } from '@/components/core/FloatingHeader';
 import { AmbientBackground } from '@/components/core/AmbientBackground';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { MobileDock } from '@/components/core/MobileDock';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 
@@ -68,12 +68,11 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background text-foreground relative selection:bg-primary/20 selection:text-primary font-sans">
       <AmbientBackground />
-      <FloatingHeader />
 
-      <main className="relative z-10 pt-20 sm:pt-24 pb-28 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full overflow-x-hidden">
+      <main className="relative z-10 pt-3 sm:pt-6 pb-32 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full overflow-x-hidden">
         {/* Barra superior de navegación unificada del Módulo SaaS Admin */}
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-8 pb-4 sm:pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border shadow-xs">
-          {/* Fila Superior: Título de Rendo Hub + Botón de Salida */}
+          {/* Fila Superior: Título de Rendo Hub + Modo Oscuro + Botón de Salida */}
           <div className="flex items-center justify-between gap-2.5 w-full lg:w-auto">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20 shadow-xs shrink-0">
@@ -85,14 +84,19 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-xs shrink-0 btn-haptic group"
-              title="Volver al panel principal del ERP"
-            >
-              <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-              <span>Dashboard</span>
-            </Link>
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center">
+                <ThemeToggle />
+              </div>
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-xs shrink-0 btn-haptic group"
+                title="Volver al panel principal del ERP"
+              >
+                <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+                <span>Dashboard</span>
+              </Link>
+            </div>
           </div>
 
           {/* Pestañas horizontales de navegación del módulo */}
