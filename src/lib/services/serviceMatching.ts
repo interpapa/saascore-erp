@@ -22,7 +22,7 @@ export type ClinicalDomain =
 
 export const DOMAIN_KEYWORDS: Record<ClinicalDomain, string[]> = {
   cardiologia: [
-    'cardiolog', 'cardio', 'corazon', 'electrocardiograma', 'ecg', 'holter', 'ecocardiograma', 'tension', 'hipertension'
+    'cardiolog', 'cardio', 'corazon', 'electrocardiograma', 'ecg', 'holter', 'mapa', 'ecocardiograma', 'presion arterial', 'tension', 'hipertension'
   ],
   ginecologia: [
     'ginecolog', 'gineco', 'ginelco', 'obstetr', 'prenatal', 'embarazo', 'parto', 'cesarea', 
