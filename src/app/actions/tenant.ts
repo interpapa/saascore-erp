@@ -350,9 +350,14 @@ export async function updateTenantSettings(
       invalidateModuleCache(tenantId);
     }
 
-    revalidatePath('/configuracion');
-    revalidatePath('/dashboard');
-    revalidatePath('/apps');
+    try {
+      revalidatePath('/configuracion');
+      revalidatePath('/dashboard');
+      revalidatePath('/apps');
+      revalidatePath('/admin');
+    } catch (revalErr) {
+      console.warn('[updateTenantSettings revalidatePath safe catch]:', revalErr);
+    }
     return { success: true, tenant };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -788,6 +793,14 @@ export async function getTenantByIdAdmin(tenantId: string, callerOrActor: Action
       .single();
 
     if (error) throw error;
+
+    if (tenant) {
+      const activeList = Array.isArray(tenant.active_modules)
+        ? tenant.active_modules
+        : (Array.isArray((tenant.metadata as any)?.active_modules) ? (tenant.metadata as any).active_modules : []);
+      tenant.active_modules = activeList.filter((m: string) => m !== 'catalogo');
+    }
+
     return { success: true, tenant };
   } catch (err: any) {
     return { success: false, error: (err as Error).message };
@@ -802,10 +815,37 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
     }
     const db = supabaseAdmin;
 
-    // Normalizar active_modules purgando estrictamente el alias legado 'catalogo'
+    // Normalizar active_modules purgando estrictamente el alias legado 'catalogo' y sincronizando dualidades
     let normalizedModules: string[] | undefined = undefined;
     if (Array.isArray(updates.active_modules)) {
-      normalizedModules = updates.active_modules.filter((m: string) => m !== 'catalogo');
+      let list = updates.active_modules.filter((m: string) => m !== 'catalogo');
+
+      // Normalizar dualidades de especialidades médicas para evitar que alias huérfanos reactiven módulos
+      const hasGineco = list.includes('ginecologia') || list.includes('med_ginecologia');
+      list = list.filter((m: string) => m !== 'ginecologia' && m !== 'med_ginecologia');
+      if (hasGineco) list.push('ginecologia', 'med_ginecologia');
+
+      const hasCardio = list.includes('cardiologia') || list.includes('med_cardiologia');
+      list = list.filter((m: string) => m !== 'cardiologia' && m !== 'med_cardiologia');
+      if (hasCardio) list.push('cardiologia', 'med_cardiologia');
+
+      const hasPedia = list.includes('pediatria') || list.includes('med_pediatria');
+      list = list.filter((m: string) => m !== 'pediatria' && m !== 'med_pediatria');
+      if (hasPedia) list.push('pediatria', 'med_pediatria');
+
+      const hasDerma = list.includes('dermatologia') || list.includes('med_dermatologia');
+      list = list.filter((m: string) => m !== 'dermatologia' && m !== 'med_dermatologia');
+      if (hasDerma) list.push('dermatologia', 'med_dermatologia');
+
+      const hasTrauma = list.includes('traumatologia') || list.includes('med_traumatologia');
+      list = list.filter((m: string) => m !== 'traumatologia' && m !== 'med_traumatologia');
+      if (hasTrauma) list.push('traumatologia', 'med_traumatologia');
+
+      const hasOftalmo = list.includes('oftalmologia') || list.includes('med_oftalmologia');
+      list = list.filter((m: string) => m !== 'oftalmologia' && m !== 'med_oftalmologia');
+      if (hasOftalmo) list.push('oftalmologia', 'med_oftalmologia');
+
+      normalizedModules = Array.from(new Set(list));
     }
 
     // Traer metadata existente para mantener campos y sincronizar active_modules
@@ -888,13 +928,16 @@ export async function updateTenantAdminAction(tenantId: string, updates: any, ca
       invalidateModuleCache(tenantId);
     }
 
-    revalidatePath('/admin');
-    revalidatePath('/admin/billing');
-    revalidatePath(`/admin/tenant/${tenantId}`);
-    revalidatePath('/dashboard');
-    revalidatePath('/configuracion');
-    revalidatePath('/apps');
-    revalidatePath('/configuracion');
+    try {
+      revalidatePath('/admin');
+      revalidatePath('/admin/billing');
+      revalidatePath(`/admin/tenant/${tenantId}`);
+      revalidatePath('/dashboard');
+      revalidatePath('/configuracion');
+      revalidatePath('/apps');
+    } catch (revalErr) {
+      console.warn('[updateTenantAdminAction revalidatePath safe catch]:', revalErr);
+    }
 
     return { success: true, tenant };
   } catch (err: any) {

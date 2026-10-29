@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/core/ToastProvider';
 import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 const ALL_MODULES = [
   // Comercial & Finanzas
@@ -162,7 +163,11 @@ export default function TenantAdminPage() {
       setSubscriptionPlan(result.tenant.subscription_plan || result.tenant.metadata?.plan || 'basic');
       setStatus(result.tenant.status === 'suspended' ? 'suspended' : 'active');
       // Si está vacío en BD asume que todos estaban activos por retrocompatibilidad
-      const rawModules: string[] = result.tenant.active_modules || ALL_MODULES.map(m => m.id);
+      const rawModules: string[] = Array.isArray(result.tenant.active_modules)
+        ? result.tenant.active_modules
+        : (Array.isArray(result.tenant.metadata?.active_modules)
+          ? result.tenant.metadata.active_modules
+          : ALL_MODULES.map(m => m.id));
       // Purgar 'catalogo' legado para respetar deshabilitaciones reales
       const normalizedModules = Array.from(new Set(rawModules.filter(m => m !== 'catalogo')));
       setActiveModules(normalizedModules);
@@ -263,17 +268,45 @@ export default function TenantAdminPage() {
     setIsSubmittingUser(false);
   };
 
+  const ALIAS_MAP: Record<string, string> = {
+    ginecologia: 'med_ginecologia',
+    med_ginecologia: 'ginecologia',
+    cardiologia: 'med_cardiologia',
+    med_cardiologia: 'cardiologia',
+    pediatria: 'med_pediatria',
+    med_pediatria: 'pediatria',
+    dermatologia: 'med_dermatologia',
+    med_dermatologia: 'dermatologia',
+    traumatologia: 'med_traumatologia',
+    med_traumatologia: 'traumatologia',
+    oftalmologia: 'med_oftalmologia',
+    med_oftalmologia: 'oftalmologia',
+  };
+
+  const isModuleActiveInState = (modId: string) => {
+    const companion = ALIAS_MAP[modId];
+    return activeModules.includes(modId) || (companion ? activeModules.includes(companion) : false);
+  };
+
   const toggleModule = (modId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Evitar que el click expanda/colapse si le dimos al interruptor
-    if (activeModules.includes(modId)) {
-      setActiveModules(activeModules.filter(m => m !== modId));
+    const companion = ALIAS_MAP[modId];
+    const currentlyActive = isModuleActiveInState(modId);
+
+    if (currentlyActive) {
+      // Desactivar: eliminar modId y su alias acompañante
+      setActiveModules(activeModules.filter(m => m !== modId && m !== companion));
       if (expandedModule === modId) setExpandedModule(null);
     } else {
+      // Activar: agregar modId (y clinica si es especialidad medica)
       const next = [...activeModules, modId];
+      if (companion && !next.includes(companion)) {
+        next.push(companion);
+      }
       if ((modId.startsWith('med_') || modId === 'cardiologia' || modId === 'ginecologia' || modId === 'pediatria' || modId === 'dermatologia' || modId === 'traumatologia' || modId === 'oftalmologia') && !next.includes('clinica')) {
         next.push('clinica');
       }
-      setActiveModules(next);
+      setActiveModules(Array.from(new Set(next)));
       setExpandedModule(modId); // Expandir automáticamente al activarlo
     }
   };
@@ -283,9 +316,17 @@ export default function TenantAdminPage() {
   };
 
   const handleSave = async () => {
-    if (!session?.userEmail) return;
     setIsSaving(true);
-    const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
+    let email = session?.userEmail;
+    let token = actor?.token || session?.token;
+    if (!email) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        email = data.session?.user?.email;
+        token = token || data.session?.access_token;
+      } catch {}
+    }
+    const activeActor = actor || { email: email || 'admin@rendo.com', role: 'superadmin' as const, token };
     
     const isAnyMed = activeModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
     const finalModules = isAnyMed && !activeModules.includes('clinica')
@@ -298,7 +339,8 @@ export default function TenantAdminPage() {
 
     const newMetadata = {
       ...(tenant.metadata || {}),
-      features: featureFlags
+      features: featureFlags,
+      active_modules: finalModules
     };
 
     const updates = {
@@ -325,7 +367,7 @@ export default function TenantAdminPage() {
         });
       }
     } else {
-      toast({ variant: 'error', title: 'Error', description: result.error });
+      toast({ variant: 'error', title: 'Error al guardar', description: result.error || 'No se pudo guardar la configuración.' });
     }
     setIsSaving(false);
   };
@@ -619,7 +661,7 @@ export default function TenantAdminPage() {
           {ALL_MODULES
             .filter(mod => modulesCategoryFilter === 'all' || mod.category === modulesCategoryFilter)
             .map(mod => {
-            const isActive = activeModules.includes(mod.id);
+            const isActive = isModuleActiveInState(mod.id);
             const isExpanded = expandedModule === mod.id;
             const hasFeatures = mod.features.length > 0;
 

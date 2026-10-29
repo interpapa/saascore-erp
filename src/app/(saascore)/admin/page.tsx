@@ -245,22 +245,50 @@ export default function AdminTenantsPage() {
     router.push(target);
   };
 
+  const ADMIN_ALIAS_MAP: Record<string, string> = {
+    ginecologia: 'med_ginecologia',
+    med_ginecologia: 'ginecologia',
+    cardiologia: 'med_cardiologia',
+    med_cardiologia: 'cardiologia',
+    pediatria: 'med_pediatria',
+    med_pediatria: 'pediatria',
+    dermatologia: 'med_dermatologia',
+    med_dermatologia: 'dermatologia',
+    traumatologia: 'med_traumatologia',
+    med_traumatologia: 'traumatologia',
+    oftalmologia: 'med_oftalmologia',
+    med_oftalmologia: 'oftalmologia',
+  };
+
+  const isModuleActiveInTenantState = (modId: string) => {
+    const companion = ADMIN_ALIAS_MAP[modId];
+    return tenantActiveModules.includes(modId) || (companion ? tenantActiveModules.includes(companion) : false);
+  };
+
   const handleOpenModulesModal = (tenant: any) => {
     setSelectedTenantForModules(tenant);
-    const rawMods = tenant.active_modules || (tenant.metadata as any)?.active_modules || ALL_SYSTEM_MODULES.map(m => m.id);
+    const rawMods = Array.isArray(tenant.active_modules)
+      ? tenant.active_modules
+      : ((tenant.metadata as any)?.active_modules || ALL_SYSTEM_MODULES.map(m => m.id));
     const cleaned = (Array.isArray(rawMods) ? rawMods : []).filter((m: string) => m !== 'catalogo');
     setTenantActiveModules(cleaned);
   };
 
   const handleToggleTenantModule = (modId: string) => {
-    if (tenantActiveModules.includes(modId)) {
-      setTenantActiveModules(tenantActiveModules.filter(m => m !== modId));
+    const companion = ADMIN_ALIAS_MAP[modId];
+    const currentlyActive = isModuleActiveInTenantState(modId);
+
+    if (currentlyActive) {
+      setTenantActiveModules(tenantActiveModules.filter(m => m !== modId && m !== companion));
     } else {
       const next = [...tenantActiveModules, modId];
-      if (modId.startsWith('med_') && !next.includes('clinica')) {
+      if (companion && !next.includes(companion)) {
+        next.push(companion);
+      }
+      if ((modId.startsWith('med_') || modId === 'cardiologia' || modId === 'ginecologia' || modId === 'pediatria' || modId === 'dermatologia' || modId === 'traumatologia' || modId === 'oftalmologia') && !next.includes('clinica')) {
         next.push('clinica');
       }
-      setTenantActiveModules(next);
+      setTenantActiveModules(Array.from(new Set(next)));
     }
   };
 
@@ -273,11 +301,22 @@ export default function AdminTenantsPage() {
   };
 
   const handleSaveTenantModules = async () => {
-    if (!selectedTenantForModules || !session?.userEmail) return;
+    if (!selectedTenantForModules) return;
     setIsSavingModules(true);
-    const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
 
-    const finalModules = tenantActiveModules.some(m => m.startsWith('med_')) && !tenantActiveModules.includes('clinica')
+    let email = session?.userEmail;
+    let token = actor?.token || session?.token;
+    if (!email) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        email = data.session?.user?.email;
+        token = token || data.session?.access_token;
+      } catch {}
+    }
+    const activeActor = actor || { email: email || 'admin@rendo.com', role: 'superadmin' as const, token };
+
+    const isAnyMed = tenantActiveModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
+    const finalModules = isAnyMed && !tenantActiveModules.includes('clinica')
       ? [...tenantActiveModules, 'clinica']
       : tenantActiveModules;
 
@@ -290,12 +329,16 @@ export default function AdminTenantsPage() {
     if (result.success) {
       toast({
         variant: 'success',
-        title: 'Módulos Actualizados',
+        title: 'Módulos Guardados',
         description: `Los módulos de "${selectedTenantForModules.name}" se guardaron exitosamente.`
       });
       setTenants(prev => prev.map(t => 
         t.id === selectedTenantForModules.id 
-          ? { ...t, active_modules: finalModules } 
+          ? { 
+              ...t, 
+              active_modules: finalModules,
+              metadata: { ...(t.metadata || {}), active_modules: finalModules }
+            } 
           : t
       ));
       setSelectedTenantForModules(null);
@@ -303,7 +346,7 @@ export default function AdminTenantsPage() {
       toast({
         variant: 'error',
         title: 'Error al actualizar',
-        description: result.error
+        description: result.error || 'No se pudieron guardar los módulos.'
       });
     }
     setIsSavingModules(false);
@@ -1110,7 +1153,7 @@ export default function AdminTenantsPage() {
               {ALL_SYSTEM_MODULES
                 .filter(m => modulesCategoryFilter === 'all' || m.category === modulesCategoryFilter)
                 .map((mod) => {
-                  const isActive = tenantActiveModules.includes(mod.id);
+                  const isActive = isModuleActiveInTenantState(mod.id);
                   return (
                     <button
                       key={mod.id}
