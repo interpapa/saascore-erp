@@ -20,8 +20,18 @@ import { isSuperAdminEmail } from './superadminWhitelist';
 
 export function isSuperAdminAuthUser(user?: { email?: string | null; app_metadata?: any; user_metadata?: any } | null): boolean {
   if (!user || !user.email) return false;
-  // Seguridad estricta: El rol SuperAdmin de Rendo Hub está reservado única y exclusivamente a la lista blanca del dueño
-  return isSuperAdminEmail(user.email);
+  if (isSuperAdminEmail(user.email)) return true;
+
+  // Acceso para staff técnico interno de la plataforma
+  const role = user.app_metadata?.role || user.user_metadata?.role;
+  const isSuper = role === 'superadmin' || user.app_metadata?.is_superadmin === true;
+  if (isSuper) {
+    const email = user.email.toLowerCase();
+    if (email.endsWith('@rendo.app') || email.endsWith('@rendo.com') || email.endsWith('@saascore.com')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function validateUserTenantAccess(

@@ -75,6 +75,7 @@ import { PrescriptionPrintModal } from '@/components/clinica/PrescriptionPrintMo
 
 const SPECIALTY_ICON_MAP: Record<MedicalSpecialtyId, React.ComponentType<{ className?: string }>> = {
   med_general: Stethoscope,
+  med_cardiologia: Activity,
   med_pediatria: Baby,
   med_ginecologia: HeartPulse,
   med_dermatologia: Sparkles,
@@ -121,9 +122,10 @@ export default function ClinicaMultiEspecialidadPage() {
         ? currentTenant.active_modules
         : (tenantMeta.active_modules as string[])) || [];
 
-    const activeMedSubmodules = MEDICAL_SPECIALTIES_LIST.filter((spec) =>
-      rawModules.includes(spec.id)
-    );
+    const activeMedSubmodules = MEDICAL_SPECIALTIES_LIST.filter((spec) => {
+      const alias = spec.id.replace('med_', '');
+      return rawModules.includes(spec.id) || rawModules.includes(alias);
+    });
 
     // Si tiene sub-módulos específicos activos, mostrar esos; si solo tiene 'clinica' (o vacío), mostrar todas por defecto
     if (activeMedSubmodules.length > 0) {

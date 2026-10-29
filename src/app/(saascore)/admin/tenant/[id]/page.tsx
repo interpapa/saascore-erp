@@ -75,6 +75,7 @@ const ALL_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', features: [] },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'salud', features: [] },
+  { id: 'cardiologia', name: 'Cardiología & Cardiovascular', category: 'salud', features: [] },
   { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'salud', features: [] },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', features: [] },
   { id: 'med_general', name: 'Especialidad: Medicina General e Interna', category: 'salud', features: [] },
@@ -245,7 +246,7 @@ export default function TenantAdminPage() {
       if (expandedModule === modId) setExpandedModule(null);
     } else {
       const next = [...activeModules, modId];
-      if (modId.startsWith('med_') && !next.includes('clinica')) {
+      if ((modId.startsWith('med_') || modId === 'cardiologia' || modId === 'ginecologia' || modId === 'pediatria' || modId === 'dermatologia' || modId === 'traumatologia' || modId === 'oftalmologia') && !next.includes('clinica')) {
         next.push('clinica');
       }
       setActiveModules(next);
@@ -262,7 +263,8 @@ export default function TenantAdminPage() {
     setIsSaving(true);
     const activeActor = actor || { email: session.userEmail, role: 'superadmin' as const };
     
-    const finalModules = activeModules.some(m => m.startsWith('med_')) && !activeModules.includes('clinica')
+    const isAnyMed = activeModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
+    const finalModules = isAnyMed && !activeModules.includes('clinica')
       ? [...activeModules, 'clinica']
       : activeModules;
 

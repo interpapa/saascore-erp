@@ -18,9 +18,9 @@ import { isModuleActive } from '../lib/core/kernel/moduleRegistry';
 export async function runRendoSaludTests() {
   console.log('\n--- 🩺 Módulo 12: Clínica Médica Multi-Especialidad (Rendo Salud) ---');
 
-  // 1. Verificar registro de las 6 especialidades y los 48 procedimientos
-  console.log('12.1 Catálogo de 6 especialidades médicas y 48 procedimientos con etapas');
-  assert.equal(MEDICAL_SPECIALTIES_LIST.length, 6, 'Deben existir exactamente 6 especialidades médicas en el núcleo clínico');
+  // 1. Verificar registro de las 7 especialidades y procedimientos precargados
+  console.log('12.1 Catálogo de 7 especialidades médicas y procedimientos con etapas');
+  assert.equal(MEDICAL_SPECIALTIES_LIST.length, 7, 'Deben existir exactamente 7 especialidades médicas en el núcleo clínico');
   assert.ok(MEDICAL_PROCEDURES_MASTER.length >= 48, 'Deben existir al menos 48 procedimientos médicos precargados');
 
   for (const spec of MEDICAL_SPECIALTIES_LIST) {

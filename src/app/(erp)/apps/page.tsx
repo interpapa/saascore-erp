@@ -25,7 +25,11 @@ import {
   HeartPulse,
   Baby,
   CreditCard,
-  Factory
+  Factory,
+  Heart,
+  Sparkles,
+  Bone,
+  Eye
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
@@ -37,7 +41,7 @@ import { resolveDependenciesForActivation, checkModuleDeactivationDependencies }
 interface AppModule {
   id: string;
   name: string;
-  category: 'comercial' | 'operaciones' | 'finanzas' | 'administracion';
+  category: 'comercial' | 'operaciones' | 'salud' | 'finanzas' | 'administracion';
   icon: unknown;
   gradient: string;
   description: string;
@@ -73,11 +77,17 @@ export default function AppsManagerPage() {
     { id: 'calendario', name: 'Citas y Turnos', category: 'operaciones', icon: CalendarDays, gradient: 'from-blue-400 to-blue-600', description: 'Agenda de atención a clientes, asignación de técnicos y programación de servicios.' },
     { id: 'whatsapp', name: 'WhatsApp CRM', category: 'comercial', icon: MessageCircle, gradient: 'from-green-400 to-emerald-600', description: 'Bandeja omnicanal de soporte con chat en tiempo real y vinculación a clientes.' },
     { id: 'kanban', name: 'Órdenes de Trabajo', category: 'operaciones', icon: KanbanSquare, gradient: 'from-yellow-400 to-orange-500', description: 'Tablero visual de seguimiento de servicios, diagnósticos y reparaciones.' },
-    { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'operaciones', icon: Stethoscope, gradient: 'from-teal-400 to-cyan-600', description: 'Odontograma digital FDI interactivo, ortodoncia con brackets, endodoncia, periodoncia y planes de tratamiento.' },
+    { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'salud', icon: Stethoscope, gradient: 'from-teal-400 to-cyan-600', description: 'Odontograma digital FDI interactivo, ortodoncia con brackets, endodoncia, periodoncia y planes de tratamiento.' },
+    { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'salud', icon: Baby, gradient: 'from-pink-500 to-rose-600', description: 'Fórmula obstétrica G-P-C-A, gestograma interactivo por FUM, control prenatal, citología Bethesda y colposcopia.' },
+    { id: 'cardiologia', name: 'Cardiología & Cardiovascular', category: 'salud', icon: Heart, gradient: 'from-rose-600 to-red-700', description: 'Evaluación cardiológica, ECG de 12 derivaciones, hipertensión arterial, MAPA y Holter de arritmia.' },
+    { id: 'pediatria', name: 'Pediatría & Puericultura', category: 'salud', icon: Baby, gradient: 'from-amber-400 to-orange-500', description: 'Control de niño sano, percentiles antropométricos OMS, esquema de inmunización y dosis por kg.' },
+    { id: 'dermatologia', name: 'Dermatología & Estética', category: 'salud', icon: Sparkles, gradient: 'from-purple-400 to-pink-500', description: 'Fototipo de Fitzpatrick, regla dermatoscópica ABCDE, mapeo de lesiones cutáneas y dermoestética.' },
+    { id: 'traumatologia', name: 'Traumatología & Fisioterapia', category: 'salud', icon: Bone, gradient: 'from-blue-600 to-indigo-700', description: 'Goniometría articular (ROM), fuerza muscular de Daniels, maniobras ortopédicas y rehabilitación.' },
+    { id: 'oftalmologia', name: 'Oftalmología & Optometría', category: 'salud', icon: Eye, gradient: 'from-teal-500 to-emerald-700', description: 'Agudeza visual Snellen, refracción subjetiva OD/OI (Esfera, Cilindro, Eje) y tonometría ocular.' },
+    { id: 'med_general', name: 'Medicina General e Interna', category: 'salud', icon: Stethoscope, gradient: 'from-cyan-500 to-blue-600', description: 'Consulta integral de medicina interna, evaluación por sistemas, riesgo cardiovascular y PAM.' },
+    { id: 'clinica', name: 'Clínica Médica Multi-Especialidad', category: 'salud', icon: HeartPulse, gradient: 'from-rose-500 to-red-600', description: 'Historia médica unificada, triaje de signos vitales, evolución SOAP, récipe digital y estación médica.' },
     { id: 'barberia', name: 'Barbería & Estilo Masculino', category: 'operaciones', icon: Scissors, gradient: 'from-amber-600 to-stone-800', description: 'Estación de silla de barbero, turnos walk-in en sala, ritual de toalla caliente, cortes fade y comisiones de estilistas.' },
     { id: 'grooming', name: 'Peluquería & Spa Canino', category: 'operaciones', icon: Dog, gradient: 'from-emerald-500 to-teal-700', description: 'Ficha de mascotas, razas, tipos de manto, control de temperamento, inspección de nudos/parásitos y pipeline de baño/corte.' },
-    { id: 'clinica', name: 'Clínica Médica Multi-Especialidad', category: 'operaciones', icon: HeartPulse, gradient: 'from-rose-500 to-red-600', description: 'Historia médica unificada, triaje de signos vitales, evolución SOAP, récipe digital y 6 especialidades médicas.' },
-    { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'operaciones', icon: Baby, gradient: 'from-pink-500 to-rose-600', description: 'Fórmula obstétrica G-P-C-A, gestograma interactivo por FUM, control prenatal, citología Bethesda y colposcopia.' },
     { id: 'suscripciones', name: 'Suscripciones & Membresías', category: 'comercial', icon: CreditCard, gradient: 'from-indigo-500 to-purple-600', description: 'Planes recurrentes, academias, cortes de cobro, extensiones de ciclo, semáforo de mora y WhatsApp.' },
     { id: 'produccion', name: 'Producción & Recetas (MRP)', category: 'operaciones', icon: Factory, gradient: 'from-amber-500 to-orange-600', description: 'Formulación y listas de materiales (BOM), escandallos, cálculo de costo unitario y transformación de materias primas.' },
     { id: 'equipo', name: 'Personal & Nómina', category: 'administracion', icon: Users, gradient: 'from-indigo-400 to-indigo-600', description: 'Registro de empleados, marcaje de asistencia y liquidación de sueldos.' },
@@ -121,7 +131,22 @@ export default function AppsManagerPage() {
       if (isTargetInventory) {
         updatedModules = activeModules.filter(m => m !== 'inventario' && m !== 'catalogo');
       } else {
-        updatedModules = activeModules.filter(m => m !== moduleId);
+        const aliasMap: Record<string, string> = {
+          ginecologia: 'med_ginecologia',
+          med_ginecologia: 'ginecologia',
+          cardiologia: 'med_cardiologia',
+          med_cardiologia: 'cardiologia',
+          pediatria: 'med_pediatria',
+          med_pediatria: 'pediatria',
+          dermatologia: 'med_dermatologia',
+          med_dermatologia: 'dermatologia',
+          traumatologia: 'med_traumatologia',
+          med_traumatologia: 'traumatologia',
+          oftalmologia: 'med_oftalmologia',
+          med_oftalmologia: 'oftalmologia',
+        };
+        const companion = aliasMap[moduleId];
+        updatedModules = activeModules.filter(m => m !== moduleId && m !== companion);
       }
     } else {
       // Activación en Cascada de Dependencias Requeridas
@@ -134,7 +159,7 @@ export default function AppsManagerPage() {
 
       if (resolved.requiredModulesToAdd.length > 0) {
         autoActivatedNames = resolved.requiredModulesToAdd
-          .filter(id => id !== 'med_ginecologia' && id !== 'catalogo')
+          .filter(id => !id.startsWith('med_') && id !== 'catalogo')
           .map(id => modulesList.find(m => m.id === id)?.name || id);
       }
     }
@@ -220,6 +245,7 @@ export default function AppsManagerPage() {
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {[
           { id: 'all', label: 'Todos los Módulos' },
+          { id: 'salud', label: 'Salud & Especialidades' },
           { id: 'comercial', label: 'Comercial & Ventas' },
           { id: 'operaciones', label: 'Operaciones & Logística' },
           { id: 'finanzas', label: 'Finanzas & NIIF' },

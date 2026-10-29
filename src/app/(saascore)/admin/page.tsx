@@ -62,6 +62,7 @@ const ALL_SYSTEM_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', desc: 'Gestión multisede y consolidación' },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología Especializada', category: 'salud', desc: 'Odontograma interactivo y sillón dental' },
+  { id: 'cardiologia', name: 'Cardiología & Cardiovascular', category: 'salud', desc: 'Electrocardiograma, MAPA, Holter de arritmias y ecocardiograma' },
   { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'salud', desc: 'Fórmula obstétrica G-P-C-A, FUM, gestograma, citología Bethesda y control prenatal' },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', desc: 'Estación médica, SOAP y récipe digital' },
   { id: 'med_general', name: 'Medicina General e Interna', category: 'salud', desc: 'Examen físico, triaje y PAM cardiovascular' },

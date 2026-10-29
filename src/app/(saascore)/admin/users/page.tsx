@@ -57,6 +57,7 @@ const ALL_SYSTEM_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones' },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología Especializada', category: 'salud' },
+  { id: 'cardiologia', name: 'Cardiología & Cardiovascular', category: 'salud' },
   { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'salud' },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud' },
   { id: 'med_general', name: 'Medicina General e Interna', category: 'salud' },

@@ -21,8 +21,14 @@ export type ModuleId =
   | 'estadisticas'
   | 'odontologia'
   | 'ginecologia'
+  | 'cardiologia'
+  | 'pediatria'
+  | 'dermatologia'
+  | 'traumatologia'
+  | 'oftalmologia'
   | 'clinica'
   | 'med_general'
+  | 'med_cardiologia'
   | 'med_pediatria'
   | 'med_ginecologia'
   | 'med_dermatologia'
@@ -37,10 +43,17 @@ export type ModuleId =
 
 export const MEDICAL_SPECIALTY_MODULE_IDS: ModuleId[] = [
   'med_general',
-  'med_pediatria',
+  'cardiologia',
+  'med_cardiologia',
+  'ginecologia',
   'med_ginecologia',
+  'pediatria',
+  'med_pediatria',
+  'dermatologia',
   'med_dermatologia',
+  'traumatologia',
   'med_traumatologia',
+  'oftalmologia',
   'med_oftalmologia',
 ];
 
@@ -161,6 +174,48 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
     description: 'Fórmula obstétrica G-P-C-A, gestograma en vivo por FUM, control prenatal, citología Bethesda, colposcopia y procedimientos gineco-obstétricos.',
     dependencies: ['clientes', 'calendario', 'caja'],
   },
+  cardiologia: {
+    id: 'cardiologia',
+    name: 'Cardiología & Cardiovascular',
+    category: 'operaciones',
+    description: 'Evaluación cardiovascular, electrocardiograma de 12 derivaciones, control de hipertensión arterial, MAPA y Holter de arritmia.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
+  med_cardiologia: {
+    id: 'med_cardiologia',
+    name: 'Especialidad: Cardiología & Cardiovascular',
+    category: 'operaciones',
+    description: 'Evaluación cardiovascular, electrocardiograma, MAPA y Holter de arritmia.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
+  pediatria: {
+    id: 'pediatria',
+    name: 'Pediatría & Puericultura',
+    category: 'operaciones',
+    description: 'Control de niño sano, percentiles antropométricos OMS, esquema de inmunización y dosificación pediátrica por kg.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
+  dermatologia: {
+    id: 'dermatologia',
+    name: 'Dermatología & Estética',
+    category: 'operaciones',
+    description: 'Fototipo de Fitzpatrick, regla dermatoscópica ABCDE, mapeo de lesiones cutáneas y protocolos dermoestéticos.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
+  traumatologia: {
+    id: 'traumatologia',
+    name: 'Traumatología & Fisioterapia',
+    category: 'operaciones',
+    description: 'Goniometría articular (ROM), fuerza muscular de Daniels, maniobras ortopédicas y plan de rehabilitación física.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
+  oftalmologia: {
+    id: 'oftalmologia',
+    name: 'Oftalmología & Optometría',
+    category: 'operaciones',
+    description: 'Agudeza visual Snellen, refracción subjetiva OD/OI (Esfera, Cilindro, Eje, Adición, DIP) y tonometría ocular.',
+    dependencies: ['clientes', 'calendario', 'caja'],
+  },
   clinica: {
     id: 'clinica',
     name: 'Clínica Médica (Base)',
@@ -170,10 +225,10 @@ export const MODULE_CATALOG: Record<ModuleId, ModuleDefinition> = {
   },
   med_general: {
     id: 'med_general',
-    name: 'Especialidad: Medicina General e Interna',
+    name: 'Medicina General e Interna',
     category: 'operaciones',
     description: 'Consulta integral de medicina interna, evaluación por sistemas, riesgo cardiovascular y control metabólico.',
-    dependencies: ['clinica'],
+    dependencies: ['clientes', 'calendario', 'caja'],
   },
   med_pediatria: {
     id: 'med_pediatria',
@@ -292,13 +347,25 @@ export function isModuleActive(
   }
   if (moduleId === 'clinica') {
     return activeModules.includes('clinica') ||
-      activeModules.some(m => m.startsWith('med_'));
+      activeModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
   }
-  if (moduleId === 'ginecologia') {
+  if (moduleId === 'ginecologia' || moduleId === 'med_ginecologia') {
     return activeModules.includes('ginecologia') || activeModules.includes('med_ginecologia');
   }
-  if (moduleId === 'med_ginecologia') {
-    return activeModules.includes('med_ginecologia') || activeModules.includes('ginecologia');
+  if (moduleId === 'cardiologia' || moduleId === 'med_cardiologia') {
+    return activeModules.includes('cardiologia') || activeModules.includes('med_cardiologia');
+  }
+  if (moduleId === 'pediatria' || moduleId === 'med_pediatria') {
+    return activeModules.includes('pediatria') || activeModules.includes('med_pediatria');
+  }
+  if (moduleId === 'dermatologia' || moduleId === 'med_dermatologia') {
+    return activeModules.includes('dermatologia') || activeModules.includes('med_dermatologia');
+  }
+  if (moduleId === 'traumatologia' || moduleId === 'med_traumatologia') {
+    return activeModules.includes('traumatologia') || activeModules.includes('med_traumatologia');
+  }
+  if (moduleId === 'oftalmologia' || moduleId === 'med_oftalmologia') {
+    return activeModules.includes('oftalmologia') || activeModules.includes('med_oftalmologia');
   }
   return activeModules.includes(moduleId) || 
     (moduleId === 'inventario' && activeModules.includes('catalogo')) || 
@@ -421,9 +488,19 @@ export function resolveDependenciesForActivation(
 
   collect(targetModuleId);
 
-  // Sincronización transparente ginecologia <-> med_ginecologia
-  if (targetModuleId === 'ginecologia' && !currentActiveModules.includes('med_ginecologia')) {
-    toAdd.add('med_ginecologia');
+  // Sincronización transparente de alias para módulos médicos
+  const specialtyAliasMap: Record<string, string> = {
+    ginecologia: 'med_ginecologia',
+    cardiologia: 'med_cardiologia',
+    pediatria: 'med_pediatria',
+    dermatologia: 'med_dermatologia',
+    traumatologia: 'med_traumatologia',
+    oftalmologia: 'med_oftalmologia',
+  };
+
+  const alias = specialtyAliasMap[targetModuleId];
+  if (alias && !currentActiveModules.includes(alias)) {
+    toAdd.add(alias);
   }
 
   const allResultingModules = Array.from(new Set([...currentActiveModules, targetModuleId, ...toAdd]));
@@ -447,9 +524,14 @@ export function checkModuleDeactivationDependencies(
 
   for (const activeMod of currentActiveModules) {
     if (activeMod === targetModuleId) continue;
-    // Ignorar alias ginecologia <-> med_ginecologia como bloqueo mutuo
-    if ((targetModuleId === 'ginecologia' && activeMod === 'med_ginecologia') ||
-        (targetModuleId === 'med_ginecologia' && activeMod === 'ginecologia')) {
+    // Ignorar pares de alias (ej. ginecologia <-> med_ginecologia, cardiologia <-> med_cardiologia) como bloqueo mutuo
+    const isSpecialtyAliasPair = (a: string, b: string) => {
+      const cleanA = a.replace('med_', '');
+      const cleanB = b.replace('med_', '');
+      return cleanA === cleanB;
+    };
+
+    if (isSpecialtyAliasPair(targetModuleId, activeMod)) {
       continue;
     }
     const deps = getModuleDependencies(activeMod);

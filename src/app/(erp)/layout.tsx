@@ -77,7 +77,7 @@ export default function ERPLayout({
   if (targetModule) {
     // A. Verificar si está activo en el tenant
     const isTenantActive = targetModule === 'clinica'
-      ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_')))
+      ? (tenantModules.includes('clinica') || tenantModules.some((m: string) => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia'))
       : targetModule === 'ginecologia'
         ? (tenantModules.includes('ginecologia') || tenantModules.includes('med_ginecologia'))
         : targetModule === 'inventario'
@@ -89,7 +89,7 @@ export default function ERPLayout({
     } else if (userAllowed) {
       // B. Si el usuario tiene asignación manual de módulos desde Rendo Hub
       const isUserAllowed = targetModule === 'clinica'
-        ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_')))
+        ? (userAllowed.includes('clinica') || userAllowed.some((m: string) => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia'))
         : targetModule === 'ginecologia'
           ? (userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia'))
           : targetModule === 'inventario'

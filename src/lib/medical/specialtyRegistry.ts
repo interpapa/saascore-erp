@@ -7,6 +7,7 @@
 
 export type MedicalSpecialtyId =
   | 'med_general'
+  | 'med_cardiologia'
   | 'med_pediatria'
   | 'med_ginecologia'
   | 'med_dermatologia'
@@ -114,6 +115,57 @@ export const MEDICAL_SPECIALTIES_MAP: Record<MedicalSpecialtyId, MedicalSpecialt
         instructions:
           '• Tomar 1 cápsula de Esomeprazol 40 mg en ayunas (30 min antes del desayuno) por 4 semanas.\n• Tomar 10 ml de Sucralfato 1 hora después de cada comida principal y al acostarse por 10 días.\n• Evitar café, cítricos, picantes, grasas, AINEs y no acostarse antes de 2 horas tras cenar.',
         labOrders: ['Antígeno Fecal para Helicobacter pylori', 'Perfil Hepático (TGO, TGP, Bilirrubina)'],
+      },
+    ],
+  },
+
+  med_cardiologia: {
+    id: 'med_cardiologia',
+    name: 'Cardiología & Cardiovascular',
+    shortName: 'Cardiología',
+    description: 'Evaluación cardiovascular, electrocardiograma, control de hipertensión arterial, MAPA y Holter de arritmia.',
+    color: '#dc2626',
+    badgeBg: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
+    emoji: '❤️',
+    commonCie10: [
+      { code: 'I10', description: 'Hipertensión esencial (primaria)' },
+      { code: 'I20.9', description: 'Angina de pecho, no especificada' },
+      { code: 'I25.1', description: 'Enfermedad aterosclerótica del corazón' },
+      { code: 'I47.1', description: 'Taquicardia supraventricular paroxística' },
+      { code: 'I48.0', description: 'Fibrilación auricular' },
+      { code: 'I49.9', description: 'Arritmia cardíaca, no especificada' },
+      { code: 'I50.9', description: 'Insuficiencia cardíaca, no especificada' },
+      { code: 'R00.0', description: 'Taquicardia, no especificada' },
+      { code: 'R00.2', description: 'Palpitaciones precordiales' },
+      { code: 'R07.9', description: 'Dolor en el pecho / precordialgia' },
+    ],
+    prescriptionTemplates: [
+      {
+        id: 'tpl-cardio-hta',
+        title: 'Manejo de Hipertensión Arterial (HTA)',
+        medications:
+          '1. Losartán Potásico 50 mg (Tabletas) — Caja x 30\n2. Amlodipino 5 mg (Tabletas) — Caja x 30\n3. Ácido Acetilsalicílico 81 mg — 30 tabletas',
+        instructions:
+          '• Tomar 1 tableta de Losartán 50 mg cada mañana en ayunas.\n• Tomar 1 tableta de Amlodipino 5 mg en la noche.\n• Dieta hiposódica estricta (menos de 2g de sal al día).\n• Anotar valores de tensión arterial matutina y vespertina.',
+        labOrders: ['Perfil Lipídico Completo', 'Glicemia Basal', 'Creatinina y Urea', 'Electrolitos Séricos (Na, K, Cl)'],
+      },
+      {
+        id: 'tpl-cardio-arritmia',
+        title: 'Protocolo de Palpitaciones y Arritmias',
+        medications:
+          '1. Bisoprolol Fumarato 2.5 mg (Tabletas) — Caja x 30\n2. Magnesio Quelado 400 mg (Cápsulas) — Frasco x 60',
+        instructions:
+          '• Tomar 1 tableta de Bisoprolol 2.5 mg con el desayuno.\n• Evitar café, bebidas energéticas, tabaco y estrés excesivo.\n• Acudir a colocación de Holter de Arritmia según pauta.',
+        labOrders: ['TSH Ultrasensible', 'Electrolitos Séricos', 'Ecocardiograma Transtorácico'],
+      },
+      {
+        id: 'tpl-cardio-dislipidemia',
+        title: 'Manejo de Dislipidemia y Prevención Secundaria',
+        medications:
+          '1. Atorvastatina Cálcica 20 mg (Tabletas) — Caja x 30\n2. Ácido Acetilsalicílico 81 mg (Tabletas) — Frasco x 30',
+        instructions:
+          '• Tomar 1 tableta de Atorvastatina 20 mg cada noche antes de dormir.\n• Tomar 1 tableta de Ácido Acetilsalicílico 81 mg al mediodía con almuerzo.\n• Dieta mediterránea baja en grasas saturadas y trans.\n• Actividad física aeróbica 30 minutos al día, 5 días por semana.',
+        labOrders: ['Perfil Lipídico de Control (Colesterol Total, LDL, HDL, Triglicéridos)', 'TGO / TGP Transaminasas', 'CPK Total'],
       },
     ],
   },
@@ -493,6 +545,129 @@ export const MEDICAL_PROCEDURES_MASTER: MedicalProcedureDefinition[] = [
     ],
   },
 
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 1.B CARDIOLOGÍA & CARDIOVASCULAR (8 procedimientos)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  {
+    id: 'med-card-01',
+    code: 'CARD-01',
+    specialtyId: 'med_cardiologia',
+    name: 'Consulta Cardiológica y Ecocardiograma',
+    categoryLabel: 'Consulta & Ecografía',
+    defaultPriceUSD: 80.0,
+    estimatedDurationMin: 60,
+    sessionsRequired: 1,
+    color: '#e11d48',
+    stages: [
+      { id: 'card01-s1', title: 'Anamnesis cardiológica, estratificación de riesgo y examen físico', order: 1, sessionNumber: 1 },
+      { id: 'card01-s2', title: 'Ecocardiograma transtorácico Doppler color e informe estructurado', order: 2, sessionNumber: 1 },
+    ],
+  },
+  {
+    id: 'med-card-02',
+    code: 'CARD-02',
+    specialtyId: 'med_cardiologia',
+    name: 'Holter de Arritmia (24 Horas)',
+    categoryLabel: 'Monitoreo Ambulatorio',
+    defaultPriceUSD: 50.0,
+    estimatedDurationMin: 30,
+    sessionsRequired: 2,
+    color: '#be123c',
+    stages: [
+      { id: 'card02-s1', title: 'Colocación de grabadora digital Holter y registro en bitácora de eventos (Cita 1)', order: 1, sessionNumber: 1 },
+      { id: 'card02-s2', title: 'Retiro del equipo, procesamiento algorítmico y entrega de informe de arritmias (Cita 2)', order: 2, sessionNumber: 2 },
+    ],
+  },
+  {
+    id: 'med-card-03',
+    code: 'CARD-03',
+    specialtyId: 'med_cardiologia',
+    name: 'Monitoreo Ambulatorio de Presión Arterial (MAPA 24h)',
+    categoryLabel: 'Monitoreo Ambulatorio',
+    defaultPriceUSD: 50.0,
+    estimatedDurationMin: 30,
+    sessionsRequired: 2,
+    color: '#9f1239',
+    stages: [
+      { id: 'card03-s1', title: 'Colocación de manguito braquial, calibración presurométrica y programación de intervalos (Cita 1)', order: 1, sessionNumber: 1 },
+      { id: 'card03-s2', title: 'Retiro del presurometro, descarga de lecturas diurnas/nocturnas e informe de patrón dipper (Cita 2)', order: 2, sessionNumber: 2 },
+    ],
+  },
+  {
+    id: 'med-card-04',
+    code: 'CARD-04',
+    specialtyId: 'med_cardiologia',
+    name: 'Electrocardiograma de Reposo de 12 Derivaciones (ECG) + Informe',
+    categoryLabel: 'Diagnóstico Electrofisiológico',
+    defaultPriceUSD: 30.0,
+    estimatedDurationMin: 30,
+    sessionsRequired: 1,
+    color: '#fb7185',
+    stages: [
+      { id: 'card04-s1', title: 'Preparación cutánea y fijación de electrodos precordiales y periféricos', order: 1, sessionNumber: 1 },
+      { id: 'card04-s2', title: 'Adquisición de trazado de 12 derivaciones, cálculo de intervalos (PR, QRS, QTc) y diagnóstico', order: 2, sessionNumber: 1 },
+    ],
+  },
+  {
+    id: 'med-card-05',
+    code: 'CARD-05',
+    specialtyId: 'med_cardiologia',
+    name: 'Ecocardiograma Transtorácico Doppler Color',
+    categoryLabel: 'Imagen Cardíaca',
+    defaultPriceUSD: 70.0,
+    estimatedDurationMin: 45,
+    sessionsRequired: 1,
+    color: '#f43f5e',
+    stages: [
+      { id: 'card05-s1', title: 'Evaluación dimensional de cavidades ventriculares y función sistólica (FEVI)', order: 1, sessionNumber: 1 },
+      { id: 'card05-s2', title: 'Análisis Doppler de morfología y dinámica valvular mitral, aórtica y tricuspídea', order: 2, sessionNumber: 1 },
+    ],
+  },
+  {
+    id: 'med-card-06',
+    code: 'CARD-06',
+    specialtyId: 'med_cardiologia',
+    name: 'Prueba de Esfuerzo en Banda Rodante (Ergometría)',
+    categoryLabel: 'Cardiología Funcional',
+    defaultPriceUSD: 90.0,
+    estimatedDurationMin: 45,
+    sessionsRequired: 1,
+    color: '#e11d48',
+    stages: [
+      { id: 'card06-s1', title: 'Trazado electrocardiográfico basal y medición de PA previa', order: 1, sessionNumber: 1 },
+      { id: 'card06-s2', title: 'Ejercicio en banda rodante según protocolo Bruce con monitoreo electrocardiográfico continuo', order: 2, sessionNumber: 1 },
+    ],
+  },
+  {
+    id: 'med-card-07',
+    code: 'CARD-07',
+    specialtyId: 'med_cardiologia',
+    name: 'Evaluación Cardiovascular Preoperatoria Integral (Goldman / Lee)',
+    categoryLabel: 'Evaluación de Riesgo',
+    defaultPriceUSD: 50.0,
+    estimatedDurationMin: 35,
+    sessionsRequired: 1,
+    color: '#be123c',
+    stages: [
+      { id: 'card07-s1', title: 'Anamnesis clínica, ECG de reposo y cálculo de índice de riesgo cardíaco revisado (RCRI)', order: 1, sessionNumber: 1 },
+      { id: 'card07-s2', title: 'Emisión de informe cardiovascular preoperatorio con pautas perioperatorias', order: 2, sessionNumber: 1 },
+    ],
+  },
+  {
+    id: 'med-card-08',
+    code: 'CARD-08',
+    specialtyId: 'med_cardiologia',
+    name: 'Consulta Cardiológica de Control & Titulación de Fármacos',
+    categoryLabel: 'Control Clínico',
+    defaultPriceUSD: 40.0,
+    estimatedDurationMin: 30,
+    sessionsRequired: 1,
+    color: '#9f1239',
+    stages: [
+      { id: 'card08-s1', title: 'Control de presión arterial en consulta y verificación de metas terapéuticas', order: 1, sessionNumber: 1 },
+      { id: 'card08-s2', title: 'Ajuste de dosis antihipertensivas / antiarrítmicas y emisión de récipe', order: 2, sessionNumber: 1 },
+    ],
+  },
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 2. PEDIATRÍA & PUERICULTURA (8 procedimientos)
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

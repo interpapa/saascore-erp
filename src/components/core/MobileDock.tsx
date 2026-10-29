@@ -118,7 +118,7 @@ export function MobileDock() {
       if (item.id === 'config') {
         isActive = isSuper || isOwner || session?.role === 'manager';
       } else if (item.id === 'clinica') {
-        isActive = enabledModules.includes('clinica') || enabledModules.some(m => m.startsWith('med_'));
+        isActive = enabledModules.includes('clinica') || enabledModules.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
       } else if (item.id === 'ginecologia') {
         isActive = enabledModules.includes('ginecologia') || enabledModules.includes('med_ginecologia');
       } else {
@@ -130,7 +130,7 @@ export function MobileDock() {
       // Regla de permisos de usuario (asignación explícita o RBAC)
       if (userAllowed) {
         if (item.id === 'clinica') {
-          return userAllowed.includes('clinica') || userAllowed.some(m => m.startsWith('med_'));
+          return userAllowed.includes('clinica') || userAllowed.some(m => m.startsWith('med_') || m === 'cardiologia' || m === 'ginecologia' || m === 'pediatria' || m === 'dermatologia' || m === 'traumatologia' || m === 'oftalmologia');
         }
         if (item.id === 'ginecologia') {
           return userAllowed.includes('ginecologia') || userAllowed.includes('med_ginecologia');

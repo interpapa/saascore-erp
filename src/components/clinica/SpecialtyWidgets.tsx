@@ -5,6 +5,7 @@ import {
   Stethoscope,
   Baby,
   HeartPulse,
+  Heart,
   Sparkles,
   Bone,
   Eye,
@@ -381,7 +382,578 @@ export function SpecialtyWidgets({
     );
   }
 
+  
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 1.B CARDIOLOGÍA & CARDIOVASCULAR
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  if (specialtyId === 'med_cardiologia' || (specialtyId as string) === 'cardiologia') {
+    const cardState = specialtyState.cardiology || specialtyState || {};
+    const ecg = cardState.ecg || {
+      ritmo: 'Sinusal',
+      hr: vitals.heartRate || 75,
+      prMs: 160,
+      qrsMs: 85,
+      qtcMs: 410,
+      ejeQrs: 'Normal (0° a +90°)',
+      stSegment: 'Normal / Isoeléctrico',
+      conclusiones: 'Trazado electrocardiográfico sin alteraciones del ritmo ni signos agudos de isquemia.',
+    };
+
+    const echo = cardState.echo || {
+      fevi: 60,
+      dstdVi: 48,
+      sivMm: 10,
+      ppviMm: 10,
+      patronDiastolico: 'Normal',
+      valvulas: 'Válvula mitral y aórtica normoinsertas, móviles, sin gradientes ni insuficiencias patológicas.',
+      conclusiones: 'Función sistólica y diastólica biventricular conservada en reposo. Espesores parietales normales.',
+    };
+
+    const monitoreo = cardState.monitoreo || {
+      tipoEstudio: 'Holter de Arritmia',
+      duracionHoras: 24,
+      fcMin: 54,
+      fcMax: 130,
+      fcPromedio: 76,
+      ectopiasSVE: 'Aisladas (< 50 en 24h)',
+      ectopiasVE: 'Ausentes o monomórficas aisladas',
+      pausas: 'No se detectaron pausas significativas > 2.0s',
+      conclusionEstudio: 'Ritmo sinusal sostenido con variabilidad circadiana normal. Sin eventos de taquiarritmia ventricular ni bloqueos AV avanzados.',
+      // Campos MAPA
+      paPromedio24h: '124/78 mmHg',
+      cargaDiurna: '15%',
+      cargaNocturna: '10%',
+      patronCircadiano: 'Dipper (caída nocturna normal 10–20%)',
+      conclusionMapa: 'Perfil hemodinámico dentro de límites normales, conservando patrón dipper circadiano.',
+    };
+
+    const nyhaClass = cardState.nyhaClass || 'Clase I (Sin limitación física habitual)';
+    const cvRisk = cardState.cvRisk || 'Bajo (< 5% Framingham)';
+
+    const updateEcg = (field: string, val: any) => {
+      onChangeSpecialtyState({
+        ...specialtyState,
+        cardiology: {
+          ...cardState,
+          ecg: { ...ecg, [field]: val },
+        },
+      });
+    };
+
+    const updateEcho = (field: string, val: any) => {
+      onChangeSpecialtyState({
+        ...specialtyState,
+        cardiology: {
+          ...cardState,
+          echo: { ...echo, [field]: val },
+        },
+      });
+    };
+
+    const updateMonitoreo = (field: string, val: any) => {
+      onChangeSpecialtyState({
+        ...specialtyState,
+        cardiology: {
+          ...cardState,
+          monitoreo: { ...monitoreo, [field]: val },
+        },
+      });
+    };
+
+    const updateCardField = (field: string, val: any) => {
+      onChangeSpecialtyState({
+        ...specialtyState,
+        cardiology: {
+          ...cardState,
+          [field]: val,
+        },
+      });
+    };
+
+    const feviNum = Number(echo.fevi) || 60;
+    const feviClassification =
+      feviNum >= 52
+        ? { label: 'FEVI Normal (≥52%)', color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' }
+        : feviNum >= 41
+        ? { label: 'FEVI Ligeramente Deprimida (41-51%)', color: 'text-amber-500 bg-amber-500/10 border-amber-500/20' }
+        : feviNum >= 30
+        ? { label: 'FEVI Moderadamente Deprimida (30-40%)', color: 'text-orange-500 bg-orange-500/10 border-orange-500/20' }
+        : { label: 'FEVI Severamente Deprimida (<30%)', color: 'text-rose-500 bg-rose-500/10 border-rose-500/30' };
+
+    const qtcNum = Number(ecg.qtcMs) || 410;
+    const qtcAlert = qtcNum > 460;
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {/* Banner Hemodinámico & PAM */}
+        <div className="rounded-2xl border border-rose-500/20 bg-gradient-to-br from-rose-500/10 via-transparent to-red-600/5 p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-500 flex items-center justify-center border border-rose-500/30">
+              <Heart className="w-5 h-5 fill-rose-500/30" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-[var(--text-primary)] flex items-center gap-2">
+                Estación Cardiológica & Hemodinámica
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-600 dark:text-rose-400">
+                  Dra. María Teresa Vera
+                </span>
+              </h4>
+              <p className="text-xs text-[var(--text-secondary)]">
+                Registro de ECG de 12 derivaciones, Ecocardiograma Doppler, MAPA y Holter de arritmia.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="px-3 py-1.5 rounded-xl border border-border bg-[var(--bg-primary)] text-xs font-bold flex items-center gap-2">
+              <Activity className="w-3.5 h-3.5 text-rose-500" />
+              <span>PAM: <strong className="text-rose-600 dark:text-rose-400">{mapInfo.map} mmHg</strong></span>
+              <span className="text-[10px] text-[var(--text-secondary)] font-normal">({mapInfo.ahaStage})</span>
+            </div>
+            <div className="px-3 py-1.5 rounded-xl border border-border bg-[var(--bg-primary)] text-xs font-bold flex items-center gap-2">
+              <HeartPulse className="w-3.5 h-3.5 text-rose-500" />
+              <span>FC: <strong className="text-foreground">{vitals.heartRate || 75} lpm</strong></span>
+            </div>
+            <div className="px-3 py-1.5 rounded-xl border border-border bg-[var(--bg-primary)] text-xs font-bold">
+              <span>PA: <strong className="text-foreground">{vitals.systolic}/{vitals.diastolic} mmHg</strong></span>
+            </div>
+          </div>
+        </div>
+
+        {/* 1. ELECTROCARDIOGRAMA DE 12 DERIVACIONES */}
+        <div className="rounded-2xl border border-border bg-[var(--bg-primary)] p-5 space-y-4 shadow-xs">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-rose-500" />
+              <h5 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
+                Electrocardiograma de 12 Derivaciones (ECG)
+              </h5>
+            </div>
+            {qtcAlert && (
+              <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-600 border border-rose-500/30 flex items-center gap-1.5 animate-pulse">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                Alerta: QTc Prolongado ({qtcNum} ms)
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Ritmo de Base</label>
+              <select
+                value={ecg.ritmo}
+                onChange={(e) => updateEcg('ritmo', e.target.value)}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              >
+                <option value="Sinusal">Sinusal Regular</option>
+                <option value="Fibrilación Auricular">Fibrilación Auricular (FA)</option>
+                <option value="Flutter Auricular">Flutter Auricular</option>
+                <option value="Taquicardia Sinusal">Taquicardia Sinusal</option>
+                <option value="Bradicardia Sinusal">Bradicardia Sinusal</option>
+                <option value="Bloqueo AV 1er Grado">Bloqueo AV 1er Grado</option>
+                <option value="Bloqueo Rama Izquierda (BRI)">Bloqueo Rama Izquierda (BRI)</option>
+                <option value="Bloqueo Rama Derecha (BRD)">Bloqueo Rama Derecha (BRD)</option>
+                <option value="Extrasístoles Ventriculares">Extrasístoles Ventriculares Frecuentes</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Intervalo PR (ms)</label>
+              <input
+                type="number"
+                min={80}
+                max={350}
+                value={ecg.prMs}
+                onChange={(e) => updateEcg('prMs', Number(e.target.value))}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Complejo QRS (ms)</label>
+              <input
+                type="number"
+                min={60}
+                max={200}
+                value={ecg.qrsMs}
+                onChange={(e) => updateEcg('qrsMs', Number(e.target.value))}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">QTc Corregido (ms)</label>
+              <input
+                type="number"
+                min={300}
+                max={600}
+                value={ecg.qtcMs}
+                onChange={(e) => updateEcg('qtcMs', Number(e.target.value))}
+                className={`w-full text-xs font-semibold bg-[var(--bg-secondary)] border rounded-xl px-2.5 py-2 text-[var(--text-primary)] ${
+                  qtcAlert ? 'border-rose-500 bg-rose-500/10 text-rose-600' : 'border-border'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Eje Eléctrico QRS</label>
+              <select
+                value={ecg.ejeQrs}
+                onChange={(e) => updateEcg('ejeQrs', e.target.value)}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              >
+                <option value="Normal (0° a +90°)">Normal (0° a +90°)</option>
+                <option value="Desviación Izquierda (-30° a -90°)">Desviación Izquierda (-30° a -90°)</option>
+                <option value="Desviación Derecha (+90° a +180°)">Desviación Derecha (+90° a +180°)</option>
+                <option value="Indeterminado / Extremo">Indeterminado / Extremo</option>
+              </select>
+            </div>
+
+            <div className="sm:col-span-3">
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Segmento ST / Repolarización Ventricular</label>
+              <select
+                value={ecg.stSegment}
+                onChange={(e) => updateEcg('stSegment', e.target.value)}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              >
+                <option value="Normal / Isoeléctrico">Normal / Isoeléctrico</option>
+                <option value="Supradesnivel ST (Lesión Subepicárdica)">Supradesnivel ST (Lesión Subepicárdica)</option>
+                <option value="Infradesnivel ST (Isquemia Subendocárdica)">Infradesnivel ST (Isquemia Subendocárdica)</option>
+                <option value="Inversión simétrica de onda T">Inversión simétrica de onda T (Isquemia transmural)</option>
+                <option value="Repolarización precoz / Variante normal">Repolarización precoz / Variante normal</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+              Conclusión e Interpretación del Electrocardiograma
+            </label>
+            <textarea
+              rows={2}
+              value={ecg.conclusiones}
+              onChange={(e) => updateEcg('conclusiones', e.target.value)}
+              placeholder="Ej: Ritmo sinusal regular, PR y QTc normales, sin signos agudos de isquemia ni arritmias..."
+              className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl p-2.5 text-[var(--text-primary)]"
+            />
+          </div>
+        </div>
+
+        {/* 2. ECOCARDIOGRAMA TRANSTORÁCICO & DOPPLER */}
+        <div className="rounded-2xl border border-border bg-[var(--bg-primary)] p-5 space-y-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <HeartPulse className="w-4 h-4 text-rose-500" />
+              <h5 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
+                Ecocardiograma Transtorácico Doppler Color
+              </h5>
+            </div>
+            <span className={`text-xs font-black px-3 py-1 rounded-xl border ${feviClassification.color}`}>
+              FEVI: {echo.fevi}% — {feviClassification.label}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+                FEVI Teichholz / Simpson (%)
+              </label>
+              <input
+                type="number"
+                min={15}
+                max={85}
+                value={echo.fevi}
+                onChange={(e) => updateEcho('fevi', Number(e.target.value))}
+                className="w-full text-xs font-bold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-rose-600 dark:text-rose-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+                Diámetro Diastólico VI (DTDVI mm)
+              </label>
+              <input
+                type="number"
+                min={30}
+                max={80}
+                value={echo.dstdVi}
+                onChange={(e) => updateEcho('dstdVi', Number(e.target.value))}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+                Septum Interventricular (SIV mm)
+              </label>
+              <input
+                type="number"
+                min={6}
+                max={25}
+                value={echo.sivMm}
+                onChange={(e) => updateEcho('sivMm', Number(e.target.value))}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+                Pared Posterior VI (PPVI mm)
+              </label>
+              <input
+                type="number"
+                min={6}
+                max={25}
+                value={echo.ppviMm}
+                onChange={(e) => updateEcho('ppviMm', Number(e.target.value))}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+                Aparato Valvular y Flujos Doppler
+              </label>
+              <textarea
+                rows={2}
+                value={echo.valvulas}
+                onChange={(e) => updateEcho('valvulas', e.target.value)}
+                className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl p-2.5 text-[var(--text-primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">
+                Conclusión del Ecocardiograma
+              </label>
+              <textarea
+                rows={2}
+                value={echo.conclusiones}
+                onChange={(e) => updateEcho('conclusiones', e.target.value)}
+                className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl p-2.5 text-[var(--text-primary)]"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. MONITOREO AMBULATORIO: HOLTER DE ARRITMIA 24H & MAPA */}
+        <div className="rounded-2xl border border-border bg-[var(--bg-primary)] p-5 space-y-4 shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-rose-500" />
+              <h5 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)]">
+                Monitoreo Ambulatorio: Holter 24h & MAPA
+              </h5>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => updateMonitoreo('tipoEstudio', 'Holter de Arritmia')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                  monitoreo.tipoEstudio === 'Holter de Arritmia'
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'bg-[var(--bg-secondary)] border border-border text-[var(--text-secondary)]'
+                }`}
+              >
+                Holter de Arritmia
+              </button>
+              <button
+                type="button"
+                onClick={() => updateMonitoreo('tipoEstudio', 'MAPA')}
+                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all ${
+                  monitoreo.tipoEstudio === 'MAPA'
+                    ? 'bg-rose-500 text-white shadow-xs'
+                    : 'bg-[var(--bg-secondary)] border border-border text-[var(--text-secondary)]'
+                }`}
+              >
+                MAPA (Presión Arterial)
+              </button>
+            </div>
+          </div>
+
+          {monitoreo.tipoEstudio === 'Holter de Arritmia' ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">FC Mínima (lpm)</label>
+                  <input
+                    type="number"
+                    value={monitoreo.fcMin}
+                    onChange={(e) => updateMonitoreo('fcMin', Number(e.target.value))}
+                    className="w-full text-xs font-bold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">FC Promedio (lpm)</label>
+                  <input
+                    type="number"
+                    value={monitoreo.fcPromedio}
+                    onChange={(e) => updateMonitoreo('fcPromedio', Number(e.target.value))}
+                    className="w-full text-xs font-bold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">FC Máxima (lpm)</label>
+                  <input
+                    type="number"
+                    value={monitoreo.fcMax}
+                    onChange={(e) => updateMonitoreo('fcMax', Number(e.target.value))}
+                    className="w-full text-xs font-bold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Ectopias Supraventriculares (SVE)</label>
+                  <input
+                    type="text"
+                    value={monitoreo.ectopiasSVE}
+                    onChange={(e) => updateMonitoreo('ectopiasSVE', e.target.value)}
+                    className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Ectopias Ventriculares (VE)</label>
+                  <input
+                    type="text"
+                    value={monitoreo.ectopiasVE}
+                    onChange={(e) => updateMonitoreo('ectopiasVE', e.target.value)}
+                    className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Conclusión del Holter de Arritmia</label>
+                <textarea
+                  rows={2}
+                  value={monitoreo.conclusionEstudio}
+                  onChange={(e) => updateMonitoreo('conclusionEstudio', e.target.value)}
+                  className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl p-2.5 text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">PA Promedio 24h</label>
+                  <input
+                    type="text"
+                    value={monitoreo.paPromedio24h}
+                    onChange={(e) => updateMonitoreo('paPromedio24h', e.target.value)}
+                    className="w-full text-xs font-bold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Carga Tensional Diurna (%)</label>
+                  <input
+                    type="text"
+                    value={monitoreo.cargaDiurna}
+                    onChange={(e) => updateMonitoreo('cargaDiurna', e.target.value)}
+                    className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Patrón Circadiano</label>
+                  <select
+                    value={monitoreo.patronCircadiano}
+                    onChange={(e) => updateMonitoreo('patronCircadiano', e.target.value)}
+                    className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+                  >
+                    <option value="Dipper (caída nocturna normal 10–20%)">Dipper (Normal 10–20%)</option>
+                    <option value="Non-Dipper (caída nocturna <10%)">Non-Dipper (Riesgo CV elevado)</option>
+                    <option value="Ríser / Invertido (hipertensión nocturna)">Ríser / Invertido</option>
+                    <option value="Extreme Dipper (caída nocturna >20%)">{'Extreme Dipper (>20%)'}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Conclusión del MAPA</label>
+                <textarea
+                  rows={2}
+                  value={monitoreo.conclusionMapa}
+                  onChange={(e) => updateMonitoreo('conclusionMapa', e.target.value)}
+                  className="w-full text-xs bg-[var(--bg-secondary)] border border-border rounded-xl p-2.5 text-[var(--text-primary)]"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 4. RIESGO CARDIOVASCULAR & CLASE NYHA */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-border bg-[var(--bg-primary)] p-4 space-y-3 shadow-xs">
+            <h5 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-rose-500" />
+              Clase Funcional NYHA & Riesgo Cardiovascular
+            </h5>
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Clase NYHA (Insuficiencia Cardíaca)</label>
+              <select
+                value={nyhaClass}
+                onChange={(e) => updateCardField('nyhaClass', e.target.value)}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              >
+                <option value="Clase I (Sin limitación de actividad física ordinaria)">Clase I: Sin limitación en actividad física habitual</option>
+                <option value="Clase II (Limitación leve de actividad ordinaria)">Clase II: Limitación leve, fatiga o disnea en esfuerzo moderado</option>
+                <option value="Clase III (Limitación marcada de actividad habitual)">Clase III: Limitación marcada, confortable solo en reposo</option>
+                <option value="Clase IV (Incapacidad total, síntomas en reposo)">Clase IV: Síntomas y disnea incluso en reposo</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-bold text-[var(--text-secondary)] mb-1">Estratificación de Riesgo CV Global</label>
+              <select
+                value={cvRisk}
+                onChange={(e) => updateCardField('cvRisk', e.target.value)}
+                className="w-full text-xs font-semibold bg-[var(--bg-secondary)] border border-border rounded-xl px-2.5 py-2 text-[var(--text-primary)]"
+              >
+                <option value="Bajo (< 5% Framingham / SCORE)">Bajo (&lt; 5% a 10 años)</option>
+                <option value="Moderado (5-10% Framingham / SCORE)">Moderado (5–10% a 10 años)</option>
+                <option value="Alto (10-20% Framingham / SCORE)">Alto (10–20% a 10 años)</option>
+                <option value="Muy Alto (> 20% Framingham / SCORE)">Muy Alto (&gt; 20% / Enfermedad CV establecida)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Atajos Rápidos de Prescripción */}
+          <div className="rounded-2xl border border-border bg-[var(--bg-primary)] p-4 space-y-3 shadow-xs">
+            <h5 className="text-xs font-black uppercase tracking-wider text-[var(--text-primary)] flex items-center gap-2">
+              <Syringe className="w-4 h-4 text-rose-500" />
+              Atajos Rápidos de Prescripción Cardiológica
+            </h5>
+            <p className="text-[11px] text-[var(--text-secondary)]">
+              Clic para añadir automáticamente el fármaco con su posología al récipe médico de la consulta:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { name: 'Losartán 50 mg', ind: '1 tableta vía oral cada 12 horas (control HTA).' },
+                { name: 'Amlodipino 5 mg', ind: '1 tableta vía oral cada mañana.' },
+                { name: 'Bisoprolol 2.5 mg', ind: '1 tableta vía oral en la mañana con desayuno.' },
+                { name: 'Atorvastatina 20 mg', ind: '1 tableta vía oral cada noche.' },
+                { name: 'Aspirina Protect 81 mg', ind: '1 tableta vía oral diaria con el almuerzo.' },
+              ].map((drug) => (
+                <button
+                  key={drug.name}
+                  type="button"
+                  onClick={() => onAppendPrescription?.(drug.name, drug.ind)}
+                  className="px-2.5 py-1.5 rounded-xl border border-rose-500/30 bg-rose-500/5 hover:bg-rose-500/15 text-rose-600 dark:text-rose-400 text-xs font-bold transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {drug.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 2. PEDIATRÍA Y PUERICULTURA
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   if (specialtyId === 'med_pediatria') {
