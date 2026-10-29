@@ -77,9 +77,9 @@ const ALL_ERP_MODULES: DockItem[] = [
 const ADMIN_DOCK_ITEMS: DockItem[] = [
   { id: 'admin_tenants', label: 'Empresas', href: '/admin', icon: Database },
   { id: 'admin_users', label: 'Usuarios', href: '/admin/users', icon: Users },
-  { id: 'admin_billing', label: 'Facturación', href: '/admin/billing', icon: CreditCard },
+  { id: 'admin_billing', label: 'Facturas', href: '/admin/billing', icon: CreditCard },
   { id: 'admin_studio', label: 'Studio', href: '/admin/studio', icon: Blocks },
-  { id: 'admin_erp', label: 'Ir al ERP', href: '/dashboard', icon: Home },
+  { id: 'admin_erp', label: 'ERP', href: '/dashboard', icon: Home },
 ];
 
 export function MobileDock() {
@@ -147,10 +147,10 @@ export function MobileDock() {
   // 4. Si estamos en Rendo Hub, renderizar barra de navegación de Superadmin
   if (isAdminSection) {
     return (
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 w-[94%] max-w-sm md:hidden pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="fixed bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-40 w-[96%] max-w-sm md:hidden pointer-events-none animate-in fade-in slide-in-from-bottom-2 duration-300">
         <nav 
           aria-label="Navegación Rendo Hub Móvil"
-          className="pointer-events-auto flex items-center justify-around px-2 py-2 bg-card/95 dark:bg-slate-900/95 border border-border/80 rounded-[26px] shadow-2xl shadow-black/20 backdrop-blur-xl"
+          className="pointer-events-auto flex items-center justify-around px-1.5 py-1.5 bg-card/95 dark:bg-slate-900/95 border border-border/80 rounded-[26px] shadow-2xl shadow-black/20 backdrop-blur-xl"
         >
           {ADMIN_DOCK_ITEMS.map((item) => {
             const IconComponent = item.icon;
@@ -162,16 +162,16 @@ export function MobileDock() {
               <Link 
                 key={item.id} 
                 href={item.href}
-                className="flex-1 flex flex-col items-center justify-center relative py-1 rounded-2xl transition-all btn-haptic group"
+                className="flex-1 min-w-0 flex flex-col items-center justify-center relative py-1 rounded-2xl transition-all btn-haptic group"
               >
                 <div
                   className={`flex items-center justify-center transition-transform duration-200 ${
                     isActive ? 'scale-110 -translate-y-0.5 text-primary font-bold' : 'text-slate-500 dark:text-slate-400 group-hover:text-foreground'
                   }`}
                 >
-                  <IconComponent size={20} strokeWidth={isActive ? 2.5 : 2} />
+                  <IconComponent size={19} strokeWidth={isActive ? 2.5 : 2} />
                 </div>
-                <span className={`text-[10px] font-bold mt-1 tracking-tight transition-colors ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`}>
+                <span className={`text-[10px] font-bold mt-0.5 tracking-tight transition-colors truncate max-w-full px-0.5 ${isActive ? 'text-primary' : 'text-slate-400 dark:text-slate-500'}`}>
                   {item.label}
                 </span>
                 {isActive && (

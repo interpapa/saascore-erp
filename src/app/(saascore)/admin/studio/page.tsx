@@ -94,7 +94,7 @@ export default function StudioAdminPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
         {categories.map(cat => (
           <button
             key={cat.id}
@@ -110,7 +110,7 @@ export default function StudioAdminPage() {
         ))}
       </div>
 
-      <div className="bg-card rounded-3xl border border-border shadow-sm overflow-hidden p-6">
+      <div className="bg-card rounded-2xl sm:rounded-3xl border border-border shadow-sm overflow-hidden p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-6">
           <div>
             <h2 className="text-lg font-bold text-foreground">ADN Modular del Sistema</h2>
@@ -166,7 +166,7 @@ export default function StudioAdminPage() {
           ))}
         </div>
 
-        <div className="mt-8 pt-6 border-t border-border flex items-center justify-between">
+        <div className="mt-6 sm:mt-8 pt-5 sm:pt-6 border-t border-border flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3.5">
           <p className="text-xs text-muted-foreground">
             Los módulos marcados como <span className="font-bold text-foreground">Core</span> son requeridos para la integridad básica del sistema.
           </p>

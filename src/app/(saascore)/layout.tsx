@@ -70,36 +70,34 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
       <AmbientBackground />
       <FloatingHeader />
 
-      <main className="relative z-10 pt-20 sm:pt-24 pb-24 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full overflow-x-hidden">
+      <main className="relative z-10 pt-20 sm:pt-24 pb-28 md:pb-12 px-3 sm:px-6 max-w-7xl mx-auto w-full overflow-x-hidden">
         {/* Barra superior de navegación unificada del Módulo SaaS Admin */}
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6 sm:mb-8 pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-4 sm:p-5 rounded-3xl border shadow-xs overflow-hidden">
-          {/* Botón directo de regreso al Dashboard + Título de Módulo */}
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-2xl text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-md shadow-primary/20 btn-haptic group shrink-0"
-              title="Volver al panel principal del ERP"
-            >
-              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              <span>Volver al Dashboard</span>
-            </Link>
-
-            <div className="h-6 w-px bg-border hidden sm:block" />
-
-            <div className="flex items-center gap-2.5">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 sm:gap-4 mb-5 sm:mb-8 pb-4 sm:pb-5 border-b border-border/80 bg-card/60 backdrop-blur-md p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border shadow-xs">
+          {/* Fila Superior: Título de Rendo Hub + Botón de Salida */}
+          <div className="flex items-center justify-between gap-2.5 w-full lg:w-auto">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold border border-rose-500/20 shadow-xs shrink-0">
                 <Crown size={18} className="sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-black text-foreground tracking-tight leading-none">Rendo Hub</h1>
-                <p className="text-[11px] sm:text-xs text-slate-500 font-semibold mt-0.5">Módulo de Administración SaaS</p>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-black text-foreground tracking-tight leading-none truncate">Rendo Hub</h1>
+                <p className="text-[10px] sm:text-xs text-muted-foreground font-semibold mt-0.5 truncate">Consola Central SaaS</p>
               </div>
             </div>
+
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all shadow-xs shrink-0 btn-haptic group"
+              title="Volver al panel principal del ERP"
+            >
+              <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
+              <span>Dashboard</span>
+            </Link>
           </div>
 
           {/* Pestañas horizontales de navegación del módulo */}
-          <div className="w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-            <nav className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-2xl w-max max-w-full">
+          <div className="w-full lg:w-auto overflow-x-auto no-scrollbar -mx-1 px-1">
+            <nav className="flex items-center gap-1.5 p-1 bg-muted/60 border border-border rounded-xl sm:rounded-2xl w-max">
               {navItems.map((item) => {
                 const isActive = item.exact 
                   ? pathname === item.href 
@@ -116,7 +114,7 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
                         : 'text-slate-500 hover:text-foreground hover:bg-card/50'
                     }`}
                   >
-                    <Icon size={15} />
+                    <Icon size={14} />
                     <span>{item.label}</span>
                   </Link>
                 );
@@ -127,28 +125,31 @@ export default function RendoLayout({ children }: { children: ReactNode }) {
 
         {/* Telemetría y estado de servidores */}
         {healthData && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 p-3.5 sm:px-4 sm:py-2.5 bg-card/60 border border-border/80 rounded-2xl text-xs text-slate-500 font-mono shadow-2xs overflow-hidden">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="flex items-center gap-1.5 shrink-0">
-                <Database size={13} className="text-rose-500" />
-                <b className="text-foreground">{healthData.tenantsCount}</b> Empresas
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 mb-5 sm:mb-6 p-3 sm:px-4 sm:py-2.5 bg-card/60 border border-border/80 rounded-2xl text-xs text-slate-500 font-mono shadow-2xs">
+            <div className="grid grid-cols-3 sm:flex sm:flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span className="flex items-center gap-1.5 text-[11px] sm:text-xs truncate">
+                <Database size={13} className="text-rose-500 shrink-0" />
+                <b className="text-foreground">{healthData.tenantsCount}</b>
+                <span className="text-muted-foreground hidden sm:inline">Empresas</span>
               </span>
-              <span className="flex items-center gap-1.5 shrink-0">
-                <Users size={13} className="text-indigo-500" />
-                <b className="text-foreground">{healthData.usersCount}</b> Usuarios
+              <span className="flex items-center gap-1.5 text-[11px] sm:text-xs truncate">
+                <Users size={13} className="text-indigo-500 shrink-0" />
+                <b className="text-foreground">{healthData.usersCount}</b>
+                <span className="text-muted-foreground hidden sm:inline">Usuarios</span>
               </span>
-              <span className="flex items-center gap-1.5 shrink-0">
-                <Activity size={13} className="text-emerald-500" />
-                <b className="text-foreground">{healthData.todayDocsCount}</b> Transacciones Hoy
+              <span className="flex items-center gap-1.5 text-[11px] sm:text-xs truncate">
+                <Activity size={13} className="text-emerald-500 shrink-0" />
+                <b className="text-foreground">{healthData.todayDocsCount}</b>
+                <span className="text-muted-foreground hidden sm:inline">Transacciones</span>
               </span>
             </div>
-            <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
-              <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full shrink-0">
+            <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50 text-[11px]">
+              <span className="flex items-center gap-1 font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
                 <Zap size={11} /> {healthData.latencyMs}ms
               </span>
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold text-[11px] uppercase tracking-wider shrink-0">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                Sistemas Operativos
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider shrink-0 text-[10px] sm:text-[11px]">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Operativo
               </div>
             </div>
           </div>

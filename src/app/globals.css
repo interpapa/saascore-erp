@@ -379,3 +379,13 @@ body {
     width: 100% !important;
   }
 }
+
+
+/* UTILIDADES MÓVILES */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

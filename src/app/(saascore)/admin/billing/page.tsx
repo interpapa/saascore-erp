@@ -94,7 +94,7 @@ export default function BillingAdminPage() {
     <div className="w-full space-y-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-slate-400 hover:text-foreground transition-colors btn-haptic">
             <ArrowLeft size={18} />
           </Link>
@@ -237,7 +237,7 @@ export default function BillingAdminPage() {
               <div key={t.id} className="p-4 space-y-3">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <h3 className="font-bold text-foreground text-sm">{t.name}</h3>
+                    <h3 className="font-bold text-foreground text-sm truncate">{t.name}</h3>
                     <p className="text-[10px] font-mono text-slate-400">ID: {t.id.slice(0, 8)}...</p>
                   </div>
                   <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${t.status === 'suspended' ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400'}`}>

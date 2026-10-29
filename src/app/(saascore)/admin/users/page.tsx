@@ -405,7 +405,7 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Barra de Búsqueda y Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-card p-3.5 sm:p-4 rounded-2xl border border-border shadow-2xs">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-card p-3 sm:p-4 rounded-2xl border border-border shadow-2xs">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
@@ -413,7 +413,7 @@ export default function AdminUsersPage() {
             placeholder="Buscar por correo o empresa..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
+            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
           />
           {searchTerm && (
             <button
@@ -425,11 +425,11 @@ export default function AdminUsersPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+        <div className="grid grid-cols-2 sm:flex items-center gap-2">
           <select
             value={tenantFilter}
             onChange={(e) => setTenantFilter(e.target.value)}
-            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0 shadow-2xs"
+            className="bg-background border border-border rounded-xl px-2.5 sm:px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shadow-2xs truncate"
           >
             <option value="all">Empresa: Todas</option>
             {tenants.map(t => (
@@ -440,7 +440,7 @@ export default function AdminUsersPage() {
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="bg-background border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0 shadow-2xs"
+            className="bg-background border border-border rounded-xl px-2.5 sm:px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shadow-2xs truncate"
           >
             <option value="all">Rol: Todos</option>
             <option value="superadmin">Superadmin</option>
@@ -728,7 +728,7 @@ export default function AdminUsersPage() {
       {/* MODAL EDITAR PERMISOS & MÓDULOS */}
       {selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-md animate-in fade-in">
-          <div className="bg-card border border-border rounded-3xl w-full max-w-3xl p-5 sm:p-7 shadow-2xl relative max-h-[92vh] overflow-y-auto">
+          <div className="bg-card border border-border rounded-3xl w-full max-w-3xl p-4 sm:p-7 shadow-2xl relative max-h-[90vh] overflow-y-auto rounded-2xl sm:rounded-3xl">
             <button
               onClick={() => setSelectedUser(null)}
               className="absolute top-5 right-5 p-2 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted transition-colors btn-haptic"

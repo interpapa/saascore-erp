@@ -343,40 +343,44 @@ export default function TenantAdminPage() {
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6 pb-24 animate-in fade-in">
       {/* Header Unificado */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-border/60 mb-6">
-        <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-          <Link href="/admin" className="p-2.5 rounded-xl bg-card border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0 btn-haptic">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border/80 pb-5">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <Link
+            href="/admin"
+            className="p-2 sm:p-2.5 rounded-xl bg-card border border-border text-slate-400 hover:text-foreground transition-colors btn-haptic shrink-0"
+          >
             <ArrowLeft size={18} />
           </Link>
-          <div className="flex-1 truncate">
-            <h1 className="text-xl sm:text-3xl font-black text-foreground tracking-tight flex items-center gap-2 truncate">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-3xl font-black text-foreground tracking-tight truncate">
               {tenant.name}
             </h1>
-            <p className="text-muted-foreground font-mono text-[10px] sm:text-xs mt-1 truncate">ID: {tenant.id}</p>
+            <p className="text-muted-foreground font-mono text-[10px] sm:text-xs mt-0.5 truncate">ID: {tenant.id}</p>
           </div>
         </div>
-        <div className="flex w-full sm:w-auto gap-2">
+        <div className="grid grid-cols-3 sm:flex w-full sm:w-auto gap-2">
           <button
             onClick={handleImpersonate}
-            className="flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs shrink-0 btn-haptic"
+            className="justify-center flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-xs btn-haptic truncate"
             title="Ingresar a la sesión de este negocio en modo soporte (Modo Dios)"
           >
-            <LogIn size={16} /> Entrar al ERP
+            <LogIn size={15} className="shrink-0" />
+            <span className="truncate">Entrar</span>
           </button>
           <button 
             onClick={handleDelete}
             disabled={isSaving}
-            className="w-10 sm:w-auto flex justify-center items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all shrink-0 btn-haptic"
+            className="justify-center flex items-center bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/20 px-3 py-2.5 rounded-xl transition-all btn-haptic text-xs font-bold"
             title="Eliminar Empresa"
           >
-            <Trash2 size={18} />
+            <Trash2 size={16} />
           </button>
           <button 
             onClick={handleSave}
             disabled={isSaving}
-            className="flex-1 sm:flex-none justify-center bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
+            className="justify-center bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs btn-haptic truncate"
           >
-            {isSaving ? 'Guardando...' : <><Save size={18} /> Guardar Cambios</>}
+            {isSaving ? 'Guardando...' : <><Save size={16} className="shrink-0" /> <span className="truncate">Guardar</span></>}
           </button>
         </div>
       </div>
@@ -452,46 +456,73 @@ export default function TenantAdminPage() {
             No hay miembros explícitos en user_tenants para esta empresa.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold border-b border-border/60">
-                <tr>
-                  <th className="pb-2">Usuario (Email / ID)</th>
-                  <th className="pb-2">Rol Asignado</th>
-                  <th className="pb-2">Fecha Vinculación</th>
-                  <th className="pb-2 text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                {users.map(u => (
-                  <tr key={u.id || u.user_email} className="hover:bg-muted/40 transition-colors">
-                    <td className="py-2.5 font-medium text-foreground">
-                      {u.user_email || u.user_id}
-                    </td>
-                    <td className="py-2.5">
-                      <span className="bg-muted text-primary px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold border border-border">
-                        {u.role}
-                      </span>
-                    </td>
-                    <td className="py-2.5 text-muted-foreground">
-                      {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}
-                    </td>
-                    <td className="py-2.5 text-right">
-                      {u.user_email && (
-                        <button
-                          onClick={() => handleResetPassword(u.user_email)}
-                          className="px-2.5 py-1 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border text-[11px] font-semibold transition-all inline-flex items-center gap-1 btn-haptic"
-                          title="Resetear Contraseña"
-                        >
-                          <KeyRound size={12} /> Reset Clave
-                        </button>
-                      )}
-                    </td>
+          <>
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold border-b border-border/60">
+                  <tr>
+                    <th className="pb-2">Usuario (Email / ID)</th>
+                    <th className="pb-2">Rol Asignado</th>
+                    <th className="pb-2">Fecha Vinculación</th>
+                    <th className="pb-2 text-right">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {users.map(u => (
+                    <tr key={u.id || u.user_email} className="hover:bg-muted/40 transition-colors">
+                      <td className="py-2.5 font-medium text-foreground">
+                        {u.user_email || u.user_id}
+                      </td>
+                      <td className="py-2.5">
+                        <span className="bg-muted text-primary px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold border border-border">
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-muted-foreground">
+                        {u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="py-2.5 text-right">
+                        {u.user_email && (
+                          <button
+                            onClick={() => handleResetPassword(u.user_email)}
+                            className="px-2.5 py-1 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground border border-border text-[11px] font-semibold transition-all inline-flex items-center gap-1 btn-haptic"
+                            title="Resetear Contraseña"
+                          >
+                            <KeyRound size={12} /> Reset Clave
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Tarjetas Móviles de Usuarios */}
+            <div className="md:hidden space-y-2">
+              {users.map(u => (
+                <div key={u.id || u.user_email} className="p-3 bg-muted/20 border border-border rounded-xl space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-xs text-foreground truncate min-w-0">{u.user_email || u.user_id}</span>
+                    <span className="bg-primary/10 text-primary px-2 py-0.5 rounded font-mono text-[10px] uppercase font-bold border border-primary/20 shrink-0">
+                      {u.role}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[11px] text-muted-foreground">
+                    <span>{u.created_at ? new Date(u.created_at).toLocaleDateString() : 'N/A'}</span>
+                    {u.user_email && (
+                      <button
+                        onClick={() => handleResetPassword(u.user_email)}
+                        className="px-2.5 py-1 rounded bg-muted hover:bg-accent text-foreground text-[11px] font-semibold border border-border inline-flex items-center gap-1 btn-haptic"
+                      >
+                        <KeyRound size={12} /> Reset Clave
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -507,7 +538,7 @@ export default function TenantAdminPage() {
         </div>
         
         {/* Filtros de Categorías y Acciones Rápidas */}
-        <div className="p-4 bg-muted/10 border-b border-border/60 flex flex-wrap items-center justify-between gap-3">
+        <div className="p-3 sm:p-4 bg-muted/10 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
           <div className="flex flex-wrap gap-1.5">
             {[
               { id: 'all', label: 'Todos' },
@@ -561,31 +592,31 @@ export default function TenantAdminPage() {
               <div key={mod.id} className={`transition-colors ${isExpanded ? 'bg-muted/30' : 'hover:bg-muted/10'}`}>
                 {/* Cabecera del Módulo */}
                 <div 
-                  className={`flex items-center justify-between p-4 sm:p-5 cursor-pointer ${!isActive ? 'opacity-60' : ''}`}
+                  className={`flex items-center justify-between p-3.5 sm:p-5 cursor-pointer ${!isActive ? 'opacity-60' : ''}`}
                   onClick={() => {
                     if (isActive && hasFeatures) {
                       setExpandedModule(isExpanded ? null : mod.id);
                     }
                   }}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1 pr-2">
                     {hasFeatures && isActive ? (
-                      <div className="text-muted-foreground">
-                        {isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                      <div className="text-muted-foreground shrink-0">
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                       </div>
                     ) : (
-                      <div className="w-[18px]" /> // Spacer
+                      <div className="w-4 shrink-0" />
                     )}
-                    <span className={`font-bold sm:text-lg ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <span className={`font-bold text-xs sm:text-base truncate ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {mod.name}
                     </span>
                     {hasFeatures && (
-                      <span className="hidden sm:inline-block bg-muted text-muted-foreground text-[10px] font-bold px-2 py-0.5 rounded-md ml-2 border border-border">
+                      <span className="hidden sm:inline-block bg-muted text-muted-foreground text-[10px] font-bold px-2 py-0.5 rounded-md ml-1 border border-border shrink-0">
                         {mod.features.length} Ajustes
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2 shrink-0">
                     {isActive && (
                       <button
                         type="button"
@@ -593,10 +624,10 @@ export default function TenantAdminPage() {
                           e.stopPropagation();
                           handleOpenModuleInERP(mod.id);
                         }}
-                        className="text-[11px] font-bold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 border border-primary/20 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 btn-haptic cursor-pointer shadow-2xs"
+                        className="text-[10px] sm:text-[11px] font-bold text-primary hover:text-primary/90 bg-primary/10 hover:bg-primary/20 border border-primary/20 px-2 sm:px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 btn-haptic cursor-pointer shadow-2xs"
                         title={`Acceder directamente al módulo ${mod.name} en el ERP`}
                       >
-                        <span>Acceder</span>
+                        <span>Abrir</span>
                         <span className="text-[9px]">↗</span>
                       </button>
                     )}
@@ -607,8 +638,8 @@ export default function TenantAdminPage() {
                       title={isActive ? 'Desactivar módulo' : 'Activar módulo'}
                     >
                       {isActive 
-                        ? <ToggleRight size={32} className="text-emerald-500" />
-                        : <ToggleLeft size={32} className="text-muted-foreground/40" />
+                        ? <ToggleRight size={28} className="text-emerald-500 sm:w-8 sm:h-8" />
+                        : <ToggleLeft size={28} className="text-muted-foreground/40 sm:w-8 sm:h-8" />
                       }
                     </button>
                   </div>
@@ -616,7 +647,7 @@ export default function TenantAdminPage() {
 
                 {/* Configuraciones Internas (Feature Flags) */}
                 {isExpanded && isActive && hasFeatures && (
-                  <div className="px-4 sm:px-12 pb-5 pt-1 bg-muted/20 border-t border-border/60">
+                  <div className="px-3 sm:px-12 pb-4 pt-1 bg-muted/20 border-t border-border/60">
                     <div className="flex items-center gap-2 text-xs font-bold text-primary mb-4 uppercase tracking-widest">
                       <Settings2 size={14} /> Opciones Internas
                     </div>

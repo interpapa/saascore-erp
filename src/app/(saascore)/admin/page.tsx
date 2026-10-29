@@ -330,43 +330,43 @@ export default function AdminTenantsPage() {
           <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight mb-1">Gestión de Empresas (Tenants)</h1>
           <p className="text-muted-foreground text-xs sm:text-sm font-medium">Control maestro de acceso, telemetría y empresas de tu plataforma SaaS.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-3 sm:flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={fetchTenants}
             disabled={isLoading}
-            className="bg-card hover:bg-muted text-foreground border border-border px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs disabled:opacity-50 btn-haptic"
+            className="justify-center bg-card hover:bg-muted text-foreground border border-border px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs disabled:opacity-50 btn-haptic"
             title="Sincronizar y detectar automáticamente nuevos usuarios de Supabase"
           >
-            <RefreshCw size={15} className={`text-primary ${isLoading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">Sincronizar</span>
+            <RefreshCw size={14} className={`text-primary shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
+            <span className="truncate">Sync</span>
           </button>
           <Link
             href="/admin/users"
-            className="bg-card hover:bg-muted text-foreground border border-border px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
+            className="justify-center bg-card hover:bg-muted text-foreground border border-border px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs btn-haptic"
           >
-            <Users size={16} className="text-primary" /> 
-            <span>Usuarios</span>
+            <Users size={15} className="text-primary shrink-0" /> 
+            <span className="truncate">Usuarios</span>
           </Link>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 shadow-xs btn-haptic"
+            className="justify-center bg-primary hover:bg-primary/90 text-primary-foreground px-3 py-2 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs btn-haptic truncate"
           >
-            <Shield size={16} /> 
-            <span>Nueva Empresa</span>
+            <Shield size={15} className="shrink-0" /> 
+            <span className="truncate">+ Empresa</span>
           </button>
         </div>
       </div>
 
       {/* Barra de Búsqueda y Filtros Rápidos */}
-      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-card p-3.5 sm:p-4 rounded-2xl border border-border shadow-xs">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-card p-3 sm:p-4 rounded-2xl border border-border shadow-xs">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Buscar por nombre de empresa o ID..."
+            placeholder="Buscar por nombre o ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2 text-xs sm:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
+            className="w-full bg-background border border-border rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-foreground focus:border-primary focus:ring-1 focus:ring-primary outline-none placeholder:text-muted-foreground transition-all"
           />
           {searchTerm && (
             <button
@@ -378,11 +378,11 @@ export default function AdminTenantsPage() {
           )}
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0">
-          <div className="flex bg-muted/60 p-1 rounded-xl border border-border shrink-0">
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-hidden">
+          <div className="flex-1 md:flex-none flex bg-muted/60 p-1 rounded-xl border border-border overflow-x-auto no-scrollbar">
             <button
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex-1 md:flex-none px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center ${
                 statusFilter === 'all'
                   ? 'bg-primary text-primary-foreground shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -392,7 +392,7 @@ export default function AdminTenantsPage() {
             </button>
             <button
               onClick={() => setStatusFilter('active')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex-1 md:flex-none px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center ${
                 statusFilter === 'active'
                   ? 'bg-emerald-500 text-white shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -402,7 +402,7 @@ export default function AdminTenantsPage() {
             </button>
             <button
               onClick={() => setStatusFilter('suspended')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              className={`flex-1 md:flex-none px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap text-center ${
                 statusFilter === 'suspended'
                   ? 'bg-rose-500 text-white shadow-xs'
                   : 'text-muted-foreground hover:text-foreground'
@@ -415,7 +415,7 @@ export default function AdminTenantsPage() {
           <select
             value={planFilter}
             onChange={(e) => setPlanFilter(e.target.value)}
-            className="bg-card border border-border rounded-xl px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0 shadow-xs"
+            className="bg-card border border-border rounded-xl px-2.5 sm:px-3 py-2 text-xs text-foreground font-bold outline-none focus:border-primary shrink-0 shadow-xs"
           >
             <option value="all">Planes: Todos</option>
             <option value="basic">Basic ($49)</option>
@@ -428,7 +428,7 @@ export default function AdminTenantsPage() {
       {envInfo && (
         <div className={`px-4 py-2.5 rounded-2xl border text-xs font-mono flex flex-wrap items-center gap-x-4 gap-y-1 ${envInfo.isProd ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400' : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400'}`}>
           <span><b>Base de datos:</b> {envInfo.environmentName} · {envInfo.projectRef}</span>
-          <span><b>Usuario:</b> {session?.userEmail || 'sin sesión'}</span>
+          <span className="truncate max-w-[240px]"><b>Usuario:</b> {session?.userEmail || 'sin sesión'}</span>
           <span><b>Empresas cargadas:</b> {tenants.length}</span>
         </div>
       )}
@@ -1023,7 +1023,7 @@ export default function AdminTenantsPage() {
             </div>
 
             {/* Pestañas de Categoría */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2 border-b border-border/70">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-2 mb-2 border-b border-border/70 -mx-1 px-1">
               <button
                 type="button"
                 onClick={() => setModulesCategoryFilter('all')}
