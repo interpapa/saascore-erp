@@ -62,11 +62,10 @@ const ALL_SYSTEM_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', desc: 'Gestión multisede y consolidación' },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología Especializada', category: 'salud', desc: 'Odontograma interactivo y sillón dental' },
-  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Dedicado)', category: 'salud', desc: 'Módulo independiente en /ginecologia, FUM, gestograma, citología y caja' },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'salud', desc: 'Fórmula obstétrica G-P-C-A, FUM, gestograma, citología Bethesda y control prenatal' },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', desc: 'Estación médica, SOAP y récipe digital' },
   { id: 'med_general', name: 'Medicina General e Interna', category: 'salud', desc: 'Examen físico, triaje y PAM cardiovascular' },
   { id: 'med_pediatria', name: 'Pediatría y Puericultura', category: 'salud', desc: 'Dosis por kg, vacunas y curvas de crecimiento' },
-  { id: 'med_ginecologia', name: 'Ginecología y Obstetricia', category: 'salud', desc: 'Fórmula obstétrica, FUM y gestograma' },
   { id: 'med_dermatologia', name: 'Dermatología y Estética', category: 'salud', desc: 'Mapa anatómico, Fitzpatrick y procedimientos' },
   { id: 'med_traumatologia', name: 'Traumatología y Fisioterapia', category: 'salud', desc: 'Goniometría, EVA y paquetes de rehabilitación' },
   { id: 'med_oftalmologia', name: 'Oftalmología y Optometría', category: 'salud', desc: 'Refracción OD/OI, tonometría y fondo de ojo' },

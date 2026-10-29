@@ -75,11 +75,10 @@ const ALL_MODULES = [
   { id: 'franquicias', name: 'Franquicias & Sedes', category: 'operaciones', features: [] },
   // Salud & Especialidades Médicas
   { id: 'odontologia', name: 'Odontología & Salud Dental', category: 'salud', features: [] },
-  { id: 'ginecologia', name: 'Ginecología & Obstetricia (Dedicado)', category: 'salud', features: [] },
+  { id: 'ginecologia', name: 'Ginecología & Obstetricia', category: 'salud', features: [] },
   { id: 'clinica', name: 'Clínica Médica (Base)', category: 'salud', features: [] },
   { id: 'med_general', name: 'Especialidad: Medicina General e Interna', category: 'salud', features: [] },
   { id: 'med_pediatria', name: 'Especialidad: Pediatría y Puericultura', category: 'salud', features: [] },
-  { id: 'med_ginecologia', name: 'Especialidad: Ginecología y Obstetricia', category: 'salud', features: [] },
   { id: 'med_dermatologia', name: 'Especialidad: Dermatología y Estética', category: 'salud', features: [] },
   { id: 'med_traumatologia', name: 'Especialidad: Traumatología y Fisioterapia', category: 'salud', features: [] },
   { id: 'med_oftalmologia', name: 'Especialidad: Oftalmología y Optometría', category: 'salud', features: [] },

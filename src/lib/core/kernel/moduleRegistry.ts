@@ -377,12 +377,90 @@ export async function assertModuleEnabled(
       };
     }
 
-    // Los modulos en Rendo son completamente desacoplados y autonomos.
-    // Las dependencias en MODULE_CATALOG son informativas/sugerencias de integracion,
-    // por lo que ningun modulo bloquea la operacion de otro si esta desactivado.
     return { authorized: true };
   } catch (err: unknown) {
     console.error('[assertModuleEnabled Error]:', err);
     return { authorized: false, error: 'Error al verificar la disponibilidad del módulo.' };
   }
+}
+
+/**
+ * Obtiene las dependencias obligatorias de un módulo.
+ */
+export function getModuleDependencies(moduleId: string): ModuleId[] {
+  const def = MODULE_CATALOG[moduleId as ModuleId];
+  return def?.dependencies || [];
+}
+
+/**
+ * Resuelve las dependencias requeridas para activar un módulo en cascada.
+ * Devuelve los módulos que deben agregarse y el conjunto total resultante.
+ */
+export function resolveDependenciesForActivation(
+  targetModuleId: string,
+  currentActiveModules: string[]
+): {
+  requiredModulesToAdd: string[];
+  allResultingModules: string[];
+} {
+  const toAdd = new Set<string>();
+  const visited = new Set<string>();
+
+  function collect(modId: string) {
+    if (visited.has(modId)) return;
+    visited.add(modId);
+
+    const deps = getModuleDependencies(modId);
+    for (const dep of deps) {
+      if (!currentActiveModules.includes(dep)) {
+        toAdd.add(dep);
+      }
+      collect(dep);
+    }
+  }
+
+  collect(targetModuleId);
+
+  // Sincronización transparente ginecologia <-> med_ginecologia
+  if (targetModuleId === 'ginecologia' && !currentActiveModules.includes('med_ginecologia')) {
+    toAdd.add('med_ginecologia');
+  }
+
+  const allResultingModules = Array.from(new Set([...currentActiveModules, targetModuleId, ...toAdd]));
+  return {
+    requiredModulesToAdd: Array.from(toAdd),
+    allResultingModules,
+  };
+}
+
+/**
+ * Comprueba si un módulo puede desactivarse de forma segura o si otros módulos activos dependen de él.
+ */
+export function checkModuleDeactivationDependencies(
+  targetModuleId: string,
+  currentActiveModules: string[]
+): {
+  canDeactivate: boolean;
+  blockingModules: { id: string; name: string }[];
+} {
+  const blocking: { id: string; name: string }[] = [];
+
+  for (const activeMod of currentActiveModules) {
+    if (activeMod === targetModuleId) continue;
+    // Ignorar alias ginecologia <-> med_ginecologia como bloqueo mutuo
+    if ((targetModuleId === 'ginecologia' && activeMod === 'med_ginecologia') ||
+        (targetModuleId === 'med_ginecologia' && activeMod === 'ginecologia')) {
+      continue;
+    }
+    const deps = getModuleDependencies(activeMod);
+    if (deps.includes(targetModuleId as ModuleId)) {
+      const def = MODULE_CATALOG[activeMod as ModuleId];
+      blocking.push({ id: activeMod, name: def?.name || activeMod });
+    }
+  }
+
+  return {
+    canDeactivate: blocking.length === 0,
+    blockingModules: blocking,
+  };
 }

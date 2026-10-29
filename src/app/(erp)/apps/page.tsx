@@ -32,6 +32,7 @@ import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { updateTenantSettings } from '@/app/actions/tenant';
 import { useToast } from '@/components/core/ToastProvider';
 import { useActionActor } from '@/hooks/useActionActor';
+import { resolveDependenciesForActivation, checkModuleDeactivationDependencies } from '@/lib/core/kernel/moduleRegistry';
 
 interface AppModule {
   id: string;
@@ -102,14 +103,40 @@ export default function AppsManagerPage() {
       : activeModules.includes(moduleId);
 
     let updatedModules: string[];
-    if (isTargetInventory) {
-      updatedModules = isInstalled
-        ? activeModules.filter(m => m !== 'inventario' && m !== 'catalogo')
-        : [...activeModules.filter(m => m !== 'catalogo' && m !== 'inventario'), 'inventario', 'catalogo'];
+    let autoActivatedNames: string[] = [];
+
+    if (isInstalled) {
+      // Validación de Dependencias Bloqueantes al Desactivar
+      const check = checkModuleDeactivationDependencies(moduleId, activeModules);
+      if (!check.canDeactivate) {
+        const blockingNames = check.blockingModules.map(m => m.name).join(', ');
+        toast({
+          variant: 'error',
+          title: 'Dependencia Requerida',
+          description: `No puedes desactivar "${modulesList.find(m => m.id === moduleId)?.name || moduleId}" porque los siguientes módulos activos dependen de él: ${blockingNames}.`,
+        });
+        return;
+      }
+
+      if (isTargetInventory) {
+        updatedModules = activeModules.filter(m => m !== 'inventario' && m !== 'catalogo');
+      } else {
+        updatedModules = activeModules.filter(m => m !== moduleId);
+      }
     } else {
-      updatedModules = isInstalled
-        ? activeModules.filter(m => m !== moduleId)
-        : [...activeModules, moduleId];
+      // Activación en Cascada de Dependencias Requeridas
+      const resolved = resolveDependenciesForActivation(moduleId, activeModules);
+      updatedModules = resolved.allResultingModules;
+
+      if (isTargetInventory && !updatedModules.includes('catalogo')) {
+        updatedModules.push('catalogo');
+      }
+
+      if (resolved.requiredModulesToAdd.length > 0) {
+        autoActivatedNames = resolved.requiredModulesToAdd
+          .filter(id => id !== 'med_ginecologia' && id !== 'catalogo')
+          .map(id => modulesList.find(m => m.id === id)?.name || id);
+      }
     }
 
     setActiveModules(updatedModules);
@@ -138,10 +165,18 @@ export default function AppsManagerPage() {
           metadata: newMetadata,
           active_modules: updatedModules,   // FIX C5: sincronizar store a nivel raíz
         });
+        const modName = modulesList.find(m => m.id === moduleId)?.name || moduleId;
+        let desc = isInstalled
+          ? `El módulo "${modName}" ha sido desactivado correctamente.`
+          : `El módulo "${modName}" ha sido activado correctamente.`;
+        if (autoActivatedNames.length > 0) {
+          desc += ` Se incluyeron automáticamente sus dependencias requeridas: ${autoActivatedNames.join(', ')}.`;
+        }
+
         toast({
           variant: 'success',
           title: isInstalled ? 'Módulo Desactivado' : 'Módulo Activado',
-          description: `El módulo "${modulesList.find(m => m.id === moduleId)?.name}" ha sido ${isInstalled ? 'desactivado' : 'activado'} correctamente.`,
+          description: desc,
         });
       }
     } catch (err) {
