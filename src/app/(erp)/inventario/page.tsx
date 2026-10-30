@@ -10,6 +10,7 @@ import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import { QuickStockModal } from '@/components/ui/QuickStockModal';
 import { 
   Plus, 
+  Minus,
   Package, 
   DollarSign, 
   AlertTriangle, 
@@ -960,7 +961,7 @@ export default function InventarioPage() {
                           )}
                         </div>
 
-                        {item.type === 'product' && (
+                        {item.type !== 'service' && (
                           <div className="text-right">
                             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Valuación Bodega</p>
                             <p className="text-sm font-black font-mono text-foreground">
@@ -973,28 +974,70 @@ export default function InventarioPage() {
                         )}
                       </div>
 
-                      {/* Barra de Acción Rápida en Hover para Stock Crítico */}
-                      {(isLowStock || isOut) && (
+                      {/* Controles de Stock Grandes y Visibles en Tarjeta */}
+                      {item.type !== 'service' && (
                         <div 
                           className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between gap-2"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <button
-                            onClick={() => router.push(`/compras?item=${item.id}`)}
-                            className="flex-1 btn-base bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs py-1.5 px-2 rounded-lg flex items-center justify-center gap-1.5 shadow-xs"
-                          >
-                            <ShoppingCart size={13} />
-                            Comprar
-                          </button>
-                          <button
-                            onClick={() => {
-                              setStockModalItemId(item.id);
-                              setIsStockModalOpen(true);
-                            }}
-                            className="btn-base bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-foreground font-bold text-xs py-1.5 px-3 rounded-lg border border-border"
-                          >
-                            + Stock
-                          </button>
+                          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-border shadow-2xs gap-1">
+                            <button
+                              type="button"
+                              disabled={stock <= 0}
+                              onClick={() => handleExpressStockChange(item, Math.max(0, stock - 1))}
+                              className="w-9 h-9 flex items-center justify-center rounded-xl bg-card hover:bg-rose-500 hover:text-white text-slate-700 dark:text-slate-200 border border-border/60 disabled:opacity-30 disabled:pointer-events-none active:scale-90 transition-all btn-haptic shadow-2xs"
+                              title="Restar 1 unidad"
+                            >
+                              <Minus size={16} strokeWidth={3} />
+                            </button>
+                            <span
+                              onClick={() => {
+                                setStockModalItemId(item.id);
+                                setIsStockModalOpen(true);
+                              }}
+                              className={`min-w-[42px] px-2 text-center text-sm font-black font-mono cursor-pointer hover:underline ${
+                                isOut
+                                  ? 'text-rose-600 dark:text-rose-400'
+                                  : isLowStock
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-emerald-600 dark:text-emerald-400'
+                              }`}
+                              title="Toca para ajustar existencias con motivo"
+                            >
+                              {stock}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleExpressStockChange(item, stock + 1)}
+                              className="w-9 h-9 flex items-center justify-center rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-30 active:scale-90 transition-all btn-haptic shadow-xs font-black"
+                              title="Sumar 1 unidad"
+                            >
+                              <Plus size={16} strokeWidth={3} />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {(isLowStock || isOut) && (
+                              <button
+                                onClick={() => router.push(`/compras?item=${item.id}`)}
+                                className="btn-base text-xs font-black bg-orange-600 hover:bg-orange-700 text-white px-2.5 py-2 rounded-xl shadow-2xs btn-haptic flex items-center gap-1"
+                                title="Emitir orden de compra"
+                              >
+                                <ShoppingCart size={13} />
+                                <span>Comprar</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setStockModalItemId(item.id);
+                                setIsStockModalOpen(true);
+                              }}
+                              className="text-xs font-black px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground border border-border shadow-2xs btn-haptic"
+                            >
+                              Ajustar
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1084,17 +1127,46 @@ export default function InventarioPage() {
                         <td className="p-3.5 text-right font-bold text-emerald-600 dark:text-emerald-400">
                           {marginPct}%
                         </td>
-                        <td className="p-3.5 text-right font-bold">
-                          {item.type === 'product' ? (
-                            <span className={isOut ? 'text-red-500' : isLowStock ? 'text-amber-500' : 'text-foreground'}>
-                              {stock} {item.metadata?.unit_of_measure || 'uds'}
-                            </span>
+                        <td className="p-3.5 text-right font-bold" onClick={(e) => e.stopPropagation()}>
+                          {item.type !== 'service' ? (
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={stock <= 0}
+                                onClick={() => handleExpressStockChange(item, Math.max(0, stock - 1))}
+                                className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-500 hover:text-white text-slate-700 dark:text-slate-200 flex items-center justify-center font-black active:scale-90 transition-all disabled:opacity-30 border border-border shadow-2xs btn-haptic"
+                                title="Restar 1 unidad"
+                              >
+                                <Minus size={15} strokeWidth={3} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStockModalItemId(item.id);
+                                  setIsStockModalOpen(true);
+                                }}
+                                className={`min-w-[48px] px-2 py-1 text-center font-mono font-black text-sm rounded-lg hover:underline ${
+                                  isOut ? 'text-red-500' : isLowStock ? 'text-amber-500' : 'text-foreground'
+                                }`}
+                                title="Clic para abrir ajuste detallado con motivo"
+                              >
+                                {stock} <span className="text-[10px] font-normal text-slate-400">{item.metadata?.unit_of_measure || 'uds'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExpressStockChange(item, stock + 1)}
+                                className="w-8 h-8 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center font-black active:scale-90 transition-all shadow-xs btn-haptic"
+                                title="Sumar 1 unidad"
+                              >
+                                <Plus size={15} strokeWidth={3} />
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
                         </td>
                         <td className="p-3.5 text-right font-mono font-bold text-foreground">
-                          {item.type === 'product' ? `$${(cost * stock).toFixed(2)}` : '-'}
+                          {item.type !== 'service' ? `${(cost * stock).toFixed(2)}` : '-'}
                         </td>
                         <td className="p-3.5">
                           <span
@@ -1119,14 +1191,14 @@ export default function InventarioPage() {
                         </td>
                         <td className="p-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end gap-1.5">
-                            {item.type === 'product' && (
+                            {item.type !== 'service' && (
                               <>
                                 <button
                                   onClick={() => {
                                     setStockModalItemId(item.id);
                                     setIsStockModalOpen(true);
                                   }}
-                                  className="btn-base btn-xs bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground font-bold px-2 py-1 rounded-lg border border-border"
+                                  className="btn-base text-xs font-black bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-foreground px-3 py-1.5 rounded-xl border border-border shadow-2xs btn-haptic"
                                   title="Ajustar Stock"
                                 >
                                   + Stock
@@ -1134,7 +1206,7 @@ export default function InventarioPage() {
                                 {(isLowStock || isOut) && (
                                   <button
                                     onClick={() => router.push(`/compras?item=${item.id}`)}
-                                    className="btn-base btn-xs bg-orange-600 hover:bg-orange-700 text-white font-bold px-2 py-1 rounded-lg"
+                                    className="btn-base text-xs font-black bg-orange-600 hover:bg-orange-700 text-white px-3 py-1.5 rounded-xl shadow-2xs btn-haptic"
                                     title="Emitir Orden de Compra"
                                   >
                                     Comprar

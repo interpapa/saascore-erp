@@ -118,11 +118,11 @@ export function InventarioExpress({
       </div>
 
       {/* 2. Pestañas Limpias Táctiles: [ Todos ] [ Productos ] [ Servicios ] */}
-      <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-900/80 p-1 rounded-2xl border border-border">
+      <div className="grid grid-cols-3 gap-1.5 bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-border">
         <button
           type="button"
           onClick={() => setActiveTab('all')}
-          className={`py-2 px-1 rounded-xl text-xs font-black transition-all text-center btn-haptic truncate ${
+          className={`py-2.5 px-1 rounded-xl text-xs sm:text-sm font-black transition-all text-center btn-haptic truncate ${
             activeTab === 'all'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-slate-500 hover:text-foreground'
@@ -133,7 +133,7 @@ export function InventarioExpress({
         <button
           type="button"
           onClick={() => setActiveTab('products')}
-          className={`py-2 px-1 rounded-xl text-xs font-black transition-all text-center btn-haptic truncate ${
+          className={`py-2.5 px-1 rounded-xl text-xs sm:text-sm font-black transition-all text-center btn-haptic truncate ${
             activeTab === 'products'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-slate-500 hover:text-foreground'
@@ -144,7 +144,7 @@ export function InventarioExpress({
         <button
           type="button"
           onClick={() => setActiveTab('services')}
-          className={`py-2 px-1 rounded-xl text-xs font-black transition-all text-center btn-haptic truncate ${
+          className={`py-2.5 px-1 rounded-xl text-xs sm:text-sm font-black transition-all text-center btn-haptic truncate ${
             activeTab === 'services'
               ? 'bg-card text-foreground shadow-xs'
               : 'text-slate-500 hover:text-foreground'
@@ -155,21 +155,21 @@ export function InventarioExpress({
       </div>
 
       {/* 3. Buscador Amplio y Chips de Categorías */}
-      <div className="space-y-2">
+      <div className="space-y-2.5">
         <div className="relative">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             placeholder="Buscar por nombre, SKU o categoría..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-card border border-border rounded-2xl pl-10 pr-9 py-2.5 text-xs font-bold text-foreground placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-primary shadow-xs"
+            className="w-full bg-card border border-border rounded-2xl pl-11 pr-10 py-3 text-sm font-bold text-foreground placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-primary shadow-xs"
           />
           {searchTerm && (
             <button
               type="button"
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full w-5 h-5 flex items-center justify-center cursor-pointer"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-sm bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-full w-6 h-6 flex items-center justify-center cursor-pointer hover:bg-slate-300"
             >
               ×
             </button>
@@ -182,7 +182,7 @@ export function InventarioExpress({
             <button
               type="button"
               onClick={() => setSelectedCategory('all')}
-              className={`px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition-colors ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold shrink-0 transition-colors ${
                 selectedCategory === 'all'
                   ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black'
                   : 'bg-card border border-border text-slate-500 hover:text-foreground'
@@ -195,7 +195,7 @@ export function InventarioExpress({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold shrink-0 transition-colors ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold shrink-0 transition-colors ${
                   selectedCategory === cat
                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black'
                     : 'bg-card border border-border text-slate-500 hover:text-foreground'
@@ -216,7 +216,7 @@ export function InventarioExpress({
           <p className="text-xs text-slate-500">Prueba con otro término de búsqueda o categoría.</p>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {filteredItems.map((item) => {
             const isService = item.type === 'service';
             const stock = Number(item.stock_quantity ?? (item as any).stock ?? (item as any).quantity ?? 0);
@@ -230,7 +230,7 @@ export function InventarioExpress({
               <div
                 key={item.id}
                 onClick={() => onSelectItem ? onSelectItem(item) : (onEditItem ? onEditItem(item) : null)}
-                className={`bg-card border rounded-2xl p-3 shadow-xs flex items-center justify-between gap-3 transition-all cursor-pointer hover:border-primary/50 active:scale-99 ${
+                className={`bg-card border rounded-3xl p-3.5 sm:p-4 shadow-xs flex flex-col gap-2.5 transition-all cursor-pointer hover:border-primary/50 active:scale-99 ${
                   isOut 
                     ? 'border-red-200 dark:border-red-900/40 bg-red-50/10' 
                     : isLow 
@@ -238,118 +238,129 @@ export function InventarioExpress({
                     : 'border-border'
                 }`}
               >
-                {/* Columna Izquierda: Imagen / Foto 56x56 */}
-                <div className="w-14 h-14 rounded-2xl overflow-hidden border border-border/60 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                  {itemImage ? (
-                    <img
-                      src={itemImage}
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const parent = (e.target as HTMLElement).parentElement;
-                        if (parent) parent.innerHTML = '<div class="text-xl">📦</div>';
-                      }}
-                    />
-                  ) : (
-                    <div className="text-slate-400">
-                      {isService ? <span className="text-xl">✂️</span> : <Package size={22} />}
-                    </div>
-                  )}
-                </div>
+                {/* Fila Principal: Foto + Info + Precio */}
+                <div className="flex items-center justify-between gap-3">
+                  {/* Foto 56x56 */}
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden border border-border/60 shrink-0 bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                    {itemImage ? (
+                      <img
+                        src={itemImage}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const parent = (e.target as HTMLElement).parentElement;
+                          if (parent) parent.innerHTML = '<div class="text-xl">📦</div>';
+                        }}
+                      />
+                    ) : (
+                      <div className="text-slate-400">
+                        {isService ? <span className="text-2xl">✂️</span> : <Package size={26} />}
+                      </div>
+                    )}
+                  </div>
 
-                {/* Columna Centro: Nombre en Alto Contraste y SKU */}
-                <div className="flex-1 min-w-0 pr-1">
-                  <h3 className="font-black text-slate-900 dark:text-white text-sm line-clamp-1 leading-snug">
-                    {item.name}
-                  </h3>
-                  <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 flex-wrap">
-                    <span className="font-bold text-slate-600 dark:text-slate-400">
-                      {item.category || (isService ? 'Servicio' : 'General')}
+                  {/* Nombre en Alto Contraste y SKU */}
+                  <div className="flex-1 min-w-0 pr-1">
+                    <h3 className="font-black text-slate-900 dark:text-white text-sm sm:text-base line-clamp-1 leading-snug">
+                      {item.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 flex-wrap">
+                      <span className="font-bold text-slate-600 dark:text-slate-400">
+                        {item.category || (isService ? 'Servicio' : 'General')}
+                      </span>
+                      {item.sku && (
+                        <>
+                          <span>•</span>
+                          <span className="font-mono font-bold text-[11px] text-slate-400">
+                            {item.sku}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Precio Grande */}
+                  <div className="text-right shrink-0">
+                    <span className="font-mono font-black text-lg sm:text-xl text-slate-900 dark:text-white leading-tight">
+                      ${price.toFixed(2)}
                     </span>
-                    {item.sku && (
-                      <>
-                        <span>•</span>
-                        <span className="font-mono font-bold text-[11px] text-slate-400">
-                          {item.sku}
-                        </span>
-                      </>
+                    {isService && (
+                      <span className="block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 text-center">
+                        Servicio
+                      </span>
                     )}
                   </div>
                 </div>
 
-                {/* Columna Derecha: Stock con Stepper Rápido Táctil y Precio Prominente */}
-                <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
-                  <span className="font-mono font-black text-base text-slate-900 dark:text-white leading-tight">
-                    ${price.toFixed(2)}
-                  </span>
-
-                  {!isService ? (
-                    <div className="flex items-center gap-1">
-                      {onStockChange ? (
-                        <div 
-                          onClick={(e) => e.stopPropagation()} 
-                          className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-xl p-0.5 border border-border shadow-2xs"
-                        >
-                          <button
-                            type="button"
-                            disabled={stock <= 0}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onStockChange(item, Math.max(0, stock - 1));
-                            }}
-                            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-card disabled:opacity-30 disabled:pointer-events-none active:scale-90 transition-transform btn-haptic"
-                            title="Restar 1 unidad"
-                          >
-                            <Minus size={11} strokeWidth={3} />
-                          </button>
-                          <span
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenAdjustmentModal(item.id);
-                            }}
-                            className={`px-1.5 text-[11px] font-black font-mono cursor-pointer hover:underline ${
-                              isOut
-                                ? 'text-rose-600 dark:text-rose-400'
-                                : isLow
-                                ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-emerald-600 dark:text-emerald-400'
-                            }`}
-                            title="Toca para ajustar existencias con motivo"
-                          >
-                            {stock}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onStockChange(item, stock + 1);
-                            }}
-                            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 dark:text-slate-300 hover:bg-card active:scale-90 transition-transform btn-haptic"
-                            title="Sumar 1 unidad"
-                          >
-                            <Plus size={11} strokeWidth={3} />
-                          </button>
-                        </div>
-                      ) : (
-                        <span
-                          className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
-                            isOut
-                              ? 'bg-rose-500/10 text-rose-600 border-rose-500/20'
-                              : isLow
-                              ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                              : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                          }`}
-                        >
-                          {isOut ? 'Agotado' : `${stock} disp.`}
-                        </span>
-                      )}
+                {/* Fila Inferior de Stock: Botones Agregar/Quitar Grandes y Fácilmente Táctiles */}
+                {!isService && (
+                  <div 
+                    onClick={(e) => e.stopPropagation()} 
+                    className="pt-2 border-t border-border/40 flex items-center justify-between gap-2"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-slate-500">Stock:</span>
+                      <button
+                        type="button"
+                        onClick={() => onOpenAdjustmentModal(item.id)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-black font-mono cursor-pointer hover:underline border transition-colors ${
+                          isOut
+                            ? 'bg-rose-500/10 text-rose-600 border-rose-500/30'
+                            : isLow
+                            ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                            : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                        }`}
+                        title="Toca para ajustar existencias con motivo"
+                      >
+                        {isOut ? 'Agotado (0)' : `${stock} ${item.metadata?.unit_of_measure || 'uds'}`}
+                      </button>
                     </div>
-                  ) : (
-                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
-                      Servicio
-                    </span>
-                  )}
-                </div>
+
+                    {onStockChange && (
+                      <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-border shadow-2xs gap-1">
+                        <button
+                          type="button"
+                          disabled={stock <= 0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStockChange(item, Math.max(0, stock - 1));
+                          }}
+                          className="w-10 h-10 flex items-center justify-center rounded-xl bg-card hover:bg-rose-500 hover:text-white text-slate-700 dark:text-slate-200 border border-border/60 disabled:opacity-30 disabled:pointer-events-none active:scale-90 transition-all btn-haptic shadow-2xs"
+                          title="Restar 1 unidad"
+                        >
+                          <Minus size={18} strokeWidth={3} />
+                        </button>
+                        <span
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenAdjustmentModal(item.id);
+                          }}
+                          className={`min-w-[42px] px-2 text-center text-base sm:text-lg font-black font-mono cursor-pointer hover:underline ${
+                            isOut
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : isLow
+                              ? 'text-amber-600 dark:text-amber-400'
+                              : 'text-emerald-600 dark:text-emerald-400'
+                          }`}
+                          title="Toca para ajustar con motivo"
+                        >
+                          {stock}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStockChange(item, stock + 1);
+                          }}
+                          className="w-10 h-10 flex items-center justify-center rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-30 active:scale-90 transition-all btn-haptic shadow-xs font-black"
+                          title="Sumar 1 unidad"
+                        >
+                          <Plus size={18} strokeWidth={3} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}

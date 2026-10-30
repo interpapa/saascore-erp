@@ -192,20 +192,28 @@ export function QuickStockModal({
 
         <form onSubmit={handleAdjustStock} className="space-y-4">
           {/* Selector de Tipo de Movimiento */}
-          <div className="flex bg-slate-100 dark:bg-slate-800/60 p-1 rounded-2xl">
+          <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl gap-2 border border-border/50">
             <button
               type="button"
               onClick={() => setOperationType('add')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black transition-all ${operationType === 'add' ? 'bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-foreground'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all btn-haptic ${
+                operationType === 'add'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
             >
-              <PlusCircle size={15} /> Entrada (+)
+              <PlusCircle size={18} /> Entrada (+)
             </button>
             <button
               type="button"
               onClick={() => setOperationType('subtract')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black transition-all ${operationType === 'subtract' ? 'bg-white dark:bg-slate-700 shadow-sm text-amber-600 dark:text-amber-400' : 'text-slate-500 hover:text-foreground'}`}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black transition-all btn-haptic ${
+                operationType === 'subtract'
+                  ? 'bg-amber-600 text-white shadow-md'
+                  : 'text-slate-500 hover:text-foreground'
+              }`}
             >
-              <MinusCircle size={15} /> Salida / Merma (-)
+              <MinusCircle size={18} /> Salida / Merma (-)
             </button>
           </div>
 
@@ -214,20 +222,37 @@ export function QuickStockModal({
             <select
               value={selectedItemId}
               onChange={(e) => handleItemSelect(e.target.value)}
-              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-sm font-semibold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+              className="w-full bg-background border border-border rounded-2xl px-3.5 py-3 text-sm font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
             >
               <option value="">-- Seleccionar de inventario --</option>
               {items.filter((i: any) => i.type !== 'service').map((i: any) => (
                 <option key={i.id} value={i.id}>
-                  {i.name} — Stock actual: {i.stock ?? i.stock_quantity ?? 0} uds
+                  {i.name} — Stock actual: {Number(i.stock ?? i.stock_quantity ?? 0)} uds
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1.5">Cantidad *</label>
+          {/* Stepper y Cantidad Grande */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-500">
+                Cantidad a {operationType === 'add' ? 'Ingresar' : 'Retirar'} *
+              </label>
+              <span className="text-xs font-bold text-slate-500">
+                Stock Resultante: <b className="font-mono text-foreground font-black text-sm">{resultingStock} uds</b>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleQuantityChange(Math.max(1, quantity - 1))}
+                className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-500 hover:text-white text-foreground font-black text-2xl flex items-center justify-center active:scale-95 transition-all border border-border shadow-xs shrink-0 btn-haptic"
+                title="Restar 1"
+              >
+                -
+              </button>
               <input
                 type="number"
                 min="1"
@@ -235,15 +260,31 @@ export function QuickStockModal({
                 onChange={(e) => handleQuantityChange(Number(e.target.value) || 0)}
                 onFocus={(e) => e.target.select()}
                 placeholder="1"
-                className="w-full bg-background border border-border rounded-xl px-3.5 py-2.5 text-sm font-bold text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+                className="flex-1 bg-background border border-border rounded-2xl h-12 text-center text-2xl font-black font-mono text-foreground focus:outline-hidden focus:ring-2 focus:ring-primary shadow-xs"
               />
+              <button
+                type="button"
+                onClick={() => handleQuantityChange(quantity + 1)}
+                className="w-12 h-12 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-black text-2xl flex items-center justify-center active:scale-95 transition-all shadow-xs shrink-0 btn-haptic"
+                title="Sumar 1"
+              >
+                +
+              </button>
             </div>
 
-            <div>
-              <label className="text-xs font-bold text-slate-500 block mb-1.5">Stock Resultante</label>
-              <div className="w-full bg-slate-50 dark:bg-slate-800/40 border border-border rounded-xl px-3.5 py-2.5 text-sm font-black text-foreground">
-                {resultingStock} uds
-              </div>
+            {/* Atajos Rápidos de Incremento para evitar tipear */}
+            <div className="flex items-center justify-center gap-1.5 pt-1 flex-wrap">
+              <span className="text-[11px] font-bold text-slate-400 mr-1">Rápido:</span>
+              {[1, 5, 10, 25, 50, 100].map((inc) => (
+                <button
+                  key={inc}
+                  type="button"
+                  onClick={() => handleQuantityChange(quantity + inc)}
+                  className="px-2.5 py-1 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-primary/20 hover:text-primary text-xs font-black text-slate-700 dark:text-slate-300 border border-border/60 active:scale-95 transition-all btn-haptic"
+                >
+                  +{inc}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -252,7 +293,7 @@ export function QuickStockModal({
             <select
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-hidden focus:ring-2 focus:ring-primary/20"
+              className="w-full bg-background border border-border rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold focus:outline-hidden focus:ring-2 focus:ring-primary/20"
             >
               <option value="Reposición de mercancía">📦 Reposición de mercancía</option>
               <option value="Ajuste por conteo físico">📋 Ajuste por conteo físico</option>
