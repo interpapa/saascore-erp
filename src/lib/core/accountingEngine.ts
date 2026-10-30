@@ -32,11 +32,11 @@ export function buildInvoiceJournalLines(invoice: Document): JournalEntryLine[] 
     if (m === 'credit' || m === 'credito') {
       return { account_code: '1.1.02.01', account_name: 'Clientes Nacionales (Crédito / CxC)' };
     }
-    if (['binance', 'usdt', 'crypto', 'cripto'].includes(m)) {
-      return { account_code: '1.1.01.02', account_name: 'Billetera Digital - Binance Pay (USDT)' };
+    if (['binance', 'binance_pay', 'usdt', 'crypto', 'cripto'].includes(m)) {
+      return { account_code: '1.1.01.04', account_name: 'Billetera Digital - Binance Pay (USDT)' };
     }
     if (['zelle'].includes(m)) {
-      return { account_code: '1.1.01.02', account_name: 'Cuenta Digital - Zelle (USD)' };
+      return { account_code: '1.1.01.03', account_name: 'Cuenta Digital - Zelle (USD)' };
     }
     if (['pago_movil', 'pagomovil'].includes(m)) {
       const bankSuffix = bankName ? ` (${bankName})` : '';
@@ -188,15 +188,15 @@ export async function generateJournalEntryForInvoice(invoice: Document, tenantId
   const bankName = meta.bank_name ? String(meta.bank_name).trim() : '';
 
   const getMethodReadable = (m: string) => {
-    const raw = (m || '').toLowerCase().trim();
-    if (raw.includes('binance') || raw.includes('usdt')) return 'Binance Pay (USDT)';
+    const raw = (m || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
+    if (raw === 'binance' || raw === 'binance_pay' || raw === 'usdt' || raw === 'crypto') return 'Binance Pay (USDT)';
     if (raw.includes('zelle')) return 'Zelle';
     if (raw.includes('pago_movil') || raw.includes('pagomovil')) return 'Pago Móvil';
-    if (raw.includes('card') || raw.includes('tarjeta') || raw.includes('punto')) return 'Punto POS / Tarjeta';
-    if (raw.includes('transfer')) return 'Transferencia Bancaria';
+    if (raw.includes('card') || raw.includes('tarjeta') || raw.includes('pos') || raw.includes('punto')) return 'Punto POS / Tarjeta';
+    if (raw.includes('transfer') || raw.includes('bank')) return 'Transferencia Bancaria';
     if (raw.includes('ves')) return 'Efectivo (Bs)';
-    if (raw.includes('credit')) return 'Crédito (CxC)';
-    if (raw.includes('mixed')) return 'Pago Dividido';
+    if (raw.includes('credit') || raw.includes('credito')) return 'Crédito (CxC)';
+    if (raw.includes('mixed') || raw.includes('mixto')) return 'Pago Dividido';
     return 'Efectivo ($ USD)';
   };
 

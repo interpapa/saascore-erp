@@ -449,7 +449,7 @@ export default function InventarioPage() {
       return {
         SKU: i.sku || '',
         Nombre: i.name,
-        Tipo: i.type === 'product' ? 'Producto Físico' : 'Servicio',
+        Tipo: i.type !== 'service' ? 'Producto Físico' : 'Servicio',
         Categoría: i.category || 'General',
         'Costo Adquisición ($)': cost.toFixed(2),
         'Precio Venta ($)': price.toFixed(2),
@@ -517,14 +517,14 @@ export default function InventarioPage() {
       }
 
       // Filtro por Tab Principal
-      if (activeTab === 'items' && item.type !== 'product') return false;
+      if (activeTab === 'items' && item.type === 'service') return false;
       if (activeTab === 'services' && item.type !== 'service') return false;
       
       const stock = item.stock_quantity ?? (item as any).stock ?? 0;
       const minStock = Number(item.metadata?.min_stock ?? 5);
 
       if (activeTab === 'reorder') {
-        if (item.type !== 'product') return false;
+        if (item.type === 'service') return false;
         if (stock > minStock) return false;
       }
 
@@ -547,7 +547,7 @@ export default function InventarioPage() {
       }
 
       // Filtro por Estado de Stock
-      if (statusFilter !== 'all' && item.type === 'product') {
+      if (statusFilter !== 'all' && item.type !== 'service') {
         if (statusFilter === 'out_of_stock' && stock > 0) return false;
         if (statusFilter === 'low_stock' && (stock <= 0 || stock > minStock)) return false;
         if (statusFilter === 'in_stock' && stock <= minStock) return false;
@@ -559,7 +559,7 @@ export default function InventarioPage() {
 
   // Métricas Financieras y de Inventario Nivel Odoo
   const metrics = useMemo(() => {
-    const products = items.filter((i) => i.type === 'product');
+    const products = items.filter((i) => i.type !== 'service');
     const services = items.filter((i) => i.type === 'service');
 
     let totalCostValuation = 0;

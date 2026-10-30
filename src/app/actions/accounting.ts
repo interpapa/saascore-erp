@@ -301,7 +301,9 @@ export async function getJournalEntriesAction(
 
           // Discriminar Venta a Crédito (AR) vs Venta Cobrada al Contado (Caja o Banco) o Pago Mixto
           const isCredit = methodInfo.code === 'credit';
-          const isBank = ['card', 'transfer', 'pago_movil', 'zelle', 'binance'].includes(methodInfo.code);
+          const isBinance = methodInfo.code === 'binance';
+          const isZelle = methodInfo.code === 'zelle';
+          const isBank = ['card', 'transfer', 'pago_movil'].includes(methodInfo.code);
           const payments = Array.isArray(doc.metadata?.payments) ? doc.metadata.payments : null;
 
           if (methodInfo.code === 'mixed' && payments && payments.length > 0) {
@@ -310,10 +312,29 @@ export async function getJournalEntriesAction(
               if (pAmount <= 0) continue;
               const pMethod = String(p.method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
               const pIsCredit = pMethod === 'credit' || pMethod === 'credito';
-              const pIsBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'zelle', 'binance', 'usdt', 'pos', 'bank', 'punto'].includes(pMethod);
+              const pIsBinance = ['binance', 'binance_pay', 'usdt', 'crypto'].includes(pMethod);
+              const pIsZelle = pMethod === 'zelle';
+              const pIsBank = ['card', 'tarjeta', 'transfer', 'transferencia', 'pago_movil', 'pagomovil', 'pos', 'bank', 'punto'].includes(pMethod);
+
+              let accCode = '1.1.01.01';
+              let accName = 'Caja Principal (Efectivo)';
+              if (pIsCredit) {
+                accCode = '1.1.02.01';
+                accName = 'Clientes Nacionales (Crédito / CxC)';
+              } else if (pIsBinance) {
+                accCode = '1.1.01.04';
+                accName = 'Billeteras Digitales y Cripto (Binance / USDT)';
+              } else if (pIsZelle) {
+                accCode = '1.1.01.03';
+                accName = 'Cuenta Divisas (USD / Zelle)';
+              } else if (pIsBank) {
+                accCode = '1.1.01.02';
+                accName = 'Banco y Cuentas Operativas';
+              }
+
               lines.push({
-                account_code: pIsCredit ? '1.1.02.01' : (pIsBank ? '1.1.01.02' : '1.1.01.01'),
-                account_name: pIsCredit ? 'Clientes Nacionales (Crédito / CxC)' : (pIsBank ? 'Banco y Cuentas Operativas' : 'Caja Principal (Efectivo)'),
+                account_code: accCode,
+                account_name: accName,
                 debit: pAmount,
                 credit: 0,
                 description: `Cobro parcial en ${p.method || 'Caja'} ${doc.document_number}`,
@@ -326,6 +347,22 @@ export async function getJournalEntriesAction(
               debit: total,
               credit: 0,
               description: `Venta a Crédito ${doc.document_number}`,
+            });
+          } else if (isBinance) {
+            lines.push({
+              account_code: '1.1.01.04',
+              account_name: `Billeteras Digitales y Cripto (${docMethodLabel})`,
+              debit: total,
+              credit: 0,
+              description: `Cobro en ${docMethodLabel} ${doc.document_number}`,
+            });
+          } else if (isZelle) {
+            lines.push({
+              account_code: '1.1.01.03',
+              account_name: `Cuenta Divisas (${docMethodLabel})`,
+              debit: total,
+              credit: 0,
+              description: `Cobro en ${docMethodLabel} ${doc.document_number}`,
             });
           } else {
             lines.push({

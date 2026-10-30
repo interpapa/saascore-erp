@@ -169,7 +169,7 @@ export function MobileBankingFeed({
       const isInflow = netCash > 0 || (netCash === 0 && conceptStr.toLowerCase().includes('venta'));
       const amount = Math.abs(netCash) > 0 ? Math.abs(netCash) : otherTotal || lines.reduce((acc, l) => acc + Number(l.debit || 0), 0);
 
-      // Determinar icono y método de pago / banco
+      // Determinar icono y método de pago / banco con coincidencia estricta y segura
       const pm = (entry.payment_method || (entry as any).metadata?.payment_method || '').toLowerCase().trim();
       const bn = entry.bank_name || (entry as any).metadata?.bank_name || '';
       const pml = entry.payment_method_label || (entry as any).metadata?.payment_method_label || '';
@@ -178,36 +178,50 @@ export function MobileBankingFeed({
       let methodIcon = 'receipt';
       let methodLabel = pml || 'Venta / Factura';
 
-      if (pm.includes('binance') || pm.includes('usdt') || lowerConcept.includes('binance') || lowerRef.includes('binance') || lowerConcept.includes('usdt')) {
+      const cleanPm = pm.replace(/[\s-]+/g, '_');
+      const isBinance = cleanPm === 'binance' || cleanPm === 'binance_pay' || cleanPm === 'usdt' || cleanPm === 'crypto' || lowerConcept.includes('binance pay');
+      const isPagoMovil = cleanPm === 'pago_movil' || cleanPm === 'pagomovil' || lowerConcept.includes('pago móvil') || lowerConcept.includes('pagomovil');
+      const isZelle = cleanPm === 'zelle' || lowerConcept.includes('zelle');
+      const isCard = cleanPm === 'card' || cleanPm === 'tarjeta' || cleanPm === 'pos' || cleanPm === 'punto' || lowerConcept.includes('tarjeta') || lowerConcept.includes('punto');
+      const isTransfer = cleanPm === 'transfer' || cleanPm === 'transferencia' || cleanPm === 'bank' || lowerConcept.includes('transferencia');
+      const isVES = cleanPm === 'cash_ves' || cleanPm === 'ves' || lowerConcept.includes('bolívar') || lowerConcept.includes('bolivar');
+      const isCredit = cleanPm === 'credit' || cleanPm === 'credito' || lowerConcept.includes('crédito') || lowerConcept.includes('credito');
+      const isMixed = cleanPm === 'mixed' || cleanPm === 'mixto' || lowerConcept.includes('mixto') || lowerConcept.includes('dividido');
+      const isCash = cleanPm === 'cash' || cleanPm === 'cash_usd' || cleanPm === 'efectivo' || lowerConcept.includes('efectivo') || lowerConcept.includes('caja');
+
+      if (isBinance) {
         methodIcon = 'binance';
         methodLabel = pml || 'Binance Pay (USDT)';
-      } else if (pm.includes('pago_movil') || pm.includes('pagomovil') || lowerConcept.includes('pago móvil') || lowerConcept.includes('pagomovil') || lowerRef.includes('pago móvil')) {
+      } else if (isPagoMovil) {
         methodIcon = 'phone';
         methodLabel = pml || (bn ? `Pago Móvil · ${bn}` : 'Pago Móvil');
-      } else if (pm.includes('zelle') || lowerConcept.includes('zelle') || lowerRef.includes('zelle')) {
+      } else if (isZelle) {
         methodIcon = 'zelle';
         methodLabel = pml || 'Zelle';
-      } else if (pm.includes('card') || pm.includes('tarjeta') || pm.includes('pos') || pm.includes('punto') || lowerConcept.includes('tarjeta') || lowerConcept.includes('punto') || lowerConcept.includes('pos')) {
+      } else if (isCard) {
         methodIcon = 'card';
         methodLabel = pml || (bn ? `Punto · ${bn}` : 'Punto de Venta');
-      } else if (pm.includes('transfer') || lowerConcept.includes('transferencia') || lowerConcept.includes('banco')) {
+      } else if (isTransfer) {
         methodIcon = 'bank';
         methodLabel = pml || (bn ? `Transf. · ${bn}` : 'Transferencia Bancaria');
-      } else if (pm.includes('ves') || lowerConcept.includes('bolívar') || lowerConcept.includes('bolivar')) {
+      } else if (isVES) {
         methodIcon = 'cash';
         methodLabel = pml || 'Efectivo (Bs)';
-      } else if (pm.includes('cash') || pm.includes('efectivo') || lowerConcept.includes('efectivo') || lowerConcept.includes('caja')) {
+      } else if (isCash) {
         methodIcon = 'cash';
         methodLabel = pml || 'Efectivo ($ USD)';
-      } else if (pm.includes('credit') || lowerConcept.includes('crédito') || lowerConcept.includes('credito')) {
+      } else if (isCredit) {
         methodIcon = 'credit';
         methodLabel = pml || 'Crédito (CxC)';
-      } else if (pm.includes('mixed') || lowerConcept.includes('mixto')) {
+      } else if (isMixed) {
         methodIcon = 'mixed';
         methodLabel = pml || 'Pago Dividido';
       } else if (lowerConcept.includes('compra') || lowerConcept.includes('proveedor') || lowerConcept.includes('gasto')) {
         methodIcon = 'expense';
         methodLabel = 'Gasto / Compra';
+      } else if (lowerConcept.includes('nómina') || lowerConcept.includes('nomina') || lowerConcept.includes('sueldo')) {
+        methodIcon = 'expense';
+        methodLabel = 'Nómina / Sueldos';
       }
 
       // Formato de hora / fecha

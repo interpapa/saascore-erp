@@ -128,10 +128,16 @@ export async function createItemAction(
       metadata: { action: 'created', name: input.name, price: input.base_price },
     });
 
+    const numStock = newItem
+      ? (newItem.stock !== undefined && newItem.stock !== null
+        ? Number(newItem.stock)
+        : (newItem.stock_quantity !== undefined && newItem.stock_quantity !== null ? Number(newItem.stock_quantity) : 0))
+      : 0;
     const mappedItem = newItem ? {
       ...newItem,
-      stock: newItem.stock !== undefined ? newItem.stock : newItem.stock_quantity,
-      stock_quantity: newItem.stock_quantity !== undefined ? newItem.stock_quantity : (newItem.stock ?? 0),
+      type: newItem.type || (newItem.category?.toLowerCase() === 'servicios' ? 'service' : 'product'),
+      stock: numStock,
+      stock_quantity: numStock,
     } : null;
 
     return { success: true, item: mappedItem };
@@ -251,10 +257,16 @@ export async function updateItemAction(
       metadata: { action: 'updated', updates },
     });
 
+    const numStock = updatedItem
+      ? (updatedItem.stock !== undefined && updatedItem.stock !== null
+        ? Number(updatedItem.stock)
+        : (updatedItem.stock_quantity !== undefined && updatedItem.stock_quantity !== null ? Number(updatedItem.stock_quantity) : 0))
+      : 0;
     const mappedItem = updatedItem ? {
       ...updatedItem,
-      stock: updatedItem.stock !== undefined ? updatedItem.stock : updatedItem.stock_quantity,
-      stock_quantity: updatedItem.stock_quantity !== undefined ? updatedItem.stock_quantity : (updatedItem.stock ?? 0),
+      type: updatedItem.type || (updatedItem.category?.toLowerCase() === 'servicios' ? 'service' : 'product'),
+      stock: numStock,
+      stock_quantity: numStock,
     } : null;
 
     return { success: true, item: mappedItem };
@@ -382,11 +394,18 @@ export async function getItemsAction(tenantId: string, type: ItemType | undefine
     if (error) throw new Error(error.message);
 
     // Map `stock` or `stock_quantity` safely to `stock_quantity` for interface compatibility
-    const mappedItems = (items || []).map((item: any) => ({
-      ...item,
-      stock: item.stock !== undefined ? item.stock : item.stock_quantity,
-      stock_quantity: item.stock_quantity !== undefined ? item.stock_quantity : (item.stock ?? 0),
-    }));
+    const mappedItems = (items || []).map((item: any) => {
+      const numStock = item.stock !== undefined && item.stock !== null
+        ? Number(item.stock)
+        : (item.stock_quantity !== undefined && item.stock_quantity !== null ? Number(item.stock_quantity) : 0);
+      const safeType = item.type || (item.category?.toLowerCase() === 'servicios' ? 'service' : 'product');
+      return {
+        ...item,
+        type: safeType,
+        stock: numStock,
+        stock_quantity: numStock,
+      };
+    });
 
     return { success: true, items: mappedItems };
   } catch (err: any) {

@@ -26,6 +26,7 @@ export const DEFAULT_CHART_OF_ACCOUNTS: AccountNode[] = [
   { code: '1.1.01.01', name: 'Caja Principal (Efectivo)', type: 'asset', level: 4, parentCode: '1.1.01', isHeader: false },
   { code: '1.1.01.02', name: 'Bancos Nacionales (Moneda Local)', type: 'asset', level: 4, parentCode: '1.1.01', isHeader: false },
   { code: '1.1.01.03', name: 'Cuenta Divisas (USD)', type: 'asset', level: 4, parentCode: '1.1.01', isHeader: false },
+  { code: '1.1.01.04', name: 'Billeteras Digitales y Cripto (Binance / USDT)', type: 'asset', level: 4, parentCode: '1.1.01', isHeader: false },
   { code: '1.1.02', name: 'Cuentas por Cobrar Comerciales', type: 'asset', level: 3, parentCode: '1.1', isHeader: true },
   { code: '1.1.02.01', name: 'Clientes Nacionales (AR)', type: 'asset', level: 4, parentCode: '1.1.02', isHeader: false },
   { code: '1.1.03', name: 'Inventarios', type: 'asset', level: 3, parentCode: '1.1', isHeader: true },

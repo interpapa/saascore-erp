@@ -219,7 +219,7 @@ export function InventarioExpress({
         <div className="space-y-2">
           {filteredItems.map((item) => {
             const isService = item.type === 'service';
-            const stock = item.stock_quantity ?? (item as any).stock ?? 0;
+            const stock = Number(item.stock_quantity ?? (item as any).stock ?? (item as any).quantity ?? 0);
             const minStock = Number((item.metadata as any)?.min_stock ?? 5);
             const isOut = !isService && stock <= 0;
             const isLow = !isService && stock > 0 && stock <= minStock;

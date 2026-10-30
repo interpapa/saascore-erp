@@ -44,47 +44,49 @@ function PaymentMethodBadge({
   label?: string;
   bank?: string;
 }) {
-  const m = (method || '').toLowerCase().trim();
+  const m = (method || '').toLowerCase().trim().replace(/[\s-]+/g, '_');
   let bgClass = 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700';
   let Icon = Wallet;
-  let text = label || 'Efectivo';
+  let text = label || 'Efectivo ($ USD)';
 
-  if (m.includes('binance') || m.includes('usdt')) {
+  if (m === 'binance' || m === 'binance_pay' || m === 'usdt' || m === 'crypto') {
     bgClass = 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-500/30';
     Icon = Coins;
     text = label || 'Binance Pay (USDT)';
-  } else if (m.includes('pago_movil') || m.includes('pagomovil')) {
+  } else if (m === 'pago_movil' || m === 'pagomovil' || m.includes('pago_movil')) {
     bgClass = 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border-indigo-500/30';
     Icon = Smartphone;
     text = label || (bank ? `Pago Móvil · ${bank}` : 'Pago Móvil');
-  } else if (m.includes('zelle')) {
+  } else if (m === 'zelle' || m.includes('zelle')) {
     bgClass = 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30';
     Icon = Landmark;
     text = label || 'Zelle';
-  } else if (m.includes('card') || m.includes('tarjeta') || m.includes('pos') || m.includes('punto')) {
+  } else if (m === 'card' || m === 'tarjeta' || m === 'pos' || m === 'punto' || m.includes('tarjeta') || m.includes('punto')) {
     bgClass = 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30';
     Icon = CreditCard;
     text = label || (bank ? `Punto · ${bank}` : 'Punto POS / Tarjeta');
-  } else if (m.includes('transfer') || m.includes('bank')) {
+  } else if (m === 'transfer' || m === 'transferencia' || m === 'bank' || m.includes('transfer')) {
     bgClass = 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/30';
     Icon = Building2;
     text = label || (bank ? `Transf. · ${bank}` : 'Transferencia Bancaria');
-  } else if (m.includes('ves')) {
+  } else if (m === 'cash_ves' || m.includes('ves') || m.includes('bolivar')) {
     bgClass = 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border-teal-500/30';
     Icon = Coins;
     text = label || 'Efectivo (Bs)';
-  } else if (m.includes('credit')) {
+  } else if (m === 'credit' || m.includes('credit')) {
     bgClass = 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/30';
     Icon = Clock;
     text = label || 'Crédito (CxC)';
-  } else if (m.includes('mixed')) {
+  } else if (m === 'mixed' || m.includes('mixed')) {
     bgClass = 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
     Icon = Split;
     text = label || 'Pago Dividido';
-  } else if (m.includes('cash') || m.includes('efectivo')) {
+  } else if (m === 'cash' || m === 'cash_usd' || m.includes('cash') || m.includes('efectivo')) {
     bgClass = 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
     Icon = DollarSign;
     text = label || 'Efectivo ($ USD)';
+  } else if (label) {
+    text = label;
   }
 
   return (
