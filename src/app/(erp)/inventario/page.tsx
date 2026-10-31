@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CatalogModal } from '@/components/catalog/CatalogModal';
 import { CatalogDrawer } from '@/components/catalog/CatalogDrawer';
-import { getItemsAction, createItemAction, updateItemAction, deleteItemAction } from '@/app/actions/items';
+import { getItemsAction, createItemAction, updateItemAction, deleteItemAction, adjustItemStockAction } from '@/app/actions/items';
 import { getAuditLogsAction } from '@/app/actions/audit';
 import { Item } from '@/lib/api/items';
 import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
@@ -56,6 +56,7 @@ export default function InventarioPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [initialModalTab, setInitialModalTab] = useState<'general' | 'pricing' | 'inventory' | 'service'>('general');
   const [viewMode, setViewMode] = useViewPreference('inventario-view-mode', 'grid');
   const [activeTab, setActiveTab] = useState<TabType>('items');
   const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
@@ -301,6 +302,29 @@ export default function InventarioPage() {
         }
 
         if (res?.success) {
+          // Si hubo un ajuste rápido de existencias físicas con Kardex
+          const stockAdjustment = data.metadata?.stock_adjustment;
+          if (stockAdjustment && stockAdjustment.delta !== 0 && !isTemporaryId(editingItem.id)) {
+            try {
+              await adjustItemStockAction(
+                editingItem.id,
+                stockAdjustment.delta,
+                targetTenantId,
+                actor,
+                stockAdjustment.reason,
+                stockAdjustment.expense ? {
+                  recordExpense: true,
+                  unitCost: stockAdjustment.expense.unit_cost,
+                  totalCost: stockAdjustment.expense.total_cost,
+                  paymentSource: stockAdjustment.expense.payment_source,
+                  supplierName: stockAdjustment.expense.supplier_name,
+                } : undefined
+              );
+            } catch (adjErr) {
+              console.warn('[inventario] Error al registrar movimiento de Kardex:', adjErr);
+            }
+          }
+
           toast({ variant: 'success', title: 'Artículo Actualizado', description: `"${data.name}" se actualizó correctamente en inventario.` });
           setEditingItem(null);
           fetchItems();
@@ -618,16 +642,26 @@ export default function InventarioPage() {
           tenantId={activeTenant?.id || ''}
           onStockChange={handleExpressStockChange}
           onOpenAdjustmentModal={(id) => {
-            setStockModalItemId(id);
-            setIsStockModalOpen(true);
+            const item = items.find((i) => i.id === id);
+            if (item) {
+              setEditingItem(item);
+              setInitialModalTab('inventory');
+              setIsModalOpen(true);
+            }
           }}
           onNewItem={() => {
             setEditingItem(null);
+            setInitialModalTab('general');
             setIsModalOpen(true);
           }}
-          onSelectItem={(item) => setSelectedItem(item)}
+          onSelectItem={(item) => {
+            setEditingItem(item);
+            setInitialModalTab('general');
+            setIsModalOpen(true);
+          }}
           onEditItem={(item) => {
             setEditingItem(item);
+            setInitialModalTab('general');
             setIsModalOpen(true);
           }}
           auditLogs={auditLogs}
@@ -1247,6 +1281,7 @@ export default function InventarioPage() {
         }}
         onSave={handleSaveItem}
         editItem={editingItem}
+        initialTab={initialModalTab}
       />
 
       {/* Drawer Lateral de Ficha Detallada */}
