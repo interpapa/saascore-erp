@@ -1,3 +1,4 @@
+import { formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
@@ -1410,7 +1411,7 @@ export default function OdontologiaPage() {
               todayAppointments.map((appt) => {
                 const isSelected = selectedPatient?.id === (appt.client_id || appt.entity_id);
                 const apptPatient = customers.find((c) => c.id === (appt.client_id || appt.entity_id));
-                const apptTime = appt.start_time ? appt.start_time.slice(11, 16) : '09:00';
+                const apptTime = appt.start_time ? formatAppointmentTime(appt.start_time) : '09:00';
 
                 return (
                   <button
@@ -1737,7 +1738,7 @@ export default function OdontologiaPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {todayAppointments.slice(0, 6).map((appt) => {
                   const apptPatient = customers.find((c) => c.id === (appt.client_id || appt.entity_id));
-                  const apptTime = appt.start_time ? appt.start_time.slice(11, 16) : '09:00';
+                  const apptTime = appt.start_time ? formatAppointmentTime(appt.start_time) : '09:00';
                   return (
                     <div
                       key={appt.id}
@@ -2635,7 +2636,7 @@ export default function OdontologiaPage() {
                           <div key={a.id} className="p-3 rounded-xl border border-teal-500/30 bg-teal-500/5 flex items-center justify-between gap-3">
                             <div>
                               <span className="text-xs font-bold text-foreground block">{a.service_title || 'Consulta Odontológica'}</span>
-                              <span className="text-[10px] text-slate-400 font-mono">Turno de Hoy: {a.start_time?.slice(11, 16)}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">Turno de Hoy: {formatAppointmentTime(a.start_time)}</span>
                             </div>
                             <span className="inline-block text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-500/10 text-teal-600 uppercase">
                               {a.status || 'Confirmada'}

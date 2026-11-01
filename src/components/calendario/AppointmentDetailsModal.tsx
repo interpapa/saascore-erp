@@ -852,7 +852,9 @@ export function AppointmentDetailsModal({
                     const srvId = appointment.service_id || '';
                     const srvTitle = encodeURIComponent(appointment.title || appointment.service_name || 'Servicio de Cita');
                     const clientQuery = appointment.client_id ? `&client_id=${appointment.client_id}` : '';
-                    window.location.href = `/caja?appointment_id=${appointment.id}${clientQuery}&service_id=${srvId}&price=${currentPrice}&title=${srvTitle}`;
+                    const doctorQuery = appointment.employee_id ? `&doctor_id=${appointment.employee_id}` : '';
+                    const docNameQuery = appointment.employee_name ? `&doctor_name=${encodeURIComponent(appointment.employee_name)}` : '';
+                    window.location.href = `/caja?appointment_id=${appointment.id}${clientQuery}&service_id=${srvId}&price=${currentPrice}&title=${srvTitle}${doctorQuery}${docNameQuery}`;
                   }}
                   className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500 text-white shadow-md hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1"
                   title="Facturar en Punto de Venta POS y agregar extras"

@@ -1,3 +1,4 @@
+import { isTimeWithinWorkingHours, formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 'use server';
 
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
@@ -256,6 +257,37 @@ export async function createAppointmentAction(
         }
       } catch {
         // En caso de tabla appointments no disponible, el fallback se encargará
+      }
+    }
+
+    // Validación de jornada laboral del médico / especialista
+    if (payload.employee_id && !payload.metadata?.allow_outside_hours) {
+      try {
+        const { data: empData } = await supabaseAdmin
+          .from('entities')
+          .select('id, name, metadata')
+          .eq('id', payload.employee_id)
+          .maybeSingle();
+
+        if (empData && empData.metadata?.working_hours) {
+          const localTime = formatAppointmentTime(payload.start_time);
+          const datePart = payload.start_time.split('T')[0];
+          const scheduleCheck = isTimeWithinWorkingHours(
+            datePart,
+            localTime,
+            payload.duration_minutes || 60,
+            empData.metadata.working_hours
+          );
+
+          if (scheduleCheck.hasScheduleConfigured && !scheduleCheck.isWithinHours) {
+            return {
+              success: false,
+              error: `El profesional "${empData.name}" no atiende en ese horario (${scheduleCheck.error}). Selecciona un horario dentro de su jornada laboral.`
+            };
+          }
+        }
+      } catch (scheduleErr) {
+        console.warn('[appointments] Error verificando jornada laboral:', scheduleErr);
       }
     }
 

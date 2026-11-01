@@ -1,3 +1,4 @@
+import { formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 'use client';
 
 export const dynamic = 'force-dynamic';
@@ -971,7 +972,7 @@ export default function GinecologiaPage() {
                   <div key={appt.id} className="py-3 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-pink-50 dark:bg-pink-950/40 text-pink-600 flex items-center justify-center font-black text-xs">
-                        {appt.start_time ? appt.start_time.split('T')[1]?.slice(0, 5) : '09:00'}
+                        {appt.start_time ? formatAppointmentTime(appt.start_time) : '09:00'}
                       </div>
                       <div>
                         <p className="text-xs font-black text-foreground">{appt.title || 'Consulta Médica'}</p>

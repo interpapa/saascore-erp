@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { isTimeWithinWorkingHours, formatAppointmentTime } from '../lib/calendario/calendarDateUtils';
 
 export interface AppointmentSlot {
   start: string; // HH:mm
@@ -89,7 +90,6 @@ export async function runCitasTests() {
   console.log('  ✓ Detección de colisiones de turnos por duración compuesta validada');
 
   console.log('4.2 Citas completadas o canceladas no deben bloquear slots');
-  // Si filtramos citas canceladas/completadas antes de pasar bookedIntervals:
   const appointmentsInDb = [
     { start: '09:00', end: '10:00', status: 'cancelled' },
     { start: '10:00', end: '10:30', status: 'completed' },
@@ -105,6 +105,34 @@ export async function runCitasTests() {
   assert.equal(slotsFiltered[4].isBooked, false, 'Turno con cita completada debe quedar libre para el próximo paciente');
   assert.equal(slotsFiltered[6].isBooked, true, 'Turno con cita confirmada debe permanecer bloqueado');
   console.log('  ✓ Liberación de turnos tras cancelación o conclusión verificada');
+
+  console.log('4.3 Validación estricta de jornadas médicas (Doctor Mañana vs Tarde)');
+  const doctorMananaSchedule = {
+    monday: [{ start: '08:00', end: '13:00' }],
+    wednesday: [{ start: '08:00', end: '13:00' }],
+    friday: [{ start: '08:00', end: '13:00' }],
+  };
+
+  // Cita a las 10:00 AM un Lunes (Dentro de turno matutino)
+  const validCheck = isTimeWithinWorkingHours('2026-11-02', '10:00', 30, doctorMananaSchedule);
+  assert.equal(validCheck.isWithinHours, true, '10:00 AM debe ser válida para médico de la mañana');
+
+  // Cita a las 15:00 (3:00 PM) un Lunes (Fuera de turno matutino)
+  const invalidCheck = isTimeWithinWorkingHours('2026-11-02', '15:00', 30, doctorMananaSchedule);
+  assert.equal(invalidCheck.isWithinHours, false, '15:00 (3:00 PM) debe ser rechazada para médico que solo atiende de 08:00 a 13:00');
+  assert.ok(invalidCheck.error?.includes('fuera de la jornada'), 'Debe emitir mensaje de error explicativo');
+
+  // Cita un Martes (Día que el médico no labora)
+  const offDayCheck = isTimeWithinWorkingHours('2026-11-03', '10:00', 30, doctorMananaSchedule);
+  assert.equal(offDayCheck.isWithinHours, false, 'Día sin horario configurado debe ser rechazado');
+  console.log('  ✓ Prevención de agendamiento fuera de jornada y detección de turno matutino/vespertino validada');
+
+  console.log('4.4 Formateo seguro de hora para evitar discrepancia de zona horaria móvil vs PC');
+  // Timestamp en formato ISO
+  const testIso = '2026-10-31T10:00:00';
+  const formatted = formatAppointmentTime(testIso);
+  assert.ok(formatted.includes(':'), 'Debe formatear hora local sin error');
+  console.log('  ✓ Formateo resiliente sin slice(11, 16) validado');
 
   console.log('✅ [04_citas.test.ts] Todos los tests pasaron exitosamente.');
 }

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { isTimeWithinWorkingHours } from '@/lib/calendario/calendarDateUtils';
 import { 
   X, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign, 
   FileText, Check, Lock, CalendarRange, Building, Palmtree, Coffee, 
@@ -25,6 +26,7 @@ export interface AppointmentModalProps {
   initialTime?: string | null;
   initialClientId?: string | null;
   initialLocation?: string | null;
+  initialEmployeeId?: string | null;
 }
 
 export const BLOCK_PRESETS = [
@@ -59,11 +61,13 @@ export function AppointmentModal({
   initialTime,
   initialClientId,
   initialLocation,
+  initialEmployeeId,
 }: AppointmentModalProps) {
+  const [allowOutsideHours, setAllowOutsideHours] = useState(false);
   const [title, setTitle] = useState('');
   const [serviceId, setServiceId] = useState('');
   const [clientId, setClientId] = useState('');
-  const [employeeId, setEmployeeId] = useState('');
+  const [employeeId, setEmployeeId] = useState(initialEmployeeId || '');
   const [dateStr, setDateStr] = useState(toYYYYMMDD(new Date()));
   const [timeStr, setTimeStr] = useState('09:00');
   const [durationMinutes, setDurationMinutes] = useState(60);
@@ -79,6 +83,13 @@ export function AppointmentModal({
   const [customLocation, setCustomLocation] = useState('');
   const [isFixedClass, setIsFixedClass] = useState(false);
   const hasCourts = Boolean(courts && courts.length > 0);
+
+  const selectedEmp = useMemo(() => employees.find(e => e.id === employeeId), [employees, employeeId]);
+  const empSchedule = (selectedEmp?.metadata as any)?.working_hours;
+  const scheduleValidation = useMemo(() => {
+    if (!employeeId || !empSchedule) return null;
+    return isTimeWithinWorkingHours(dateStr, timeStr, durationMinutes, empSchedule);
+  }, [employeeId, empSchedule, dateStr, timeStr, durationMinutes]);
 
   // Estados dedicados para Bloqueo / Mantenimiento
   const [blockMode, setBlockMode] = useState<'hours' | 'full_day' | 'multi_day'>('full_day');
@@ -100,7 +111,8 @@ export function AppointmentModal({
       setServiceId('');
       setClientId(initialClientId || '');
       setCustomClientName('');
-      setEmployeeId('');
+      setEmployeeId(initialEmployeeId || '');
+      setAllowOutsideHours(false);
       setDurationMinutes(60);
       setStatus('scheduled');
       setPrice(0);
@@ -307,6 +319,13 @@ export function AppointmentModal({
         throw new Error('El horario seleccionado para hoy ya ha transcurrido.');
       }
 
+      // Validación de jornada laboral del médico
+      if (type === 'appointment' && employeeId && scheduleValidation) {
+        if (scheduleValidation.hasScheduleConfigured && !scheduleValidation.isWithinHours && !allowOutsideHours) {
+          throw new Error(scheduleValidation.error || 'El profesional no atiende en el horario seleccionado.');
+        }
+      }
+
       const startTimeISO = startDateTime.toISOString();
       const endTimeISO = new Date(startDateTime.getTime() + durationMinutes * 60000).toISOString();
 
@@ -317,6 +336,7 @@ export function AppointmentModal({
         location: courtLocation || null,
         court_name: courtLocation || null,
         is_fixed_class: isFixedClass,
+        allow_outside_hours: allowOutsideHours,
       };
       if (isGroupClass || isFixedClass) {
         const s = services.find((srv) => srv.id === serviceId);

@@ -21,12 +21,13 @@ import {
 import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
+import { formatAppointmentTime, formatAppointmentTime12h } from '@/lib/calendario/calendarDateUtils';
 
 interface DailyTimelineExpressProps {
   appointments: Appointment[];
   onSelectAppointment: (appt: Appointment) => void;
   onUpdateStatus: (id: string, status: AppointmentStatus) => Promise<void>;
-  onOpenCreateModal: () => void;
+  onOpenCreateModal: (employeeId?: string) => void;
   currentDate: Date;
   onDateChange: (date: Date) => void;
   isDentalActive?: boolean;
@@ -75,11 +76,12 @@ export function DailyTimelineExpress({
     onDateChange(new Date());
   };
 
-  // Filtrar citas del día seleccionado (usando fecha local para evitar salto a las 8:00 PM UTC-4)
+  // Filtrar citas del día seleccionado usando componentes locales para evitar desface horario
   const year = currentDate.getFullYear();
   const month = String(currentDate.getMonth() + 1).padStart(2, '0');
   const day = String(currentDate.getDate()).padStart(2, '0');
   const dateStr = `${year}-${month}-${day}`;
+
   const dayAppointments = appointments
     .filter((a) => {
       try {
@@ -93,21 +95,11 @@ export function DailyTimelineExpress({
       } catch {}
       return a.start_time.startsWith(dateStr);
     })
-    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
   const filteredDayAppointments = selectedEmployeeId === 'all'
     ? dayAppointments
     : dayAppointments.filter((a) => a.employee_id === selectedEmployeeId);
-
-  // Estados visuales
-  const statusStyles: Record<string, { label: string; color: string }> = {
-    pending: { label: 'Pendiente', color: 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30' },
-    confirmed: { label: 'Confirmada', color: 'bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-500/30' },
-    in_progress: { label: 'En Consulta', color: 'bg-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/40 animate-pulse' },
-    completed: { label: 'Completada', color: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30' },
-    cancelled: { label: 'Cancelada', color: 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30' },
-    no_show: { label: 'No Asistió', color: 'bg-slate-400/20 text-slate-500 border-slate-400/30' },
-  };
 
   return (
     <div className="space-y-4">
@@ -156,7 +148,7 @@ export function DailyTimelineExpress({
           )}
           <button
             type="button"
-            onClick={onOpenCreateModal}
+            onClick={() => onOpenCreateModal(selectedEmployeeId !== 'all' ? selectedEmployeeId : undefined)}
             className="p-2 rounded-xl bg-primary text-primary-foreground font-black hover:bg-primary/90 transition-all btn-haptic shadow-xs"
             title="Nueva Cita"
           >
@@ -228,7 +220,7 @@ export function DailyTimelineExpress({
             </div>
             <button
               type="button"
-              onClick={onOpenCreateModal}
+              onClick={() => onOpenCreateModal(selectedEmployeeId !== 'all' ? selectedEmployeeId : undefined)}
               className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl shadow-xs btn-haptic"
             >
               + Agendar Cita
@@ -236,8 +228,11 @@ export function DailyTimelineExpress({
           </div>
         ) : (
           filteredDayAppointments.map((appt) => {
-            const timeFormatted = appt.start_time.slice(11, 16);
-            const endTimeFormatted = appt.end_time?.slice(11, 16);
+            // Conversión estricta a hora local (evita desfase de 5 horas entre móvil y PC)
+            const timeFormatted = formatAppointmentTime(appt.start_time);
+            const endTimeFormatted = formatAppointmentTime(appt.end_time);
+            const timeFormatted12h = formatAppointmentTime12h(appt.start_time);
+
             const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
             const clientPhone = (appt as any).client_phone || (appt as any).client?.phone;
             const apptColor = (appt.metadata?.color as string) || visual.color || '#6366f1';
@@ -296,7 +291,6 @@ export function DailyTimelineExpress({
               );
             }
 
-
             return (
               <div
                 key={appt.id}
@@ -319,8 +313,9 @@ export function DailyTimelineExpress({
                     }`}>
                       <Clock size={16} className="mx-auto mb-0.5" />
                       <span className="text-xs font-black font-mono block">{timeFormatted}</span>
+                      <span className="text-[10px] text-teal-600 dark:text-teal-400 font-bold block">{timeFormatted12h}</span>
                       {endTimeFormatted && (
-                        <span className="text-[10px] text-slate-400 font-mono block">{endTimeFormatted}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block mt-0.5">hasta {endTimeFormatted}</span>
                       )}
                     </div>
 
@@ -357,12 +352,12 @@ export function DailyTimelineExpress({
 
                 {/* Acciones Rápidas de 1-Toque */}
                 <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border/60">
-                  {/* Botón WhatsApp Recordatorio */}
+                  {/* Botón WhatsApp Recordatorio (con hora local exacta) */}
                   {clientPhone ? (
                     <a
                       href={getPrimaryWhatsAppUrl(
                         clientPhone,
-                        `Hola ${appt.client_name}, te recordamos tu cita hoy a las ${timeFormatted} para ${appt.service_name || appt.title || 'tu consulta'}. ¡Te esperamos!`
+                        `Hola ${appt.client_name}, te recordamos tu cita hoy a las ${timeFormatted} (${timeFormatted12h}) para ${appt.service_name || appt.title || 'tu consulta'}. ¡Te esperamos!`
                       )}
                       target="_blank"
                       rel="noreferrer"
@@ -410,7 +405,7 @@ export function DailyTimelineExpress({
                     </button>
                   )}
 
-                  {/* Botón Cobrar en Caja */}
+                  {/* Botón Cobrar en Caja con Vinculación al Médico Tratante */}
                   <button
                     type="button"
                     onClick={() => {
@@ -420,6 +415,8 @@ export function DailyTimelineExpress({
                       if (appt.price) params.set('price', appt.price.toString());
                       const sName = appt.service_name || appt.title;
                       if (sName) params.set('title', sName);
+                      if (appt.employee_id) params.set('doctor_id', appt.employee_id);
+                      if (appt.employee_name) params.set('doctor_name', appt.employee_name);
                       router.push(`/caja?${params.toString()}`);
                     }}
                     className="py-2 px-2 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[11px] font-bold text-center flex items-center justify-center gap-1.5 transition-all btn-haptic"

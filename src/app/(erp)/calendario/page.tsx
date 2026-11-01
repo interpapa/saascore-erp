@@ -71,6 +71,7 @@ export default function CalendarioPage() {
   const [selectedDateForCreate, setSelectedDateForCreate] = useState<Date | null>(null);
   const [selectedTimeForCreate, setSelectedTimeForCreate] = useState<string | null>(null);
   const [selectedCourtForCreate, setSelectedCourtForCreate] = useState<string | null>(null);
+  const [selectedEmployeeForCreate, setSelectedEmployeeForCreate] = useState<string | null>(null);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   
@@ -376,7 +377,8 @@ export default function CalendarioPage() {
   };
 
   // Open Create Modal for a specific date slot
-  const handleSelectDateSlot = (date: Date, timeStr?: string, prefillCourt?: string) => {
+  const handleSelectDateSlot = (date: Date, timeStr?: string, prefillCourt?: string, prefillEmployeeId?: string) => {
+    setSelectedEmployeeForCreate(prefillEmployeeId || null);
     setSelectedDateForCreate(date);
     setSelectedTimeForCreate(timeStr || null);
     setSelectedCourtForCreate(prefillCourt || null);
@@ -577,6 +579,7 @@ export default function CalendarioPage() {
               setSelectedDateForCreate(null);
               setSelectedTimeForCreate(null);
               setSelectedCourtForCreate(null);
+              setSelectedEmployeeForCreate(filterState.employee_id !== 'all' ? (filterState.employee_id || null) : null);
               setCreateModalType(type);
               setIsCreateModalOpen(true);
             }}
@@ -594,6 +597,7 @@ export default function CalendarioPage() {
           setSelectedDateForCreate(null);
           setSelectedTimeForCreate(null);
           setSelectedCourtForCreate(null);
+          setSelectedEmployeeForCreate(null);
         }}
         onSave={handleCreateAppointment}
         onSaveBlock={handleSaveBlock}
@@ -605,6 +609,7 @@ export default function CalendarioPage() {
         initialTime={selectedTimeForCreate}
         initialClientId={clientParam}
         initialLocation={selectedCourtForCreate}
+        initialEmployeeId={selectedEmployeeForCreate}
       />
 
       {/* Appointment Details & Status Transition Modal */}

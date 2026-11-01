@@ -96,6 +96,8 @@ function CajaPageContent() {
   const serviceIdParam = searchParams.get('service_id');
   const priceParam = searchParams.get('price') || searchParams.get('amount') || debtAmountParam;
   const titleParam = searchParams.get('title') || searchParams.get('desc') || (debtClientParam && debtAmountParam ? 'Abono / Liquidación de Deuda' : null);
+  const doctorIdParam = searchParams.get('doctor_id');
+  const doctorNameParam = searchParams.get('doctor_name');
 
   // Estado de Cita Vinculada (si proviene del Calendario)
   const [linkedAppointmentId, setLinkedAppointmentId] = useState<string | null>(appointmentIdParam || null);
@@ -278,10 +280,20 @@ function CajaPageContent() {
 
       if (appointmentIdParam) {
         setLinkedAppointmentId(appointmentIdParam);
+        if (doctorIdParam || doctorNameParam) {
+          const docNameDecoded = doctorNameParam ? decodeURIComponent(doctorNameParam) : 'Especialista';
+          setLoadedConsultationInfo({
+            doctorId: doctorIdParam || undefined,
+            doctorName: docNameDecoded,
+            doctorCommissionPercent: 0,
+            patientName: title,
+            source: 'calendario'
+          });
+        }
         toast({
           variant: 'success',
           title: 'Cita Vinculada al Ticket',
-          description: `"${title}" precargado. Puedes cobrarlo o agregar productos/servicios adicionales.`
+          description: `"${title}" precargado.${doctorNameParam ? ` Atiende: Dr(a). ${decodeURIComponent(doctorNameParam)}` : ''}`
         });
       }
     }

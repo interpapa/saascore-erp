@@ -14,7 +14,7 @@ export interface CalendarGridProps {
   courts?: CourtResource[];
   isLoading: boolean;
   onSelectAppointment: (appt: Appointment) => void;
-  onSelectDateSlot: (date: Date, timeStr?: string, prefillCourt?: string) => void;
+  onSelectDateSlot: (date: Date, timeStr?: string, prefillCourt?: string, prefillEmployeeId?: string) => void;
   onOpenCreateModal: (type?: 'appointment' | 'block') => void;
   onDrillDown?: (date: Date, mode: 'day' | 'week' | 'month') => void;
 }
@@ -222,7 +222,7 @@ export function CalendarGrid({
                           <div 
                             key={time} 
                             className="h-16 border-b border-border/30 cursor-pointer hover:bg-primary/5 transition-colors"
-                            onClick={() => onSelectDateSlot(currentDate, time, col.type === 'court' ? col.name : undefined)}
+                            onClick={() => onSelectDateSlot(currentDate, time, col.type === 'court' ? col.name : undefined, col.type === 'employee' ? col.id : undefined)}
                           />
                         ))}
                         
