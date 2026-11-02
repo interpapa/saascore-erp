@@ -325,7 +325,17 @@ const GENERATE_TIMES = (
   return times;
 };
 
-export default function BookingClient({ tenant, employees, theme }: { tenant: Tenant, employees: Employee[], theme?: { bgColor: string; btnColor: string } }) {
+export default function BookingClient({ 
+  tenant, 
+  employees, 
+  catalogServices = [],
+  theme 
+}: { 
+  tenant: Tenant; 
+  employees: Employee[]; 
+  catalogServices?: any[];
+  theme?: { bgColor: string; btnColor: string };
+}) {
   // Theme handling con protección total anti-invisibilidad y contraste WCAG
   const defaultTheme = { bgColor: "#f8fafc", btnColor: "#0B3B24" };
   const appliedBg = normalizeHexColor(theme?.bgColor, defaultTheme.bgColor);
@@ -402,7 +412,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     return map;
   }, [tenant?.metadata]);
 
-  // Extract unique services from all employees (Memoized)
+  // Extract unique services from catalog and employees (Memoized)
   const uniqueServices = useMemo(() => {
     interface ServiceAgg {
       name: string;
@@ -415,8 +425,32 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     }
     const allServices = new Map<string, ServiceAgg>();
     
+    // 0. Servicios registrados formalmente en el Catálogo de Servicios del ERP (tabla items)
+    if (Array.isArray(catalogServices) && catalogServices.length > 0) {
+      catalogServices.forEach(item => {
+        if (!item?.name || !item.name.trim()) return;
+        const key = item.name.trim().toLowerCase();
+        const detectedDomain = detectClinicalDomain(item.name) || detectClinicalDomain(item.category);
+        const cat = resolveCategoryName(detectedDomain, item.category || 'Servicios Clínicos');
+        const dur = Number(item.metadata?.duration_minutes || item.metadata?.durationMinutes) || 45;
+        const price = Number(item.base_price) || 0;
+
+        if (!allServices.has(key)) {
+          allServices.set(key, {
+            name: item.name.trim(),
+            durationMinutes: dur,
+            prices: price > 0 ? [price] : [],
+            hasFrom: false,
+            hasHidden: false,
+            basePrice: price > 0 ? price : undefined,
+            category: cat,
+          });
+        }
+      });
+    }
+
     employees.forEach(emp => {
-      if (!emp.is_active) return;
+      if (emp.is_active === false) return;
       const empDomain = getEmployeePrimaryDomain(emp);
       const empRole = (emp.metadata?.role_title || emp.role || '').trim();
       const svcs = emp.metadata?.services as any[];
@@ -457,7 +491,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       if (isGeneralEnabled) {
         const customGeneralName = emp.metadata?.general_service_name?.trim();
         const roleTitle = (emp.metadata?.role_title || emp.role || '').trim();
-        const docRole = (emp.metadata?.doctor_config?.role || emp.metadata?.doctor_config?.specialty || '').trim();
+        const docRole = (emp.metadata?.doctor_config?.role || emp.metadata?.doctor_config?.specialty || emp.metadata?.specialty || emp.metadata?.cargo || '').trim();
         const dentistRole = (emp.metadata?.dentist_config?.role || '').trim();
         const barberRole = (emp.metadata?.barber_config?.role || '').trim();
         const groomerRole = (emp.metadata?.groomer_config?.role || '').trim();
@@ -466,29 +500,28 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         let branchName = '';
         if (customGeneralName) {
           branchName = customGeneralName;
+        } else if (docRole) {
+          branchName = docRole.toLowerCase().startsWith('consulta') ? docRole : `Consulta: ${docRole}`;
         } else if (
           roleTitle && 
           roleTitle !== 'Espacio / Recurso' && 
           roleTitle !== 'Especialista' &&
           roleTitle !== 'Profesional' &&
-          roleTitle !== 'Colaborador'
+          roleTitle !== 'Colaborador' &&
+          roleTitle !== 'employee'
         ) {
-          branchName = roleTitle;
-        } else if (docRole) {
-          branchName = docRole;
+          branchName = roleTitle.toLowerCase().startsWith('consulta') ? roleTitle : `Consulta: ${roleTitle}`;
         } else if (dentistRole) {
           branchName = dentistRole;
         } else if (barberRole) {
           branchName = barberRole;
         } else if (groomerRole) {
           branchName = groomerRole;
+        } else if (emp.name.toLowerCase().includes('dr.') || emp.name.toLowerCase().includes('dra.')) {
+          const docDomain = empDomain ? resolveCategoryName(empDomain) : 'Medicina General';
+          branchName = `Consulta Médica (${docDomain})`;
         } else if ((!svcs || svcs.length === 0) && (empDomain || emp.metadata?.is_doctor || emp.metadata?.doctor_config)) {
           branchName = 'Atención General';
-        } else {
-          // Si el colaborador ya tiene procedimientos particulares detallados (ej: Ecografía, Control Prenatal, etc.)
-          // y no se configuró un nombre de servicio general explícito, la rama/especialidad actúa como categoría organizadora,
-          // no como un servicio duplicado suelto en la lista.
-          branchName = '';
         }
 
         if (branchName) {
@@ -515,6 +548,18 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         }
       }
     });
+
+    // 3. Fallback Infalible: Si aún no hay servicios, pero hay especialistas/doctores en la empresa
+    if (allServices.size === 0 && employees.length > 0) {
+      allServices.set('consulta_general', {
+        name: 'Consulta / Evaluación Médica',
+        durationMinutes: 45,
+        prices: [],
+        hasFrom: false,
+        hasHidden: false,
+        category: 'Medicina General',
+      });
+    }
 
     return Array.from(allServices.values()).map(s => {
       let priceText = '';
@@ -551,7 +596,7 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
         category: s.category || 'General',
       };
     });
-  }, [employees, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
+  }, [employees, catalogServices, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
 
   // Categorías de especialidad detectadas y ordenadas canónicamente (ej. Medicina General, Odontología, Ginecología, etc.)
   const availableCategories = useMemo(() => {

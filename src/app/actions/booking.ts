@@ -139,8 +139,9 @@ export async function processBookingAction(formData: unknown) {
         .from('entities')
         .select('id, name, metadata, role')
         .eq('tenant_id', cleanData.tenantId)
-        .eq('type', 'employee')
-        .eq('status', 'active');
+        .in('type', ['employee', 'doctor', 'staff'])
+        .neq('status', 'inactive')
+        .is('deleted_at', null);
         
       if (employees && employees.length > 0) {
         // Revisar si los empleados tienen cita activa en ese rango horario
@@ -520,8 +521,9 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
         .from('entities')
         .select('id, metadata')
         .eq('tenant_id', tenantId)
-        .eq('type', 'employee')
-        .eq('status', 'active');
+        .in('type', ['employee', 'doctor', 'staff'])
+        .neq('status', 'inactive')
+        .is('deleted_at', null);
         
       const bookableStaff = (staffEntities || []).filter(e => (e.metadata as any)?.bookable !== false);
       const totalStaff = Math.max(1, bookableStaff.length);
