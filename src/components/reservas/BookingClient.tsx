@@ -834,12 +834,9 @@ export default function BookingClient({
     if (tenant.metadata?.booking_settings?.timezone_offset && /^[+-]\d{2}:\d{2}$/.test(tenant.metadata.booking_settings.timezone_offset)) {
       return tenant.metadata.booking_settings.timezone_offset;
     }
-    const offset = -new Date().getTimezoneOffset();
-    const sign = offset >= 0 ? '+' : '-';
-    const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
-    const hours = Math.floor(Math.abs(offset) / 60);
-    const mins = Math.abs(offset) % 60;
-    return `${sign}${pad(hours)}:${pad(mins)}`;
+    // Default garantizado a la zona horaria del consultorio / clínica (-04:00 para Venezuela)
+    // Garantiza que la hora seleccionada por el paciente (ej. 10:00 AM) coincida con la hora local de la consulta médica
+    return '-04:00';
   }, [tenant.metadata?.booking_settings?.timezone_offset]);
 
   useEffect(() => {

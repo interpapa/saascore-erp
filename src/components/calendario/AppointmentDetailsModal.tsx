@@ -92,12 +92,14 @@ function formatDateTime(isoString?: string): string {
   if (!isoString) return '-';
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return '-';
-  return d.toLocaleString('es-ES', {
+  return d.toLocaleString('es-VE', {
+    timeZone: 'America/Caracas',
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: true,
   });
 }
 
@@ -105,7 +107,12 @@ function formatTimeOnly(isoString?: string): string {
   if (!isoString) return '';
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('es-VE', { 
+    timeZone: 'America/Caracas', 
+    hour: '2-digit', 
+    minute: '2-digit', 
+    hour12: true 
+  });
 }
 
 export function AppointmentDetailsModal({

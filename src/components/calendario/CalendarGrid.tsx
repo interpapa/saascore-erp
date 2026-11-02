@@ -5,6 +5,11 @@ import { CalendarDays, Clock, User, Plus } from 'lucide-react';
 import { Appointment, AppointmentStatus, Employee, CourtResource, DEFAULT_SPORTS_COURTS } from '@/types/calendario';
 import { EmptyState } from '@/components/core/EmptyState';
 import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
+import { 
+  getTimeInZone, 
+  getDateStringInZone, 
+  formatAppointmentTime12h 
+} from '@/lib/calendario/calendarDateUtils';
 
 export interface CalendarGridProps {
   viewMode: 'day' | 'week' | 'month' | 'agenda';
@@ -57,18 +62,12 @@ const STATUS_CONFIG: Record<
   },
 };
 
-function toLocalDateString(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+function toLocalDateString(d: Date | string): string {
+  return getDateStringInZone(d);
 }
 
 function formatTime(isoString: string): string {
-  if (!isoString) return '';
-  const d = new Date(isoString);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  return formatAppointmentTime12h(isoString);
 }
 
 export function CalendarGrid({
@@ -242,11 +241,9 @@ export function CalendarGrid({
                              topPx = 0;
                              heightPx = 780 * pixelsPerMin;
                            } else {
-                             const startD = new Date(appt.start_time);
-                             const endD = appt.end_time ? new Date(appt.end_time) : new Date(startD.getTime() + 45*60000);
-                             
-                             const startMins = startD.getHours() * 60 + startD.getMinutes();
-                             const endMins = endD.getHours() * 60 + endD.getMinutes();
+                             const startZone = getTimeInZone(appt.start_time);
+                             const startMins = startZone.minutesFromMidnight;
+                             const endMins = appt.end_time ? getTimeInZone(appt.end_time).minutesFromMidnight : (startMins + 45);
                              
                              const topMins = startMins - (8 * 60);
                              const durationMins = endMins - startMins;

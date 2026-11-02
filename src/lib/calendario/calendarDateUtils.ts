@@ -27,16 +27,64 @@ export const DAY_LABELS_ES: Record<string, string> = {
   sunday: 'Domingo'
 };
 
+export const DEFAULT_BUSINESS_TIMEZONE = 'America/Caracas';
+
+/**
+ * Obtiene la hora, minuto y minutos desde medianoche garantizados en la zona horaria del negocio
+ * sin importar la zona horaria del dispositivo, navegador o servidor.
+ */
+export function getTimeInZone(isoString?: string | null, timeZone: string = DEFAULT_BUSINESS_TIMEZONE): { hour: number; minute: number; minutesFromMidnight: number } {
+  if (!isoString) return { hour: 0, minute: 0, minutesFromMidnight: 0 };
+  try {
+    const d = new Date(isoString);
+    if (!isNaN(d.getTime())) {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: false,
+      });
+      const parts = formatter.formatToParts(d);
+      const rawHour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+      const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+      const hour = rawHour === 24 ? 0 : rawHour;
+      return { hour, minute, minutesFromMidnight: hour * 60 + minute };
+    }
+  } catch {}
+  return { hour: 0, minute: 0, minutesFromMidnight: 0 };
+}
+
+/**
+ * Convierte cualquier fecha o ISO string a formato YYYY-MM-DD en la zona horaria del negocio.
+ */
+export function getDateStringInZone(d: Date | string, timeZone: string = DEFAULT_BUSINESS_TIMEZONE): string {
+  try {
+    const dateObj = typeof d === 'string' ? new Date(d) : d;
+    if (!isNaN(dateObj.getTime())) {
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      return formatter.format(dateObj); // YYYY-MM-DD
+    }
+  } catch {}
+  const fallback = typeof d === 'string' ? new Date(d) : d;
+  return toLocalDateString(fallback);
+}
+
 /**
  * Formatea una fecha ISO a la hora local HH:mm (ej. "10:00")
  * Previene el error común de `slice(11, 16)` que extrae la hora UTC sin convertir a hora local.
  */
-export function formatAppointmentTime(isoString?: string | null): string {
+export function formatAppointmentTime(isoString?: string | null, timeZone: string = DEFAULT_BUSINESS_TIMEZONE): string {
   if (!isoString) return '';
   try {
     const d = new Date(isoString);
     if (!isNaN(d.getTime())) {
       return d.toLocaleTimeString('es-ES', { 
+        timeZone,
         hour: '2-digit', 
         minute: '2-digit', 
         hour12: false 
@@ -49,12 +97,13 @@ export function formatAppointmentTime(isoString?: string | null): string {
 /**
  * Formatea una fecha ISO a formato 12 horas (ej. "10:00 AM" / "03:00 PM")
  */
-export function formatAppointmentTime12h(isoString?: string | null): string {
+export function formatAppointmentTime12h(isoString?: string | null, timeZone: string = DEFAULT_BUSINESS_TIMEZONE): string {
   if (!isoString) return '';
   try {
     const d = new Date(isoString);
     if (!isNaN(d.getTime())) {
       return d.toLocaleTimeString('es-VE', { 
+        timeZone,
         hour: '2-digit', 
         minute: '2-digit', 
         hour12: true 

@@ -137,7 +137,7 @@ export async function processBookingAction(formData: unknown) {
     if (finalBarberId === 'any') {
       const { data: employees } = await supabaseAdmin
         .from('entities')
-        .select('id, name, metadata, role')
+        .select('id, name, metadata')
         .eq('tenant_id', cleanData.tenantId)
         .in('type', ['employee', 'doctor', 'staff'])
         .neq('status', 'inactive')
@@ -151,7 +151,6 @@ export async function processBookingAction(formData: unknown) {
           .eq('tenant_id', cleanData.tenantId)
           .neq('status', 'cancelled')
           .neq('status', 'no_show')
-          .neq('status', 'completed')
           .lt('start_time', endDateTime.toISOString())
           .gt('end_time', startDateTime.toISOString());
           
@@ -197,7 +196,6 @@ export async function processBookingAction(formData: unknown) {
         .eq('employee_id', finalBarberId)
         .neq('status', 'cancelled')
         .neq('status', 'no_show')
-        .neq('status', 'completed')
         .lt('start_time', endDateTime.toISOString())
         .gt('end_time', startDateTime.toISOString())
         .limit(1);
@@ -501,8 +499,7 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
       .gte('start_time', windowStart.toISOString())
       .lte('start_time', windowEnd.toISOString())
       .neq('status', 'cancelled')
-      .neq('status', 'no_show')
-      .neq('status', 'completed');
+      .neq('status', 'no_show');
       
     if (employeeId !== 'any') {
       // Bloquea tanto las citas asignadas al colaborador como los bloqueos generales de la empresa (employee_id nulo)
