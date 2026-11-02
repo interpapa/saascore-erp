@@ -86,8 +86,8 @@ export function detectClinicalDomain(text?: string | null): ClinicalDomain | nul
 export function getEmployeePrimaryDomain(emp: any): ClinicalDomain | null {
   if (!emp) return null;
 
-  // 1. Cargo / Profesión explícita (role_title o role)
-  const primaryTitle = emp.metadata?.role_title || emp.role;
+  // 1. Cargo / Profesión explícita (role_title, cargo, position o role)
+  const primaryTitle = emp.metadata?.role_title || emp.metadata?.cargo || emp.metadata?.position || emp.metadata?.department || emp.role;
   const primaryDomain = detectClinicalDomain(primaryTitle);
   if (primaryDomain) return primaryDomain;
 
@@ -96,14 +96,30 @@ export function getEmployeePrimaryDomain(emp: any): ClinicalDomain | null {
   if (emp.metadata?.is_barber || emp.metadata?.barber_config?.is_active) return 'barberia';
   if (emp.metadata?.is_groomer || emp.metadata?.groomer_config?.is_active) return 'grooming';
 
-  // 3. Configuración de médico
+  // 3. Configuración de médico y especialidades
   const docRole = emp.metadata?.doctor_config?.role;
   const docRoleDomain = detectClinicalDomain(docRole);
   if (docRoleDomain) return docRoleDomain;
 
-  const docSpec = emp.metadata?.doctor_config?.specialty || emp.metadata?.specialty;
+  const docSpec = emp.metadata?.doctor_config?.specialty || emp.metadata?.specialty || emp.metadata?.specialty_id || emp.metadata?.doctor_config?.specialty_id || emp.metadata?.specialization;
   const docSpecDomain = detectClinicalDomain(docSpec);
   if (docSpecDomain) return docSpecDomain;
+
+  // 4. Módulos habilitados en metadata.modules o metadata.module
+  if (Array.isArray(emp.metadata?.modules)) {
+    for (const mod of emp.metadata.modules) {
+      const modDomain = detectClinicalDomain(mod);
+      if (modDomain) return modDomain;
+    }
+  }
+  if (emp.metadata?.module) {
+    const modDomain = detectClinicalDomain(emp.metadata.module);
+    if (modDomain) return modDomain;
+  }
+
+  // 5. Nombre de la persona (ej. "Dr. Abdul - Ginecología")
+  const nameDomain = detectClinicalDomain(emp.name);
+  if (nameDomain) return nameDomain;
 
   return null;
 }
@@ -159,11 +175,20 @@ export function matchesEmployeeService(emp: any, serviceName: string): boolean {
 
   const candidates: Array<string | undefined> = [
     emp.metadata?.role_title,
+    emp.metadata?.cargo,
+    emp.metadata?.position,
+    emp.metadata?.department,
     emp.metadata?.role,
     emp.role,
     emp.metadata?.doctor_config?.role,
     cleanDocSpecialty,
     emp.metadata?.specialty,
+    emp.metadata?.specialty_id,
+    emp.metadata?.specialization,
+    emp.metadata?.doctor_specialty,
+    emp.metadata?.medical_specialty,
+    emp.metadata?.module,
+    ...(Array.isArray(emp.metadata?.modules) ? emp.metadata.modules : []),
     emp.metadata?.dentist_config?.specialty,
     emp.metadata?.dentist_config?.role,
     emp.metadata?.barber_config?.specialty,

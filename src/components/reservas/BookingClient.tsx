@@ -704,30 +704,38 @@ export default function BookingClient({
 
   // Filter employees based on selected service (Memoized)
   const filteredEmployees = useMemo(() => {
-    if (!selectedService) return employees.filter(emp => emp.is_active);
+    const activeStaff = employees.filter(emp => emp.is_active !== false);
+    if (!selectedService) return activeStaff;
     
     // 1. Filtrar por vinculación inteligente (servicios particulares, servicio general o especialidad/rama médica)
-    const matched = employees.filter(emp => {
-      if (!emp.is_active) return false;
+    const matched = activeStaff.filter(emp => {
       return matchesEmployeeService(emp, selectedService.name);
     });
 
     // 2. Si hay colaboradores o doctores especializados coincidentes, mostrarlos
     if (matched.length > 0) return matched;
 
-    // 3. Si el servicio solicitado pertenece a un dominio médico/profesional específico (ej. Cardiología, Ginecología, Odontología)
-    // NUNCA hacer fallback a especialistas de otras ramas incompatibles (blindaje anti-contaminación)
-    const targetDomain = detectClinicalDomain(selectedService.name);
+    // 3. Si el servicio coincide con el dominio clínico de algún doctor
+    const targetDomain = detectClinicalDomain(selectedService.name) || (selectedService.category ? detectClinicalDomain(selectedService.category) : null);
     if (targetDomain && targetDomain !== 'med_general') {
-      return [];
+      const domainMatches = activeStaff.filter(emp => {
+        const empDomain = getEmployeePrimaryDomain(emp);
+        return empDomain === targetDomain;
+      });
+      if (domainMatches.length > 0) return domainMatches;
     }
 
-    // 4. Si el servicio es genérico (ej. "Consulta General"), mostrar únicamente profesionales sin especialidad clínica excluyente
-    return employees.filter(emp => {
-      if (!emp.is_active) return false;
+    // 4. Si el servicio es genérico o los profesionales activos no tienen conflicto
+    const compatibleStaff = activeStaff.filter(emp => {
       const empDomain = getEmployeePrimaryDomain(emp);
-      return !empDomain || empDomain === 'med_general';
+      if (!empDomain || empDomain === 'med_general') return true;
+      if (targetDomain && empDomain === targetDomain) return true;
+      return false;
     });
+
+    if (compatibleStaff.length > 0) return compatibleStaff;
+
+    return activeStaff;
   }, [employees, selectedService]);
   
   const dates = useMemo(() => {
