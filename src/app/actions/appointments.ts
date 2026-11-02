@@ -1,6 +1,6 @@
-import { isTimeWithinWorkingHours, formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 'use server';
 
+import { isTimeWithinWorkingHours, formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { writeAuditLog } from '@/lib/core/auditLogger';
 import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
@@ -357,6 +357,35 @@ export async function createAppointmentAction(
       .single();
 
     if (!error && newAppt) {
+      // Blindaje Concurrente Nivel 2: Comprobación post-inserción inmediata contra sobre-reserva
+      if (safeEmployeeId) {
+        try {
+          const { data: activeClashes } = await supabaseAdmin
+            .from('appointments')
+            .select('id, created_at')
+            .eq('tenant_id', tenantId)
+            .eq('employee_id', safeEmployeeId)
+            .eq('start_time', payload.start_time)
+            .neq('status', 'cancelled')
+            .neq('status', 'no_show')
+            .order('created_at', { ascending: true });
+
+          if (activeClashes && activeClashes.length > 1) {
+            const firstWinner = activeClashes[0];
+            if (firstWinner.id !== newAppt.id) {
+              console.warn(`[Appointments] Conflicto concurrente interceptado para cita ${newAppt.id}. Ganador: ${firstWinner.id}. Revirtiendo.`);
+              await supabaseAdmin.from('appointments').delete().eq('id', newAppt.id);
+              return {
+                success: false,
+                error: 'Conflicto de horario: Este turno fue reservado por otro usuario en este mismo instante. Por favor selecciona otro horario o especialista.'
+              };
+            }
+          }
+        } catch (postCheckErr) {
+          console.warn('[Appointments] Error en verificación post-insert:', postCheckErr);
+        }
+      }
+
       await writeAuditLog({
         tenant_id: tenantId,
         actor_email: actor.email,
@@ -708,13 +737,25 @@ export async function rescheduleOrMoveAppointmentAction(
     const calculatedEndTime = updates.end_time || 
       new Date(new Date(updates.start_time).getTime() + (updates.duration_minutes || 60) * 60000).toISOString();
 
-    // 1. Anti-colisión de Coach (si viene employee_id)
-    if (updates.employee_id) {
+    // 1. Obtener cita y metadata actual para determinar especialista y fusionar
+    const { data: currentAppt } = await supabaseAdmin
+      .from('appointments')
+      .select('*')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    const targetEmployeeId = updates.employee_id !== undefined 
+      ? sanitizeUUID(updates.employee_id) 
+      : (currentAppt?.employee_id || null);
+
+    // 2. Anti-colisión de Especialista / Médico (defensivo ante arrastre de turnos)
+    if (targetEmployeeId) {
       const { data: overlappingEmp } = await supabaseAdmin
         .from('appointments')
         .select('id, title, start_time, end_time')
         .eq('tenant_id', tenantId)
-        .eq('employee_id', updates.employee_id)
+        .eq('employee_id', targetEmployeeId)
         .neq('id', id)
         .neq('status', 'cancelled')
         .neq('status', 'no_show')
@@ -726,12 +767,12 @@ export async function rescheduleOrMoveAppointmentAction(
       if (overlappingEmp && overlappingEmp.length > 0) {
         return {
           success: false,
-          error: `El coach ya tiene otra clase/actividad en ese horario ("${overlappingEmp[0].title || 'Cita'}"). Elige otro horario o entrenador.`
+          error: `El profesional ya tiene otra cita en ese horario ("${overlappingEmp[0].title || 'Cita'}"). Elige otro horario o especialista.`
         };
       }
     }
 
-    // 2. Anti-colisión de Pista / Cancha (si viene location o court_name)
+    // 3. Anti-colisión de Pista / Espacio Físico (si aplica)
     const courtTarget = (updates.location || updates.court_name || (updates.metadata?.court_name as string) || '').trim();
     if (courtTarget) {
       const { data: overlappingCourts } = await supabaseAdmin
@@ -760,14 +801,6 @@ export async function rescheduleOrMoveAppointmentAction(
         }
       }
     }
-
-    // 3. Obtener metadata actual para fusionar
-    const { data: currentAppt } = await supabaseAdmin
-      .from('appointments')
-      .select('*')
-      .eq('id', id)
-      .eq('tenant_id', tenantId)
-      .maybeSingle();
 
     const mergedMetadata = {
       ...(typeof currentAppt?.metadata === 'object' && currentAppt?.metadata !== null ? currentAppt.metadata : {}),

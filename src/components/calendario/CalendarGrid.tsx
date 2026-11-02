@@ -264,9 +264,17 @@ export function CalendarGrid({
                            return (
                              <div 
                                key={appt.id}
+                               draggable={false}
                                onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
-                               className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 ${visual.bg}`}
-                               style={{ top: `${topPx}px`, height: `${heightPx}px`, borderLeftColor: cardBorderColor }}
+                               className={`absolute left-1 right-1 rounded-xl p-2.5 shadow-sm border border-l-4 overflow-hidden flex flex-col gap-0.5 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01] z-10 select-none touch-manipulation ${visual.bg}`}
+                               style={{ 
+                                 top: `${topPx}px`, 
+                                 height: `${heightPx}px`, 
+                                 borderLeftColor: cardBorderColor,
+                                 WebkitUserSelect: 'none',
+                                 userSelect: 'none',
+                                 WebkitTouchCallout: 'none'
+                               }}
                              >
                                <div className="flex items-center justify-between gap-1">
                                  <span className="text-xs font-black leading-tight truncate">
@@ -411,9 +419,15 @@ export function CalendarGrid({
                           return (
                             <div
                               key={appt.id}
+                              draggable={false}
                               onClick={(e) => { e.stopPropagation(); onSelectAppointment(appt); }}
-                              className={`p-2.5 rounded-xl border-l-4 flex flex-col gap-1 transition-all hover:scale-[1.02] ${visual.bg}`}
-                              style={{ borderLeftColor: cardBorderColor }}
+                              className={`p-2.5 rounded-xl border-l-4 flex flex-col gap-1 transition-all hover:scale-[1.02] cursor-pointer select-none touch-manipulation ${visual.bg}`}
+                              style={{ 
+                                borderLeftColor: cardBorderColor,
+                                WebkitUserSelect: 'none',
+                                userSelect: 'none',
+                                WebkitTouchCallout: 'none'
+                              }}
                             >
                               <div className="flex items-center justify-between gap-1">
                                 <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.metadata?.is_block ? `🔒 ${appt.title}` : (appt.client_name || appt.title)}</span>

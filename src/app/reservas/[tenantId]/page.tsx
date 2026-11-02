@@ -20,36 +20,37 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
     );
   }
 
-  // 1. Fetch Tenant and Employees in parallel for maximum speed
-  const [tenantRes, employeesRes] = await Promise.all([
-    supabaseAdmin
-      .from('tenants')
-      .select('id, name, metadata')
-      .eq('id', tenantId)
-      .single(),
-    supabaseAdmin
-      .from('entities')
-      .select('id, name, metadata, status')
-      .eq('tenant_id', tenantId)
-      .eq('type', 'employee')
-      .eq('status', 'active'),
-  ]);
+  // 1. Fetch Tenant (Soporta UUID directo o Slug / Nombre de consultorio)
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId);
+  let tenantQuery = supabaseAdmin
+    .from('tenants')
+    .select('id, name, metadata');
+    
+  if (isUuid) {
+    tenantQuery = tenantQuery.eq('id', tenantId);
+  } else {
+    tenantQuery = tenantQuery.or(`metadata->>slug.eq.${tenantId},name.ilike.${tenantId}`);
+  }
 
-  const tenant = tenantRes.data;
-  const tenantError = tenantRes.error;
-  const employeesData = employeesRes.data;
+  const { data: tenant, error: tenantError } = await tenantQuery.maybeSingle();
 
   if (tenantError || !tenant) {
     return (
       <div className="p-10 bg-red-50 text-red-900 min-h-screen">
-        <h1 className="text-2xl font-bold mb-4">Error de Depuración (Solo para el Admin)</h1>
-        <p><strong>ID buscado:</strong> {tenantId}</p>
-        <p><strong>Error de Supabase:</strong> {tenantError?.message || 'Ningún error, pero devolvió null'}</p>
-        <p><strong>Código de error:</strong> {tenantError?.code}</p>
-        <p><strong>Detalles:</strong> {tenantError?.details}</p>
+        <h1 className="text-2xl font-bold mb-4">Empresa / Consultorio no encontrado</h1>
+        <p><strong>Identificador buscado:</strong> {tenantId}</p>
+        <p><strong>Error de Supabase:</strong> {tenantError?.message || 'No se encontró ninguna empresa con este enlace.'}</p>
       </div>
     );
   }
+
+  // 2. Fetch Employees usando el ID real del tenant
+  const { data: employeesData } = await supabaseAdmin
+    .from('entities')
+    .select('id, name, metadata, status, role')
+    .eq('tenant_id', tenant.id)
+    .eq('type', 'employee')
+    .eq('status', 'active');
 
   const employees = (employeesData || [])
     .filter(e => {
@@ -65,27 +66,34 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
       const svcs = Array.isArray(e.metadata?.services) ? e.metadata.services : [];
       if (isPhysicalResource && svcs.length === 0) return false;
 
-      // 4. Excluir registros huérfanos sin rol, sin servicios y sin configuración explícita
-      const hasServices = svcs.length > 0;
+      // 4. Reconocer rol clínico, especialidad médica o cargo laboral
       const hasClinicalConfig = Boolean(
         e.metadata?.role_title ||
         e.metadata?.doctor_config?.specialty ||
         e.metadata?.doctor_config?.role ||
         e.metadata?.dentist_config?.role ||
-        e.metadata?.barber_config?.role
+        e.metadata?.barber_config?.role ||
+        e.metadata?.role ||
+        (e as any).role ||
+        e.metadata?.cargo ||
+        e.metadata?.position ||
+        e.metadata?.specialty ||
+        e.metadata?.specialization
       );
       const isExplicitlyBookable = e.metadata?.bookable === true;
+      const hasServices = svcs.length > 0;
 
-      if (!isExplicitlyBookable && !hasServices && !hasClinicalConfig) {
+      // Si no es recurso físico y está activo sin exclusión explícita, se incluye
+      if (isPhysicalResource && !hasServices) {
         return false;
       }
 
-      return true;
+      return isExplicitlyBookable || hasServices || hasClinicalConfig || true;
     })
     .map(e => ({
       id: e.id,
       name: e.name,
-      role: e.metadata?.role_title || e.metadata?.doctor_config?.specialty || e.metadata?.doctor_config?.role || e.metadata?.dentist_config?.role || e.metadata?.role || 'Profesional',
+      role: e.metadata?.role_title || e.metadata?.doctor_config?.specialty || e.metadata?.doctor_config?.role || e.metadata?.dentist_config?.role || e.metadata?.role || (e as any).role || e.metadata?.cargo || 'Especialista',
       is_active: e.status === 'active',
       metadata: e.metadata
     }));

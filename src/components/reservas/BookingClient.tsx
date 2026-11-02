@@ -199,7 +199,7 @@ const isSlotAvailable = (
   return true;
 };
 
-const GENERATE_DATES = (allEmployees: Employee[], barber?: Employee | null, maxDays: number = 14) => {
+const GENERATE_DATES = (allEmployees: Employee[], barber?: Employee | null, maxDays: number = 14, openDays: number[] = [1, 2, 3, 4, 5, 6]) => {
   const dates = [];
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -211,18 +211,39 @@ const GENERATE_DATES = (allEmployees: Employee[], barber?: Employee | null, maxD
   while (dates.length < maxDays && attempts < 90) {
     const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + attempts);
     const dayKey = mappingDays[d.getDay()];
+    const dayOfWeek = d.getDay();
     
     let isWorkingDay = false;
     
     if (barber && barber.id !== 'any') {
-      const shifts = barber.metadata?.working_hours?.[dayKey] || [];
-      isWorkingDay = shifts.length > 0;
+      const wh = barber.metadata?.working_hours;
+      const hasCustomSchedule = wh && typeof wh === 'object' && Object.keys(wh).length > 0;
+      if (hasCustomSchedule) {
+        const shifts = wh[dayKey] || [];
+        isWorkingDay = shifts.length > 0;
+      } else {
+        // Fallback: Si el especialista no tiene turnos individuales configurados, atiende según días de apertura del negocio
+        isWorkingDay = openDays.includes(dayOfWeek);
+      }
     } else {
-      isWorkingDay = allEmployees.some(emp => {
-        if (!emp.is_active) return false;
-        const shifts = emp.metadata?.working_hours?.[dayKey] || [];
-        return shifts.length > 0;
+      const hasAnyEmpWithSchedule = allEmployees.some(emp => {
+        const wh = emp.metadata?.working_hours;
+        return wh && typeof wh === 'object' && Object.keys(wh).length > 0;
       });
+
+      if (hasAnyEmpWithSchedule) {
+        isWorkingDay = allEmployees.some(emp => {
+          if (!emp.is_active) return false;
+          const wh = emp.metadata?.working_hours;
+          if (wh && typeof wh === 'object' && Object.keys(wh).length > 0) {
+            const shifts = wh[dayKey] || [];
+            return shifts.length > 0;
+          }
+          return openDays.includes(dayOfWeek);
+        });
+      } else {
+        isWorkingDay = openDays.includes(dayOfWeek);
+      }
     }
     
     if (isWorkingDay) {
@@ -660,8 +681,8 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   }, [employees, selectedService]);
   
   const dates = useMemo(() => {
-    return GENERATE_DATES(employees, selectedBarber, settings.maxDaysInAdvance);
-  }, [employees, selectedBarber, settings.maxDaysInAdvance]);
+    return GENERATE_DATES(employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays);
+  }, [employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays]);
   
   // Re-adjust selected date if current selection is invalid for new barber
   const [selectedDate, setSelectedDate] = useState(dates.length > 0 ? dates[0].fullDate : '');
@@ -790,6 +811,15 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
     setErrorMessage('');
 
     try {
+      // Verificación atómica previa en tiempo real contra colisiones
+      const preCheck = await getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
+      if (preCheck.success && Array.isArray(preCheck.bookedTimes) && preCheck.bookedTimes.includes(selectedTime)) {
+        setIsSubmitting(false);
+        setBookedTimes(preCheck.bookedTimes);
+        setErrorMessage('Lo sentimos, este turno acaba de ser reservado por otro paciente. Por favor selecciona otro horario.');
+        return;
+      }
+
       const svcNameLower = (selectedService?.name || '').toLowerCase();
       const isSportsSvc = svcNameLower.includes('padel') || svcNameLower.includes('pádel') || svcNameLower.includes('tenis') || hasCourts;
       const isGroupSvc = Boolean(

@@ -1,9 +1,9 @@
-import { formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 'use client';
 
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   Baby, 

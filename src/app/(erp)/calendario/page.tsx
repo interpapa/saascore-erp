@@ -107,9 +107,12 @@ export default function CalendarioPage() {
       setIsLoading(true);
       const [apptsRes, empRes, custRes, srvRes] = await Promise.all([
         getAppointmentsAction(currentTenant.id, filterState, actor),
-        isTeamEnabled ? getEntitiesAction(currentTenant.id, 'employee', 50, actor) : Promise.resolve({ success: true, entities: [] }),
-        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 50, actor) : Promise.resolve({ success: true, entities: [] }),
-        isInventoryEnabled ? getItemsAction(currentTenant.id, 'service', 50, actor) : Promise.resolve({ success: true, items: [] }),
+        // Los colaboradores/médicos deben cargarse SIEMPRE en la agenda clínica,
+        // sin importar si la empresa tiene contratado el módulo separado de RRHH/Nómina ('equipo').
+        getEntitiesAction(currentTenant.id, 'employee', 100, actor),
+        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 100, actor) : Promise.resolve({ success: true, entities: [] }),
+        // Cargar catálogo de servicios clínicos/procedimientos para asignación directa en turnos
+        getItemsAction(currentTenant.id, 'service', 100, actor),
       ]);
 
       if (apptsRes.success) {

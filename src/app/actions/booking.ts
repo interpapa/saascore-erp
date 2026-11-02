@@ -67,13 +67,17 @@ export async function processBookingAction(formData: unknown) {
 
     const cleanData = bookingSchema.parse(formData);
 
-    // Validación Backend de Módulo Activo (Estilo Odoo 17)
+    // Validación Backend de Módulo Activo (Estilo Odoo 17 - Compatible con Citas, Odontología y Clínica)
     const moduleCheck = await assertModuleEnabled(cleanData.tenantId, 'calendario');
     if (!moduleCheck.authorized) {
-      return { 
-        success: false, 
-        error: moduleCheck.error || 'El sistema de reservas está temporalmente inactivo para esta empresa.' 
-      };
+      const dentalCheck = await assertModuleEnabled(cleanData.tenantId, 'odontologia');
+      const clinicCheck = await assertModuleEnabled(cleanData.tenantId, 'clinica');
+      if (!dentalCheck.authorized && !clinicCheck.authorized) {
+        return { 
+          success: false, 
+          error: moduleCheck.error || 'El sistema de reservas está temporalmente inactivo para esta empresa.' 
+        };
+      }
     }
 
     const fullName = `${cleanData.firstName} ${cleanData.lastName || ''}`.trim();
@@ -418,10 +422,39 @@ export async function processBookingAction(formData: unknown) {
           }
           return { success: true, message: 'Reserva procesada exitosamente.', assignedBarberName: finalBarberName };
         }
-      } else if (error.code === '23505' || error.message.includes('unique_appointment_slot')) {
-        return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado. Por favor elige otro.' };
+      } else if (error.code === '23505' || error.message?.includes('unique_appointment_slot') || error.message?.includes('duplicate key')) {
+        return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado por otro paciente. Por favor elige otro horario.' };
       } else {
         return { success: false, error: `Error DB: ${error.message}` };
+      }
+    }
+
+    // Blindaje Concurrente Nivel 2: Comprobación post-inserción inmediata contra condiciones de carrera
+    if (finalBarberId && finalBarberId !== 'any') {
+      try {
+        const { data: activeClashes } = await supabaseAdmin
+          .from('appointments')
+          .select('id, created_at')
+          .eq('tenant_id', cleanData.tenantId)
+          .eq('employee_id', finalBarberId)
+          .eq('start_time', startDateTime.toISOString())
+          .neq('status', 'cancelled')
+          .neq('status', 'no_show')
+          .order('created_at', { ascending: true });
+
+        if (activeClashes && activeClashes.length > 1) {
+          const firstWinner = activeClashes[0];
+          if (firstWinner.id !== createdApptId) {
+            console.warn(`[Anti-Collision] Carrera interceptada para cita ${createdApptId}. Ganador: ${firstWinner.id}. Revirtiendo.`);
+            await supabaseAdmin.from('appointments').delete().eq('id', createdApptId);
+            return {
+              success: false,
+              error: 'Lo sentimos, este turno acaba de ser reservado por otro paciente en este instante. Por favor selecciona otro horario.'
+            };
+          }
+        }
+      } catch (checkErr) {
+        console.warn('[Anti-Collision] Verificación post-inserción no bloqueante:', checkErr);
       }
     }
 
