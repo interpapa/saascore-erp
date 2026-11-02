@@ -411,7 +411,6 @@ export default function BookingClient({
 
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean, icon?: string, category?: string} | null>(null);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   const [selectedBarberPrice, setSelectedBarberPrice] = useState<number | undefined>(undefined);
 
@@ -624,140 +623,14 @@ export default function BookingClient({
     });
   }, [employees, catalogServices, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
 
-  // Categorías de especialidad detectadas y ordenadas canónicamente (ej. Medicina General, Odontología, Ginecología, etc.)
-  const availableCategories = useMemo(() => {
-    const invalidCategories = new Set([
-      'General',
-      'Profesional',
-      'Especialista',
-      'Colaborador',
-      'Espacio / Recurso',
-      'software developer',
-    ]);
-    const cats = new Set<string>();
-
-    uniqueServices.forEach((s: any) => {
-      const cat = (s.category || '').trim();
-      if (cat && !invalidCategories.has(cat)) {
-        cats.add(cat);
-      }
-    });
-
-    const canonicalOrder: Record<string, number> = {
-      'Medicina General': 1,
-      'Odontología': 2,
-      'Ginecología y Obstetricia': 3,
-      'Pediatría': 4,
-      'Cardiología': 5,
-      'Dermatología': 6,
-      'Traumatología': 7,
-      'Oftalmología': 8,
-      'Barbería': 9,
-      'Peluquería Canina': 10,
-    };
-
-    return Array.from(cats).sort((a, b) => {
-      const orderA = canonicalOrder[a] ?? 99;
-      const orderB = canonicalOrder[b] ?? 99;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.localeCompare(b, 'es');
-    });
-  }, [uniqueServices]);
-
-  // Auto-detectar especialidad desde URL (?especialidad=... o ?rama=...) o preseleccionar
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const spec = params.get('especialidad') || params.get('rama') || params.get('specialty') || params.get('cat');
-      if (spec) {
-        const normSpec = spec.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        const match = availableCategories.find(c => {
-          const normC = c.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-          return normC.includes(normSpec) || normSpec.includes(normC);
-        });
-        if (match) {
-          setSelectedCategory(match);
-          return;
-        }
-      }
-    }
-    // Si la empresa solo tiene 1 especialidad o departamento, ir directo a sus servicios sin pantalla intermedia
-    if (availableCategories.length === 1 && selectedCategory === null) {
-      setSelectedCategory(availableCategories[0]);
-    } else if (availableCategories.length === 0 && selectedCategory === null) {
-      setSelectedCategory('all');
-    }
-  }, [availableCategories, selectedCategory]);
-
-  const handleSelectSpecialty = (cat: string) => {
-    setSelectedCategory(cat);
-    if (typeof window !== 'undefined' && window.history) {
-      const url = new URL(window.location.href);
-      if (cat === 'all') {
-        url.searchParams.delete('especialidad');
-        url.searchParams.delete('rama');
-      } else {
-        url.searchParams.set('especialidad', cat.toLowerCase());
-      }
-      window.history.replaceState({}, '', url.toString());
-    }
-  };
-
-  const handleBackToSpecialties = () => {
-    setSelectedCategory(null);
-    if (typeof window !== 'undefined' && window.history) {
-      const url = new URL(window.location.href);
-      url.searchParams.delete('especialidad');
-      url.searchParams.delete('rama');
-      window.history.replaceState({}, '', url.toString());
-    }
-  };
-
-  // Servicios filtrados por la categoría seleccionada
-  const displayedServices = useMemo(() => {
-    if (!selectedCategory || selectedCategory === 'all') return uniqueServices;
-    return uniqueServices.filter((s: any) => s.category === selectedCategory);
-  }, [uniqueServices, selectedCategory]);
-
-  // Filter employees based on selected service (Memoized)
-  const filteredEmployees = useMemo(() => {
-    const activeStaff = employees.filter(emp => emp.is_active !== false);
-    if (!selectedService) return activeStaff;
-    
-    // 1. Filtrar por vinculación inteligente (servicios particulares, servicio general o especialidad/rama médica)
-    const matched = activeStaff.filter(emp => {
-      return matchesEmployeeService(emp, selectedService.name);
-    });
-
-    // 2. Si hay colaboradores o doctores especializados coincidentes, mostrarlos
-    if (matched.length > 0) return matched;
-
-    // 3. Si el servicio coincide con el dominio clínico de algún doctor
-    const targetDomain = detectClinicalDomain(selectedService.name) || (selectedService.category ? detectClinicalDomain(selectedService.category) : null);
-    if (targetDomain && targetDomain !== 'med_general') {
-      const domainMatches = activeStaff.filter(emp => {
-        const empDomain = getEmployeePrimaryDomain(emp);
-        return empDomain === targetDomain;
-      });
-      if (domainMatches.length > 0) return domainMatches;
-    }
-
-    // 4. Si el servicio es genérico o los profesionales activos no tienen conflicto
-    const compatibleStaff = activeStaff.filter(emp => {
-      const empDomain = getEmployeePrimaryDomain(emp);
-      if (!empDomain || empDomain === 'med_general') return true;
-      if (targetDomain && empDomain === targetDomain) return true;
-      return false;
-    });
-
-    if (compatibleStaff.length > 0) return compatibleStaff;
-
-    return activeStaff;
-  }, [employees, selectedService]);
+  // Personal / Doctores activos disponibles para reservas
+  const activeEmployees = useMemo(() => {
+    return employees.filter(emp => emp.is_active !== false);
+  }, [employees]);
   
   const dates = useMemo(() => {
-    return GENERATE_DATES(employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays);
-  }, [employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays]);
+    return GENERATE_DATES(activeEmployees, selectedBarber, settings.maxDaysInAdvance, settings.openDays);
+  }, [activeEmployees, selectedBarber, settings.maxDaysInAdvance, settings.openDays]);
   
   // Re-adjust selected date if current selection is invalid for new barber
   const [selectedDate, setSelectedDate] = useState(dates.length > 0 ? dates[0].fullDate : '');
@@ -1098,7 +971,7 @@ export default function BookingClient({
           {/* Main Content Area: Directorio Directo de Especialistas */}
           <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
             <div className="max-w-5xl mx-auto">
-              {employees.length === 0 ? (
+              {activeEmployees.length === 0 ? (
                 <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8 shadow-xs">
                   <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                   <h3 className="text-lg font-bold text-slate-800 mb-1">No hay especialistas registrados en este momento</h3>
@@ -1119,7 +992,7 @@ export default function BookingClient({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {employees.length > 1 && (
+                  {activeEmployees.length > 1 && (
                     <button
                       type="button"
                       onClick={() => {
@@ -1156,7 +1029,7 @@ export default function BookingClient({
                     </button>
                   )}
 
-                  {employees.map(barber => {
+                  {activeEmployees.map(barber => {
                     const empRoleTitle = (barber.metadata?.role_title || barber.metadata?.doctor_config?.specialty || barber.metadata?.specialty || barber.role || 'Especialista').trim();
                     const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
                     const scheduleHint = getDoctorScheduleSummary(barber);
