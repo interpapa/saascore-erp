@@ -66,7 +66,7 @@ export default async function ReservasPublicPage({ params }: { params: Promise<{
   // 2. Fetch Employees usando el ID real del tenant (tolerante a estado activo o null)
   const { data: employeesData } = await supabaseAdmin
     .from('entities')
-    .select('id, name, metadata, status, role')
+    .select('id, name, metadata, status')
     .eq('tenant_id', tenant.id)
     .in('type', ['employee', 'doctor', 'staff'])
     .is('deleted_at', null);
