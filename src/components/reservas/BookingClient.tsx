@@ -18,7 +18,8 @@ import {
   Stethoscope, 
   Dog, 
   Scissors, 
-  Tag 
+  Tag,
+  PhoneCall
 } from 'lucide-react';
 import { processBookingAction, getBookedTimesAction } from '@/app/actions/booking';
 import { normalizeHexColor, getContrastTextColor } from '@/lib/theme/colorUtils';
@@ -26,6 +27,31 @@ import { matchesEmployeeService, detectClinicalDomain, getEmployeePrimaryDomain 
 
 type Tenant = { id: string, name: string, metadata?: any };
 type Employee = { id: string, name: string, role: string, is_active: boolean, metadata?: any };
+
+const getDoctorScheduleSummary = (emp: Employee): string => {
+  const wh = emp.metadata?.working_hours;
+  if (!wh || typeof wh !== 'object' || Object.keys(wh).length === 0) {
+    return 'Horarios regulares';
+  }
+  const dayAbbr: Record<string, string> = {
+    monday: 'Lun',
+    tuesday: 'Mar',
+    wednesday: 'Mié',
+    thursday: 'Jue',
+    friday: 'Vie',
+    saturday: 'Sáb',
+    sunday: 'Dom'
+  };
+  const activeDays = Object.entries(wh)
+    .filter(([_, shifts]: [string, any]) => Array.isArray(shifts) && shifts.length > 0)
+    .map(([day]) => dayAbbr[day] || day);
+  
+  if (activeDays.length === 0) return 'Sin turnos asignados';
+  if (activeDays.length >= 5 && !activeDays.includes('Dom') && !activeDays.includes('Sáb')) {
+    return 'Lunes a Viernes';
+  }
+  return `Atiende: ${activeDays.join(', ')}`;
+};
 
 const getServiceIcon = (serviceName: string, customIcon?: string) => {
   if (customIcon) {
@@ -693,15 +719,6 @@ export default function BookingClient({
     return uniqueServices.filter((s: any) => s.category === selectedCategory);
   }, [uniqueServices, selectedCategory]);
 
-  // Si todos los colaboradores hacen lo mismo o solo existe 1 rama en la empresa,
-  // no hace falta preguntarle al cliente qué quiere: se preselecciona la rama y se va directo al Paso 2
-  useEffect(() => {
-    if (uniqueServices.length === 1 && !selectedService && step === 1) {
-      setSelectedService(uniqueServices[0]);
-      setStep(2);
-    }
-  }, [uniqueServices, selectedService, step]);
-
   // Filter employees based on selected service (Memoized)
   const filteredEmployees = useMemo(() => {
     const activeStaff = employees.filter(emp => emp.is_active !== false);
@@ -834,6 +851,41 @@ export default function BookingClient({
     };
   }, [selectedBarber, selectedDate, tenant.id, clientTzOffset]);
 
+  // Procedimientos o servicios disponibles específicamente para el doctor seleccionado
+  const doctorAvailableServices = useMemo(() => {
+    if (!selectedBarber || selectedBarber.id === 'any') return uniqueServices;
+    
+    const bSvcs = Array.isArray(selectedBarber.metadata?.services) ? (selectedBarber.metadata.services as any[]) : [];
+    if (bSvcs.length > 0) {
+      return bSvcs.map(s => {
+        const p = Number(s.price) || 0;
+        return {
+          name: s.name,
+          durationMinutes: Number(s.duration || s.durationMinutes) || 45,
+          basePrice: p > 0 ? p : undefined,
+          priceText: p > 0 ? `$${p}` : settings.noPriceLabel,
+          isCustomPrice: p <= 0,
+          category: selectedBarber.metadata?.specialty || 'Servicio',
+        };
+      });
+    }
+
+    const compatible = uniqueServices.filter(s => matchesEmployeeService(selectedBarber, s.name));
+    if (compatible.length > 0) return compatible;
+
+    const spec = selectedBarber.metadata?.specialty || (selectedBarber.role && selectedBarber.role !== 'employee' && selectedBarber.role !== 'Colaborador' ? selectedBarber.role : null);
+    const svcName = spec ? (spec.toLowerCase().startsWith('consulta') ? spec : `Consulta: ${spec}`) : 'Consulta Médica';
+    const genPrice = selectedBarber.metadata?.general_service_price ? Number(selectedBarber.metadata.general_service_price) : undefined;
+    return [{
+      name: svcName,
+      durationMinutes: 45,
+      basePrice: genPrice && genPrice > 0 ? genPrice : undefined,
+      priceText: genPrice && genPrice > 0 ? `$${genPrice}` : settings.noPriceLabel,
+      isCustomPrice: !genPrice || genPrice <= 0,
+      category: spec || 'Medicina General',
+    }];
+  }, [selectedBarber, uniqueServices, settings.noPriceLabel]);
+
   const handleServiceSelect = (service: { name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean }) => {
     setSelectedService(service);
     setStep(2);
@@ -843,19 +895,45 @@ export default function BookingClient({
 
   const handleBarberSelect = (barber: Employee) => {
     setSelectedBarber(barber);
-    if (barber.id !== 'any' && selectedService) {
-      const bSvcs = barber.metadata?.services as any[];
-      const bSvc = bSvcs?.find(s => s.name.trim().toLowerCase() === selectedService.name.toLowerCase());
-      if (bSvc?.price !== undefined && Number(bSvc.price) > 0) {
-        setSelectedBarberPrice(Number(bSvc.price));
-      } else if (barber.metadata?.general_service_price !== undefined && Number(barber.metadata?.general_service_price) > 0) {
-        setSelectedBarberPrice(Number(barber.metadata?.general_service_price));
-      } else {
-        setSelectedBarberPrice(selectedService.basePrice);
-      }
+
+    // 1. Encontrar o construir el servicio por defecto para este especialista
+    const bSvcs = Array.isArray(barber.metadata?.services) ? (barber.metadata.services as any[]) : [];
+    let chosenSvc: any = null;
+
+    if (bSvcs.length > 0) {
+      const first = bSvcs[0];
+      const p = Number(first.price) || 0;
+      chosenSvc = {
+        name: first.name || 'Consulta Médica',
+        durationMinutes: Number(first.duration || first.durationMinutes) || 45,
+        basePrice: p > 0 ? p : undefined,
+        priceText: p > 0 ? `$${p}` : settings.noPriceLabel,
+        isCustomPrice: p <= 0,
+        category: barber.metadata?.specialty || 'Servicio',
+      };
+      setSelectedBarberPrice(p > 0 ? p : undefined);
     } else {
-      setSelectedBarberPrice(selectedService?.basePrice);
+      const compatible = uniqueServices.find(s => matchesEmployeeService(barber, s.name));
+      if (compatible) {
+        chosenSvc = compatible;
+        setSelectedBarberPrice(compatible.basePrice);
+      } else {
+        const spec = barber.metadata?.specialty || (barber.role && barber.role !== 'employee' && barber.role !== 'Colaborador' ? barber.role : null);
+        const svcName = spec ? (spec.toLowerCase().startsWith('consulta') ? spec : `Consulta: ${spec}`) : 'Consulta Médica';
+        const genPrice = barber.metadata?.general_service_price ? Number(barber.metadata.general_service_price) : undefined;
+        chosenSvc = {
+          name: svcName,
+          durationMinutes: 45,
+          basePrice: genPrice && genPrice > 0 ? genPrice : undefined,
+          priceText: genPrice && genPrice > 0 ? `$${genPrice}` : settings.noPriceLabel,
+          isCustomPrice: !genPrice || genPrice <= 0,
+          category: spec || 'Medicina General',
+        };
+        setSelectedBarberPrice(genPrice && genPrice > 0 ? genPrice : undefined);
+      }
     }
+
+    setSelectedService(chosenSvc);
     setStep(3);
     setErrorMessage('');
     setSuccessMessage('');
@@ -984,343 +1062,70 @@ export default function BookingClient({
   return (
     <div className="min-h-screen font-sans text-slate-800 transition-colors" style={rootStyle}>
       
-      {/* ===== STEP 1: Seleccionar Servicio ===== */}
-      {step === 1 && (
+            {/* ===== STEP 1: Seleccionar Médico / Especialista Directamente ===== */}
+      {(step === 1 || step === 2) && (
         <div className="min-h-screen flex flex-col">
           {/* Hero Banner */}
-          <div 
+          <div
             className="px-6 py-10 md:px-12 md:py-14 lg:py-16 transition-colors shadow-xs"
             style={{ backgroundColor: appliedBtn, color: btnTextColor }}
           >
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center gap-5 md:gap-7">
               {settings.logoUrl && (
                 <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-white p-2.5 shadow-md flex items-center justify-center shrink-0 border border-white/20">
-                  <img 
-                    src={settings.logoUrl} 
-                    alt={settings.headerTitle} 
+                  <img
+                    src={settings.logoUrl}
+                    alt={settings.headerTitle}
                     className="max-w-full max-h-full object-contain rounded-xl"
                     onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
                   />
                 </div>
               )}
               <div>
-                {availableCategories.length > 1 && selectedCategory && selectedCategory !== 'all' ? (
-                  <>
-                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest opacity-85 mb-1.5" style={{ color: btnTextColor }}>
-                      <span>{settings.headerTitle}</span>
-                      <span>›</span>
-                      <span>Especialidad Médica</span>
-                    </div>
-                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight flex items-center gap-3" style={{ color: btnTextColor }}>
-                      <span className="text-3xl md:text-4xl">{getSpecialtyMeta(selectedCategory).icon}</span>
-                      <span>{selectedCategory}</span>
-                    </h1>
-                    <p className="text-sm md:text-base max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
-                      {getSpecialtyMeta(selectedCategory).description}
-                    </p>
-                  </>
-                ) : availableCategories.length > 1 && !selectedCategory ? (
-                  <>
-                    <div className="inline-block px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-2 border border-white/25" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}>
-                      Paso 1 de 3 · Directorio de Especialidades
-                    </div>
-                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
-                      {settings.headerTitle}
-                    </h1>
-                    <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
-                      Selecciona una especialidad médica o departamento para ver sus consultas y procedimientos disponibles.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
-                      {settings.headerTitle}
-                    </h1>
-                    <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
-                      {settings.headerSubtitle}
-                    </p>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          {/* Main Content Area */}
-          <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
-            <div className="max-w-5xl mx-auto">
-              
-              {/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                  VISTA A: DIRECTORIO DE ESPECIALIDADES / RAMAS MÉDICAS
-                  (Se muestra cuando el centro tiene múltiples especialidades y el paciente no ha elegido una)
-                  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
-              {availableCategories.length > 1 && !selectedCategory ? (
-                <div className="space-y-6 animate-in fade-in duration-300">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200/80">
-                    <div>
-                      <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-                        Especialidades Médicas Disponibles
-                      </h2>
-                      <p className="text-xs md:text-sm text-slate-500 mt-0.5">
-                        Toca una especialidad para ver sus médicos, estudios y procedimientos:
-                      </p>
-                    </div>
-                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full self-start sm:self-auto">
-                      {availableCategories.length} departamentos activos
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {availableCategories.map((cat) => {
-                      const meta = getSpecialtyMeta(cat);
-                      const catServices = uniqueServices.filter((s: any) => s.category === cat);
-                      return (
-                        <button
-                          key={cat}
-                          type="button"
-                          onClick={() => handleSelectSpecialty(cat)}
-                          className="group bg-white rounded-3xl p-6 text-left border-2 border-slate-200/80 hover:border-[color:var(--theme-btn)] hover:shadow-xl transition-all duration-200 active:scale-[0.98] flex flex-col justify-between relative overflow-hidden shadow-xs hover:-translate-y-0.5"
-                        >
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-3xl shadow-xs group-hover:scale-110 transition-transform">
-                                {meta.icon}
-                              </div>
-                              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80">
-                                {meta.badge}
-                              </span>
-                            </div>
-                            <div>
-                              <h3 className="text-lg md:text-xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors">
-                                {cat}
-                              </h3>
-                              <p className="text-xs text-slate-500 mt-1.5 leading-relaxed line-clamp-3">
-                                {meta.description}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-xs font-bold text-slate-400">
-                              {catServices.length} {catServices.length === 1 ? 'procedimiento' : 'procedimientos'}
-                            </span>
-                            <div className="flex items-center gap-1.5 text-xs font-black text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform">
-                              <span>Ver Servicios</span>
-                              <ChevronRight size={16} />
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="text-center pt-8 border-t border-slate-200/60">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectSpecialty('all')}
-                      className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-4 transition-colors p-2"
-                    >
-                      O ver el catálogo general con todos los servicios ({uniqueServices.length})
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    VISTA B: LISTA DE PROCEDIMIENTOS DE LA ESPECIALIDAD
-                    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-                <div className="space-y-6 animate-in fade-in duration-300">
-                  
-                  {/* Barra de Navegación y Retorno a Especialidades */}
-                  {availableCategories.length > 1 && (
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
-                      <button
-                        type="button"
-                        onClick={handleBackToSpecialties}
-                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs font-black text-slate-700 transition-all shadow-xs active:scale-95"
-                      >
-                        <ArrowLeft size={15} />
-                        <span>← Volver a Todas las Especialidades</span>
-                      </button>
-
-                      {selectedCategory && selectedCategory !== 'all' && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[color:var(--theme-btn)]/10 text-[color:var(--theme-btn)] text-xs font-black">
-                          <span>{getSpecialtyMeta(selectedCategory).icon}</span>
-                          <span>Especialidad: {selectedCategory}</span>
-                        </div>
-                      )}
-
-                      {selectedCategory === 'all' && (
-                        <span className="text-xs font-bold text-slate-400">
-                          Catálogo General ({uniqueServices.length} servicios)
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Selector de Pestañas Rápidas cuando se visualizan todos los servicios */}
-                  {selectedCategory === 'all' && availableCategories.length > 0 && (
-                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCategory('all')}
-                        className="px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs bg-slate-900 text-white"
-                      >
-                        🌟 Todos ({uniqueServices.length})
-                      </button>
-                      {availableCategories.map((cat) => {
-                        const count = uniqueServices.filter((s: any) => s.category === cat).length;
-                        const catMeta = getSpecialtyMeta(cat);
-                        return (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => handleSelectSpecialty(cat)}
-                            className="px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs flex items-center gap-1.5 bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
-                          >
-                            <span>{catMeta.icon}</span>
-                            <span>{cat}</span>
-                            <span className="opacity-75 text-[11px] ml-0.5">({count})</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {displayedServices.length === 0 ? (
-                    <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8">
-                      <p className="text-slate-400 text-base font-medium">No hay servicios o procedimientos registrados para esta especialidad.</p>
-                      {availableCategories.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={handleBackToSpecialties}
-                          className="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black"
-                        >
-                          Ver Otras Especialidades
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="mb-4">
-                        <h2 className="text-lg md:text-xl font-black text-slate-900">
-                          {selectedCategory && selectedCategory !== 'all' ? `Procedimientos de ${selectedCategory}` : 'Procedimientos y Servicios Disponibles'}
-                        </h2>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Selecciona el servicio o estudio que deseas agendar con nuestros especialistas:
-                        </p>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {displayedServices.map((service, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleServiceSelect(service)}
-                            className="group bg-white rounded-2xl overflow-hidden shadow-xs border border-slate-200 hover:border-slate-400 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
-                          >
-                            <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
-                              <div className="pr-3">
-                                <h3 className="text-lg md:text-xl font-black leading-snug" style={{ color: appliedBtn }}>
-                                  {service.name}
-                                </h3>
-                                {service.category && service.category !== 'General' && (
-                                  <span className="text-[10px] font-bold text-slate-400 block mt-1">
-                                    {service.category}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-xs shrink-0">
-                                {getServiceIcon(service.name, service.icon)}
-                              </div>
-                            </div>
-                            <div className="p-4 flex items-center justify-between w-full bg-white">
-                              <div className="flex items-center gap-2.5 text-slate-500">
-                                <div className="flex items-center gap-1.5 text-xs font-semibold">
-                                  <Clock size={14} className="text-slate-400" />
-                                  <span>{service.durationMinutes} min</span>
-                                </div>
-                                {settings.showPrices && service.priceText && (
-                                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
-                                    service.isCustomPrice 
-                                      ? 'bg-slate-100 text-slate-600 border border-slate-200' 
-                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  }`}>
-                                    {service.priceText}
-                                  </span>
-                                )}
-                              </div>
-                              <ChevronRight size={18} className="text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== STEP 2: Seleccionar Profesional ===== */}
-      {step === 2 && (
-        <div className="min-h-screen flex flex-col">
-          {/* Hero Banner */}
-          <div 
-            className="px-6 py-10 md:px-12 md:py-14 lg:py-16 relative transition-colors shadow-xs"
-            style={{ backgroundColor: appliedBtn, color: btnTextColor }}
-          >
-            {uniqueServices.length > 1 && (
-              <button 
-                onClick={() => {
-                  setSelectedService(null);
-                  setStep(1);
-                }} 
-                className="absolute top-6 left-6 p-2.5 rounded-full transition-colors border border-white/20"
-                style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
-                title="Volver a los servicios"
-              >
-                <ArrowLeft size={20} />
-              </button>
-            )}
-            <div className="max-w-5xl mx-auto mt-4 flex items-center gap-4">
-              {settings.logoUrl && (
-                <div className="w-12 h-12 rounded-xl bg-white p-1.5 shadow-sm hidden sm:flex items-center justify-center shrink-0">
-                  <img 
-                    src={settings.logoUrl} 
-                    alt="Logo" 
-                    className="max-w-full max-h-full object-contain rounded-lg"
-                    onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
-                  />
-                </div>
-              )}
-              <div>
-                <span className="text-[11px] font-bold uppercase tracking-widest block mb-0.5 opacity-80" style={{ color: btnTextColor }}>
+                <span className="text-[11px] font-bold uppercase tracking-widest block mb-1 opacity-80" style={{ color: btnTextColor }}>
                   {settings.headerTitle}
                 </span>
-                <h1 className="text-2xl md:text-4xl font-black mb-1 tracking-tight flex items-center gap-2.5" style={{ color: btnTextColor }}>
-                  {selectedService?.icon && <span className="text-2xl md:text-3xl select-none leading-none">{selectedService.icon}</span>}
-                  <span>{selectedService?.name || 'Profesional'}</span>
+                <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
+                  Elige tu Especialista
                 </h1>
-                <p className="text-xs md:text-sm max-w-lg opacity-85" style={{ color: btnTextColor }}>
-                  ¿Con qué especialista te gustaría agendar tu cita?
+                <p className="text-sm md:text-base max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                  Selecciona con quién deseas agendar tu cita para ver sus días y horarios de atención:
                 </p>
               </div>
             </div>
           </div>
-          
-          {/* Employee Cards */}
+
+          {/* Main Content Area: Directorio Directo de Especialistas */}
           <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
-              <div className="max-w-5xl mx-auto">
-                {filteredEmployees.length === 0 && (
-                  <p className="text-center text-slate-400 mt-10 text-lg">No hay profesionales disponibles para este servicio.</p>
-                )}
+            <div className="max-w-5xl mx-auto">
+              {employees.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8 shadow-xs">
+                  <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <h3 className="text-lg font-bold text-slate-800 mb-1">No hay especialistas registrados en este momento</h3>
+                  <p className="text-slate-500 text-sm max-w-md mx-auto">
+                    Por favor comunícate directamente con la recepción para coordinar tu cita.
+                  </p>
+                  {settings.whatsappNumber && (
+                    <a
+                      href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 mt-5 px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm"
+                    >
+                      <PhoneCall size={16} />
+                      Contactar por WhatsApp
+                    </a>
+                  )}
+                </div>
+              ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredEmployees.length > 1 && (
+                  {employees.length > 1 && (
                     <button
+                      type="button"
                       onClick={() => {
                         handleBarberSelect({ id: 'any', name: 'Cualquier Profesional', role: 'El que esté libre', is_active: true });
                       }}
-                      className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl overflow-hidden shadow-sm border border-slate-700 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
+                      className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl overflow-hidden shadow-xs border border-slate-700 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
                     >
                       <div className="p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-700/60">
                         <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-700/70 text-slate-200 flex items-center justify-center border-4 border-slate-800 shadow-md group-hover:scale-105 transition-transform shrink-0">
@@ -1334,107 +1139,86 @@ export default function BookingClient({
                             Cualquiera disponible
                           </h2>
                           <p className="text-xs text-slate-400 font-medium mt-0.5">
-                            Asignación automática del especialista libre
+                            Asignación automática según disponibilidad
                           </p>
                         </div>
                       </div>
                       <div className="p-4 flex items-center justify-between w-full bg-slate-800/50 mt-auto">
                         <div className="flex items-center gap-2 text-slate-400">
                           <Clock size={16} />
-                          <span className="text-sm font-medium">Horarios más flexibles</span>
+                          <span className="text-xs font-semibold">Horarios más flexibles</span>
                         </div>
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center group-hover:bg-slate-600 transition-colors">
-                          <ChevronRight size={16} className="text-slate-300" />
+                        <div className="flex items-center gap-1 text-xs font-black text-indigo-300 group-hover:translate-x-1 transition-transform">
+                          <span>Ver Horarios</span>
+                          <ChevronRight size={18} />
                         </div>
                       </div>
                     </button>
                   )}
-                  {filteredEmployees.map(barber => (
-                    <button
-                      key={barber.id}
-                      onClick={() => handleBarberSelect(barber)}
-                      className="group bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/50 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
-                    >
-                      <div className="bg-gradient-to-b from-slate-50 to-white p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-100">
-                        {barber.metadata?.avatar_url ? (
-                          <div className="relative shrink-0">
-                            <img 
-                              src={barber.metadata.avatar_url} 
-                              alt={barber.name} 
-                              className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform" 
-                            />
-                            <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" title="Disponible" />
-                          </div>
-                        ) : (
-                          <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-indigo-50 text-[color:var(--theme-btn)] flex items-center justify-center font-black text-2xl border-4 border-white shadow-md group-hover:scale-105 transition-transform shrink-0">
-                            {barber.name.slice(0, 2).toUpperCase()}
-                          </div>
-                        )}
-                        <div className="text-center sm:text-left flex-1 min-w-0">
-                          {(() => {
-                            const empRoleTitle = (barber.metadata?.role_title || barber.role || 'Especialista').trim();
-                            const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
-                            return (
-                              <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
-                                {empRoleIcon && <span className="select-none">{empRoleIcon}</span>}
-                                <span>{barber.role || 'Especialista'}</span>
-                              </span>
-                            );
-                          })()}
-                          <h2 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors truncate">
-                            {barber.name}
-                          </h2>
-                          {barber.metadata?.specialty && (
-                            <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
-                              {barber.metadata.specialty}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="p-4 flex items-center justify-between w-full bg-slate-50/60 mt-auto">
-                        <div className="flex items-center gap-2.5 text-slate-500">
-                          <div className="flex items-center gap-1.5 text-xs font-semibold">
-                            <Briefcase size={14} className="text-slate-400" />
-                            <span>{barber.role || 'Profesional'}</span>
-                          </div>
-                          {(() => {
-                            if (!settings.showPrices) return null;
-                            const bSvcs = barber.metadata?.services as any[];
-                            const bSvc = bSvcs?.find(s => s.name.trim().toLowerCase() === selectedService?.name?.toLowerCase());
-                            if (bSvc?.priceDisplay === 'hidden') {
-                              return (
-                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                                  {settings.noPriceLabel}
-                                </span>
-                              );
-                            }
-                            const priceToDisplay = (bSvc?.price !== undefined && Number(bSvc.price) > 0)
-                              ? Number(bSvc.price)
-                              : (barber.metadata?.general_service_price !== undefined && Number(barber.metadata?.general_service_price) > 0)
-                                ? Number(barber.metadata?.general_service_price)
-                                : null;
 
-                            if (priceToDisplay !== null) {
-                              return (
-                                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  {bSvc?.priceDisplay === 'from' ? `Desde $${priceToDisplay}` : `$${priceToDisplay}`}
-                                </span>
-                              );
-                            }
-                            return null;
-                          })()}
+                  {employees.map(barber => {
+                    const empRoleTitle = (barber.metadata?.role_title || barber.metadata?.doctor_config?.specialty || barber.metadata?.specialty || barber.role || 'Especialista').trim();
+                    const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
+                    const scheduleHint = getDoctorScheduleSummary(barber);
+
+                    return (
+                      <button
+                        key={barber.id}
+                        type="button"
+                        onClick={() => handleBarberSelect(barber)}
+                        className="group bg-white rounded-3xl overflow-hidden shadow-xs border border-slate-200 hover:border-slate-400 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
+                      >
+                        <div className="bg-gradient-to-b from-slate-50 to-white p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-100">
+                          {barber.metadata?.avatar_url ? (
+                            <div className="relative shrink-0">
+                              <img
+                                src={barber.metadata.avatar_url}
+                                alt={barber.name}
+                                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform"
+                              />
+                              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" title="Disponible" />
+                            </div>
+                          ) : (
+                            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-indigo-50 text-[color:var(--theme-btn)] flex items-center justify-center font-black text-2xl border-4 border-white shadow-md group-hover:scale-105 transition-transform shrink-0">
+                              {barber.name.slice(0, 2).toUpperCase()}
+                            </div>
+                          )}
+                          <div className="text-center sm:text-left flex-1 min-w-0">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[color:var(--theme-btn)] bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                              {empRoleIcon && <span className="select-none">{empRoleIcon}</span>}
+                              <span>{empRoleTitle}</span>
+                            </span>
+                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors truncate">
+                              {barber.name}
+                            </h2>
+                            {barber.metadata?.specialty && barber.metadata.specialty !== empRoleTitle && (
+                              <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
+                                {barber.metadata.specialty}
+                              </p>
+                            )}
+                          </div>
                         </div>
-                        <ChevronRight size={18} className="text-[color:var(--theme-btn)] transition-colors" />
-                      </div>
-                    </button>
-                  ))}
-              </div>
+
+                        <div className="p-4 flex items-center justify-between w-full bg-slate-50/60 mt-auto">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                            <Calendar size={14} className="text-slate-400" />
+                            <span>{scheduleHint}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-xs font-black text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform">
+                            <span>Ver Horarios</span>
+                            <ChevronRight size={18} />
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
-
-      {/* ===== STEP 3: Seleccionar Fecha, Hora y Datos ===== */}
+{/* ===== STEP 3: Seleccionar Fecha, Hora y Datos ===== */}
       {step === 3 && (
         <div className="min-h-screen flex flex-col lg:flex-row">
           {/* Sidebar / Top Bar */}
@@ -1444,7 +1228,7 @@ export default function BookingClient({
           >
             <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-6">
               <button 
-                onClick={() => setStep(2)} 
+                onClick={() => setStep(1)} title="Volver a los profesionales" 
                 className="p-2.5 rounded-full transition-colors border border-white/20"
                 style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
               >
@@ -1520,6 +1304,46 @@ export default function BookingClient({
             <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 md:py-10 pb-40 lg:pb-10">
               <div className="max-w-3xl mx-auto space-y-8">
                 
+                {/* Selector de Procedimiento o Servicio si el especialista ofrece más de uno */}
+                {doctorAvailableServices.length > 1 && (
+                  <section>
+                    <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3 flex items-center gap-2">
+                      <Sparkles size={14} /> Procedimiento / Servicio
+                    </h3>
+                    <div className="flex flex-wrap gap-2.5">
+                      {doctorAvailableServices.map((svc, idx) => {
+                        const isSelected = selectedService?.name?.toLowerCase() === svc.name?.toLowerCase();
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              setSelectedService(svc);
+                              setSelectedBarberPrice(svc.basePrice);
+                            }}
+                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 ${
+                              isSelected
+                                ? 'shadow-sm scale-[1.02]'
+                                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                            }`}
+                            style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
+                          >
+                            <span>{svc.name}</span>
+                            {settings.showPrices && svc.priceText && (
+                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                              }`}
+                              >
+                                {svc.priceText}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                )}
+
                 {/* Dates */}
                 <section>
                   <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
