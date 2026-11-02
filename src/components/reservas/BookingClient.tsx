@@ -167,16 +167,40 @@ const resolveCategoryName = (domain: string | null, customFallback?: string): st
   if (domain === 'barberia') return 'Barbería';
   if (domain === 'grooming') return 'Peluquería Canina';
   if (domain === 'med_general') return 'Medicina General';
-  if (
-    customFallback && 
-    customFallback !== 'Especialista' && 
-    customFallback !== 'Espacio / Recurso' && 
-    customFallback !== 'Profesional' &&
-    customFallback !== 'Colaborador'
-  ) {
-    return customFallback;
+  
+  if (customFallback) {
+    const fallbackDomain = detectClinicalDomain(customFallback);
+    if (fallbackDomain) return resolveCategoryName(fallbackDomain);
+    const trimmed = customFallback.trim();
+    if (
+      trimmed && 
+      trimmed !== 'Especialista' && 
+      trimmed !== 'Espacio / Recurso' && 
+      trimmed !== 'Profesional' &&
+      trimmed !== 'Colaborador' &&
+      trimmed !== 'employee'
+    ) {
+      return trimmed;
+    }
   }
-  return 'General';
+  return 'Medicina General';
+};
+
+// Comparador resiliente de categorías a prueba de acentos, mayúsculas y alias
+const isCategoryMatch = (serviceCat?: string | null, targetCat?: string | null): boolean => {
+  if (!targetCat || targetCat === 'all') return true;
+  if (!serviceCat) return false;
+  if (serviceCat === targetCat) return true;
+
+  const normS = serviceCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  const normT = targetCat.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (normS === normT || normS.includes(normT) || normT.includes(normS)) return true;
+
+  const d1 = detectClinicalDomain(serviceCat);
+  const d2 = detectClinicalDomain(targetCat);
+  if (d1 && d2 && d1 === d2) return true;
+
+  return false;
 };
 
 const toLocalDateString = (d: Date): string => {
@@ -192,18 +216,16 @@ const isSlotAvailable = (
   booked: string[],
   selectedDateStr?: string
 ): boolean => {
-  // 1. Validar que la fecha y la hora no hayan transcurrido
   if (selectedDateStr) {
     const now = new Date();
     const todayStr = toLocalDateString(now);
     if (selectedDateStr < todayStr) {
-      return false; // Días del pasado bloqueados
+      return false;
     }
     if (selectedDateStr === todayStr) {
       const [h, m] = time24.split(':').map(Number);
       const slotMins = h * 60 + m;
       const currentMins = now.getHours() * 60 + now.getMinutes();
-      // Bloquear si el horario ya pasó (con margen de cortesía de 5 min)
       if (slotMins <= currentMins + 5) {
         return false;
       }
@@ -248,7 +270,6 @@ const GENERATE_DATES = (allEmployees: Employee[], barber?: Employee | null, maxD
         const shifts = wh[dayKey] || [];
         isWorkingDay = shifts.length > 0;
       } else {
-        // Fallback: Si el especialista no tiene turnos individuales configurados, atiende según días de apertura del negocio
         isWorkingDay = openDays.includes(dayOfWeek);
       }
     } else {
@@ -274,15 +295,14 @@ const GENERATE_DATES = (allEmployees: Employee[], barber?: Employee | null, maxD
     
     if (isWorkingDay) {
       dates.push({
-        dateObj: d,
-        dayName: attempts === 0 ? 'HOY' : dayNames[d.getDay()],
+        dayName: dayNames[d.getDay()],
         dayNum: d.getDate(),
-        fullDate: toLocalDateString(d),
-        dayKey: mappingDays[d.getDay()]
+        fullDate: toLocalDateString(d)
       });
     }
     attempts++;
   }
+  
   return dates;
 };
 
@@ -290,16 +310,24 @@ const normalizeWhatsAppPhone = (rawPhone?: string | null, defaultCountry = '58')
   if (!rawPhone) return '';
   let clean = rawPhone.replace(/[^0-9]/g, '');
   if (!clean) return '';
-  if (clean.startsWith('0')) {
-    clean = defaultCountry + clean.slice(1);
-  } else if (clean.length === 10 && (clean.startsWith('412') || clean.startsWith('414') || clean.startsWith('424') || clean.startsWith('416') || clean.startsWith('426'))) {
+
+  if (clean.startsWith('00')) {
+    clean = clean.substring(2);
+  }
+
+  if (clean.startsWith('0') && clean.length === 11) {
+    clean = defaultCountry + clean.substring(1);
+  }
+
+  if (clean.length === 10 && !clean.startsWith('58')) {
     clean = defaultCountry + clean;
   }
+
   return clean;
 };
 
-const parseTime = (time: string) => {
-  const [h, m] = time.split(':').map(Number);
+const parseTime = (timeStr: string) => {
+  const [h, m] = timeStr.split(':').map(Number);
   return h * 60 + m;
 };
 
@@ -324,7 +352,6 @@ const GENERATE_TIMES = (
   shifts?: {start: string, end: string}[],
   hasCustomSchedule: boolean = false
 ) => {
-  // Guardia defensiva: intervalo mínimo de 5 minutos para prevenir bucles infinitos (DoS en navegador)
   const safeInterval = Math.max(5, Number(interval) || 30);
   const times = [];
   
@@ -333,14 +360,11 @@ const GENERATE_TIMES = (
       if (!shift?.start || !shift?.end) continue;
       const startMins = parseTime(shift.start);
       const endMins = parseTime(shift.end);
-      // Blindaje: El turno debe terminar antes o exactamente al finalizar la jornada del médico
       for (let m = startMins; m + safeInterval <= endMins; m += safeInterval) {
         times.push(formatTime(m));
       }
     }
   } else if (!hasCustomSchedule) {
-    // Si el especialista tiene agenda configurada pero no atiende este día, times queda vacío []
-    // Solo se recurre al horario general si el profesional no tiene horario configurado
     const startMins = parseTime(globalStart);
     const endMins = parseTime(globalEnd);
     for (let m = startMins; m + safeInterval <= endMins; m += safeInterval) {
@@ -362,7 +386,6 @@ export default function BookingClient({
   catalogServices?: any[];
   theme?: { bgColor: string; btnColor: string };
 }) {
-  // Theme handling con protección total anti-invisibilidad y contraste WCAG
   const defaultTheme = { bgColor: "#f8fafc", btnColor: "#0B3B24" };
   const appliedBg = normalizeHexColor(theme?.bgColor, defaultTheme.bgColor);
   const appliedBtn = normalizeHexColor(theme?.btnColor, defaultTheme.btnColor);
@@ -411,10 +434,10 @@ export default function BookingClient({
 
   const [step, setStep] = useState(1);
   const [selectedService, setSelectedService] = useState<{name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean, icon?: string, category?: string} | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedBarber, setSelectedBarber] = useState<Employee | null>(null);
   const [selectedBarberPrice, setSelectedBarberPrice] = useState<number | undefined>(undefined);
 
-  // Mapa de puestos configurados en la empresa con sus íconos elegidos
   const configuredRolesMap = useMemo(() => {
     const map = new Map<string, string>();
     const rawRoles = (tenant?.metadata as any)?.company_roles;
@@ -437,7 +460,7 @@ export default function BookingClient({
     return map;
   }, [tenant?.metadata]);
 
-  // Extract unique services from catalog and employees (Memoized)
+  // Extrae y normaliza los servicios del catálogo y de los médicos
   const uniqueServices = useMemo(() => {
     interface ServiceAgg {
       name: string;
@@ -450,7 +473,7 @@ export default function BookingClient({
     }
     const allServices = new Map<string, ServiceAgg>();
     
-    // 0. Servicios registrados formalmente en el Catálogo de Servicios del ERP (tabla items)
+    // 0. Servicios registrados en el Catálogo de Servicios del ERP (tabla items)
     if (Array.isArray(catalogServices) && catalogServices.length > 0) {
       catalogServices.forEach(item => {
         if (!item?.name || !item.name.trim()) return;
@@ -474,27 +497,32 @@ export default function BookingClient({
       });
     }
 
+    // 1. Procedimientos particulares y consultas de los especialistas
     employees.forEach(emp => {
       if (emp.is_active === false) return;
       const empDomain = getEmployeePrimaryDomain(emp);
-      const empRole = (emp.metadata?.role_title || emp.role || '').trim();
+      const empRole = (emp.metadata?.role_title || emp.metadata?.cargo || emp.metadata?.specialty || emp.role || '').trim();
+      const empCategory = empDomain 
+        ? resolveCategoryName(empDomain) 
+        : resolveCategoryName(detectClinicalDomain(empRole), empRole);
+
       const svcs = emp.metadata?.services as any[];
-      const defaultSlot = Number(emp.metadata?.default_slot_minutes || emp.metadata?.general_slot_minutes || 60);
+      const defaultSlot = Number(emp.metadata?.default_slot_minutes || emp.metadata?.general_slot_minutes || 45);
       const isGeneralEnabled = emp.metadata?.general_service_enabled !== false;
       const generalPrice = emp.metadata?.general_service_price !== undefined ? Number(emp.metadata?.general_service_price) : undefined;
 
-      // 1. Servicios Particulares o Especializados creados por el negocio en "Funciones y Servicios"
-      if (svcs && svcs.length > 0) {
+      // 1.1 Procedimientos particulares agregados al especialista
+      if (svcs && Array.isArray(svcs) && svcs.length > 0) {
         svcs.forEach(s => {
-          if (!s.name || !s.name.trim()) return;
+          if (!s?.name || !s.name.trim()) return;
           const key = s.name.trim().toLowerCase();
           const detectedDomain = detectClinicalDomain(s.name) || empDomain;
-          const cat = resolveCategoryName(detectedDomain, empRole);
+          const cat = detectedDomain ? resolveCategoryName(detectedDomain) : empCategory;
 
           if (!allServices.has(key)) {
             allServices.set(key, {
               name: s.name.trim(),
-              durationMinutes: Number(s.durationMinutes) || defaultSlot,
+              durationMinutes: Number(s.durationMinutes || s.duration) || defaultSlot,
               prices: [],
               hasFrom: false,
               hasHidden: false,
@@ -512,48 +540,24 @@ export default function BookingClient({
         });
       }
 
-      // 2. Rama / Especialidad o Servicio General del Colaborador
-      if (isGeneralEnabled) {
+      // 1.2 Consulta Médica / General de la Especialidad
+      if (isGeneralEnabled || !svcs || svcs.length === 0) {
         const customGeneralName = emp.metadata?.general_service_name?.trim();
-        const roleTitle = (emp.metadata?.role_title || emp.role || '').trim();
-        const docRole = (emp.metadata?.doctor_config?.role || emp.metadata?.doctor_config?.specialty || emp.metadata?.specialty || emp.metadata?.cargo || '').trim();
-        const dentistRole = (emp.metadata?.dentist_config?.role || '').trim();
-        const barberRole = (emp.metadata?.barber_config?.role || '').trim();
-        const groomerRole = (emp.metadata?.groomer_config?.role || '').trim();
-
-        // Determinar el nombre de la rama oficial
+        const docRole = (emp.metadata?.doctor_config?.role || emp.metadata?.doctor_config?.specialty || emp.metadata?.specialty || '').trim();
+        
         let branchName = '';
         if (customGeneralName) {
           branchName = customGeneralName;
         } else if (docRole) {
           branchName = docRole.toLowerCase().startsWith('consulta') ? docRole : `Consulta: ${docRole}`;
-        } else if (
-          roleTitle && 
-          roleTitle !== 'Espacio / Recurso' && 
-          roleTitle !== 'Especialista' &&
-          roleTitle !== 'Profesional' &&
-          roleTitle !== 'Colaborador' &&
-          roleTitle !== 'employee'
-        ) {
-          branchName = roleTitle.toLowerCase().startsWith('consulta') ? roleTitle : `Consulta: ${roleTitle}`;
-        } else if (dentistRole) {
-          branchName = dentistRole;
-        } else if (barberRole) {
-          branchName = barberRole;
-        } else if (groomerRole) {
-          branchName = groomerRole;
-        } else if (emp.name.toLowerCase().includes('dr.') || emp.name.toLowerCase().includes('dra.')) {
-          const docDomain = empDomain ? resolveCategoryName(empDomain) : 'Medicina General';
-          branchName = `Consulta Médica (${docDomain})`;
-        } else if ((!svcs || svcs.length === 0) && (empDomain || emp.metadata?.is_doctor || emp.metadata?.doctor_config)) {
-          branchName = 'Atención General';
+        } else if (empCategory && empCategory !== 'Medicina General' && empCategory !== 'General') {
+          branchName = `Consulta: ${empCategory}`;
+        } else {
+          branchName = 'Consulta Médica General';
         }
 
         if (branchName) {
           const key = branchName.toLowerCase();
-          const detectedBranch = detectClinicalDomain(branchName) || empDomain;
-          const cat = resolveCategoryName(detectedBranch, empRole);
-
           if (!allServices.has(key)) {
             allServices.set(key, {
               name: branchName,
@@ -562,7 +566,7 @@ export default function BookingClient({
               hasFrom: false,
               hasHidden: false,
               basePrice: generalPrice && generalPrice > 0 ? generalPrice : undefined,
-              category: cat,
+              category: empCategory,
             });
           }
           const entry = allServices.get(key)!;
@@ -573,18 +577,6 @@ export default function BookingClient({
         }
       }
     });
-
-    // 3. Fallback Infalible: Si aún no hay servicios, pero hay especialistas/doctores en la empresa
-    if (allServices.size === 0 && employees.length > 0) {
-      allServices.set('consulta_general', {
-        name: 'Consulta / Evaluación Médica',
-        durationMinutes: 45,
-        prices: [],
-        hasFrom: false,
-        hasHidden: false,
-        category: 'Medicina General',
-      });
-    }
 
     return Array.from(allServices.values()).map(s => {
       let priceText = '';
@@ -623,16 +615,148 @@ export default function BookingClient({
     });
   }, [employees, catalogServices, settings.showPrices, settings.noPriceLabel, configuredRolesMap]);
 
-  // Personal / Doctores activos disponibles para reservas
-  const activeEmployees = useMemo(() => {
-    return employees.filter(emp => emp.is_active !== false);
-  }, [employees]);
-  
+  // Categorías de especialidad detectadas y ordenadas canónicamente
+  const availableCategories = useMemo(() => {
+    const invalidCategories = new Set([
+      'General',
+      'Profesional',
+      'Especialista',
+      'Colaborador',
+      'Espacio / Recurso',
+      'software developer',
+    ]);
+    const cats = new Set<string>();
+
+    uniqueServices.forEach((s: any) => {
+      const cat = (s.category || '').trim();
+      if (cat && !invalidCategories.has(cat)) {
+        cats.add(cat);
+      }
+    });
+
+    const canonicalOrder: Record<string, number> = {
+      'Medicina General': 1,
+      'Odontología': 2,
+      'Ginecología y Obstetricia': 3,
+      'Pediatría': 4,
+      'Cardiología': 5,
+      'Dermatología': 6,
+      'Traumatología': 7,
+      'Oftalmología': 8,
+      'Barbería': 9,
+      'Peluquería Canina': 10,
+    };
+
+    return Array.from(cats).sort((a, b) => {
+      const orderA = canonicalOrder[a] ?? 99;
+      const orderB = canonicalOrder[b] ?? 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.localeCompare(b, 'es');
+    });
+  }, [uniqueServices]);
+
+  // Auto-detectar especialidad desde URL (?especialidad=... o ?rama=...) o preseleccionar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const spec = params.get('especialidad') || params.get('rama') || params.get('specialty') || params.get('cat');
+      if (spec) {
+        const match = availableCategories.find(c => isCategoryMatch(c, spec));
+        if (match) {
+          setSelectedCategory(match);
+          return;
+        }
+      }
+    }
+    // Si la empresa solo tiene 1 especialidad, ir directo a sus servicios sin pantalla intermedia
+    if (availableCategories.length === 1 && selectedCategory === null) {
+      setSelectedCategory(availableCategories[0]);
+    } else if (availableCategories.length === 0 && selectedCategory === null) {
+      setSelectedCategory('all');
+    }
+  }, [availableCategories, selectedCategory]);
+
+  const handleSelectSpecialty = (cat: string) => {
+    setSelectedCategory(cat);
+    if (typeof window !== 'undefined' && window.history) {
+      const url = new URL(window.location.href);
+      if (cat === 'all') {
+        url.searchParams.delete('especialidad');
+        url.searchParams.delete('rama');
+      } else {
+        url.searchParams.set('especialidad', cat.toLowerCase());
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
+  const handleBackToSpecialties = () => {
+    setSelectedCategory(null);
+    if (typeof window !== 'undefined' && window.history) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('especialidad');
+      url.searchParams.delete('rama');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
+
+  // Servicios filtrados por la categoría seleccionada de forma resiliente
+  const displayedServices = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'all') return uniqueServices;
+    return uniqueServices.filter((s: any) => isCategoryMatch(s.category, selectedCategory));
+  }, [uniqueServices, selectedCategory]);
+
+  // Si solo existe 1 servicio en total, auto-avanza a la selección de doctor
+  useEffect(() => {
+    if (uniqueServices.length === 1 && !selectedService && step === 1) {
+      setSelectedService(uniqueServices[0]);
+      setStep(2);
+    }
+  }, [uniqueServices, selectedService, step]);
+
+  // Filter employees based on selected service (Memoized)
+  const filteredEmployees = useMemo(() => {
+    const activeStaff = employees.filter(emp => emp.is_active !== false);
+    if (!selectedService) return activeStaff;
+    
+    // 1. Médicos que ofrecen este procedimiento explícitamente en metadata.services
+    const explicitMatches = activeStaff.filter(emp => {
+      const svcs = emp.metadata?.services;
+      if (Array.isArray(svcs)) {
+        return svcs.some((s: any) => s?.name?.trim().toLowerCase() === selectedService.name.trim().toLowerCase());
+      }
+      return false;
+    });
+    if (explicitMatches.length > 0) return explicitMatches;
+
+    // 2. Coincidencia por matchesEmployeeService
+    const matched = activeStaff.filter(emp => matchesEmployeeService(emp, selectedService.name));
+    if (matched.length > 0) return matched;
+
+    // 3. Coincidencia por dominio clínico (ej. servicio de ginecología -> doctores de ginecología)
+    const targetDomain = detectClinicalDomain(selectedService.name) || (selectedService.category ? detectClinicalDomain(selectedService.category) : null);
+    if (targetDomain && targetDomain !== 'med_general') {
+      const domainMatches = activeStaff.filter(emp => getEmployeePrimaryDomain(emp) === targetDomain);
+      if (domainMatches.length > 0) return domainMatches;
+    }
+
+    // 4. Doctores compatibles o medicina general
+    const compatibleStaff = activeStaff.filter(emp => {
+      const empDomain = getEmployeePrimaryDomain(emp);
+      if (!empDomain || empDomain === 'med_general') return true;
+      if (targetDomain && empDomain === targetDomain) return true;
+      return false;
+    });
+
+    if (compatibleStaff.length > 0) return compatibleStaff;
+
+    return activeStaff;
+  }, [employees, selectedService]);
+
   const dates = useMemo(() => {
-    return GENERATE_DATES(activeEmployees, selectedBarber, settings.maxDaysInAdvance, settings.openDays);
-  }, [activeEmployees, selectedBarber, settings.maxDaysInAdvance, settings.openDays]);
+    return GENERATE_DATES(employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays);
+  }, [employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays]);
   
-  // Re-adjust selected date if current selection is invalid for new barber
   const [selectedDate, setSelectedDate] = useState(dates.length > 0 ? dates[0].fullDate : '');
   
   useEffect(() => {
@@ -641,12 +765,27 @@ export default function BookingClient({
     }
   }, [dates, selectedDate]);
 
-  const currentDayObj = dates.find(d => d.fullDate === selectedDate);
-  const currentDayKey = currentDayObj ? currentDayObj.dayKey : 'monday';
-  const shifts = selectedBarber?.metadata?.working_hours?.[currentDayKey];
+  const dayOfWeekStr = useMemo(() => {
+    if (!selectedDate) return '';
+    const parts = selectedDate.split('-');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      return days[d.getDay()];
+    }
+    return '';
+  }, [selectedDate]);
+
+  const shifts = useMemo(() => {
+    if (selectedBarber && selectedBarber.id !== 'any' && selectedBarber.metadata?.working_hours && dayOfWeekStr) {
+      return selectedBarber.metadata.working_hours[dayOfWeekStr] || [];
+    }
+    return undefined;
+  }, [selectedBarber, dayOfWeekStr]);
+
   const hasDoctorCustomSchedule = Boolean(
-    selectedBarber &&
-    selectedBarber.id !== 'any' &&
+    selectedBarber && 
+    selectedBarber.id !== 'any' && 
     selectedBarber.metadata?.working_hours &&
     typeof selectedBarber.metadata.working_hours === 'object' &&
     Object.keys(selectedBarber.metadata.working_hours).length > 0
@@ -672,7 +811,6 @@ export default function BookingClient({
   const [customerFullName, setCustomerFullName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   
-  // Auto-completar datos guardados del cliente para evitar que los vuelva a escribir
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedFull = localStorage.getItem('rendo_client_fullname');
@@ -724,41 +862,6 @@ export default function BookingClient({
     };
   }, [selectedBarber, selectedDate, tenant.id, clientTzOffset]);
 
-  // Procedimientos o servicios disponibles específicamente para el doctor seleccionado
-  const doctorAvailableServices = useMemo(() => {
-    if (!selectedBarber || selectedBarber.id === 'any') return uniqueServices;
-    
-    const bSvcs = Array.isArray(selectedBarber.metadata?.services) ? (selectedBarber.metadata.services as any[]) : [];
-    if (bSvcs.length > 0) {
-      return bSvcs.map(s => {
-        const p = Number(s.price) || 0;
-        return {
-          name: s.name,
-          durationMinutes: Number(s.duration || s.durationMinutes) || 45,
-          basePrice: p > 0 ? p : undefined,
-          priceText: p > 0 ? `$${p}` : settings.noPriceLabel,
-          isCustomPrice: p <= 0,
-          category: selectedBarber.metadata?.specialty || 'Servicio',
-        };
-      });
-    }
-
-    const compatible = uniqueServices.filter(s => matchesEmployeeService(selectedBarber, s.name));
-    if (compatible.length > 0) return compatible;
-
-    const spec = selectedBarber.metadata?.specialty || (selectedBarber.role && selectedBarber.role !== 'employee' && selectedBarber.role !== 'Colaborador' ? selectedBarber.role : null);
-    const svcName = spec ? (spec.toLowerCase().startsWith('consulta') ? spec : `Consulta: ${spec}`) : 'Consulta Médica';
-    const genPrice = selectedBarber.metadata?.general_service_price ? Number(selectedBarber.metadata.general_service_price) : undefined;
-    return [{
-      name: svcName,
-      durationMinutes: 45,
-      basePrice: genPrice && genPrice > 0 ? genPrice : undefined,
-      priceText: genPrice && genPrice > 0 ? `$${genPrice}` : settings.noPriceLabel,
-      isCustomPrice: !genPrice || genPrice <= 0,
-      category: spec || 'Medicina General',
-    }];
-  }, [selectedBarber, uniqueServices, settings.noPriceLabel]);
-
   const handleServiceSelect = (service: { name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean }) => {
     setSelectedService(service);
     setStep(2);
@@ -768,45 +871,19 @@ export default function BookingClient({
 
   const handleBarberSelect = (barber: Employee) => {
     setSelectedBarber(barber);
-
-    // 1. Encontrar o construir el servicio por defecto para este especialista
-    const bSvcs = Array.isArray(barber.metadata?.services) ? (barber.metadata.services as any[]) : [];
-    let chosenSvc: any = null;
-
-    if (bSvcs.length > 0) {
-      const first = bSvcs[0];
-      const p = Number(first.price) || 0;
-      chosenSvc = {
-        name: first.name || 'Consulta Médica',
-        durationMinutes: Number(first.duration || first.durationMinutes) || 45,
-        basePrice: p > 0 ? p : undefined,
-        priceText: p > 0 ? `$${p}` : settings.noPriceLabel,
-        isCustomPrice: p <= 0,
-        category: barber.metadata?.specialty || 'Servicio',
-      };
-      setSelectedBarberPrice(p > 0 ? p : undefined);
-    } else {
-      const compatible = uniqueServices.find(s => matchesEmployeeService(barber, s.name));
-      if (compatible) {
-        chosenSvc = compatible;
-        setSelectedBarberPrice(compatible.basePrice);
+    if (barber.id !== 'any' && selectedService) {
+      const bSvcs = barber.metadata?.services as any[];
+      const bSvc = bSvcs?.find(s => s.name?.trim().toLowerCase() === selectedService.name?.toLowerCase());
+      if (bSvc?.price !== undefined && Number(bSvc.price) > 0) {
+        setSelectedBarberPrice(Number(bSvc.price));
+      } else if (barber.metadata?.general_service_price !== undefined && Number(barber.metadata?.general_service_price) > 0) {
+        setSelectedBarberPrice(Number(barber.metadata?.general_service_price));
       } else {
-        const spec = barber.metadata?.specialty || (barber.role && barber.role !== 'employee' && barber.role !== 'Colaborador' ? barber.role : null);
-        const svcName = spec ? (spec.toLowerCase().startsWith('consulta') ? spec : `Consulta: ${spec}`) : 'Consulta Médica';
-        const genPrice = barber.metadata?.general_service_price ? Number(barber.metadata.general_service_price) : undefined;
-        chosenSvc = {
-          name: svcName,
-          durationMinutes: 45,
-          basePrice: genPrice && genPrice > 0 ? genPrice : undefined,
-          priceText: genPrice && genPrice > 0 ? `$${genPrice}` : settings.noPriceLabel,
-          isCustomPrice: !genPrice || genPrice <= 0,
-          category: spec || 'Medicina General',
-        };
-        setSelectedBarberPrice(genPrice && genPrice > 0 ? genPrice : undefined);
+        setSelectedBarberPrice(selectedService.basePrice);
       }
+    } else {
+      setSelectedBarberPrice(selectedService?.basePrice);
     }
-
-    setSelectedService(chosenSvc);
     setStep(3);
     setErrorMessage('');
     setSuccessMessage('');
@@ -819,7 +896,6 @@ export default function BookingClient({
       return;
     }
     
-    // Separar en Nombre y Apellido de forma limpia para persistencia
     const parts = trimmedFull.split(/\s+/);
     const firstName = parts[0] || '';
     const lastName = parts.slice(1).join(' ') || '';
@@ -828,7 +904,6 @@ export default function BookingClient({
     setErrorMessage('');
 
     try {
-      // Verificación atómica previa en tiempo real contra colisiones
       const preCheck = await getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
       if (preCheck.success && Array.isArray(preCheck.bookedTimes) && preCheck.bookedTimes.includes(selectedTime)) {
         setIsSubmitting(false);
@@ -869,7 +944,6 @@ export default function BookingClient({
         return;
       }
 
-      // Guardar datos en localStorage para que el cliente no tenga que escribirlos en futuras reservas
       if (typeof window !== 'undefined') {
         localStorage.setItem('rendo_client_fullname', trimmedFull);
         localStorage.setItem('rendo_client_firstname', firstName);
@@ -882,7 +956,6 @@ export default function BookingClient({
         : '¡Reserva confirmada con éxito!';
       setSuccessMessage(confirmationMsg);
       
-      // WhatsApp Redirection: Enrutamiento Inteligente (Al empleado o a Central de Recepción)
       const routingMode = tenant.metadata?.booking_settings?.whatsappRoutingMode || 'employee_first';
       
       const assignedEmp = result.assignedBarberId 
@@ -902,7 +975,7 @@ export default function BookingClient({
       const cleanPhone = normalizeWhatsAppPhone(targetPhone);
       const template = tenant.metadata?.booking_settings?.whatsappMessageTemplate || settings.whatsappMessageTemplate;
       const readableTime = allTimes.find(t => t.value24 === selectedTime)?.label12 || selectedTime;
-      const assignedName = result.assignedBarberName || selectedBarber.name; // Usar el asignado si era 'cualquiera'
+      const assignedName = result.assignedBarberName || selectedBarber.name;
       
       const text = template
         .replace(/{{profesional}}/g, assignedName)
@@ -920,7 +993,6 @@ export default function BookingClient({
         window.open(url, '_blank');
         setStep(1);
         setSelectedTime(null);
-        // Mantener customerName, customerLastName y customerPhone para reservas subsecuentes
         setSuccessMessage('');
       }, 1500);
 
@@ -935,163 +1007,458 @@ export default function BookingClient({
   return (
     <div className="min-h-screen font-sans text-slate-800 transition-colors" style={rootStyle}>
       
-            {/* ===== STEP 1: Seleccionar Médico / Especialista Directamente ===== */}
-      {(step === 1 || step === 2) && (
+      {/* ===== STEP 1: Seleccionar Servicio o Especialidad ===== */}
+      {step === 1 && (
         <div className="min-h-screen flex flex-col">
           {/* Hero Banner */}
-          <div
+          <div 
             className="px-6 py-10 md:px-12 md:py-14 lg:py-16 transition-colors shadow-xs"
             style={{ backgroundColor: appliedBtn, color: btnTextColor }}
           >
             <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center gap-5 md:gap-7">
               {settings.logoUrl && (
                 <div className="w-20 h-20 md:w-24 md:h-24 rounded-2xl bg-white p-2.5 shadow-md flex items-center justify-center shrink-0 border border-white/20">
-                  <img
-                    src={settings.logoUrl}
-                    alt={settings.headerTitle}
+                  <img 
+                    src={settings.logoUrl} 
+                    alt={settings.headerTitle} 
                     className="max-w-full max-h-full object-contain rounded-xl"
                     onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
                   />
                 </div>
               )}
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-widest block mb-1 opacity-80" style={{ color: btnTextColor }}>
-                  {settings.headerTitle}
-                </span>
-                <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
-                  Elige tu Especialista
-                </h1>
-                <p className="text-sm md:text-base max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
-                  Selecciona con quién deseas agendar tu cita para ver sus días y horarios de atención:
-                </p>
+                {availableCategories.length > 1 && selectedCategory && selectedCategory !== 'all' ? (
+                  <>
+                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest opacity-85 mb-1.5" style={{ color: btnTextColor }}>
+                      <span>{settings.headerTitle}</span>
+                      <span>›</span>
+                      <span>Especialidad Médica</span>
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight flex items-center gap-3" style={{ color: btnTextColor }}>
+                      <span className="text-3xl md:text-4xl">{getSpecialtyMeta(selectedCategory).icon}</span>
+                      <span>{selectedCategory}</span>
+                    </h1>
+                    <p className="text-sm md:text-base max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                      {getSpecialtyMeta(selectedCategory).description}
+                    </p>
+                  </>
+                ) : availableCategories.length > 1 && !selectedCategory ? (
+                  <>
+                    <div className="inline-block px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider mb-2 border border-white/25" style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}>
+                      Paso 1 de 3 · Directorio de Especialidades
+                    </div>
+                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
+                      {settings.headerTitle}
+                    </h1>
+                    <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                      Selecciona una especialidad médica o departamento para ver sus consultas y procedimientos disponibles.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h1 className="text-3xl md:text-5xl font-black mb-2 tracking-tight" style={{ color: btnTextColor }}>
+                      {settings.headerTitle}
+                    </h1>
+                    <p className="text-sm md:text-lg max-w-xl font-medium leading-relaxed opacity-90" style={{ color: btnTextColor }}>
+                      {settings.headerSubtitle}
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
-
-          {/* Main Content Area: Directorio Directo de Especialistas */}
+          
+          {/* Main Content Area */}
           <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
             <div className="max-w-5xl mx-auto">
-              {activeEmployees.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8 shadow-xs">
-                  <Users className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                  <h3 className="text-lg font-bold text-slate-800 mb-1">No hay especialistas registrados en este momento</h3>
-                  <p className="text-slate-500 text-sm max-w-md mx-auto">
-                    Por favor comunícate directamente con la recepción para coordinar tu cita.
-                  </p>
-                  {settings.whatsappNumber && (
-                    <a
-                      href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 mt-5 px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-colors shadow-sm"
-                    >
-                      <PhoneCall size={16} />
-                      Contactar por WhatsApp
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {activeEmployees.length > 1 && (
+              
+              {/* VISTA A: DIRECTORIO DE ESPECIALIDADES MÉDICAS */}
+              {availableCategories.length > 1 && !selectedCategory ? (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200/80">
+                    <div>
+                      <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                        Especialidades Médicas Disponibles
+                      </h2>
+                      <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+                        Toca una especialidad para ver sus médicos, estudios y procedimientos:
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full self-start sm:self-auto">
+                      {availableCategories.length} departamentos activos
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {availableCategories.map((cat) => {
+                      const meta = getSpecialtyMeta(cat);
+                      const catServices = uniqueServices.filter((s: any) => isCategoryMatch(s.category, cat));
+                      
+                      return (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => handleSelectSpecialty(cat)}
+                          className="group bg-white rounded-3xl p-6 border border-slate-200/80 hover:border-slate-400 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col justify-between relative overflow-hidden"
+                        >
+                          <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-100/50 to-transparent rounded-bl-full pointer-events-none" />
+
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-3xl shadow-2xs group-hover:scale-110 transition-transform">
+                                {meta.icon}
+                              </div>
+                              <span className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80">
+                                {meta.badge}
+                              </span>
+                            </div>
+
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
+                              Especialidad
+                            </span>
+
+                            <h3 className="text-xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors leading-snug">
+                              {cat}
+                            </h3>
+
+                            <p className="text-xs text-slate-500 mt-2 font-medium leading-relaxed line-clamp-2">
+                              {meta.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
+                            <span className="text-xs font-bold text-slate-400">
+                              {catServices.length} {catServices.length === 1 ? 'procedimiento' : 'procedimientos'}
+                            </span>
+                            <div className="flex items-center gap-1.5 text-xs font-black text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform">
+                              <span>Ver Servicios</span>
+                              <ChevronRight size={16} />
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="text-center pt-8 border-t border-slate-200/60">
                     <button
                       type="button"
-                      onClick={() => {
-                        handleBarberSelect({ id: 'any', name: 'Cualquier Profesional', role: 'El que esté libre', is_active: true });
-                      }}
-                      className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl overflow-hidden shadow-xs border border-slate-700 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
+                      onClick={() => handleSelectSpecialty('all')}
+                      className="text-xs font-bold text-slate-500 hover:text-slate-900 underline underline-offset-4 transition-colors p-2"
                     >
-                      <div className="p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-700/60">
-                        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-700/70 text-slate-200 flex items-center justify-center border-4 border-slate-800 shadow-md group-hover:scale-105 transition-transform shrink-0">
-                          <Users className="text-slate-300 w-12 h-12" />
-                        </div>
-                        <div className="text-center sm:text-left flex-1 min-w-0">
-                          <span className="inline-block text-[11px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full mb-1.5 border border-indigo-500/20">
-                            Sin preferencia
-                          </span>
-                          <h2 className="text-xl sm:text-2xl font-black text-white group-hover:text-indigo-200 transition-colors">
-                            Cualquiera disponible
-                          </h2>
-                          <p className="text-xs text-slate-400 font-medium mt-0.5">
-                            Asignación automática según disponibilidad
-                          </p>
-                        </div>
-                      </div>
-                      <div className="p-4 flex items-center justify-between w-full bg-slate-800/50 mt-auto">
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <Clock size={16} />
-                          <span className="text-xs font-semibold">Horarios más flexibles</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs font-black text-indigo-300 group-hover:translate-x-1 transition-transform">
-                          <span>Ver Horarios</span>
-                          <ChevronRight size={18} />
-                        </div>
-                      </div>
+                      O ver el catálogo general con todos los servicios ({uniqueServices.length})
                     </button>
+                  </div>
+                </div>
+              ) : (
+                /* VISTA B: LISTA DE PROCEDIMIENTOS DE LA ESPECIALIDAD */
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  
+                  {/* Barra de Navegación y Retorno a Especialidades */}
+                  {availableCategories.length > 1 && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                      <button
+                        type="button"
+                        onClick={handleBackToSpecialties}
+                        className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-xs font-black text-slate-700 transition-all shadow-xs active:scale-95"
+                      >
+                        <ArrowLeft size={15} />
+                        <span>← Volver a Todas las Especialidades</span>
+                      </button>
+
+                      {selectedCategory && selectedCategory !== 'all' && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[color:var(--theme-btn)]/10 text-[color:var(--theme-btn)] text-xs font-black">
+                          <span>{getSpecialtyMeta(selectedCategory).icon}</span>
+                          <span>Especialidad: {selectedCategory}</span>
+                        </div>
+                      )}
+
+                      {selectedCategory === 'all' && (
+                        <span className="text-xs font-bold text-slate-400">
+                          Catálogo General ({uniqueServices.length} servicios)
+                        </span>
+                      )}
+                    </div>
                   )}
 
-                  {activeEmployees.map(barber => {
-                    const empRoleTitle = (barber.metadata?.role_title || barber.metadata?.doctor_config?.specialty || barber.metadata?.specialty || barber.role || 'Especialista').trim();
-                    const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
-                    const scheduleHint = getDoctorScheduleSummary(barber);
-
-                    return (
+                  {/* Selector de Pestañas Rápidas cuando se visualizan todos los servicios */}
+                  {selectedCategory === 'all' && availableCategories.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
                       <button
-                        key={barber.id}
                         type="button"
-                        onClick={() => handleBarberSelect(barber)}
-                        className="group bg-white rounded-3xl overflow-hidden shadow-xs border border-slate-200 hover:border-slate-400 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
+                        onClick={() => setSelectedCategory('all')}
+                        className="px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs bg-slate-900 text-white"
                       >
-                        <div className="bg-gradient-to-b from-slate-50 to-white p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-100">
-                          {barber.metadata?.avatar_url ? (
-                            <div className="relative shrink-0">
-                              <img
-                                src={barber.metadata.avatar_url}
-                                alt={barber.name}
-                                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform"
-                              />
-                              <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" title="Disponible" />
-                            </div>
-                          ) : (
-                            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-indigo-50 text-[color:var(--theme-btn)] flex items-center justify-center font-black text-2xl border-4 border-white shadow-md group-hover:scale-105 transition-transform shrink-0">
-                              {barber.name.slice(0, 2).toUpperCase()}
-                            </div>
-                          )}
-                          <div className="text-center sm:text-left flex-1 min-w-0">
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-[color:var(--theme-btn)] bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
-                              {empRoleIcon && <span className="select-none">{empRoleIcon}</span>}
-                              <span>{empRoleTitle}</span>
-                            </span>
-                            <h2 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors truncate">
-                              {barber.name}
-                            </h2>
-                            {barber.metadata?.specialty && barber.metadata.specialty !== empRoleTitle && (
-                              <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
-                                {barber.metadata.specialty}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="p-4 flex items-center justify-between w-full bg-slate-50/60 mt-auto">
-                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                            <Calendar size={14} className="text-slate-400" />
-                            <span>{scheduleHint}</span>
-                          </div>
-                          <div className="flex items-center gap-1 text-xs font-black text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform">
-                            <span>Ver Horarios</span>
-                            <ChevronRight size={18} />
-                          </div>
-                        </div>
+                        🌟 Todos ({uniqueServices.length})
                       </button>
-                    );
-                  })}
+                      {availableCategories.map((cat) => {
+                        const count = uniqueServices.filter((s: any) => isCategoryMatch(s.category, cat)).length;
+                        const catMeta = getSpecialtyMeta(cat);
+                        return (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => handleSelectSpecialty(cat)}
+                            className="px-4 py-2 rounded-2xl text-xs font-black transition-all whitespace-nowrap shadow-xs flex items-center gap-1.5 bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                          >
+                            <span>{catMeta.icon}</span>
+                            <span>{cat}</span>
+                            <span className="opacity-75 text-[11px] ml-0.5">({count})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {displayedServices.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 p-8">
+                      <p className="text-slate-400 text-base font-medium">No hay servicios o procedimientos registrados para esta especialidad.</p>
+                      {availableCategories.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={handleBackToSpecialties}
+                          className="mt-4 px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black"
+                        >
+                          Ver Otras Especialidades
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="mb-4">
+                        <h2 className="text-lg md:text-xl font-black text-slate-900">
+                          {selectedCategory && selectedCategory !== 'all' ? `Procedimientos de ${selectedCategory}` : 'Procedimientos y Servicios Disponibles'}
+                        </h2>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          Selecciona el servicio o estudio que deseas agendar con nuestros especialistas:
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {displayedServices.map((service, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleServiceSelect(service)}
+                            className="group bg-white rounded-2xl overflow-hidden shadow-xs border border-slate-200 hover:border-slate-400 hover:shadow-lg text-left transition-all active:scale-[0.98] flex flex-col relative"
+                          >
+                            <div className="bg-slate-50 p-6 relative w-full flex items-center justify-between border-b border-slate-100">
+                              <div className="pr-3">
+                                <h3 className="text-lg md:text-xl font-black leading-snug" style={{ color: appliedBtn }}>
+                                  {service.name}
+                                </h3>
+                                {service.category && service.category !== 'General' && (
+                                  <span className="text-[10px] font-bold text-slate-400 block mt-1">
+                                    {service.category}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center border-4 border-slate-50 shadow-xs shrink-0">
+                                {getServiceIcon(service.name, service.icon)}
+                              </div>
+                            </div>
+                            <div className="p-4 flex items-center justify-between w-full bg-white">
+                              <div className="flex items-center gap-2.5 text-slate-500">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold">
+                                  <Clock size={14} className="text-slate-400" />
+                                  <span>{service.durationMinutes} min</span>
+                                </div>
+                                {settings.showPrices && service.priceText && (
+                                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                                    service.isCustomPrice 
+                                      ? 'bg-slate-100 text-slate-600 border border-slate-200' 
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  }`}>
+                                    {service.priceText}
+                                  </span>
+                                )}
+                              </div>
+                              <ChevronRight size={18} className="text-[color:var(--theme-btn)] group-hover:translate-x-1 transition-transform" />
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
         </div>
       )}
-{/* ===== STEP 3: Seleccionar Fecha, Hora y Datos ===== */}
+
+      {/* ===== STEP 2: Seleccionar Profesional ===== */}
+      {step === 2 && (
+        <div className="min-h-screen flex flex-col">
+          {/* Hero Banner */}
+          <div 
+            className="px-6 py-10 md:px-12 md:py-14 lg:py-16 relative transition-colors shadow-xs"
+            style={{ backgroundColor: appliedBtn, color: btnTextColor }}
+          >
+            <button 
+              onClick={() => {
+                setSelectedService(null);
+                setStep(1);
+              }} 
+              className="absolute top-6 left-6 p-2.5 rounded-full transition-colors border border-white/20"
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
+              title="Volver a los procedimientos"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="max-w-5xl mx-auto mt-4 flex items-center gap-4">
+              {settings.logoUrl && (
+                <div className="w-12 h-12 rounded-xl bg-white p-1.5 shadow-sm hidden sm:flex items-center justify-center shrink-0">
+                  <img 
+                    src={settings.logoUrl} 
+                    alt="Logo" 
+                    className="max-w-full max-h-full object-contain rounded-lg"
+                    onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-widest block mb-0.5 opacity-80" style={{ color: btnTextColor }}>
+                  {settings.headerTitle}
+                </span>
+                <h1 className="text-2xl md:text-4xl font-black mb-1 tracking-tight flex items-center gap-2.5" style={{ color: btnTextColor }}>
+                  {selectedService?.icon && <span className="text-2xl md:text-3xl select-none leading-none">{selectedService.icon}</span>}
+                  <span>{selectedService?.name || 'Profesional'}</span>
+                </h1>
+                <p className="text-xs md:text-sm max-w-lg opacity-85" style={{ color: btnTextColor }}>
+                  ¿Con qué especialista te gustaría agendar tu cita?
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Employee Cards */}
+          <div className="flex-1 px-6 md:px-12 py-8 md:py-12">
+            <div className="max-w-5xl mx-auto">
+              {filteredEmployees.length === 0 && (
+                <p className="text-center text-slate-400 mt-10 text-lg">No hay profesionales disponibles para este servicio.</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredEmployees.length > 1 && (
+                  <button
+                    onClick={() => {
+                      handleBarberSelect({ id: 'any', name: 'Cualquier Profesional', role: 'El que esté libre', is_active: true });
+                    }}
+                    className="group bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl overflow-hidden shadow-sm border border-slate-700 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
+                  >
+                    <div className="p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-700/60">
+                      <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-slate-700/70 text-slate-200 flex items-center justify-center border-4 border-slate-800 shadow-md group-hover:scale-105 transition-transform shrink-0">
+                        <Users className="text-slate-300 w-12 h-12" />
+                      </div>
+                      <div className="text-center sm:text-left flex-1 min-w-0">
+                        <span className="inline-block text-[11px] font-black uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2.5 py-0.5 rounded-full mb-1.5 border border-indigo-500/20">
+                          Sin preferencia
+                        </span>
+                        <h2 className="text-xl sm:text-2xl font-black text-white group-hover:text-indigo-200 transition-colors">
+                          Cualquiera disponible
+                        </h2>
+                        <p className="text-xs text-slate-400 font-medium mt-0.5">
+                          Asignación automática del especialista libre
+                        </p>
+                      </div>
+                    </div>
+                    <div className="p-4 flex items-center justify-between w-full bg-slate-800/50 mt-auto">
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Clock size={16} />
+                        <span className="text-sm font-medium">Horarios más flexibles</span>
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center group-hover:bg-slate-600 transition-colors">
+                        <ChevronRight size={16} className="text-slate-300" />
+                      </div>
+                    </div>
+                  </button>
+                )}
+                {filteredEmployees.map(barber => (
+                  <button
+                    key={barber.id}
+                    onClick={() => handleBarberSelect(barber)}
+                    className="group bg-white rounded-3xl overflow-hidden shadow-sm border border-slate-200 hover:border-[color:var(--theme-btn)]/50 hover:shadow-xl text-left transition-all active:scale-[0.98] flex flex-col relative"
+                  >
+                    <div className="bg-gradient-to-b from-slate-50 to-white p-6 relative w-full flex flex-col sm:flex-row items-center gap-5 border-b border-slate-100">
+                      {barber.metadata?.avatar_url ? (
+                        <div className="relative shrink-0">
+                          <img 
+                            src={barber.metadata.avatar_url} 
+                            alt={barber.name} 
+                            className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-4 border-white shadow-md group-hover:scale-105 transition-transform" 
+                          />
+                          <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white shadow-xs" title="Disponible" />
+                        </div>
+                      ) : (
+                        <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-indigo-50 text-[color:var(--theme-btn)] flex items-center justify-center font-black text-2xl border-4 border-white shadow-md group-hover:scale-105 transition-transform shrink-0">
+                          {barber.name.slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="text-center sm:text-left flex-1 min-w-0">
+                        {(() => {
+                          const empRoleTitle = (barber.metadata?.role_title || barber.role || 'Especialista').trim();
+                          const empRoleIcon = configuredRolesMap.get(empRoleTitle.toLowerCase());
+                          return (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full mb-1.5">
+                              {empRoleIcon && <span className="select-none">{empRoleIcon}</span>}
+                              <span>{barber.role || 'Especialista'}</span>
+                            </span>
+                          );
+                        })()}
+                        <h2 className="text-xl sm:text-2xl font-black text-slate-900 group-hover:text-[color:var(--theme-btn)] transition-colors truncate">
+                          {barber.name}
+                        </h2>
+                        {barber.metadata?.specialty && (
+                          <p className="text-xs text-slate-500 font-medium mt-0.5 truncate">
+                            {barber.metadata.specialty}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-4 flex items-center justify-between w-full bg-slate-50/60 mt-auto">
+                      <div className="flex items-center gap-2.5 text-slate-500">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold">
+                          <Briefcase size={14} className="text-slate-400" />
+                          <span>{barber.role || 'Profesional'}</span>
+                        </div>
+                        {(() => {
+                          if (!settings.showPrices) return null;
+                          const bSvcs = barber.metadata?.services as any[];
+                          const bSvc = bSvcs?.find(s => s.name?.trim().toLowerCase() === selectedService?.name?.toLowerCase());
+                          if (bSvc?.priceDisplay === 'hidden') {
+                            return (
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                                {settings.noPriceLabel}
+                              </span>
+                            );
+                          }
+                          const priceToDisplay = (bSvc?.price !== undefined && Number(bSvc.price) > 0)
+                            ? Number(bSvc.price)
+                            : (barber.metadata?.general_service_price !== undefined && Number(barber.metadata?.general_service_price) > 0)
+                              ? Number(barber.metadata?.general_service_price)
+                              : null;
+
+                          if (priceToDisplay !== null) {
+                            return (
+                              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {bSvc?.priceDisplay === 'from' ? `Desde $${priceToDisplay}` : `$${priceToDisplay}`}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                      <ChevronRight size={18} className="text-[color:var(--theme-btn)] transition-colors" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 3: Seleccionar Fecha, Hora y Datos ===== */}
       {step === 3 && (
         <div className="min-h-screen flex flex-col lg:flex-row">
           {/* Sidebar / Top Bar */}
@@ -1101,9 +1468,10 @@ export default function BookingClient({
           >
             <div className="flex items-center gap-4 lg:flex-col lg:items-start lg:gap-6">
               <button 
-                onClick={() => setStep(1)} title="Volver a los profesionales" 
+                onClick={() => setStep(2)} 
                 className="p-2.5 rounded-full transition-colors border border-white/20"
                 style={{ backgroundColor: 'rgba(255,255,255,0.15)', color: btnTextColor }}
+                title="Volver a los especialistas"
               >
                 <ArrowLeft size={20} />
               </button>
@@ -1177,46 +1545,6 @@ export default function BookingClient({
             <div className="flex-1 overflow-y-auto px-6 md:px-10 py-8 md:py-10 pb-40 lg:pb-10">
               <div className="max-w-3xl mx-auto space-y-8">
                 
-                {/* Selector de Procedimiento o Servicio si el especialista ofrece más de uno */}
-                {doctorAvailableServices.length > 1 && (
-                  <section>
-                    <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-3 flex items-center gap-2">
-                      <Sparkles size={14} /> Procedimiento / Servicio
-                    </h3>
-                    <div className="flex flex-wrap gap-2.5">
-                      {doctorAvailableServices.map((svc, idx) => {
-                        const isSelected = selectedService?.name?.toLowerCase() === svc.name?.toLowerCase();
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => {
-                              setSelectedService(svc);
-                              setSelectedBarberPrice(svc.basePrice);
-                            }}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 ${
-                              isSelected
-                                ? 'shadow-sm scale-[1.02]'
-                                : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                            }`}
-                            style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
-                          >
-                            <span>{svc.name}</span>
-                            {settings.showPrices && svc.priceText && (
-                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
-                                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                              }`}
-                              >
-                                {svc.priceText}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </section>
-                )}
-
                 {/* Dates */}
                 <section>
                   <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
