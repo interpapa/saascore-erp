@@ -346,7 +346,6 @@ export async function createAppointmentAction(
         client_id: safeClientId,
         service_id: safeServiceId,
         employee_id: safeEmployeeId,
-        location: courtTarget || payload.location || null,
         start_time: payload.start_time,
         end_time: calculatedEndTime,
         status: payload.status || 'scheduled',
@@ -817,7 +816,6 @@ export async function rescheduleOrMoveAppointmentAction(
       metadata: mergedMetadata,
     };
     if (updates.employee_id !== undefined) updatePayload.employee_id = sanitizeUUID(updates.employee_id) || null;
-    if (courtTarget) updatePayload.location = courtTarget;
 
     const { error: updateErr } = await supabaseAdmin
       .from('appointments')

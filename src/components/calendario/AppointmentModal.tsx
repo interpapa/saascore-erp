@@ -309,20 +309,10 @@ export function AppointmentModal({
         throw new Error('Fecha u hora inválida.');
       }
 
-      const now = new Date();
-      const todayDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const selectedDateOnly = new Date(startDateTime.getFullYear(), startDateTime.getMonth(), startDateTime.getDate());
-      if (selectedDateOnly < todayDateOnly) {
-        throw new Error('No es posible agendar en una fecha que ya ha transcurrido.');
-      }
-      if (selectedDateOnly.getTime() === todayDateOnly.getTime() && startDateTime.getTime() < now.getTime() - 5 * 60000) {
-        throw new Error('El horario seleccionado para hoy ya ha transcurrido.');
-      }
-
-      // Validación de jornada laboral del médico
+      // Validación de jornada laboral del médico (permite excepción con allowOutsideHours)
       if (type === 'appointment' && employeeId && scheduleValidation) {
         if (scheduleValidation.hasScheduleConfigured && !scheduleValidation.isWithinHours && !allowOutsideHours) {
-          throw new Error(scheduleValidation.error || 'El profesional no atiende en el horario seleccionado.');
+          throw new Error(`${scheduleValidation.error || 'El profesional no atiende en el horario seleccionado'}. Marca la casilla "Permitir Horario Especial / Urgencia" si deseas agendarlo de todos modos.`);
         }
       }
 
@@ -942,7 +932,6 @@ export function AppointmentModal({
                   <input
                     type="date"
                     required
-                    min={toYYYYMMDD(new Date())}
                     value={dateStr}
                     onChange={(e) => setDateStr(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -962,6 +951,25 @@ export function AppointmentModal({
                   />
                 </div>
               </div>
+
+              {/* Alerta interactiva si el horario seleccionado está fuera de la jornada habitual del médico */}
+              {scheduleValidation?.hasScheduleConfigured && !scheduleValidation?.isWithinHours && (
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">⚠️</span>
+                    <span className="font-medium">{scheduleValidation.error}</span>
+                  </div>
+                  <label className="flex items-center gap-2 font-bold cursor-pointer bg-white/80 dark:bg-black/40 px-3 py-1.5 rounded-xl border border-amber-500/30 shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={allowOutsideHours}
+                      onChange={(e) => setAllowOutsideHours(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                    />
+                    <span className="text-[11px]">Permitir Horario Especial / Urgencia</span>
+                  </label>
+                </div>
+              )}
 
               {/* Status & Price Row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -135,6 +135,7 @@ export default function CalendarioPage() {
           role: e.metadata?.role || 'Empleado',
           is_active: e.status === 'active',
           bookable: e.metadata?.bookable !== false,
+          metadata: e.metadata,
         }));
         setEmployees(mappedEmps);
       }
