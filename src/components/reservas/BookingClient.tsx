@@ -295,7 +295,8 @@ const GENERATE_TIMES = (
   globalStart: string, 
   globalEnd: string, 
   interval: number, 
-  shifts?: {start: string, end: string}[]
+  shifts?: {start: string, end: string}[],
+  hasCustomSchedule: boolean = false
 ) => {
   // Guardia defensiva: intervalo mínimo de 5 minutos para prevenir bucles infinitos (DoS en navegador)
   const safeInterval = Math.max(5, Number(interval) || 30);
@@ -303,16 +304,20 @@ const GENERATE_TIMES = (
   
   if (shifts && shifts.length > 0) {
     for (const shift of shifts) {
+      if (!shift?.start || !shift?.end) continue;
       const startMins = parseTime(shift.start);
       const endMins = parseTime(shift.end);
-      for (let m = startMins; m < endMins; m += safeInterval) {
+      // Blindaje: El turno debe terminar antes o exactamente al finalizar la jornada del médico
+      for (let m = startMins; m + safeInterval <= endMins; m += safeInterval) {
         times.push(formatTime(m));
       }
     }
-  } else {
+  } else if (!hasCustomSchedule) {
+    // Si el especialista tiene agenda configurada pero no atiende este día, times queda vacío []
+    // Solo se recurre al horario general si el profesional no tiene horario configurado
     const startMins = parseTime(globalStart);
     const endMins = parseTime(globalEnd);
-    for (let m = startMins; m < endMins; m += safeInterval) {
+    for (let m = startMins; m + safeInterval <= endMins; m += safeInterval) {
       times.push(formatTime(m));
     }
   }
@@ -696,6 +701,13 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
   const currentDayObj = dates.find(d => d.fullDate === selectedDate);
   const currentDayKey = currentDayObj ? currentDayObj.dayKey : 'monday';
   const shifts = selectedBarber?.metadata?.working_hours?.[currentDayKey];
+  const hasDoctorCustomSchedule = Boolean(
+    selectedBarber &&
+    selectedBarber.id !== 'any' &&
+    selectedBarber.metadata?.working_hours &&
+    typeof selectedBarber.metadata.working_hours === 'object' &&
+    Object.keys(selectedBarber.metadata.working_hours).length > 0
+  );
 
   const slotInterval = selectedService?.durationMinutes || settings.intervalMinutes;
   
@@ -704,9 +716,10 @@ export default function BookingClient({ tenant, employees, theme }: { tenant: Te
       settings.startHour, 
       settings.endHour, 
       slotInterval,
-      shifts
+      shifts,
+      hasDoctorCustomSchedule
     );
-  }, [settings.startHour, settings.endHour, slotInterval, shifts]);
+  }, [settings.startHour, settings.endHour, slotInterval, shifts, hasDoctorCustomSchedule]);
   
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [bookedTimes, setBookedTimes] = useState<string[]>([]);

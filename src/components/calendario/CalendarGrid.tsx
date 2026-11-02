@@ -251,10 +251,17 @@ export function CalendarGrid({
                              const topMins = startMins - (8 * 60);
                              const durationMins = endMins - startMins;
                              
-                             topPx = topMins * pixelsPerMin;
-                             heightPx = Math.max(15, durationMins) * pixelsPerMin;
-
-                             if (topMins < 0) return null;
+                             if (topMins < 0) {
+                               if (endMins > 8 * 60) {
+                                 topPx = 0;
+                                 heightPx = Math.max(20, (endMins - 8 * 60) * pixelsPerMin);
+                               } else {
+                                 return null;
+                               }
+                             } else {
+                               topPx = topMins * pixelsPerMin;
+                               heightPx = Math.max(15, durationMins) * pixelsPerMin;
+                             }
                            }
 
                            const visual = getAppointmentVisualStatus(appt.status, appt.metadata);
