@@ -60,7 +60,7 @@ export function CatalogModal({
 
   // Estados de Control y Ajuste de Stock Unificado
   const [stockAdjustmentMode, setStockAdjustmentMode] = useState<'add' | 'subtract' | 'set'>('add');
-  const [adjustmentDelta, setAdjustmentDelta] = useState<number>(10);
+  const [adjustmentDelta, setAdjustmentDelta] = useState<number>(1);
   const [directStockQty, setDirectStockQty] = useState<number>(0);
   const [stockReason, setStockReason] = useState<string>('Reposición de mercancía');
   const [hasAdjustedStock, setHasAdjustedStock] = useState<boolean>(false);
@@ -85,13 +85,13 @@ export function CatalogModal({
         setImageUrl(editItem.metadata?.image_url || editItem.image_url || '');
         const currentStock = Number(editItem.stock_quantity ?? editItem.stock ?? 0);
         setDirectStockQty(currentStock);
-        setAdjustmentDelta(10);
+        setAdjustmentDelta(1);
         setHasAdjustedStock(false);
         setStockAdjustmentMode('add');
         setStockReason('Reposición de mercancía');
         setRecordExpense(false);
         setUnitCost(initialCost);
-        setTotalCost(initialCost * 10);
+        setTotalCost(initialCost * 1);
         setSupplierName(editItem.metadata?.preferred_supplier_name || '');
       } else {
         setItemType('product');

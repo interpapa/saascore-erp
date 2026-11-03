@@ -78,7 +78,9 @@ export default function InventarioPage() {
     const targetTenantId = item.tenant_id || activeTenant?.id || session?.tenantId;
     if (!targetTenantId || !actor) return;
     const clampedStock = Math.max(0, newStock);
-    const oldStock = item.stock_quantity ?? (item as any).stock ?? 0;
+    const oldStock = Number(item.stock_quantity ?? (item as any).stock ?? 0);
+    const delta = clampedStock - oldStock;
+    if (delta === 0) return;
 
     // Actualización optimista inmediata
     setItems((prev) =>
@@ -90,11 +92,12 @@ export default function InventarioPage() {
     );
 
     try {
-      const res = await updateItemAction(
+      const res = await adjustItemStockAction(
         item.id,
-        { stock_quantity: clampedStock },
+        delta,
         targetTenantId,
-        actor
+        actor,
+        delta > 0 ? 'Ajuste rápido (+1 ud)' : 'Ajuste rápido (-1 ud)'
       );
       if (!res.success) {
         // Rollback
@@ -181,8 +184,19 @@ export default function InventarioPage() {
       const res = await getItemsAction(activeTenant.id, undefined, 250, actor);
       if (res.success && res.items) {
         setItems((prev) => {
-          const pendingTemporaries = prev.filter((i) => isTemporaryId(i.id) || !isValidUUID(i.id));
-          return [...pendingTemporaries, ...(res.items as any)];
+          const serverNames = new Set((res.items as any[]).map((i) => (i.name || '').trim().toLowerCase()));
+          const pendingTemporaries = prev.filter(
+            (i) => (isTemporaryId(i.id) || !isValidUUID(i.id)) && !serverNames.has((i.name || '').trim().toLowerCase())
+          );
+          const seen = new Set<string>();
+          const unified: Item[] = [];
+          for (const item of [...pendingTemporaries, ...(res.items as any)]) {
+            if (!seen.has(item.id)) {
+              seen.add(item.id);
+              unified.push(item);
+            }
+          }
+          return unified;
         });
       }
     } catch (error) {
@@ -264,7 +278,16 @@ export default function InventarioPage() {
         });
         return;
       }
-      const itemPayload = {
+      // Separar instrucción de ajuste de stock de los metadatos persistentes del ítem
+      const stockAdjustment = data.metadata?.stock_adjustment;
+      const cleanMetadata = { ...(data.metadata || {}) };
+      delete cleanMetadata.stock_adjustment;
+
+      // BLINDAJE ANTI-CANTIDADES FANTASMA:
+      // Al editar un ítem nunca pasamos stock_quantity a updateItemAction.
+      // Si el usuario realizó un ajuste de existencias físicas, adjustItemStockAction es el ÚNICO
+      // responsable de aplicar el delta y asentar el Kardex. De lo contrario, se sumaría dos veces.
+      const itemPayload: any = {
         type: data.type,
         name: data.name,
         sku: data.sku,
@@ -272,8 +295,7 @@ export default function InventarioPage() {
         description: data.description,
         base_price: Number(data.base_price || 0),
         cost: Number(data.cost || 0),
-        stock_quantity: Number(data.stock_quantity || 0),
-        metadata: data.metadata,
+        metadata: cleanMetadata,
       };
 
       try {
@@ -302,11 +324,10 @@ export default function InventarioPage() {
         }
 
         if (res?.success) {
-          // Si hubo un ajuste rápido de existencias físicas con Kardex
-          const stockAdjustment = data.metadata?.stock_adjustment;
-          if (stockAdjustment && stockAdjustment.delta !== 0 && !isTemporaryId(editingItem.id)) {
+          // Si hubo un ajuste de existencias físicas con Kardex
+          if (stockAdjustment && typeof stockAdjustment.delta === 'number' && stockAdjustment.delta !== 0 && !isTemporaryId(editingItem.id)) {
             try {
-              await adjustItemStockAction(
+              const adjRes = await adjustItemStockAction(
                 editingItem.id,
                 stockAdjustment.delta,
                 targetTenantId,
@@ -320,9 +341,27 @@ export default function InventarioPage() {
                   supplierName: stockAdjustment.expense.supplier_name,
                 } : undefined
               );
+              if (adjRes.success && adjRes.item) {
+                res.item = adjRes.item;
+              }
             } catch (adjErr) {
               console.warn('[inventario] Error al registrar movimiento de Kardex:', adjErr);
             }
+          }
+
+          if (res?.item) {
+            setItems((prev) =>
+              prev.map((i) =>
+                i.id === editingItem.id
+                  ? {
+                      ...i,
+                      ...res.item,
+                      stock: res.item.stock !== undefined ? res.item.stock : res.item.stock_quantity,
+                      stock_quantity: res.item.stock_quantity !== undefined ? res.item.stock_quantity : (res.item.stock ?? 0),
+                    }
+                  : i
+              )
+            );
           }
 
           toast({ variant: 'success', title: 'Artículo Actualizado', description: `"${data.name}" se actualizó correctamente en inventario.` });
@@ -336,6 +375,9 @@ export default function InventarioPage() {
       }
     } else {
       const tempId = `temp_${Date.now()}`;
+      const cleanMetadata = { ...(data.metadata || {}) };
+      delete cleanMetadata.stock_adjustment;
+
       const newItem = {
         id: tempId,
         type: data.type,
@@ -345,7 +387,7 @@ export default function InventarioPage() {
         base_price: Number(data.base_price || 0),
         cost: Number(data.cost || 0),
         stock_quantity: data.type === 'product' ? Number(data.stock_quantity || 0) : 0,
-        metadata: data.metadata || {},
+        metadata: cleanMetadata,
         is_active: true,
       } as Item;
 
@@ -360,7 +402,7 @@ export default function InventarioPage() {
         base_price: Number(data.base_price || 0),
         cost: Number(data.cost || 0),
         stock_quantity: Number(data.stock_quantity || 0),
-        metadata: data.metadata,
+        metadata: cleanMetadata,
       };
 
       try {

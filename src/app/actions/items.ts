@@ -133,6 +133,26 @@ export async function createItemAction(
         ? Number(newItem.stock)
         : (newItem.stock_quantity !== undefined && newItem.stock_quantity !== null ? Number(newItem.stock_quantity) : 0))
       : 0;
+
+    // Si el producto nuevo se dio de alta con existencias físicas iniciales, registrar entrada en el Kardex
+    if (input.type === 'product' && numStock > 0) {
+      await writeAuditLog({
+        tenant_id: tenantId,
+        actor_email: actor.email,
+        actor_role: actor.role,
+        action: 'item.updated',
+        target_type: 'item',
+        target_id: newItem.id,
+        metadata: {
+          action: 'stock_adjustment',
+          delta: numStock,
+          newStock: numStock,
+          previousStock: 0,
+          reason: 'Inventario inicial al dar de alta el producto',
+        },
+      });
+    }
+
     const mappedItem = newItem ? {
       ...newItem,
       type: newItem.type || (newItem.category?.toLowerCase() === 'servicios' ? 'service' : 'product'),
