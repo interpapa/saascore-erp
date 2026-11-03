@@ -946,6 +946,13 @@ export default function BookingClient({
         localStorage.setItem('rendo_client_firstname', firstName);
         localStorage.setItem('rendo_client_lastname', lastName);
         localStorage.setItem('rendo_client_phone', customerPhone);
+
+        // Notificar en vivo e instantáneamente a cualquier pestaña abierta del calendario
+        try {
+          const bc = new BroadcastChannel('rendo_appointments_sync');
+          bc.postMessage({ type: 'APPOINTMENT_CREATED', tenantId: tenant.id });
+          bc.close();
+        } catch {}
       }
 
       const confirmationMsg = (result as any).isGroupJoin 

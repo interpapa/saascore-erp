@@ -339,14 +339,14 @@ export function AppointmentDetailsModal({
     const isEmpScope = !!appointment.employee_name && appointment.employee_name !== 'Sin Asignar';
 
     return (
-      <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+      <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden">
         <div
-          className="bg-card border border-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200"
+          className="bg-card border border-border w-full max-w-md rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
           role="dialog"
           aria-modal="true"
         >
           {/* Header */}
-          <div className="border-b border-border p-5 bg-rose-50/70 dark:bg-rose-950/30 flex items-center justify-between">
+          <div className="shrink-0 border-b border-border p-4 sm:p-5 bg-rose-50/70 dark:bg-rose-950/30 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-rose-500/15 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-500/30">
                 <Lock size={20} />
@@ -452,14 +452,14 @@ export function AppointmentDetailsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-60 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-hidden">
       <div
-        className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200"
+        className="bg-card border border-border w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
       >
-        {/* Header */}
-        <div className="border-b border-border p-5 sm:p-6 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
+        {/* Header Fijo */}
+        <div className="shrink-0 border-b border-border p-4 sm:p-5 flex items-center justify-between bg-slate-50/70 dark:bg-slate-900/70">
           <div className="flex items-center gap-3">
             <h3 className="text-xl font-black text-foreground tracking-tight">Detalles de la Cita</h3>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold ${cfg.bg}`}>
@@ -475,8 +475,8 @@ export function AppointmentDetailsModal({
           </button>
         </div>
 
-        {/* Content */}
-        <div className="p-5 sm:p-6 space-y-5">
+        {/* Content con Scroll Interno Fluido */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Main Info */}
           <div className="bg-slate-50 dark:bg-slate-900/60 border border-border p-4 rounded-2xl space-y-3">
             <h4 className="text-lg font-black text-foreground">{appointment.title}</h4>
@@ -982,41 +982,42 @@ export function AppointmentDetailsModal({
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="flex items-center justify-between pt-3 border-t border-border gap-2">
-            <div className="flex items-center gap-2">
+        </div>
+
+        {/* Footer Fijo / Sticky (Siempre visible en cualquier pantalla sin cortarse) */}
+        <div className="shrink-0 p-4 bg-slate-50/95 dark:bg-slate-900/95 border-t border-border flex items-center justify-between gap-2 z-10">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleSendAppointmentWhatsApp}
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Enviar recordatorio de cita vía WhatsApp"
+            >
+              <MessageCircle size={15} />
+              <span className="hidden sm:inline">Recordatorio WhatsApp</span>
+              <span className="sm:hidden">WhatsApp</span>
+            </button>
+
+            {onDeleteAppointment && (
               <button
                 type="button"
-                onClick={handleSendAppointmentWhatsApp}
-                className="px-3 py-2 rounded-xl text-xs font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Enviar recordatorio de cita vía WhatsApp"
+                disabled={isDeleting}
+                onClick={handleDelete}
+                className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
+                title="Eliminar cita y liberar horario"
               >
-                <MessageCircle size={15} />
-                <span className="hidden sm:inline">Recordatorio WhatsApp</span>
-                <span className="sm:hidden">WhatsApp</span>
+                <Trash2 size={14} />
+                <span className="hidden sm:inline">Eliminar</span>
               </button>
-
-              {onDeleteAppointment && (
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={handleDelete}
-                  className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
-                  title="Eliminar cita y liberar horario"
-                >
-                  <Trash2 size={14} />
-                  <span className="hidden sm:inline">Eliminar</span>
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-            >
-              Cerrar
-            </button>
+            )}
           </div>
+
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+          >
+            Cerrar
+          </button>
         </div>
       </div>
 

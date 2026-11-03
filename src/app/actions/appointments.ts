@@ -244,7 +244,6 @@ export async function createAppointmentAction(
           .eq('employee_id', payload.employee_id)
           .neq('status', 'cancelled')
           .neq('status', 'no_show')
-          .neq('status', 'completed')
           .lt('start_time', calculatedEndTime)
           .gt('end_time', payload.start_time)
           .limit(1);
@@ -301,7 +300,6 @@ export async function createAppointmentAction(
           .eq('tenant_id', tenantId)
           .neq('status', 'cancelled')
           .neq('status', 'no_show')
-          .neq('status', 'completed')
           .lt('start_time', calculatedEndTime)
           .gt('end_time', payload.start_time);
 

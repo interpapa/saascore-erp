@@ -299,7 +299,7 @@ export function AppointmentModal({
       return;
     }
 
-    const apptTitle = title.trim() || (serviceId ? services.find((s) => s.id === serviceId)?.name || 'Cita de Servicio' : 'Cita de Servicio');
+    const apptTitle = title.trim() || (customClientName.trim() ? `Consulta - ${customClientName.trim()}` : (serviceId ? services.find((s) => s.id === serviceId)?.name || 'Consulta Médica' : 'Consulta Médica'));
 
     try {
       setIsSubmitting(true);
@@ -380,7 +380,7 @@ export function AppointmentModal({
       onClick={() => { if (!isSubmitting) onClose(); }}
     >
       <div
-        className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
+        className="bg-card border border-border w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden my-auto max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-200"
         role="dialog"
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
@@ -754,12 +754,11 @@ export function AppointmentModal({
               {/* Title Input */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-                  Título de la Cita *
+                  Título de la Cita <span className="text-[10px] font-normal text-slate-400">(Opcional, se autogenera si se deja vacío)</span>
                 </label>
                 <input
                   type="text"
-                  required
-                  placeholder="Ej: Corte de Cabello + Barba"
+                  placeholder="Ej: Consulta Médica, Control, Evaluación..."
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"

@@ -172,10 +172,21 @@ export default function CalendarioPage() {
     fetchData();
   }, [fetchData]);
 
-  // Supabase Realtime WebSocket Subscription (Instant <100ms updates)
+    const broadcastLocalChange = useCallback(() => {
+    if (typeof window !== 'undefined' && currentTenant?.id) {
+      try {
+        const bc = new BroadcastChannel('rendo_appointments_sync');
+        bc.postMessage({ type: 'APPOINTMENT_UPDATED', tenantId: currentTenant.id });
+        bc.close();
+      } catch {}
+    }
+  }, [currentTenant?.id]);
+
+  // Sincronización en Vivo Multicapa (WebSocket Realtime + Cross-Tab Broadcast + Window Focus + Heartbeat)
   useEffect(() => {
     if (!currentTenant?.id) return;
 
+    // 1. Canal WebSocket Supabase Realtime (Citas creadas desde dispositivos externos o pacientes)
     const channel = supabase
       .channel(`realtime-appointments-${currentTenant.id}`)
       .on(
@@ -192,8 +203,44 @@ export default function CalendarioPage() {
       )
       .subscribe();
 
-    return () => {
+    // 2. BroadcastChannel para sincronización instantánea (<1ms) entre pestañas del mismo navegador
+    let bc: BroadcastChannel | null = null;
+    try {
+      bc = new BroadcastChannel('rendo_appointments_sync');
+      bc.onmessage = (event) => {
+        if (event.data?.tenantId === currentTenant.id) {
+          fetchData();
+        }
+      };
+    } catch {}
+
+    // 3. Auto-refresco inteligente al cambiar o volver a enfocar la pestaña del navegador
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    // 4. Latido periódico de seguridad cada 30 segundos si la pestaña está activa
+    const heartbeatInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    }, 30000);
+
+    const useSportsCourts = Boolean(
+    currentTenant?.metadata?.features?.use_sports_courts === true ||
+    (currentTenant?.metadata?.booking_settings as any)?.enable_courts === true
+  );
+
+  return () => {
       supabase.removeChannel(channel);
+      if (bc) bc.close();
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+      clearInterval(heartbeatInterval);
     };
   }, [currentTenant?.id, fetchData]);
 
@@ -219,6 +266,7 @@ export default function CalendarioPage() {
           description: `Se aplicó el bloqueo (${input.title}) en la agenda exitosamente.`,
         });
         fetchData();
+        broadcastLocalChange();
       } else {
         toast({
           variant: 'error',
@@ -244,6 +292,7 @@ export default function CalendarioPage() {
         setAppointments((prev) => prev.filter((a) => a.id !== id));
         setIsDetailsModalOpen(false);
         setSelectedAppointment(null);
+        broadcastLocalChange();
         toast({
           variant: 'success',
           title: 'Horario liberado',
@@ -313,6 +362,7 @@ export default function CalendarioPage() {
         setAppointments((prev) =>
           prev.map((a) => (a.id === optimisticId ? res.appointment! : a))
         );
+        broadcastLocalChange();
         toast({
           variant: 'success',
           title: 'Cita agendada',
@@ -361,6 +411,7 @@ export default function CalendarioPage() {
       if (!res.success) {
         throw new Error(res.error || 'Error al actualizar estado');
       }
+      broadcastLocalChange();
       toast({
         variant: 'success',
         title: 'Estado actualizado',
@@ -571,7 +622,8 @@ export default function CalendarioPage() {
             currentDate={currentDate}
             appointments={appointments}
             employees={filterState.employee_id !== 'all' ? bookableEmployees.filter(e => e.id === filterState.employee_id) : bookableEmployees}
-            courts={currentTenant?.metadata?.courts as any}
+            courts={useSportsCourts ? (currentTenant?.metadata?.courts as any) : undefined}
+            useCourts={useSportsCourts}
             isLoading={isLoading}
             onSelectAppointment={handleSelectAppointment}
             onSelectDateSlot={handleSelectDateSlot}
@@ -608,7 +660,7 @@ export default function CalendarioPage() {
         employees={bookableEmployees}
         services={services}
         clients={clients}
-        courts={currentTenant?.metadata?.courts as any}
+        courts={useSportsCourts ? (currentTenant?.metadata?.courts as any) : undefined}
         initialDate={selectedDateForCreate}
         initialTime={selectedTimeForCreate}
         initialClientId={clientParam}

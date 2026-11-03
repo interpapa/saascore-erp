@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CalendarDays, Clock, User, Plus } from 'lucide-react';
+import { CalendarDays, Clock, User, Plus, ChevronRight } from 'lucide-react';
 import { Appointment, AppointmentStatus, Employee, CourtResource, DEFAULT_SPORTS_COURTS } from '@/types/calendario';
 import { EmptyState } from '@/components/core/EmptyState';
 import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
@@ -17,6 +17,7 @@ export interface CalendarGridProps {
   appointments: Appointment[];
   employees?: Employee[];
   courts?: CourtResource[];
+  useCourts?: boolean;
   isLoading: boolean;
   onSelectAppointment: (appt: Appointment) => void;
   onSelectDateSlot: (date: Date, timeStr?: string, prefillCourt?: string, prefillEmployeeId?: string) => void;
@@ -76,6 +77,7 @@ export function CalendarGrid({
   appointments,
   employees = [],
   courts,
+  useCourts = false,
   isLoading,
   onSelectAppointment,
   onSelectDateSlot,
@@ -121,8 +123,8 @@ export function CalendarGrid({
     const activeEmployees = employees.filter(e => e.is_active);
     const dayAppts = getAppointmentsForDate(currentDate);
 
-    // Canchas activas (solo si la empresa tiene pistas/canchas configuradas)
-    const hasCourts = Boolean(courts && courts.length > 0);
+    // Canchas activas (solo si la empresa tiene explícitamente habilitado el módulo de pistas/canchas)
+    const hasCourts = Boolean(useCourts && courts && courts.length > 0);
     const activeCourts: CourtResource[] = hasCourts && courts ? courts.filter(c => c.is_active) : [];
     const effectiveDimension = hasCourts ? resourceDimension : 'employees';
 
@@ -843,45 +845,59 @@ export function CalendarGrid({
 
   return (
     <div className="space-y-4">
-      {/* Drill-down Breadcrumb Navigation */}
+      {/* Barra de Navegación Contextual Elegante (Breadcrumb) */}
       {(viewMode === 'day' || viewMode === 'week') && (
-        <div className="flex items-center justify-between bg-primary/5 dark:bg-primary/10 border border-primary/20 px-4 py-2.5 rounded-2xl">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300 flex-wrap">
+        <div className="flex items-center justify-between px-3.5 py-2 bg-gradient-to-r from-slate-50 via-slate-50/80 to-transparent dark:from-slate-900/80 dark:via-slate-900/50 dark:to-transparent border border-border/70 rounded-2xl text-xs shadow-2xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Botón Mes */}
             <button
               type="button"
               onClick={() => onDrillDown && onDrillDown(currentDate, 'month')}
-              className="text-primary hover:underline flex items-center gap-1"
+              className="px-2.5 py-1 rounded-xl bg-card border border-border/80 text-foreground hover:border-primary/40 hover:text-primary transition-all font-bold flex items-center gap-1.5 shadow-2xs group"
+              title="Ir a vista del mes"
             >
-              📅 Vista de Mes ({currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })})
+              <CalendarDays size={13} className="text-slate-400 group-hover:text-primary transition-colors" />
+              <span className="capitalize">{currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</span>
             </button>
-            <span>➔</span>
+
+            <span className="text-slate-400">/</span>
+
+            {/* Paso Semana */}
             {viewMode === 'day' ? (
+              <button
+                type="button"
+                onClick={() => onDrillDown && onDrillDown(currentDate, 'week')}
+                className="px-2.5 py-1 rounded-xl bg-card border border-border/80 text-foreground hover:border-primary/40 hover:text-primary transition-all font-bold flex items-center gap-1.5 shadow-2xs group"
+                title="Volver a vista semanal"
+              >
+                <span>Semana</span>
+              </button>
+            ) : (
+              <span className="px-2.5 py-1 rounded-xl bg-primary/10 text-primary font-black border border-primary/20 shadow-2xs">
+                Vista Semanal
+              </span>
+            )}
+
+            {/* Paso Día (solo si está en vista diaria) */}
+            {viewMode === 'day' && (
               <>
-                <button
-                  type="button"
-                  onClick={() => onDrillDown && onDrillDown(currentDate, 'week')}
-                  className="text-primary hover:underline"
-                >
-                  🗓️ Vista de Semana
-                </button>
-                <span>➔</span>
-                <span className="text-foreground font-black">
-                  📍 Día: {currentDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
+                <span className="text-slate-400">/</span>
+                <span className="px-2.5 py-1 rounded-xl bg-primary/10 text-primary font-black border border-primary/20 shadow-2xs capitalize">
+                  {currentDate.toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </span>
               </>
-            ) : (
-              <span className="text-foreground font-black">
-                🗓️ Vista de Semana
-              </span>
             )}
           </div>
 
+          {/* Botón Acción para Subir al Mes Completo */}
           <button
             type="button"
             onClick={() => onDrillDown && onDrillDown(currentDate, 'month')}
-            className="text-[11px] font-black text-primary hover:underline shrink-0"
+            className="px-3 py-1 rounded-xl text-[11px] font-bold text-slate-600 dark:text-slate-300 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all flex items-center gap-1 shrink-0"
+            title="Ver calendario del mes completo"
           >
-            Subir al Mes Completo ⬆️
+            <span>Ver Mes Completo</span>
+            <ChevronRight size={13} />
           </button>
         </div>
       )}

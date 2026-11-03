@@ -14,6 +14,7 @@ import {
   List,
   Layers,
   Check,
+  RotateCcw,
 } from 'lucide-react';
 import {
   Appointment,
@@ -80,6 +81,38 @@ export function CalendarFilters({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isJumpPopoverOpen]);
+
+  // Comprobar si estamos visualizando el período actual (Hoy)
+  const isCurrentDateToday = React.useMemo(() => {
+    const today = new Date();
+    if (viewMode === 'day') {
+      return (
+        currentDate.getFullYear() === today.getFullYear() &&
+        currentDate.getMonth() === today.getMonth() &&
+        currentDate.getDate() === today.getDate()
+      );
+    }
+    if (viewMode === 'month') {
+      return (
+        currentDate.getFullYear() === today.getFullYear() &&
+        currentDate.getMonth() === today.getMonth()
+      );
+    }
+    if (viewMode === 'week') {
+      const startOfWeek = new Date(currentDate);
+      startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      return today >= startOfWeek && today <= endOfWeek;
+    }
+    return (
+      currentDate.getFullYear() === today.getFullYear() &&
+      currentDate.getMonth() === today.getMonth() &&
+      currentDate.getDate() === today.getDate()
+    );
+  }, [currentDate, viewMode]);
 
   // Filtrado de citas para el buscador predictivo
   const matchingAppointments = React.useMemo(() => {
@@ -365,27 +398,41 @@ export function CalendarFilters({
 
         {/* Right: Date Navigation & Primary CTA */}
         <div className="flex items-center justify-between sm:justify-end gap-3 w-full lg:w-auto">
-          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-border">
-            <button
-              onClick={handlePrev}
-              aria-label="Anterior"
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              <ChevronLeft size={18} />
-            </button>
+          <div className="flex items-center gap-2">
+            {/* Botón de Retorno / Ir a Hoy con estado activo/inactivo */}
             <button
               onClick={handleToday}
-              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              disabled={isCurrentDateToday}
+              className={`px-3 py-2 rounded-2xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                isCurrentDateToday
+                  ? 'bg-slate-100/80 dark:bg-slate-800/50 text-slate-400 dark:text-slate-500 border-border cursor-default'
+                  : 'bg-primary/10 hover:bg-primary/20 text-primary border-primary/30 shadow-xs active:scale-95 cursor-pointer font-black'
+              }`}
+              title={isCurrentDateToday ? 'Estás visualizando la fecha actual' : 'Volver a la fecha de hoy'}
             >
-              Hoy
+              <RotateCcw size={12} className={!isCurrentDateToday ? 'text-primary' : 'text-slate-400'} />
+              <span>{isCurrentDateToday ? 'Hoy' : 'Ir a Hoy'}</span>
             </button>
-            <button
-              onClick={handleNext}
-              aria-label="Siguiente"
-              className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            >
-              <ChevronRight size={18} />
-            </button>
+
+            {/* Agrupación limpia de Flechas Anterior / Siguiente */}
+            <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-border">
+              <button
+                onClick={handlePrev}
+                aria-label="Anterior"
+                className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                title="Período anterior"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <button
+                onClick={handleNext}
+                aria-label="Siguiente"
+                className="p-2 rounded-xl text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                title="Período siguiente"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="flex gap-2">

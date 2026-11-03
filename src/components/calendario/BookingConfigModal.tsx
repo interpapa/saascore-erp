@@ -39,11 +39,16 @@ export function BookingConfigModal({
   const actor = useActionActor();
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'qr' | 'schedule' | 'courts' | 'theme' | 'whatsapp'>('qr');
+  const initialEnableCourts = Boolean(
+    tenant?.metadata?.features?.use_sports_courts === true ||
+    tenant?.metadata?.booking_settings?.enable_courts === true
+  );
+  const [enableCourts, setEnableCourts] = useState<boolean>(initialEnableCourts);
   const [courts, setCourts] = useState<CourtResource[]>(() => {
-    if (tenant?.metadata?.courts && Array.isArray(tenant.metadata.courts) && tenant.metadata.courts.length > 0) {
+    if (tenant?.metadata?.courts && Array.isArray(tenant.metadata.courts)) {
       return tenant.metadata.courts as CourtResource[];
     }
-    return DEFAULT_SPORTS_COURTS;
+    return [];
   });
   
   // Valores por defecto
@@ -70,6 +75,14 @@ export function BookingConfigModal({
       if (tenant?.metadata) {
         const dbSettings = tenant.metadata.booking_settings || {};
         const publicTheme = tenant.metadata.public_theme || {};
+        const courtsEnabled = Boolean(
+          tenant.metadata?.features?.use_sports_courts === true ||
+          dbSettings?.enable_courts === true
+        );
+        setEnableCourts(courtsEnabled);
+        if (Array.isArray(tenant.metadata?.courts)) {
+          setCourts(tenant.metadata.courts);
+        }
         
         setSettings({
           intervalMinutes: dbSettings.intervalMinutes || defaultSettings.intervalMinutes,
@@ -112,7 +125,8 @@ export function BookingConfigModal({
       logoUrl: settings.logoUrl.trim(),
       headerTitle: settings.headerTitle.trim(),
       headerSubtitle: settings.headerSubtitle.trim(),
-      courts: courts,
+      enable_courts: enableCourts,
+      courts: enableCourts ? courts : [],
       publicTheme: {
         bgColor: normalizeHexColor(settings.themeBg, '#ffffff'),
         btnColor: normalizeHexColor(settings.themeBtn, '#0B3B24'),
@@ -200,7 +214,7 @@ export function BookingConfigModal({
             }`}
           >
             <span>🎾</span>
-            Pistas / Canchas ({courts.filter(c => c.is_active).length})
+            Pistas / Canchas {enableCourts ? `(${courts.filter(c => c.is_active).length})` : '(Inactivo)'}
           </button>
 
           <button
@@ -346,67 +360,6 @@ export function BookingConfigModal({
                   <strong>Tip:</strong> Puedes descargar la imagen PNG para mandar a imprimir un exhibidor de acrílico en la recepción para agilizar el ingreso de los pacientes.
                 </span>
               </div>
-
-              {/* Enlaces Directos por Especialidad / Rama */}
-              <div className="bg-card p-4 rounded-3xl border border-border space-y-3">
-                <div>
-                  <h4 className="text-xs font-black text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                    <span>🔗</span> Enlaces Directos por Especialidad
-                  </h4>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Comparte un enlace específico para que el paciente entre directamente a ver los servicios de esa especialidad sin pasar por la lista general:
-                  </p>
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  {[
-                    { id: 'ginecologia', name: 'Ginecología y Obstetricia', icon: '👶' },
-                    { id: 'odontologia', name: 'Odontología & Salud Dental', icon: '🦷' },
-                    { id: 'cardiologia', name: 'Cardiología & Cardiovascular', icon: '❤️' },
-                    { id: 'pediatria', name: 'Pediatría & Puericultura', icon: '🧸' },
-                    { id: 'dermatologia', name: 'Dermatología & Estética', icon: '🧴' },
-                    { id: 'traumatologia', name: 'Traumatología & Fisioterapia', icon: '🦴' },
-                    { id: 'oftalmologia', name: 'Oftalmología & Salud Visual', icon: '👁️' },
-                    { id: 'med_general', name: 'Medicina General', icon: '🩺' },
-                  ]
-                    .filter(spec => {
-                      const activeMods = tenant?.active_modules || [];
-                      if (!activeMods || activeMods.length === 0) return true;
-                      return activeMods.includes(spec.id) || activeMods.includes(`med_${spec.id}`) || activeMods.includes('clinica');
-                    })
-                    .map((item) => {
-                      const specUrl = `${bookingPublicUrl}?especialidad=${item.id}`;
-                      return (
-                        <div key={item.id} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-border/80 text-xs gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-base">{item.icon}</span>
-                            <span className="font-bold text-foreground truncate">{item.name}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(specUrl);
-                                toast({ variant: 'success', title: '¡Enlace Copiado!', description: `Link directo de ${item.name} listo para compartir.` });
-                              }}
-                              className="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-foreground font-bold rounded-lg border border-border shadow-2xs text-[11px] transition-colors"
-                            >
-                              Copiar Link
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => window.open(specUrl, '_blank')}
-                              className="p-1 text-slate-400 hover:text-foreground transition-colors"
-                              title="Abrir enlace en nueva pestaña"
-                            >
-                              <ExternalLink className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
             </div>
           )}
 
@@ -499,98 +452,136 @@ export function BookingConfigModal({
               ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */}
           {activeTab === 'courts' && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <div className="p-3.5 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/30 text-xs text-muted-foreground flex items-center gap-3">
-                <span className="text-xl">🎾</span>
-                <p>
-                  <strong>Recursos Físicos de la Academia:</strong> Define tus canchas reales. El motor anti-colisión del calendario impedirá que se solapen dos clases o reservas en la misma pista ni con el mismo coach.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {courts.map((court, idx) => (
-                  <div key={court.id || idx} className="p-3 bg-card border border-border rounded-2xl flex items-center justify-between gap-3 shadow-xs">
-                    <div className="flex items-center gap-2.5 flex-1">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: court.color || '#10b981' }} />
-                      <input
-                        type="text"
-                        value={court.name}
-                        onChange={(e) => {
-                          const updated = [...courts];
-                          updated[idx] = { ...updated[idx], name: e.target.value };
-                          setCourts(updated);
-                        }}
-                        className="px-2.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-background text-foreground flex-1 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                        placeholder="Nombre de la pista..."
-                      />
-                      <select
-                        value={court.type || 'cristal'}
-                        onChange={(e) => {
-                          const updated = [...courts];
-                          updated[idx] = { ...updated[idx], type: e.target.value };
-                          setCourts(updated);
-                        }}
-                        className="px-2 py-1.5 text-xs font-semibold rounded-lg border border-border bg-background text-foreground focus:outline-none"
-                      >
-                        <option value="cristal">Cristal Pro</option>
-                        <option value="panoramica">Panorámica</option>
-                        <option value="individual">Individual</option>
-                        <option value="standard">Estándar</option>
-                      </select>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const updated = [...courts];
-                          updated[idx] = { ...updated[idx], is_active: !updated[idx].is_active };
-                          setCourts(updated);
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${
-                          court.is_active
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
-                        }`}
-                      >
-                        {court.is_active ? 'Activa' : 'Pausada'}
-                      </button>
-
-                      {courts.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCourts(courts.filter((_, i) => i !== idx));
-                          }}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
-                          title="Eliminar pista"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+              {/* Interruptor Maestro de Canchas */}
+              <div className="bg-card border border-border p-4 sm:p-5 rounded-2xl space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-foreground flex items-center gap-1.5">
+                      <span>🎾</span> Habilitar Gestión de Pistas y Canchas Deportivas
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      Activa esta opción únicamente si gestionas una academia deportiva o club (pádel, tenis, fútbol).
+                      En <strong>consultorios médicos, clínicas o despachos</strong> debe permanecer apagada por defecto.
+                    </p>
                   </div>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setEnableCourts(!enableCourts)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors ${
+                      enableCourts ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'
+                    }`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition ${
+                      enableCourts ? 'translate-x-2.5' : '-translate-x-2.5'
+                    }`} />
+                  </button>
+                </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  const newId = `court-${Date.now()}`;
-                  setCourts([
-                    ...courts,
-                    {
-                      id: newId,
-                      name: `Pista ${courts.length + 1}`,
-                      type: 'cristal',
-                      is_active: true,
-                      color: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'][courts.length % 6]
-                    }
-                  ]);
-                }}
-                className="w-full py-2.5 rounded-xl border-2 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all flex items-center justify-center gap-2"
-              >
-                + Agregar Nueva Pista / Cancha
-              </button>
+              {!enableCourts ? (
+                <div className="p-5 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-dashed border-border text-center space-y-2">
+                  <span className="text-2xl">🩺</span>
+                  <h4 className="text-xs font-bold text-foreground">Gestión de Canchas Desactivada</h4>
+                  <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
+                    El calendario y las reservas operarán enfocados exclusivamente en tus médicos, especialistas y procedimientos clínicos, sin vistas ni solapamientos de canchas deportivas.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="p-3.5 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-200/50 dark:border-emerald-900/30 text-xs text-muted-foreground flex items-center gap-3">
+                    <span className="text-xl">🎾</span>
+                    <p>
+                      <strong>Recursos Físicos de la Academia:</strong> Define tus canchas reales. El motor anti-colisión del calendario impedirá que se solapen dos reservas en la misma pista.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    {courts.map((court, idx) => (
+                      <div key={court.id || idx} className="p-3 bg-card border border-border rounded-2xl flex items-center justify-between gap-3 shadow-xs">
+                        <div className="flex items-center gap-2.5 flex-1">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: court.color || '#10b981' }} />
+                          <input
+                            type="text"
+                            value={court.name}
+                            onChange={(e) => {
+                              const updated = [...courts];
+                              updated[idx] = { ...updated[idx], name: e.target.value };
+                              setCourts(updated);
+                            }}
+                            className="px-2.5 py-1.5 text-xs font-bold rounded-lg border border-border bg-background text-foreground flex-1 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                            placeholder="Nombre de la pista..."
+                          />
+                          <select
+                            value={court.type || 'cristal'}
+                            onChange={(e) => {
+                              const updated = [...courts];
+                              updated[idx] = { ...updated[idx], type: e.target.value };
+                              setCourts(updated);
+                            }}
+                            className="px-2 py-1.5 text-xs font-semibold rounded-lg border border-border bg-background text-foreground focus:outline-none"
+                          >
+                            <option value="cristal">Cristal Pro</option>
+                            <option value="panoramica">Panorámica</option>
+                            <option value="individual">Individual</option>
+                            <option value="standard">Estándar</option>
+                          </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = [...courts];
+                              updated[idx] = { ...updated[idx], is_active: !updated[idx].is_active };
+                              setCourts(updated);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase transition-all ${
+                              court.is_active
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                            }`}
+                          >
+                            {court.is_active ? 'Activa' : 'Pausada'}
+                          </button>
+
+                          {courts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCourts(courts.filter((_, i) => i !== idx));
+                              }}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+                              title="Eliminar pista"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newId = `court-${Date.now()}`;
+                      setCourts([
+                        ...courts,
+                        {
+                          id: newId,
+                          name: `Pista ${courts.length + 1}`,
+                          type: 'cristal',
+                          is_active: true,
+                          color: ['#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ec4899', '#06b6d4'][courts.length % 6]
+                        }
+                      ]);
+                    }}
+                    className="w-full py-2.5 rounded-xl border-2 border-dashed border-emerald-500/40 text-emerald-600 dark:text-emerald-400 font-bold text-xs hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    + Agregar Nueva Pista / Cancha
+                  </button>
+                </>
+              )}
             </div>
           )}
 
