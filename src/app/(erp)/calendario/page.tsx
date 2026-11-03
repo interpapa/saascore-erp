@@ -98,6 +98,10 @@ export default function CalendarioPage() {
   const isCRMEnabled = isModuleActive(tenantModules, 'clientes');
   const isTeamEnabled = isModuleActive(tenantModules, 'equipo');
   const isDentalActive = isModuleActive(tenantModules, 'odontologia');
+  const useSportsCourts = Boolean(
+    currentTenant?.metadata?.features?.use_sports_courts === true ||
+    (currentTenant?.metadata?.booking_settings as any)?.enable_courts === true
+  );
 
   // Fetch Data Function (Adaptativo a Módulos Habilitados)
   const fetchData = useCallback(async () => {
@@ -230,12 +234,7 @@ export default function CalendarioPage() {
       }
     }, 30000);
 
-    const useSportsCourts = Boolean(
-    currentTenant?.metadata?.features?.use_sports_courts === true ||
-    (currentTenant?.metadata?.booking_settings as any)?.enable_courts === true
-  );
-
-  return () => {
+    return () => {
       supabase.removeChannel(channel);
       if (bc) bc.close();
       window.removeEventListener('visibilitychange', handleVisibilityChange);
