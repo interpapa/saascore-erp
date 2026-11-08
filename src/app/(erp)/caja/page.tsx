@@ -818,10 +818,12 @@ function CajaPageContent() {
   };
 
   // Cálculos Financieros Bimoneda (USD y VES)
-  const chargeTaxes = docType === 'fiscal_invoice';
-  const taxRate = typeof currentTenant?.metadata?.tax_rate === 'number'
-    ? currentTenant.metadata.tax_rate / 100
-    : 0.16; // 16% por defecto si no está fijado
+  const fiscalSettings = currentTenant?.metadata?.fiscal_settings;
+  const isTaxEnabled = Boolean(fiscalSettings?.taxes_enabled);
+  const chargeTaxes = isTaxEnabled && docType === 'fiscal_invoice';
+  const taxRate = isTaxEnabled && typeof fiscalSettings?.tax_rate === 'number'
+    ? fiscalSettings.tax_rate / 100
+    : (isTaxEnabled && typeof currentTenant?.metadata?.tax_rate === 'number' ? currentTenant.metadata.tax_rate / 100 : 0);
 
   const subtotal = useMemo(() => {
     return ticketLines.reduce((acc, l) => acc + (l.item.base_price || 0) * l.quantity, 0);
@@ -2002,38 +2004,40 @@ function CajaPageContent() {
           </div>
 
           {/* ─────────────────────────────────────────────────────────────
-              SELECTOR DISCRETO DE COMPROBANTE (CUMPLIMIENTO SENIAT)
-              Orden de Entrega (sin IVA) vs Factura Fiscal (con IVA 16%)
+              SELECTOR DISCRETO DE COMPROBANTE (CUMPLIMIENTO SENIAT / TRIBUTARIO)
+              Solo visible si la empresa activa régimen fiscal en Configuración
              ───────────────────────────────────────────────────────────── */}
-          <div className="bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-border">
-            <div className="grid grid-cols-2 gap-1 text-xs">
-              <button
-                type="button"
-                onClick={() => setDocType('delivery_order')}
-                className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic ${
-                  docType === 'delivery_order'
-                    ? 'bg-card text-foreground shadow-xs border border-border/50'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <FileText size={14} className="text-indigo-500" />
-                <span>Orden de Entrega</span>
-              </button>
-              
-              <button
-                type="button"
-                onClick={() => setDocType('fiscal_invoice')}
-                className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic ${
-                  docType === 'fiscal_invoice'
-                    ? 'bg-primary text-primary-foreground shadow-xs'
-                    : 'text-slate-500 hover:text-foreground'
-                }`}
-              >
-                <Receipt size={14} />
-                <span>Factura Fiscal</span>
-              </button>
+          {isTaxEnabled && (
+            <div className="bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-border">
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setDocType('delivery_order')}
+                  className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic ${
+                    docType === 'delivery_order'
+                      ? 'bg-card text-foreground shadow-xs border border-border/50'
+                      : 'text-slate-500 hover:text-foreground'
+                  }`}
+                >
+                  <FileText size={14} className="text-indigo-500" />
+                  <span>Orden de Entrega</span>
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setDocType('fiscal_invoice')}
+                  className={`py-2 px-3 rounded-xl font-bold transition-all flex items-center justify-center gap-1.5 btn-haptic ${
+                    docType === 'fiscal_invoice'
+                      ? 'bg-primary text-primary-foreground shadow-xs'
+                      : 'text-slate-500 hover:text-foreground'
+                  }`}
+                >
+                  <Receipt size={14} />
+                  <span>Factura Fiscal</span>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Líneas de Productos en el Ticket */}
           <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1 flex-1">

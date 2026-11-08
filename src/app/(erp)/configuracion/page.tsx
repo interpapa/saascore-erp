@@ -8,7 +8,7 @@ import { UserRole } from '@/lib/rbac';
 import { 
   ArrowLeft, Save, Building2, Globe, Image as ImageIcon, 
   AlertTriangle, CheckCircle2, Smartphone, UserPlus, Shield,
-  Sparkles, Landmark, Trash2, Plus, Phone, MapPin, Printer, Receipt, CreditCard, X
+  Sparkles, Landmark, Trash2, Plus, Phone, MapPin, Printer, Receipt, CreditCard, X, Scale
 } from 'lucide-react';
 import { 
   getBankAccountsAction, 
@@ -67,6 +67,15 @@ export default function ConfiguracionPage() {
     language: 'es',
     logo_url: '',
     mobile_dock_modules: [] as string[]
+  });
+
+  // Estado para Régimen Fiscal & Desglose de Impuestos (Opt-In por Región / Desactivado por defecto)
+  const [fiscalSettings, setFiscalSettings] = useState({
+    taxes_enabled: false,
+    region: 'exento_salud',
+    tax_rate: 0,
+    enable_igtf: false,
+    igtf_rate: 3,
   });
 
   // Estado para Cuentas Bancarias & Pago Móvil
@@ -152,6 +161,15 @@ export default function ConfiguracionPage() {
         language: (currentTenant.metadata as any)?.language || 'es',
         logo_url: (currentTenant.metadata as any)?.logo_url || '',
         mobile_dock_modules: initialDockModules
+      });
+
+      const tenantFiscal = (currentTenant.metadata as any)?.fiscal_settings || {};
+      setFiscalSettings({
+        taxes_enabled: Boolean(tenantFiscal.taxes_enabled),
+        region: tenantFiscal.region || 'exento_salud',
+        tax_rate: typeof tenantFiscal.tax_rate === 'number' ? tenantFiscal.tax_rate : ((currentTenant.metadata as any)?.tax_rate || 0),
+        enable_igtf: Boolean(tenantFiscal.enable_igtf),
+        igtf_rate: typeof tenantFiscal.igtf_rate === 'number' ? tenantFiscal.igtf_rate : 3,
       });
 
       if (actor) {
@@ -245,7 +263,9 @@ export default function ConfiguracionPage() {
         currency: formData.currency,
         language: formData.language,
         logo_url: formData.logo_url,
-        mobile_dock_modules: cleanDockModules
+        mobile_dock_modules: cleanDockModules,
+        fiscal_settings: fiscalSettings,
+        tax_rate: fiscalSettings.taxes_enabled ? fiscalSettings.tax_rate : 0
       };
 
       if (!actor) {
@@ -491,6 +511,119 @@ export default function ConfiguracionPage() {
               </select>
             </div>
           </div>
+        </div>
+
+        {/* Sección: Régimen Fiscal & Desglose de Impuestos (Opt-In por Región) */}
+        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                  <Scale size={16} />
+                </div>
+                Régimen Fiscal & Desglose Tributario (Opt-In)
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Configura si tu negocio desglosa impuestos (IVA, retenciones) en Caja POS o si opera en modalidad directa / exenta de salud.
+              </p>
+            </div>
+            
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={fiscalSettings.taxes_enabled}
+                onChange={e => {
+                  const enabled = e.target.checked;
+                  setFiscalSettings(prev => ({
+                    ...prev,
+                    taxes_enabled: enabled,
+                    tax_rate: enabled && prev.tax_rate === 0 ? 16 : prev.tax_rate
+                  }));
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600"></div>
+              <span className="ml-3 text-xs font-bold text-foreground">
+                {fiscalSettings.taxes_enabled ? 'Impuestos ACTIVADOS' : 'Desactivado (0% / Exento)'}
+              </span>
+            </label>
+          </div>
+
+          {!fiscalSettings.taxes_enabled ? (
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1">
+              <p className="font-semibold text-slate-700 dark:text-slate-300">
+                🌱 Modalidad Exenta o Directa Activa (Recomendada para Clínicas y Consultorios)
+              </p>
+              <p>
+                Caja POS cobrará el importe neto exacto sin recargos tributarios ni selector de facturación fiscal obligatorio. Activa el interruptor solo si tu entidad tributaria (SENIAT, DIAN, SAT) exige facturación fiscal con desglose de IVA.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-3 border-t border-border animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Región / Localización Fiscal
+                  </label>
+                  <select
+                    value={fiscalSettings.region}
+                    onChange={e => {
+                      const region = e.target.value;
+                      let rate = fiscalSettings.tax_rate;
+                      let igtf = fiscalSettings.enable_igtf;
+                      if (region === 've_seniat') { rate = 16; igtf = true; }
+                      else if (region === 'co_dian') { rate = 19; igtf = false; }
+                      else if (region === 'mx_sat') { rate = 16; igtf = false; }
+                      else if (region === 'exento_salud') { rate = 0; igtf = false; }
+                      setFiscalSettings(prev => ({ ...prev, region, tax_rate: rate, enable_igtf: igtf }));
+                    }}
+                    className="w-full bg-background border border-input rounded-xl px-3 py-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                  >
+                    <option value="ve_seniat">Venezuela (SENIAT - IVA 16% + IGTF)</option>
+                    <option value="co_dian">Colombia (DIAN - IVA 19%)</option>
+                    <option value="mx_sat">México (SAT - IVA 16%)</option>
+                    <option value="exento_salud">Salud / Exento (Tasa 0%)</option>
+                    <option value="personalizado">Personalizado (Manual)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-foreground mb-1">
+                    Tasa de Impuesto General / IVA (%)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={fiscalSettings.tax_rate}
+                    onChange={e => setFiscalSettings(prev => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
+                    className="w-full bg-background border border-input rounded-xl px-3 py-2.5 text-xs font-mono font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                  />
+                </div>
+
+                {fiscalSettings.region === 've_seniat' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground mb-1">
+                      IGTF Pagos en Divisas (%)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="20"
+                        step="0.5"
+                        value={fiscalSettings.igtf_rate}
+                        onChange={e => setFiscalSettings(prev => ({ ...prev, igtf_rate: parseFloat(e.target.value) || 0 }))}
+                        className="w-24 bg-background border border-input rounded-xl px-3 py-2.5 text-xs font-mono font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
+                      />
+                      <span className="text-xs text-slate-500">Aplica sobre pagos en USD</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sección: Cuentas Bancarias & Pago Móvil */}

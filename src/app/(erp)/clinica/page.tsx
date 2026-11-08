@@ -256,6 +256,7 @@ export default function ClinicaMultiEspecialidadPage() {
   const [medicalProfile, setMedicalProfile] = useState<ClinicalMedicalProfile>({});
   const [specialtiesState, setSpecialtiesState] = useState<Record<string, any>>({});
   const [clinicalEncounters, setClinicalEncounters] = useState<ClinicalEncounterRecord[]>([]);
+  const [filterBySpecialty, setFilterBySpecialty] = useState(true);
 
   // Edición en vivo del Cintillo de Alertas Médicas (Alergias y Patologías Crónicas)
   const [isEditingAlerts, setIsEditingAlerts] = useState(false);
@@ -457,6 +458,12 @@ export default function ClinicaMultiEspecialidadPage() {
         item.description.toLowerCase().includes(q)
     );
   }, [activeSpecialtyConfig.commonCie10, cie10Search]);
+
+  // Historial de consultas filtrado por especialidad activa (Expediente personalizado sin choques)
+  const displayedEncounters = useMemo(() => {
+    if (!filterBySpecialty) return clinicalEncounters;
+    return clinicalEncounters.filter((enc) => enc.specialtyId === activeSpecialtyId);
+  }, [clinicalEncounters, filterBySpecialty, activeSpecialtyId]);
 
   // Guardar alertas médicas (Alergias, Patologías Crónicas, Grupo Sanguíneo) en vivo
   const handleSaveMedicalAlerts = async () => {
@@ -1611,25 +1618,50 @@ export default function ClinicaMultiEspecialidadPage() {
 
           {/* HISTORIAL CRONOLÓGICO DE CONSULTAS ANTERIORES DEL PACIENTE */}
           <div className="rounded-2xl border border-[var(--border-color)] bg-[var(--bg-primary)] p-4 sm:p-5 shadow-sm space-y-3">
-            <div className="flex items-center justify-between pb-2.5 border-b border-[var(--border-color)]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-[var(--border-color)]">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-sky-500" />
                 <h3 className="text-sm font-black text-[var(--text-primary)]">
-                  Historial Cronológico de Consultas Anteriores
+                  Historial Cronológico de Consultas
                 </h3>
               </div>
-              <span className="text-xs font-semibold text-[var(--text-secondary)]">
-                {clinicalEncounters.length} registro(s)
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFilterBySpecialty(prev => !prev)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all btn-haptic ${
+                    filterBySpecialty
+                      ? 'bg-sky-50 dark:bg-sky-950/40 border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300'
+                      : 'bg-[var(--bg-secondary)] border-[var(--border-color)] text-[var(--text-secondary)]'
+                  }`}
+                  title="Alternar entre ver solo consultas de este módulo o de todas las especialidades"
+                >
+                  {filterBySpecialty ? `Solo ${activeSpecialtyConfig.shortName}` : 'Ver Todas las Especialidades'}
+                </button>
+                <span className="text-xs font-semibold text-[var(--text-secondary)]">
+                  {displayedEncounters.length} de {clinicalEncounters.length}
+                </span>
+              </div>
             </div>
 
             {clinicalEncounters.length === 0 ? (
               <div className="py-8 text-center text-xs text-[var(--text-secondary)]">
                 Este paciente aún no registra encuentros médicos previos en su historia clínica.
               </div>
+            ) : displayedEncounters.length === 0 ? (
+              <div className="py-8 text-center text-xs text-[var(--text-secondary)] space-y-2">
+                <p>No hay consultas previas registradas para <strong>{activeSpecialtyConfig.name}</strong>.</p>
+                <button
+                  type="button"
+                  onClick={() => setFilterBySpecialty(false)}
+                  className="text-sky-600 underline text-[11px] font-bold"
+                >
+                  Ver {clinicalEncounters.length} consulta(s) de otras especialidades médicas
+                </button>
+              </div>
             ) : (
               <div className="space-y-2.5 max-h-[360px] overflow-y-auto pr-1">
-                {clinicalEncounters.map((enc) => {
+                {displayedEncounters.map((enc) => {
                   const specInfo =
                     MEDICAL_SPECIALTIES_MAP[enc.specialtyId as MedicalSpecialtyId] ||
                     MEDICAL_SPECIALTIES_MAP.med_general;
