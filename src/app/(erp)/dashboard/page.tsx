@@ -239,6 +239,8 @@ export default function LauncherPage() {
 
     // 1. Debe estar activo en la empresa
     const SPECIALTY_ALIASES: Record<string, string> = {
+      odontologia: 'med_odontologia',
+      med_odontologia: 'odontologia',
       ginecologia: 'med_ginecologia',
       med_ginecologia: 'ginecologia',
       cardiologia: 'med_cardiologia',

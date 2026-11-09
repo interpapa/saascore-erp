@@ -33,7 +33,7 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 ### D. El Gestor de Licencias de Módulos (`/apps`)
 * **Archivo:** `src/app/(erp)/apps/page.tsx`
 * **Función:** Es la tienda/gestor de activación de módulos (estilo Odoo Apps).
-* **Comportamiento:** Permite al administrador activar (`+ Activar`) o desactivar módulos disponibles según la suscripción. Resuelve dependencias en cascada (ej. si activas caja, activa inventario).
+* **Comportamiento:** Permite al administrador activar (`+ Activar`) o desactivar módulos disponibles según la suscripción. Resuelve dependencias en cascada (ej. si activas caja, activa inventario). Para módulos ya instalados, incluye el botón directo `Abrir Módulo ↗` para ingresar inmediatamente a la aplicación.
 
 ---
 

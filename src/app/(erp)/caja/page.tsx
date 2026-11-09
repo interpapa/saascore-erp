@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -1356,6 +1356,20 @@ function CajaPageContent() {
             </button>
           )}
 
+          {pendingDentalOrders.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsDentalOrdersModalOpen(true)}
+              className="relative px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black transition-all flex items-center gap-1.5 shadow-md shadow-teal-500/20 btn-haptic"
+            >
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              </span>
+              <span>Órdenes Médicas ({pendingDentalOrders.length})</span>
+            </button>
+          )}
+
           {/* Abrir / Cerrar Caja (Arqueo Z) */}
           <button
             type="button"
@@ -1372,36 +1386,46 @@ function CajaPageContent() {
         </div>
       </div>
 
-      {/* BANNER DE CONSULTAS ODONTOLÓGICAS PENDIENTES DE COBRO */}
-      {pendingDentalOrders.length > 0 && (
-        <div className="bg-linear-to-r from-teal-500/15 via-cyan-500/10 to-transparent border border-teal-500/30 rounded-3xl p-4 flex items-center justify-between gap-3 shadow-xs animate-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-teal-500 text-white flex items-center justify-center font-black text-lg shadow-sm shadow-teal-500/30 shrink-0">
-              🦷
+      {/* BANNER DE CONSULTAS MÉDICAS Y ODONTOLÓGICAS PENDIENTES DE COBRO */}
+      {pendingDentalOrders.length > 0 && (() => {
+        const hasDental = pendingDentalOrders.some(d => d.metadata?.source === 'dental_consultation' || d.metadata?.specialty_id?.includes('odont'));
+        const hasMedical = pendingDentalOrders.some(d => d.metadata?.source === 'clinica' || (!d.metadata?.source?.includes('dental') && d.metadata?.source));
+        const label = hasDental && hasMedical 
+          ? pendingDentalOrders.length + ' Consultas Médicas y Dentales por Cobrar'
+          : hasDental
+            ? pendingDentalOrders.length + ' Consulta(s) Odontológica(s) por Cobrar'
+            : pendingDentalOrders.length + ' Orden(es) Médica(s) por Cobrar';
+        const icon = hasDental && !hasMedical ? '🦷' : hasMedical && !hasDental ? '🩺' : '🏥';
+        return (
+          <div className="bg-linear-to-r from-teal-500/15 via-sky-500/10 to-transparent border border-teal-500/30 rounded-3xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in slide-in-from-top duration-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-teal-500 text-white flex items-center justify-center font-black text-lg shadow-sm shadow-teal-500/30 shrink-0">
+                {icon}
+              </div>
+              <div>
+                <p className="text-xs font-black text-foreground flex items-center gap-2 flex-wrap">
+                  <span>{label}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500 text-white font-bold animate-pulse">
+                    Listo para Cobrar
+                  </span>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  El especialista ha despachado la orden desde el consultorio para liquidación en mostrador.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-black text-foreground flex items-center gap-2">
-                <span>{pendingDentalOrders.length} Consulta(s) Odontológica(s) por Cobrar</span>
-                <span className="text-[10px] px-2 py-0.2 rounded-full bg-teal-500 text-white font-bold">
-                  Sillón Dental
-                </span>
-              </p>
-              <p className="text-[11px] text-slate-500">
-                El odontólogo ha enviado la orden de consulta para liquidación en mostrador.
-              </p>
-            </div>
-          </div>
 
-          <button
-            type="button"
-            onClick={() => setIsDentalOrdersModalOpen(true)}
-            className="px-4 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black transition-all shadow-md shadow-teal-500/20 flex items-center gap-1.5 shrink-0 btn-haptic"
-          >
-            <span>Ver y Cargar ({pendingDentalOrders.length})</span>
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      )}
+            <button
+              type="button"
+              onClick={() => setIsDentalOrdersModalOpen(true)}
+              className="px-4 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black transition-all shadow-md shadow-teal-500/20 flex items-center justify-center gap-1.5 shrink-0 btn-haptic"
+            >
+              <span>Ver y Cargar ({pendingDentalOrders.length})</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        );
+      })()}
 
       {/* ─────────────────────────────────────────────────────────────
           2. LAYOUT PRINCIPAL EN 2 COLUMNAS (CATÁLOGO + TICKET)

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -29,8 +29,18 @@ import {
   Heart,
   Sparkles,
   Bone,
-  Eye
+  Eye,
+  ExternalLink
 } from 'lucide-react';
+
+function getModuleHref(id: string): string {
+  if (id === 'config') return '/configuracion';
+  if (id === 'med_general') return '/clinica?spec=med_general';
+  if (['cardiologia', 'pediatria', 'dermatologia', 'traumatologia', 'oftalmologia'].includes(id)) {
+    return '/clinica?spec=' + id;
+  }
+  return '/' + id;
+}
 import { useERPStore } from '@/store/useERPStore';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { updateTenantSettings } from '@/app/actions/tenant';
@@ -321,7 +331,17 @@ export default function AppsManagerPage() {
 
               <div className="pt-4 mt-4 border-t border-border flex items-center justify-between text-[11px] font-semibold text-slate-400">
                 <span className="capitalize">{mod.category}</span>
-                <span>{isActive ? 'Instalado' : 'Disponible'}</span>
+                {isActive ? (
+                  <Link
+                    href={getModuleHref(mod.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-bold text-xs transition-all btn-haptic"
+                  >
+                    <span>Abrir Módulo</span>
+                    <ExternalLink size={13} />
+                  </Link>
+                ) : (
+                  <span>Disponible</span>
+                )}
               </div>
             </div>
           );
