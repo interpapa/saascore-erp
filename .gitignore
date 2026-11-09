@@ -39,7 +39,13 @@ yarn-error.log*
 next-env.d.ts
 
 # agents directory
-/.agents/
+/.agents/*
+!/.agents/context/
+!/.agents/context/**
+!/.agents/agents/
+!/.agents/agents/**
+!/.agents/skills/
+!/.agents/skills/**
 scratch/
 test_execution_results.log
 check_db.ts
