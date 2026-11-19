@@ -28,7 +28,9 @@ import {
   KeyRound,
   LogIn,
   UserPlus,
-  X
+  X,
+  Scale,
+  Lock
 } from 'lucide-react';
 import { useToast } from '@/components/core/ToastProvider';
 import Link from 'next/link';
@@ -112,6 +114,15 @@ export default function TenantAdminPage() {
   const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({});
   const [modulesCategoryFilter, setModulesCategoryFilter] = useState<'all' | 'comercial' | 'operaciones' | 'salud' | 'servicios'>('all');
 
+  // Gobernanza Fiscal Exclusiva (Superadmin Rendo Hub)
+  const [fiscalSettings, setFiscalSettings] = useState({
+    taxes_enabled: false,
+    region: 'exento_salud',
+    tax_rate: 0,
+    enable_igtf: false,
+    igtf_rate: 3,
+  });
+
   // Gestión de Usuarios del Tenant
   const [users, setUsers] = useState<any[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
@@ -142,8 +153,25 @@ export default function TenantAdminPage() {
     };
     if (JSON.stringify(featureFlags) !== JSON.stringify(initialFeatures)) return true;
 
+    const initialFiscal = tenant.metadata?.fiscal_settings || {
+      taxes_enabled: false,
+      region: 'exento_salud',
+      tax_rate: 0,
+      enable_igtf: false,
+      igtf_rate: 3,
+    };
+    if (
+      fiscalSettings.taxes_enabled !== Boolean(initialFiscal.taxes_enabled) ||
+      fiscalSettings.region !== (initialFiscal.region || 'exento_salud') ||
+      fiscalSettings.tax_rate !== (typeof initialFiscal.tax_rate === 'number' ? initialFiscal.tax_rate : (tenant.metadata?.tax_rate || 0)) ||
+      fiscalSettings.enable_igtf !== Boolean(initialFiscal.enable_igtf) ||
+      fiscalSettings.igtf_rate !== (typeof initialFiscal.igtf_rate === 'number' ? initialFiscal.igtf_rate : 3)
+    ) {
+      return true;
+    }
+
     return false;
-  }, [tenant, name, subscriptionPlan, status, activeModules, featureFlags]);
+  }, [tenant, name, subscriptionPlan, status, activeModules, featureFlags, fiscalSettings]);
 
   useEffect(() => {
     if ((session?.userEmail || actor?.email) && id) {
@@ -177,6 +205,15 @@ export default function TenantAdminPage() {
         use_calendar_employees: true,
         use_pos_discounts: true,
         use_calendar_whatsapp: true
+      });
+
+      const tenantFiscal = result.tenant.metadata?.fiscal_settings || {};
+      setFiscalSettings({
+        taxes_enabled: Boolean(tenantFiscal.taxes_enabled),
+        region: tenantFiscal.region || 'exento_salud',
+        tax_rate: typeof tenantFiscal.tax_rate === 'number' ? tenantFiscal.tax_rate : (result.tenant.metadata?.tax_rate || 0),
+        enable_igtf: Boolean(tenantFiscal.enable_igtf),
+        igtf_rate: typeof tenantFiscal.igtf_rate === 'number' ? tenantFiscal.igtf_rate : 3,
       });
     } else if (result.error) {
       toast({ variant: 'error', title: 'Error de lectura', description: result.error });
@@ -340,7 +377,9 @@ export default function TenantAdminPage() {
     const newMetadata = {
       ...(tenant.metadata || {}),
       features: featureFlags,
-      active_modules: finalModules
+      active_modules: finalModules,
+      fiscal_settings: fiscalSettings,
+      tax_rate: fiscalSettings.taxes_enabled ? fiscalSettings.tax_rate : 0
     };
 
     const updates = {
@@ -493,6 +532,147 @@ export default function TenantAdminPage() {
               </select>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Gobernanza Fiscal Exclusiva (Superadmin Rendo Hub) */}
+      <div className="bg-card border-2 border-amber-500/30 rounded-2xl p-5 sm:p-6 shadow-sm space-y-5 relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <Scale size={18} />
+              </div>
+              <h3 className="font-black text-foreground text-base sm:text-lg tracking-tight">
+                Gobernanza Fiscal Exclusiva (Superadmin)
+              </h3>
+              <span className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                <Lock size={10} /> Control Central
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Define el régimen tributario del negocio. Los usuarios locales del tenant NO pueden alterar estos parámetros.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="relative inline-flex items-center cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={fiscalSettings.taxes_enabled}
+                onChange={e => {
+                  const enabled = e.target.checked;
+                  setFiscalSettings(prev => ({
+                    ...prev,
+                    taxes_enabled: enabled,
+                    tax_rate: enabled && prev.tax_rate === 0 ? 16 : prev.tax_rate,
+                    region: enabled && prev.region === 'exento_salud' ? 've_seniat' : prev.region,
+                    enable_igtf: enabled ? true : prev.enable_igtf,
+                  }));
+                }}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600"></div>
+              <span className="ml-3 text-xs font-black text-foreground">
+                {fiscalSettings.taxes_enabled ? 'Facturación Fiscal ACTIVADA' : 'Solo Gestión Interna (0% IVA)'}
+              </span>
+            </label>
+          </div>
+        </div>
+
+        {fiscalSettings.taxes_enabled ? (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1 animate-in fade-in duration-200">
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                Jurisdicción / Localización Fiscal
+              </label>
+              <select
+                value={fiscalSettings.region}
+                onChange={e => {
+                  const reg = e.target.value;
+                  let rate = fiscalSettings.tax_rate;
+                  let igtf = fiscalSettings.enable_igtf;
+                  let igtfRate = fiscalSettings.igtf_rate;
+                  if (reg === 've_seniat') { rate = 16; igtf = true; igtfRate = 3; }
+                  else if (reg === 'co_dian') { rate = 19; igtf = false; }
+                  else if (reg === 'mx_sat') { rate = 16; igtf = false; }
+                  else if (reg === 'exento_salud') { rate = 0; igtf = false; }
+                  setFiscalSettings(prev => ({
+                    ...prev,
+                    region: reg,
+                    tax_rate: rate,
+                    enable_igtf: igtf,
+                    igtf_rate: igtfRate
+                  }));
+                }}
+                className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-bold text-foreground focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all cursor-pointer"
+              >
+                <option value="ve_seniat">Venezuela (SENIAT - Prov. SNAT/2026/00093)</option>
+                <option value="co_dian">Colombia (DIAN - IVA 19%)</option>
+                <option value="mx_sat">México (SAT - IVA 16%)</option>
+                <option value="exento_salud">Salud / Exento (Tasa 0% Art. 18)</option>
+                <option value="personalizado">Personalizado</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                Alícuota IVA General (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={fiscalSettings.tax_rate}
+                onChange={e => setFiscalSettings(prev => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
+                className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-mono font-bold text-foreground focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                Alícuota IGTF Moneda Extranjera (%)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="20"
+                  step="0.5"
+                  disabled={!fiscalSettings.enable_igtf}
+                  value={fiscalSettings.igtf_rate}
+                  onChange={e => setFiscalSettings(prev => ({ ...prev, igtf_rate: parseFloat(e.target.value) || 0 }))}
+                  className="w-full bg-background border border-border rounded-xl px-3 py-2.5 text-xs font-mono font-bold text-foreground focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none transition-all disabled:opacity-40"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFiscalSettings(prev => ({ ...prev, enable_igtf: !prev.enable_igtf }))}
+                  className={`text-[10px] font-black uppercase px-2.5 py-2.5 rounded-xl border transition-all shrink-0 ${
+                    fiscalSettings.enable_igtf
+                      ? 'bg-amber-500/10 text-amber-600 border-amber-500/30'
+                      : 'bg-muted text-muted-foreground border-border'
+                  }`}
+                >
+                  {fiscalSettings.enable_igtf ? 'IGTF ON' : 'IGTF OFF'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="p-3.5 rounded-xl bg-muted/40 border border-border/80 text-xs text-muted-foreground flex items-center gap-2.5">
+            <ShieldCheck size={16} className="text-slate-400 shrink-0" />
+            <span>
+              <strong>Modo de Gestión Interna / Régimen Directo:</strong> Este negocio cobra el monto neto exacto (0% IVA). En Caja POS no se generará débito fiscal ni retenciones SENIAT hasta que el Superadministrador active este interruptor.
+            </span>
+          </div>
+        )}
+
+        <div className="text-[11px] text-amber-700/80 dark:text-amber-400/80 bg-amber-500/5 p-3 rounded-xl border border-amber-500/10 flex items-center gap-2">
+          <Lock size={12} className="shrink-0" />
+          <span>
+            Los cambios guardados aquí se sincronizan inmediatamente con el motor POS, la generación de comprobantes digitales Prov. 00093 y el Libro de Ventas NIIF.
+          </span>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import { UserRole } from '@/lib/rbac';
 import { 
   ArrowLeft, Save, Building2, Globe, Image as ImageIcon, 
   AlertTriangle, CheckCircle2, Smartphone, UserPlus, Shield,
-  Sparkles, Landmark, Trash2, Plus, Phone, MapPin, Printer, Receipt, CreditCard, X, Scale
+  Sparkles, Landmark, Trash2, Plus, Phone, MapPin, Printer, Receipt, CreditCard, X, Scale, Lock, ShieldCheck
 } from 'lucide-react';
 import { 
   getBankAccountsAction, 
@@ -264,8 +264,6 @@ export default function ConfiguracionPage() {
         language: formData.language,
         logo_url: formData.logo_url,
         mobile_dock_modules: cleanDockModules,
-        fiscal_settings: fiscalSettings,
-        tax_rate: fiscalSettings.taxes_enabled ? fiscalSettings.tax_rate : 0
       };
 
       if (!actor) {
@@ -513,117 +511,100 @@ export default function ConfiguracionPage() {
           </div>
         </div>
 
-        {/* Sección: Régimen Fiscal & Desglose de Impuestos (Opt-In por Región) */}
-        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <div>
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+        {/* Sección: Régimen Fiscal & Certificación (Gobernanza Central Exclusiva Rendo Hub) */}
+        <div className="bg-card border border-border rounded-3xl p-6 md:p-8 shadow-sm relative overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 border-b border-border/60 pb-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
                   <Scale size={16} />
                 </div>
-                Régimen Fiscal & Desglose Tributario (Opt-In)
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Configura si tu negocio desglosa impuestos (IVA, retenciones) en Caja POS o si opera en modalidad directa / exenta de salud.
+                <h2 className="text-lg font-bold text-foreground">
+                  Régimen Fiscal & Desglose Tributario
+                </h2>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                  <Lock size={10} /> Solo Lectura
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Estado fiscal certificado de la empresa. Este módulo rige la emisión de facturas y el libro de ventas contable.
               </p>
             </div>
-            
-            <label className="relative inline-flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={fiscalSettings.taxes_enabled}
-                onChange={e => {
-                  const enabled = e.target.checked;
-                  setFiscalSettings(prev => ({
-                    ...prev,
-                    taxes_enabled: enabled,
-                    tax_rate: enabled && prev.tax_rate === 0 ? 16 : prev.tax_rate
-                  }));
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-600"></div>
-              <span className="ml-3 text-xs font-bold text-foreground">
-                {fiscalSettings.taxes_enabled ? 'Impuestos ACTIVADOS' : 'Desactivado (0% / Exento)'}
+
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black ${
+                fiscalSettings.taxes_enabled
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-border'
+              }`}>
+                {fiscalSettings.taxes_enabled ? (
+                  <>
+                    <ShieldCheck size={14} className="text-emerald-500" />
+                    Contribuyente Formal Activo
+                  </>
+                ) : (
+                  <>
+                    <Lock size={14} className="text-slate-400" />
+                    Solo Gestión Interna (0% IVA)
+                  </>
+                )}
               </span>
-            </label>
+            </div>
           </div>
 
-          {!fiscalSettings.taxes_enabled ? (
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 text-xs text-slate-500 space-y-1">
-              <p className="font-semibold text-slate-700 dark:text-slate-300">
-                🌱 Modalidad Exenta o Directa Activa (Recomendada para Clínicas y Consultorios)
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+            <div className="p-4 rounded-2xl bg-muted/30 border border-border/80">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                Localización / Jurisdicción
+              </span>
+              <div className="text-sm font-black text-foreground capitalize">
+                {fiscalSettings.region === 've_seniat' ? 'Venezuela (SENIAT - Prov. 00093)' :
+                 fiscalSettings.region === 'co_dian' ? 'Colombia (DIAN)' :
+                 fiscalSettings.region === 'mx_sat' ? 'México (SAT)' :
+                 fiscalSettings.region === 'exento_salud' ? 'Sector Salud (Exento Art. 18)' :
+                 fiscalSettings.region}
+              </div>
+              <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                {fiscalSettings.taxes_enabled ? 'Facturación digital con validez fiscal' : 'Comprobantes y recibos internos'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-muted/30 border border-border/80">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                Alícuota IVA General
+              </span>
+              <div className="text-sm font-black text-foreground font-mono">
+                {fiscalSettings.taxes_enabled ? `${fiscalSettings.tax_rate}%` : '0.00% (Exento)'}
+              </div>
+              <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                {fiscalSettings.taxes_enabled ? 'Aplicado en facturas y POS' : 'Sin recargo tributario al cliente'}
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-muted/30 border border-border/80">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block mb-1">
+                IGTF (Divisas / Moneda Extranjera)
+              </span>
+              <div className="text-sm font-black text-foreground font-mono">
+                {fiscalSettings.taxes_enabled && fiscalSettings.enable_igtf ? `${fiscalSettings.igtf_rate}%` : 'No Aplica'}
+              </div>
+              <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                {fiscalSettings.taxes_enabled && fiscalSettings.enable_igtf ? 'Pagos en USD / Efectivo' : 'Desactivado por política'}
+              </span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+            <Lock size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed space-y-1">
+              <p className="font-bold">
+                🔒 Parámetro administrativo bajo gobernanza central exclusiva (Rendo Hub)
               </p>
               <p>
-                Caja POS cobrará el importe neto exacto sin recargos tributarios ni selector de facturación fiscal obligatorio. Activa el interruptor solo si tu entidad tributaria (SENIAT, DIAN, SAT) exige facturación fiscal con desglose de IVA.
+                Para garantizar la inalterabilidad de los libros contables y prevenir discrepancias impositivas ante las autoridades tributarias, la activación o modificación de este régimen sólo puede ser realizada por el Administrador de Rendo Hub. Si requieres habilitar la facturación formal con Providencia SNAT/2026/00093 o modificar tus tasas, por favor contacta a tu asesor de cuenta.
               </p>
             </div>
-          ) : (
-            <div className="space-y-4 pt-3 border-t border-border animate-in fade-in duration-200">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Región / Localización Fiscal
-                  </label>
-                  <select
-                    value={fiscalSettings.region}
-                    onChange={e => {
-                      const region = e.target.value;
-                      let rate = fiscalSettings.tax_rate;
-                      let igtf = fiscalSettings.enable_igtf;
-                      if (region === 've_seniat') { rate = 16; igtf = true; }
-                      else if (region === 'co_dian') { rate = 19; igtf = false; }
-                      else if (region === 'mx_sat') { rate = 16; igtf = false; }
-                      else if (region === 'exento_salud') { rate = 0; igtf = false; }
-                      setFiscalSettings(prev => ({ ...prev, region, tax_rate: rate, enable_igtf: igtf }));
-                    }}
-                    className="w-full bg-background border border-input rounded-xl px-3 py-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                  >
-                    <option value="ve_seniat">Venezuela (SENIAT - IVA 16% + IGTF)</option>
-                    <option value="co_dian">Colombia (DIAN - IVA 19%)</option>
-                    <option value="mx_sat">México (SAT - IVA 16%)</option>
-                    <option value="exento_salud">Salud / Exento (Tasa 0%)</option>
-                    <option value="personalizado">Personalizado (Manual)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground mb-1">
-                    Tasa de Impuesto General / IVA (%)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.01"
-                    value={fiscalSettings.tax_rate}
-                    onChange={e => setFiscalSettings(prev => ({ ...prev, tax_rate: parseFloat(e.target.value) || 0 }))}
-                    className="w-full bg-background border border-input rounded-xl px-3 py-2.5 text-xs font-mono font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                  />
-                </div>
-
-                {fiscalSettings.region === 've_seniat' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-foreground mb-1">
-                      IGTF Pagos en Divisas (%)
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        min="0"
-                        max="20"
-                        step="0.5"
-                        value={fiscalSettings.igtf_rate}
-                        onChange={e => setFiscalSettings(prev => ({ ...prev, igtf_rate: parseFloat(e.target.value) || 0 }))}
-                        className="w-24 bg-background border border-input rounded-xl px-3 py-2.5 text-xs font-mono font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/30"
-                      />
-                      <span className="text-xs text-slate-500">Aplica sobre pagos en USD</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          </div>
         </div>
 
         {/* Sección: Cuentas Bancarias & Pago Móvil */}

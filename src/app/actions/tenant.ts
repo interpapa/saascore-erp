@@ -333,6 +333,21 @@ export async function updateTenantSettings(
         ...existingMetadata,
         ...(updatedMetadata && typeof updatedMetadata === 'object' ? (updatedMetadata as Record<string, unknown>) : {}),
       };
+
+      // 🛡️ BLINDAJE DE SEGURIDAD FISCAL (Anti-Manipulación):
+      // Solo el Superadmin desde Rendo Hub (/admin) puede modificar fiscal_settings y tax_rate.
+      // Si el actor no es Superadmin, se preserva inmutable la configuración fiscal establecida centralmente.
+      const isSuperadmin = actor.role === 'superadmin' || (actor.email && isSuperAdminEmail(actor.email));
+      if (!isSuperadmin) {
+        (updatePayload.metadata as Record<string, unknown>).fiscal_settings = existingMetadata.fiscal_settings || {
+          taxes_enabled: false,
+          region: 'exento_salud',
+          tax_rate: 0,
+          enable_igtf: false,
+          igtf_rate: 3,
+        };
+        (updatePayload.metadata as Record<string, unknown>).tax_rate = existingMetadata.tax_rate ?? 0;
+      }
     }
 
     const { data: tenant, error } = await db

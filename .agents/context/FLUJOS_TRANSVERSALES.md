@@ -73,3 +73,14 @@ sequenceDiagram
 2. **Despacho Logístico:** Se emite la Nota de Entrega (`type: work_order`, `actual_type: delivery_order`) que ampara la movilización de la carga.
 3. **Facturación Digital Telemática:** Una vez entregado el pedido, se timbra la Factura Digital cumpliendo con el Artículo 8 de la Providencia 00093 (estampado con segundos `HH:MM:SS`, bimoneda BCV, domicilio fiscal del comprador y hash SHA-256).
 4. **Cruce de Retenciones Fiscales:** Si el cliente mayorista retiene el 75% o 100% de IVA, se registra el comprobante fiscal, deduciéndolo del saldo por cobrar y cargándolo a la cuenta de activo `1.1.03.01 (Anticipo de IVA por Compensar)`.
+
+---
+
+## 5. Gobernanza Central de Activación Fiscal & Blindaje Anti-Manipulación
+
+1. **Jerarquía Exclusiva:** Los parámetros fiscales (`taxes_enabled`, `region`, `tax_rate`, `enable_igtf`, `igtf_rate`) son de **solo lectura** para los usuarios del tenant en `/configuracion`.
+2. **Control Centralizado en Rendo Hub (`/admin/tenant/[id]`):** Únicamente el Superadministrador de la plataforma puede activar el régimen formal o alterar las tasas impositivas.
+3. **Blindaje en Servidor (`updateTenantSettings`):** Cualquier solicitud proveniente de un actor no-superadmin que intente enviar `fiscal_settings` o `tax_rate` es neutralizada en el backend, restaurando los valores originales de la base de datos.
+4. **Impacto en Contabilidad NIIF:**
+   - Si `taxes_enabled = false`: El sistema opera en "Solo Gestión Interna" (0% IVA). La cuenta `2.1.02.01 (Débito Fiscal por Pagar)` se mantiene en 0.
+   - Si `taxes_enabled = true`: El sistema opera como "Contribuyente Formal". Cada venta desglosa IVA/IGTF, timbra el documento con hash SHA-256 y alimenta el Libro de Ventas Fiscal para la declaración de la Forma 30.
