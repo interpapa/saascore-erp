@@ -45,3 +45,31 @@ sequenceDiagram
 2. La factura se emite en estado pendiente.
 3. El saldo deudor se suma atómicamente a `entities.metadata.debt_balance`.
 4. En `/clientes`, el cliente muestra su semáforo de deuda y el botón para registrar abonos parciales, balanceando la cuenta `1.1.02.01 (Cuentas por Cobrar)`.
+
+---
+
+## 4. Flujo Distribuidora & Facturación Digital (Providencia SNAT/2026/00093)
+
+```mermaid
+sequenceDiagram
+    actor Vendedor as Preventista en Ruta
+    participant ERP as Rendo ERP
+    participant Almacen as Almacén (Despacho)
+    actor Cliente as Cliente Mayorista (Contribuyente Especial)
+    participant NIIF as Contabilidad NIIF
+
+    Vendedor->>ERP: Carga Pedido (Cotización `type: quote`)
+    ERP->>Almacen: Genera Nota de Entrega (`convertQuoteToDeliveryAndInvoiceAction`)
+    Almacen->>Almacen: Picking de Mercancía & Descuento de Kardex
+    Almacen->>Cliente: Camión despacha con Nota de Entrega impresa
+    Cliente->>ERP: Conformidad de recepción en destino
+    ERP->>ERP: Generación de Factura Digital Providencia 00093 con Hash SHA-256 y QR
+    ERP->>Cliente: Envío automático de Factura Digital en PDF vía WhatsApp / Email
+    Cliente->>ERP: Pago bancario + Comprobante de Retención IVA 75% (`recordFiscalRetentionVoucherAction`)
+    ERP->>NIIF: Asiento automático de compensación (Anticipo IVA 1.1.03.01 vs Cuentas por Cobrar 1.1.02.01)
+```
+
+1. **Preventa / Cotización:** El vendedor en calle toma el pedido desde la app móvil de Rendo con listas de precio mayoristas.
+2. **Despacho Logístico:** Se emite la Nota de Entrega (`type: work_order`, `actual_type: delivery_order`) que ampara la movilización de la carga.
+3. **Facturación Digital Telemática:** Una vez entregado el pedido, se timbra la Factura Digital cumpliendo con el Artículo 8 de la Providencia 00093 (estampado con segundos `HH:MM:SS`, bimoneda BCV, domicilio fiscal del comprador y hash SHA-256).
+4. **Cruce de Retenciones Fiscales:** Si el cliente mayorista retiene el 75% o 100% de IVA, se registra el comprobante fiscal, deduciéndolo del saldo por cobrar y cargándolo a la cuenta de activo `1.1.03.01 (Anticipo de IVA por Compensar)`.

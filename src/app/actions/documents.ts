@@ -783,3 +783,40 @@ export async function getStepTemplatesAction(
     return { success: false, error: (err as Error).message };
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Facturación Digital Providencia SNAT/2026/00093
+// ─────────────────────────────────────────────────────────────
+import {
+  createProvidencia00093InvoiceAction as _createProvidencia00093InvoiceAction,
+  convertQuoteToDeliveryAndInvoiceAction as _convertQuoteToDeliveryAndInvoiceAction,
+  recordFiscalRetentionVoucherAction as _recordFiscalRetentionVoucherAction,
+} from './digitalInvoicingActions';
+import type { CreateProvidencia00093InvoiceInput } from './digitalInvoicingActions';
+
+export async function createProvidencia00093InvoiceAction(
+  input: CreateProvidencia00093InvoiceInput,
+  tenantId: string,
+  actor: ActionActor
+) {
+  return await _createProvidencia00093InvoiceAction(input, tenantId, actor);
+}
+
+export async function convertQuoteToDeliveryAndInvoiceAction(
+  params: Parameters<typeof _convertQuoteToDeliveryAndInvoiceAction>[0],
+  tenantId: string,
+  actor: ActionActor
+) {
+  return await _convertQuoteToDeliveryAndInvoiceAction(params, tenantId, actor);
+}
+
+export async function recordFiscalRetentionVoucherAction(
+  params: Parameters<typeof _recordFiscalRetentionVoucherAction>[0],
+  tenantId: string,
+  actor: ActionActor
+) {
+  return await _recordFiscalRetentionVoucherAction(params, tenantId, actor);
+}
+
+export type { CreateProvidencia00093InvoiceInput };
+

@@ -14,6 +14,13 @@ import { getExchangeRate, convertUSDToLocal } from '@/lib/core/currencyEngine';
 import { ActionActor } from './entities';
 import { isValidUUID, isTemporaryId } from '@/lib/core/uuid';
 import Decimal from 'decimal.js';
+import {
+  formatFiscalTimestampWithSeconds,
+  generateFiscalHashSha256,
+  buildFiscalQRPayload,
+  PROVIDENCIA_00093_NOTICE,
+  sanitizeVenezuelanTaxId,
+} from '@/lib/fiscal/digitalInvoicing';
 
 export interface CartItem {
   itemId: string;
@@ -319,6 +326,50 @@ export async function processSecureCheckout(
     const docSubtype = chargeTaxes ? 'fiscal_invoice' : 'delivery_order';
     const docPrefix = chargeTaxes ? 'FAC' : 'ORD';
     const docLabel = chargeTaxes ? 'Factura Fiscal' : 'Orden de Entrega';
+    const docNumber = `${docPrefix}-${Date.now().toString().slice(-6)}`;
+    const controlNumber = `00-${Date.now().toString().slice(-6)}`;
+    const issueTimestamp = formatFiscalTimestampWithSeconds(new Date());
+
+    let providencia00093Meta: Record<string, any> = {};
+    if (chargeTaxes) {
+      const canonicalData = [
+        docNumber,
+        controlNumber,
+        issueTimestamp,
+        tenantId.slice(0, 8),
+        customerSnapshot?.tax_id || 'V-GENERICO',
+        totalLocal.toFixed(2),
+        (taxResult.taxAmount * exchangeData.rate).toFixed(2),
+        exchangeData.rate.toFixed(4),
+      ].join('#');
+
+      const digitalHashSha256 = generateFiscalHashSha256(canonicalData);
+      const qrPayload = buildFiscalQRPayload({
+        sellerTaxId: 'J-RENDO',
+        buyerTaxId: customerSnapshot?.tax_id || 'V-GENERICO',
+        documentNumber: docNumber,
+        controlNumber,
+        issueTimestamp,
+        totalVes: totalLocal,
+        ivaVes: taxResult.taxAmount * exchangeData.rate,
+        digitalHash: digitalHashSha256,
+      });
+
+      providencia00093Meta = {
+        providencia: 'SNAT/2026/00093',
+        gaceta_oficial: '43.484',
+        control_number: controlNumber,
+        control_range: 'Desde N° 00-000001 hasta N° 00-500000',
+        issue_timestamp: issueTimestamp,
+        digital_hash_sha256: digitalHashSha256,
+        qr_payload: qrPayload,
+        statutory_notice: PROVIDENCIA_00093_NOTICE,
+        bcv_rate: exchangeData.rate,
+        bcv_rate_date: new Date().toISOString().split('T')[0],
+        total_usd: taxResult.total,
+        total_ves: totalLocal,
+      };
+    }
 
     const safeEntityId = (entityData && isValidUUID(entityData.id) && !isTemporaryId(entityData.id)) 
       ? entityData.id 
@@ -331,7 +382,7 @@ export async function processSecureCheckout(
         entity_id: safeEntityId,
         type: 'invoice',
         status: 'invoiced',
-        document_number: `${docPrefix}-${Date.now().toString().slice(-6)}`,
+        document_number: docNumber,
         subtotal_amount: taxResult.subtotal,
         tax_amount: taxResult.taxAmount,
         total_amount: taxResult.total,
@@ -351,6 +402,7 @@ export async function processSecureCheckout(
           currency_local: exchangeData.currency,
           currency_symbol: exchangeData.symbol,
           total_local: totalLocal,
+          ...providencia00093Meta,
           ...(extraMetadata || {}),
           cart_lines: documentLines.map((line: any) => ({
             item_id: line.item_id ?? line.itemId ?? null,

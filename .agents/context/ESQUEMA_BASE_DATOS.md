@@ -82,12 +82,28 @@
 * **`tenant_id`** `UUID REFERENCES tenants(id) ON DELETE CASCADE`
 * **`entity_id`** `UUID REFERENCES entities(id)`: Cliente o proveedor.
 * **`type`** `TEXT NOT NULL CHECK (type IN ('invoice', 'purchase_order', 'quotation'))`
-* **`status`** `TEXT DEFAULT 'draft'`: `'draft' | 'issued' | 'paid' | 'cancelled'`
-* **`document_number`** `TEXT NOT NULL`: Número correlativo.
+* **`status`** `TEXT DEFAULT 'draft'`: `'draft' | 'invoiced' | 'paid' | 'partial' | 'completed' | 'cancelled'`
+* **`document_number`** `TEXT NOT NULL`: Número correlativo (ej. `FAC-000001`, `COT-000001`, `PO-000001`).
 * **`subtotal_amount`**, **`tax_amount`**, **`total_amount`** `NUMERIC(15, 2)`
 * **`deleted_at`** `TIMESTAMPTZ DEFAULT NULL`
 * **`metadata`** `JSONB DEFAULT '{}'::jsonb`:
-  - `doc_type`: `'delivery_order'` (sin IVA) o `'fiscal_invoice'` (con IVA).
+  - `doc_type` / `doc_subtype`: `'delivery_order'` (sin IVA / control interno) o `'fiscal_invoice'` (con IVA).
+  - *Campos Fiscales Providencia SNAT/2026/00093 (Gaceta Oficial 43.484):*
+    - `providencia`: `'SNAT/2026/00093'`
+    - `gaceta_oficial`: `'43.484'`
+    - `control_number`: Número de control telemático de imprenta digital (`"00-000001"`).
+    - `control_range`: Rango autorizado (`"Desde N° 00-000001 hasta N° 00-500000"`).
+    - `issue_timestamp`: Marca temporal estricta con segundos (`"YYYY-MM-DD HH:MM:SS a.m./p.m."`) - Art. 8.
+    - `buyer_fiscal_address`: Domicilio fiscal completo del adquiriente (mandatorio).
+    - `buyer_tax_id`: RIF o Cédula normalizada del comprador (`J-123456789`, `V-12345678`).
+    - `digital_hash_sha256`: Hash criptográfico SHA-256 de los datos canónicos del documento.
+    - `qr_payload`: Cadena de validación telemática instantánea para Código QR.
+    - `bcv_rate`: Tasa de cambio oficial del BCV correspondiente a la fecha.
+    - `bcv_rate_date`: Fecha de cotización de la tasa oficial.
+    - `total_ves`: Total liquidado en Bolívares.
+    - `net_payable_usd`, `net_payable_ves`: Monto neto a pagar tras deducir retenciones.
+    - `retentions`: Objeto de retenciones `{ voucher_number, iva_rate, iva_amount_usd, islr_rate, islr_amount_usd, net_payable_usd }`.
+    - `contingency_mode`: Booleano para facturas emitidas bajo contingencia física y transmitidas telemáticamente.
   - `payments`: Detalle multimétodo `{ cash, card, transfer, mobile_pay, credit }`.
   - `exchange_rate`: Tasa BCV aplicada a la transacción.
 
@@ -107,7 +123,10 @@
   - `1.1.01.01`: Caja Principal - Efectivo ($ USD)
   - `1.1.01.02`: Bancos - Transferencias / Pago Móvil (Bs / $)
   - `1.1.02.01`: Cuentas por Cobrar Comerciales (Crédito)
+  - `1.1.03.01`: Anticipo de Impuestos - Retención IVA por Compensar (Activo)
+  - `1.1.03.02`: Anticipo de Impuestos - Retención ISLR por Compensar (Activo)
   - `2.1.02.01`: Débito Fiscal IVA por Pagar
+  - `2.1.02.02`: Débito Fiscal IGTF por Pagar (3%)
   - `4.1.01`: Ingresos por Ventas de Mercancías / Servicios
 
 ---

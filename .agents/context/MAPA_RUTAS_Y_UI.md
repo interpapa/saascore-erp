@@ -79,3 +79,15 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 | `/equipo` | `src/app/(erp)/equipo/page.tsx` | ~7 KB | Empleados, roles RBAC, registro biométrico de asistencia y liquidación salarial. |
 | `/franquicias` | `src/app/(erp)/franquicias/page.tsx` | ~13 KB | Gestión multi-sede, sucursales y consolidación de ingresos. |
 | `/tickets` | `src/app/(erp)/tickets/page.tsx` | ~9 KB | Mesa de ayuda interna e incidencias de soporte. |
+
+---
+
+## 3. Catálogo de Modales y Vistas Especializadas
+
+| Componente | Ubicación | Propósito |
+| :--- | :--- | :--- |
+| `DigitalInvoiceModal` | `src/components/fiscal/DigitalInvoiceModal.tsx` | Modal interactivo y visor imprimible de **Factura Digital Oficial (Providencia SNAT/2026/00093)**. Soporta formato A4/Carta para mayoristas y Ticket 80mm para mostrador, renderiza Código QR de validación fiscal, Código Hash SHA-256 inalterable y botón de compartir por WhatsApp. |
+| `PrescriptionPrintModal` | `src/components/clinica/PrescriptionPrintModal.tsx` | Récipe médico digital para impresión o envío por WhatsApp con membrete clínico, diagnósticos CIE-10 y prescripciones. |
+| `HeldTicketsModal` | `src/components/caja/HeldTicketsModal.tsx` | Gestión de cuentas y tickets retenidos en espera en Caja POS. |
+| `CatalogModal` | `src/components/catalog/CatalogModal.tsx` | Catálogo emergente para selección rápida de productos y servicios. |
+
