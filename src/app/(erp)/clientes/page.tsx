@@ -83,30 +83,37 @@ export default function ClientesPage() {
     toast({ variant: 'success', title: 'Reporte Exportado', description: 'El directorio de clientes se ha descargado en formato CSV.' });
   };
 
+  const hasHydrated = useERPStore(s => s.hasHydrated);
+
   const fetchClients = useCallback(async () => {
+    if (!currentTenant?.id || !actor) {
+      if (hasHydrated && !currentTenant?.id) {
+        setIsLoading(false);
+      }
+      return;
+    }
     try {
       setIsLoading(true);
-      if (!currentTenant?.id || !actor) return;
-      const [entitiesRes, schemaRes] = await Promise.all([
+      const [entitiesRes, schemaRes] = await Promise.allSettled([
         getEntitiesAction(currentTenant.id, 'customer', 150, actor),
         getTenantEntitySchemaAction(currentTenant.id, actor),
       ]);
 
-      if (entitiesRes.success && entitiesRes.entities) {
+      if (entitiesRes.status === 'fulfilled' && entitiesRes.value.success && entitiesRes.value.entities) {
         setClients(prev => {
           const pendingTemporaries = prev.filter(c => isTemporaryId(c.id) || !isValidUUID(c.id));
-          return [...pendingTemporaries, ...(entitiesRes.entities as any)];
+          return [...pendingTemporaries, ...(entitiesRes.value.entities as any)];
         });
       }
-      if (schemaRes.success && schemaRes.schema) {
-        setCustomSchema(schemaRes.schema);
+      if (schemaRes.status === 'fulfilled' && schemaRes.value.success && schemaRes.value.schema) {
+        setCustomSchema(schemaRes.value.schema);
       }
     } catch (error) {
       console.error('Error cargando clientes:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id, actor]);
+  }, [currentTenant?.id, actor, hasHydrated]);
 
   const loadAuditLogs = useCallback(async () => {
     if (!currentTenant?.id || !actor) return;

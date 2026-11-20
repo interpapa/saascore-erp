@@ -109,28 +109,24 @@ export default function CalendarioPage() {
     try {
       if (!actor) return;
       setIsLoading(true);
-      const [apptsRes, empRes, custRes, srvRes] = await Promise.all([
+      const [apptsRes, empRes, custRes, srvRes] = await Promise.allSettled([
         getAppointmentsAction(currentTenant.id, filterState, actor),
-        // Los colaboradores/médicos deben cargarse SIEMPRE en la agenda clínica,
-        // sin importar si la empresa tiene contratado el módulo separado de RRHH/Nómina ('equipo').
         getEntitiesAction(currentTenant.id, 'employee', 100, actor),
         isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 100, actor) : Promise.resolve({ success: true, entities: [] }),
-        // Cargar catálogo de servicios clínicos/procedimientos para asignación directa en turnos
         getItemsAction(currentTenant.id, 'service', 100, actor),
       ]);
 
-      if (apptsRes.success) {
-        setAppointments(apptsRes.appointments || []);
-      } else {
-        toast({
-          variant: 'error',
-          title: 'Error al cargar citas',
-          description: apptsRes.error || 'No se pudieron recuperar las citas.',
-        });
+      if (apptsRes.status === 'fulfilled') {
+        const res = apptsRes.value;
+        if (res.success) {
+          setAppointments(res.appointments || []);
+        } else if (res.error) {
+          console.warn('[Calendario] Error recuperando citas:', res.error);
+        }
       }
 
-      if (empRes.success) {
-        const mappedEmps: Employee[] = (empRes.entities || []).map((e: any) => ({
+      if (empRes.status === 'fulfilled' && empRes.value.success) {
+        const mappedEmps: Employee[] = (empRes.value.entities || []).map((e: any) => ({
           id: e.id,
           tenant_id: e.tenant_id,
           name: e.name,
@@ -144,12 +140,12 @@ export default function CalendarioPage() {
         setEmployees(mappedEmps);
       }
 
-      if (custRes.success) {
-        setClients(custRes.entities || []);
+      if (custRes.status === 'fulfilled' && custRes.value.success) {
+        setClients(custRes.value.entities || []);
       }
 
-      if (srvRes.success) {
-        const mappedServices: Service[] = (srvRes.items || []).map((s: any) => ({
+      if (srvRes.status === 'fulfilled' && srvRes.value.success) {
+        const mappedServices: Service[] = (srvRes.value.items || []).map((s: any) => ({
           id: s.id,
           tenant_id: s.tenant_id,
           name: s.name,
@@ -162,11 +158,6 @@ export default function CalendarioPage() {
       }
     } catch (err: unknown) {
       console.error('[CalendarioPage Fetch Error]:', err);
-      toast({
-        variant: 'error',
-        title: 'Error de red',
-        description: 'Fallo al comunicarse con el servidor.',
-      });
     } finally {
       setIsLoading(false);
     }

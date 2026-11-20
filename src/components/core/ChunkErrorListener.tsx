@@ -18,7 +18,10 @@ export function ChunkErrorListener() {
     const isChunkError =
       reasonStr.includes('Loading chunk') ||
       reasonStr.includes('ChunkLoadError') ||
-      reasonStr.includes('Failed to fetch dynamically imported module');
+      reasonStr.includes('Failed to fetch dynamically imported module') ||
+      reasonStr.includes('Failed to find Server Action') ||
+      reasonStr.includes('Could not find Server Action') ||
+      reasonStr.includes('action could not be found');
 
     if (isChunkError) {
       // Try to extract chunk identifier from the error message

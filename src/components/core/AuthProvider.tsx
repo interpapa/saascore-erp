@@ -64,6 +64,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // Si getUserTenant falló por error de conexión o base de datos, NO BORRAR la sesión
+      if (!result?.success) {
+        console.warn('[AuthProvider] Error temporal consultando tenant:', result?.error);
+        const existingTenant = useERPStore.getState().currentTenant;
+        const existingSession = useERPStore.getState().session;
+        if (existingTenant?.id && existingSession?.userEmail === cleanEmail) {
+          // Mantener la sesión activa localmente mientras se reestablece la conexión
+          return;
+        }
+        return;
+      }
+
       // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa principal
       if (isSuper) {
         setSession({
@@ -99,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Si no tiene empresa asignada, es un usuario nuevo pendiente de Onboarding
+      // Solo si la base de datos respondió exitosamente confirmando que no tiene empresa:
       setCurrentTenant(null);
       setSession({
         userEmail: cleanEmail,
@@ -108,7 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         token: accessToken
       });
     } catch (err) {
-      console.error('Error sincronizando sesión:', err);
+      console.error('[AuthProvider] Error sincronizando sesión:', err);
     }
   }, [setCurrentTenant, setSession]);
 

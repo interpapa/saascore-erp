@@ -38,31 +38,16 @@ function getJwtRef(token?: string): string | null {
 }
 
 export function getResolvedSupabaseUrl(): string {
-  // Respetar variable explícita de entorno si apunta a un proyecto Supabase válido
-  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (envUrl && envUrl.includes('nurbajgedeltcvgljsmg')) {
-    return PROD_SUPABASE_URL;
-  }
-  if (envUrl && envUrl.includes('pfgfsnoblxasiixeveue')) {
-    return DEV_SUPABASE_URL;
-  }
-
-  // Por gobernanza (AGENTS.md): Base de datos unificada de Producción donde residen los datos reales
+  // Gobernanza estricta (AGENTS.md): Todos los entornos apuntan unívocamente
+  // a la base de datos central de producción (nurbajgedeltcvgljsmg) donde residen
+  // todos los datos reales (clientes, citas, ventas, inventario).
+  // Ignoramos cualquier variable de entorno desactualizada de Vercel que intente apuntar a 'pfgfsnoblxasiixeveue'.
   return PROD_SUPABASE_URL;
 }
 
 export function getResolvedAnonKey(): string {
-  const url = getResolvedSupabaseUrl();
   const envKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (url.includes('pfgfsnoblxasiixeveue')) {
-    if (envKey && getJwtRef(envKey) === 'pfgfsnoblxasiixeveue') {
-      return envKey;
-    }
-    return DEV_SUPABASE_ANON_KEY;
-  }
-
-  // Producción (nurbajgedeltcvgljsmg)
+  // Solo usar la variable de entorno si coincide criptográficamente con el proyecto de producción
   if (envKey && getJwtRef(envKey) === 'nurbajgedeltcvgljsmg') {
     return envKey;
   }
@@ -70,17 +55,8 @@ export function getResolvedAnonKey(): string {
 }
 
 export function getResolvedServiceRoleKey(): string {
-  const url = getResolvedSupabaseUrl();
   const envKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (url.includes('pfgfsnoblxasiixeveue')) {
-    if (envKey && getJwtRef(envKey) === 'pfgfsnoblxasiixeveue') {
-      return envKey;
-    }
-    return DEV_SUPABASE_SERVICE_ROLE_KEY;
-  }
-
-  // Producción (nurbajgedeltcvgljsmg)
+  // Solo usar la variable de entorno si coincide criptográficamente con el proyecto de producción
   if (envKey && getJwtRef(envKey) === 'nurbajgedeltcvgljsmg') {
     return envKey;
   }
