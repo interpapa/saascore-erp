@@ -106,8 +106,15 @@ export default function CalendarioPage() {
   // Fetch Data Function (Adaptativo a Módulos Habilitados)
   const fetchData = useCallback(async () => {
     if (!currentTenant) return;
+    // Si el actor aún no está listo (cargando token), esperar brevemente y reintentar una vez
+    if (!actor) {
+      setTimeout(() => {
+        const latestActor = useERPStore.getState().session;
+        if (latestActor?.userEmail) fetchData();
+      }, 1500);
+      return;
+    }
     try {
-      if (!actor) return;
       setIsLoading(true);
       const [apptsRes, empRes, custRes, srvRes] = await Promise.allSettled([
         getAppointmentsAction(currentTenant.id, filterState, actor),

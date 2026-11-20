@@ -71,6 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const existingSession = useERPStore.getState().session;
         if (existingTenant?.id && existingSession?.userEmail === cleanEmail) {
           // Mantener la sesión activa localmente mientras se reestablece la conexión
+          // CRÍTICO: actualizar el token con el nuevo accessToken para que Server Actions funcionen
+          if (accessToken && existingSession.token !== accessToken) {
+            setSession({ ...existingSession, token: accessToken });
+          }
           return;
         }
         return;

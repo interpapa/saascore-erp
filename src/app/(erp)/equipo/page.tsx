@@ -7,6 +7,7 @@ import { Entity } from '@/lib/api/entities';
 import { Users, CreditCard, RefreshCw, Activity } from 'lucide-react';
 import { useTenantResolver } from '@/hooks/useTenantResolver';
 import { useActionActor } from '@/hooks/useActionActor';
+import { useERPStore } from '@/store/useERPStore';
 import { useToast } from '@/components/core/ToastProvider';
 import { EmployeeDirectoryTab } from '@/components/equipo/EmployeeDirectoryTab';
 import { PayrollTab } from '@/components/equipo/PayrollTab';
@@ -27,10 +28,20 @@ export default function EquipoPage() {
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('directorio');
 
-  const fetchEmployees = useCallback(async () => {
+  const fetchEmployees = useCallback(async (retryCount = 0) => {
+    if (!currentTenant?.id) return;
+    if (!actor) {
+      // Reintentar cuando el actor de sesión termine de inicializarse
+      setTimeout(() => {
+        const latestSession = useERPStore.getState().session;
+        if (latestSession?.userEmail) {
+          fetchEmployees(retryCount);
+        }
+      }, 1000);
+      return;
+    }
     try {
       setIsLoading(true);
-      if (!currentTenant?.id || !actor) return;
       const res = await getEntitiesAction(currentTenant.id, 'employee', 50, actor);
       if (res?.success) {
         const mapped = ((res.entities as any[]) || []).map(e => ({
@@ -43,13 +54,23 @@ export default function EquipoPage() {
           }
         }));
         setEmployees(mapped);
+      } else if (res?.error) {
+        console.warn('[Equipo] Advertencia cargando colaboradores:', res.error);
+        if (retryCount === 0) {
+          setTimeout(() => fetchEmployees(1), 1500);
+          return;
+        }
       }
     } catch (err) {
-      console.error('Error cargando empleados:', err);
+      console.warn('[Equipo] Error cargando empleados (reintentando...):', err);
+      if (retryCount === 0) {
+        setTimeout(() => fetchEmployees(1), 1500);
+        return;
+      }
       toast({
         variant: 'error',
         title: 'Error al cargar equipo',
-        description: 'No se pudieron cargar los colaboradores.',
+        description: 'No se pudieron cargar los colaboradores. Por favor, recarga la página.',
       });
     } finally {
       setIsLoading(false);
