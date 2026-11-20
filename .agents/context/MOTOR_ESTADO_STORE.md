@@ -21,7 +21,8 @@ Rendo ERP utiliza **Zustand** con persistencia en `localStorage` (clave: `Rendo-
   - `active_modules`: Array de módulos habilitados en la empresa.
   - `metadata`: Configuración del tenant (fiscal, logo, dock móvil, cuentas bancarias).
 * **`hasHydrated: boolean`**: Bandera para evitar parpadeos en renderizados SSR.
-* **`impersonatedTenant` / `originalTenant`**: Para soporte de Superadmin (cambio de empresa sin perder credenciales originales).
+* **`impersonatedTenant` / `originalTenant`**: Para soporte de Superadmin (cambio de empresa sin perder credenciales originales). Al detener la impersonación (`stopImpersonation`), si `originalTenant` no está definido, se conserva `currentTenant` como blindaje contra reseteo involuntario a `null`.
+* **Priorización de Membresía (`getUserTenant`)**: Cuando un usuario posee múltiples asociaciones en `user_tenants` (ej. es `owner` de su propio negocio y `admin` secundario en otra empresa), el sistema prioriza inequívocamente la empresa donde ostenta el rol de `owner`.
 
 ---
 

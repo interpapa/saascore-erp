@@ -1,6 +1,7 @@
 'use client';
 
 import { useERPStore, Tenant } from '@/store/useERPStore';
+import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 
 /**
  * Hook to resolve the active tenant cleanly and safely.
@@ -22,7 +23,9 @@ export function useTenantResolver(): Tenant | null {
       id: session.tenantId,
       name: currentTenant?.name || 'Mi Empresa',
       blocked: false,
-      active_modules: currentTenant?.active_modules || [],
+      active_modules: currentTenant?.active_modules && currentTenant.active_modules.length > 0
+        ? currentTenant.active_modules
+        : DEFAULT_ENABLED_MODULES,
       metadata: currentTenant?.metadata || {},
     };
   }

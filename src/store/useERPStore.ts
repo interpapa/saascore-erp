@@ -63,9 +63,9 @@ export const useERPStore = create<ERPState>()(
       })),
 
       stopImpersonation: () => set((state) => ({
-        currentTenant: state.originalTenant,
-        session: state.session && state.originalTenant 
-          ? { ...state.session, tenantId: state.originalTenant.id }
+        currentTenant: state.originalTenant || state.currentTenant,
+        session: state.session && (state.originalTenant || state.currentTenant)
+          ? { ...state.session, tenantId: (state.originalTenant || state.currentTenant)!.id }
           : state.session,
         impersonatedTenant: null,
         originalTenant: null,

@@ -198,7 +198,7 @@ export async function createTenant(userId: string, userEmail: string, businessNa
       if (cleanEmail) query = query.ilike('user_email', cleanEmail);
       else if (userId) query = query.eq('user_id', userId);
 
-      const { data: existingLinks } = await query.limit(1);
+      const { data: existingLinks } = await query.order('created_at', { ascending: false }).limit(1);
       if (existingLinks && existingLinks.length > 0) {
         const { data: existingTenant } = await db
           .from('tenants')
@@ -678,6 +678,7 @@ function sanitizeTenantPayload(tenant: any) {
   }
 
   const cleanMetadata = {
+    ...rawMeta,
     plan: rawMeta.plan || tenant.subscription_plan || 'pro',
     currency: rawMeta.currency || tenant.currency || 'USD',
     symbol: rawMeta.symbol || tenant.symbol || '$',
@@ -744,8 +745,13 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       return { success: true, tenant: null, role: 'owner' as UserRole };
     }
 
-    // Preferir la empresa principal 'rendo CORP' si el usuario tiene múltiples asociaciones
-    const membership = userTenants.find(m => m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04') || userTenants[0];
+    // Prioridad estricta de empresa para multi-asociación:
+    // 1. Si es Superadmin y tiene asignada la empresa matriz 'rendo CORP', respetarla
+    // 2. Si el usuario es 'owner' (dueño de su negocio), PRIORIZAR SIEMPRE la empresa donde es dueño
+    // 3. De lo contrario, usar la membresía más reciente
+    const membership = (isSuperAdmin && userTenants.find(m => m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
+      || userTenants.find(m => m.role === 'owner')
+      || userTenants[0];
 
     // 2. Traer información del Tenant
     const { data: tenant, error: tenantError } = await db

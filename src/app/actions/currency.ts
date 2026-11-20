@@ -60,7 +60,21 @@ export async function getExchangeRateAction(tenantId: string): Promise<{ success
       return { success: true, rateData: liveRate };
     }
 
-    // 3. Fallback a currencyEngine
+    // 3. Resiliencia: si la consulta en vivo falló pero el tenant ya tenía una tasa previa, usarla para evitar desfasar precios
+    if (metaRate?.rate) {
+      return {
+        success: true,
+        rateData: {
+          currency: metaRate.currency || 'VES',
+          symbol: metaRate.symbol || 'Bs.',
+          rate: Number(metaRate.rate),
+          updated_at: metaRate.updated_at || new Date().toISOString(),
+          source: metaRate.source || 'BCV'
+        }
+      };
+    }
+
+    // 4. Fallback a currencyEngine
     const rateData = await getExchangeRate('VES', tenantId);
     return { success: true, rateData };
   } catch (err: any) {
@@ -86,6 +100,25 @@ export async function syncLiveBCVRateAction(
 
     const liveRate = await fetchLiveBCVRate();
     if (!liveRate) {
+      // Fallback a la tasa persistida en el tenant si la conexión externa a BCV falla
+      const { data: tenant } = await supabaseAdmin
+        .from('tenants')
+        .select('metadata')
+        .eq('id', tenantId)
+        .single();
+      const cached = tenant?.metadata?.exchange_rate;
+      if (cached?.rate) {
+        return {
+          success: true,
+          rateData: {
+            currency: cached.currency || 'VES',
+            symbol: cached.symbol || 'Bs.',
+            rate: Number(cached.rate),
+            updated_at: cached.updated_at || new Date().toISOString(),
+            source: `${cached.source || 'BCV'} (Última guardada)`
+          }
+        };
+      }
       return { success: false, error: 'No se pudo conectar con el servicio oficial del BCV. Revisa tu conexión a internet.' };
     }
 

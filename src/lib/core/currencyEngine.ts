@@ -25,35 +25,80 @@ const DEFAULT_RATES: Record<string, ExchangeRateData> = {
 
 /**
  * Consulta la API oficial en vivo del BCV (Banco Central de Venezuela)
+ * Incluye fallback multi-fuente y headers resilientes contra bloqueos de CDN.
  */
 export async function fetchLiveBCVRate(): Promise<ExchangeRateData | null> {
+  const commonHeaders = {
+    'Accept': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  };
+
+  // Intento 1: Endpoint directo oficial
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', {
       signal: controller.signal,
-      headers: { 'Accept': 'application/json' },
+      headers: commonHeaders,
       cache: 'no-store'
     });
     clearTimeout(timeoutId);
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    const rateVal = Number(data.promedio || data.venta || data.compra);
-    if (!rateVal || isNaN(rateVal) || rateVal <= 0) return null;
-
-    return {
-      currency: 'VES',
-      symbol: 'Bs.',
-      rate: Number(rateVal.toFixed(4)),
-      updated_at: data.fechaActualizacion || new Date().toISOString(),
-      source: 'BCV (Oficial en Vivo)'
-    };
+    if (res.ok) {
+      const data = await res.json();
+      const rateVal = Number(data.promedio || data.venta || data.compra);
+      if (rateVal && !isNaN(rateVal) && rateVal > 0) {
+        return {
+          currency: 'VES',
+          symbol: 'Bs.',
+          rate: Number(rateVal.toFixed(4)),
+          updated_at: data.fechaActualizacion || new Date().toISOString(),
+          source: 'BCV (Oficial en Vivo)'
+        };
+      }
+    }
   } catch (err: any) {
-    console.warn('[fetchLiveBCVRate Warning]:', err.message);
-    return null;
+    console.warn('[fetchLiveBCVRate Endpoint 1 Warning]:', err.message);
   }
+
+  // Intento 2: Endpoint consolidado de monitores
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const res = await fetch('https://ve.dolarapi.com/v1/dolares', {
+      signal: controller.signal,
+      headers: commonHeaders,
+      cache: 'no-store'
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const list = await res.json();
+      if (Array.isArray(list)) {
+        const oficialItem = list.find((item: any) => 
+          item.fuente === 'oficial' || item.casa === 'oficial' || item.nombre?.toLowerCase()?.includes('oficial') || item.nombre?.toLowerCase()?.includes('bcv')
+        );
+        if (oficialItem) {
+          const rateVal = Number(oficialItem.promedio || oficialItem.venta || oficialItem.compra);
+          if (rateVal && !isNaN(rateVal) && rateVal > 0) {
+            return {
+              currency: 'VES',
+              symbol: 'Bs.',
+              rate: Number(rateVal.toFixed(4)),
+              updated_at: oficialItem.fechaActualizacion || new Date().toISOString(),
+              source: 'BCV (Oficial en Vivo)'
+            };
+          }
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('[fetchLiveBCVRate Endpoint 2 Warning]:', err.message);
+  }
+
+  return null;
 }
 
 export async function getExchangeRate(
