@@ -148,11 +148,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.warn('[AuthProvider] No se pudo refrescar sesión:', rErr);
           }
 
-          const existingSession = useERPStore.getState().session;
-          if (!existingSession?.userEmail) {
-            setSession(null);
-            setCurrentTenant(null);
-          }
+          // Si Supabase Auth no tiene sesión válida en este navegador para el proyecto actual:
+          // Purgar la sesión zombie para que el usuario pueda autenticarse limpiamente en /login
+          setSession(null);
+          setCurrentTenant(null);
         }
       } catch (err) {
         console.error("Error getting session:", err);

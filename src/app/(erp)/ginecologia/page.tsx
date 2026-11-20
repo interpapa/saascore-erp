@@ -398,19 +398,19 @@ export default function GinecologiaPage() {
     if (!currentTenant?.id || !actor) return;
     setIsLoadingPatients(true);
     try {
-      const [patientsRes, employeesRes, itemsRes, apptRes] = await Promise.all([
+      const [patientsRes, employeesRes, itemsRes, apptRes] = await Promise.allSettled([
         getEntitiesAction(currentTenant.id, 'customer', 200, actor),
         getEntitiesAction(currentTenant.id, 'employee', 100, actor),
         getItemsAction(currentTenant.id, undefined, 200, actor),
         getAppointmentsAction(currentTenant.id, undefined, actor),
       ]);
 
-      if (patientsRes.success && patientsRes.entities) {
-        setPatients(patientsRes.entities);
+      if (patientsRes.status === 'fulfilled' && patientsRes.value.success && patientsRes.value.entities) {
+        setPatients(patientsRes.value.entities);
       }
 
-      if (employeesRes.success && employeesRes.entities) {
-        const medicalDocs = employeesRes.entities.filter((e: any) => {
+      if (employeesRes.status === 'fulfilled' && employeesRes.value.success && employeesRes.value.entities) {
+        const medicalDocs = employeesRes.value.entities.filter((e: any) => {
           const m = e.metadata || {};
           return (
             m.is_doctor ||
@@ -419,7 +419,7 @@ export default function GinecologiaPage() {
             (Array.isArray(m.modules) && (m.modules.includes('ginecologia') || m.modules.includes('clinica')))
           );
         });
-        const finalDocs = medicalDocs.length > 0 ? medicalDocs : employeesRes.entities;
+        const finalDocs = medicalDocs.length > 0 ? medicalDocs : employeesRes.value.entities;
         setDoctors(finalDocs);
         if (finalDocs.length > 0 && !selectedDoctorId) {
           setSelectedDoctorId(finalDocs[0].id);
@@ -428,8 +428,8 @@ export default function GinecologiaPage() {
 
       // Extraer servicios configurados en los colaboradores/médicos en Citas/Equipo
       const employeeServices: any[] = [];
-      if (employeesRes.success && employeesRes.entities) {
-        employeesRes.entities.forEach((emp: any) => {
+      if (employeesRes.status === 'fulfilled' && employeesRes.value.success && employeesRes.value.entities) {
+        employeesRes.value.entities.forEach((emp: any) => {
           const svcs = emp.metadata?.services;
           if (Array.isArray(svcs)) {
             svcs.forEach((s: any) => {
@@ -451,17 +451,18 @@ export default function GinecologiaPage() {
         });
       }
 
+      const rawItems = itemsRes.status === 'fulfilled' && itemsRes.value.success && itemsRes.value.items ? itemsRes.value.items : [];
       const allItems = [
-        ...(itemsRes.success && itemsRes.items ? itemsRes.items : []),
+        ...rawItems,
         ...employeeServices,
       ];
       const merged = mergeTenantGinecoServices(allItems as any[]);
       setCatalogProcedures(merged);
 
-      if (apptRes.success && apptRes.appointments) {
+      if (apptRes.status === 'fulfilled' && apptRes.value.success && apptRes.value.appointments) {
         const todayStr = new Date().toISOString().split('T')[0];
-        const todayList = apptRes.appointments.filter((a: any) => a.start_time?.startsWith(todayStr));
-        setTodayAppointments(todayList.length > 0 ? todayList : apptRes.appointments.slice(0, 10));
+        const todayList = apptRes.value.appointments.filter((a: any) => a.start_time?.startsWith(todayStr));
+        setTodayAppointments(todayList.length > 0 ? todayList : apptRes.value.appointments.slice(0, 10));
       }
     } catch (err) {
       console.error('Error cargando datos de Ginecología:', err);

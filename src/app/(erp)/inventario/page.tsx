@@ -177,9 +177,19 @@ export default function InventarioPage() {
   };
 
   const fetchItems = useCallback(async () => {
+    if (!activeTenant?.id) {
+      setIsLoading(false);
+      return;
+    }
+    if (!actor) {
+      setTimeout(() => {
+        const latestSession = useERPStore.getState().session;
+        if (latestSession?.userEmail) fetchItems();
+      }, 1000);
+      return;
+    }
     try {
       setIsLoading(true);
-      if (!activeTenant?.id || !actor) return;
       // Ampliado a 250 items para soportar inventarios empresariales
       const res = await getItemsAction(activeTenant.id, undefined, 250, actor);
       if (res.success && res.items) {

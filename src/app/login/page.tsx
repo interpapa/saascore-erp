@@ -24,10 +24,26 @@ export default function LoginPage() {
   const activeSession = useERPStore((s) => s.session);
 
   useEffect(() => {
-    if (activeSession?.userEmail && activeSession?.tenantId) {
-      const destination = activeSession.tenantId !== 'global-admin' ? '/dashboard' : '/admin';
-      router.replace(destination);
+    let isMounted = true;
+    async function checkLiveSession() {
+      try {
+        const { data: { session: currentSupabaseSession } } = await supabase.auth.getSession();
+        if (isMounted) {
+          if (currentSupabaseSession?.user && activeSession?.userEmail && activeSession?.tenantId) {
+            const destination = activeSession.tenantId !== 'global-admin' ? '/dashboard' : '/admin';
+            router.replace(destination);
+          } else if (!currentSupabaseSession?.user && activeSession) {
+            // La sesión de Supabase no existe o expiró: purgar sesión zombie del store para permitir login limpio
+            useERPStore.getState().setSession(null);
+            useERPStore.getState().setCurrentTenant(null);
+          }
+        }
+      } catch {
+        // En caso de error, permanecer en login
+      }
     }
+    checkLiveSession();
+    return () => { isMounted = false; };
   }, [activeSession, router]);
 
   useEffect(() => {
@@ -266,8 +282,22 @@ export default function LoginPage() {
         </div>
 
         {/* Footer Informativo */}
-        <div className="py-4 bg-muted/40 border-t border-border/50 text-center text-xs text-muted-foreground">
-          Gestión de accesos centralizada vía Supabase
+        <div className="py-4 bg-muted/40 border-t border-border/50 text-center text-xs text-muted-foreground flex flex-col gap-1.5 items-center">
+          <span>Gestión de accesos centralizada vía Supabase</span>
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                localStorage.clear();
+                sessionStorage.clear();
+                await supabase.auth.signOut();
+              } catch {}
+              window.location.href = '/login';
+            }}
+            className="text-[11px] text-primary hover:underline font-medium"
+          >
+            ¿Problemas para ver tus datos? Restablecer sesión local
+          </button>
         </div>
 
       </div>

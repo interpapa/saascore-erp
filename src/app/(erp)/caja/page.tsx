@@ -304,7 +304,7 @@ function CajaPageContent() {
     if (!currentTenant?.id || !actor) return;
     try {
       setLoadingData(true);
-      const [itemsRes, customersRes, cashRes, bankRes, rateRes] = await Promise.all([
+      const [itemsRes, customersRes, cashRes, bankRes, rateRes] = await Promise.allSettled([
         isInventoryEnabled ? getItemsAction(currentTenant.id, undefined, 250, actor) : Promise.resolve({ success: true, items: [] }),
         isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 250, actor) : Promise.resolve({ success: true, entities: [] }),
         getCashSessionStatusAction(currentTenant.id, actor),
@@ -312,21 +312,21 @@ function CajaPageContent() {
         getExchangeRateAction(currentTenant.id),
       ]);
 
-      if (itemsRes?.success) setItems(itemsRes.items || []);
-      if (customersRes?.success) setCustomers(customersRes.entities || []);
-      if (cashRes?.success) setCashSessionStatus(cashRes.session || null);
-      if (bankRes?.success && bankRes.accounts?.length) {
-        setBankAccounts(bankRes.accounts);
-        setSelectedBankAccountId(bankRes.accounts[0].id);
+      if (itemsRes.status === 'fulfilled' && itemsRes.value?.success) setItems(itemsRes.value.items || []);
+      if (customersRes.status === 'fulfilled' && customersRes.value?.success) setCustomers(customersRes.value.entities || []);
+      if (cashRes.status === 'fulfilled' && cashRes.value?.success) setCashSessionStatus(cashRes.value.session || null);
+      if (bankRes.status === 'fulfilled' && bankRes.value?.success && bankRes.value.accounts?.length) {
+        setBankAccounts(bankRes.value.accounts);
+        setSelectedBankAccountId(bankRes.value.accounts[0].id);
       }
-      if (rateRes?.success && rateRes.rateData) {
+      if (rateRes.status === 'fulfilled' && rateRes.value?.success && rateRes.value.rateData) {
         setExchangeRate({
-          rate: rateRes.rateData.rate || 36.5,
-          symbol: rateRes.rateData.symbol || 'Bs.',
-          currency: rateRes.rateData.currency || 'VES',
-          source: rateRes.rateData.source || 'BCV'
+          rate: rateRes.value.rateData.rate || 36.5,
+          symbol: rateRes.value.rateData.symbol || 'Bs.',
+          currency: rateRes.value.rateData.currency || 'VES',
+          source: rateRes.value.rateData.source || 'BCV'
         });
-        setRateInput((rateRes.rateData.rate || 36.5).toFixed(2));
+        setRateInput((rateRes.value.rateData.rate || 36.5).toFixed(2));
       }
 
       // Cargar órdenes pendientes de cobro (Odontología, Barbería, Grooming)
