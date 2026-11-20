@@ -822,9 +822,8 @@ export default function GinecologiaPage() {
   };
 
   // URL del portal público para el QR
-  const bookingPublicUrl = typeof window !== 'undefined' && currentTenant?.id
-    ? `${window.location.origin}/reservas/${currentTenant.id}`
-    : `https://rendorp.com/reservas/${currentTenant?.id || ''}`;
+  const bookingSlugOrId = (currentTenant?.metadata as any)?.slug || currentTenant?.id || '';
+  const bookingPublicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://saascore-erp.vercel.app'}/reservas/${bookingSlugOrId}`;
 
   return (
     <div className="min-h-screen pb-24 text-foreground max-w-7xl mx-auto px-4 sm:px-6 pt-4 space-y-5 animate-in fade-in duration-300">

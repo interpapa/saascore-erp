@@ -80,6 +80,12 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 | `/franquicias` | `src/app/(erp)/franquicias/page.tsx` | ~13 KB | Gestión multi-sede, sucursales y consolidación de ingresos. |
 | `/tickets` | `src/app/(erp)/tickets/page.tsx` | ~9 KB | Mesa de ayuda interna e incidencias de soporte. |
 
+### 🌐 Clúster Público & Reservas Telemáticas
+| Ruta | Archivo Principal | Tamaño / Tipo | Propósito y Capacidades |
+| :--- | :--- | :--- | :--- |
+| `/reservas` | `src/app/reservas/page.tsx` | Dinámica / SSR | Portal selector de empresas/especialidades y redirección automática para enlaces sin slug. |
+| `/reservas/[tenantId]` | `src/app/reservas/[tenantId]/page.tsx` | Dinámica / SSR | Portal público de agendamiento de citas para pacientes/clientes. Soporta UUID de tenant o slug amigable (`consultorio-25`), selección de especialista, fecha, franja horaria y confirmación vía WhatsApp. |
+
 ---
 
 ## 3. Catálogo de Modales y Vistas Especializadas

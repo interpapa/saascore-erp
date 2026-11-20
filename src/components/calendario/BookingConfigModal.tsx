@@ -107,9 +107,8 @@ export function BookingConfigModal({
 
   if (!isOpen) return null;
 
-  const bookingPublicUrl = typeof window !== 'undefined' && tenant?.id
-    ? `${window.location.origin}/reservas/${tenant.id}`
-    : `https://rendorp.com/reservas/${tenant?.id || ''}`;
+  const bookingSlugOrId = (tenant?.metadata as any)?.slug || tenant?.id || '';
+  const bookingPublicUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://saascore-erp.vercel.app'}/reservas/${bookingSlugOrId}`;
 
   const handleSave = async () => {
     setIsSaving(true);

@@ -484,11 +484,17 @@ export async function processBookingAction(formData: unknown) {
 // NUEVA FUNCIÓN PARA LEER HORAS OCUPADAS (SERVER ACTION)
 export async function getBookedTimesAction(tenantId: string, employeeId: string, date: string, timezoneOffset?: string) {
   try {
+    if (!tenantId || !date || typeof date !== 'string') {
+      return { success: false, bookedTimes: [], groupSlots: {} };
+    }
     const tzOffset = timezoneOffset && /^[+-]\d{2}:\d{2}$/.test(timezoneOffset) ? timezoneOffset : '-04:00';
     const offsetMs = parseOffsetToMs(tzOffset);
     // Ventana ampliada de 24 horas antes y después para nunca perder citas por discrepancias entre UTC y hora local
     const startDate = new Date(`${date}T00:00:00${tzOffset}`);
     const endDate = new Date(`${date}T23:59:59${tzOffset}`);
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+      return { success: false, bookedTimes: [], groupSlots: {} };
+    }
     const windowStart = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
     const windowEnd = new Date(endDate.getTime() + 24 * 60 * 60 * 1000);
 

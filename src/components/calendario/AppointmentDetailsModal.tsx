@@ -1041,9 +1041,7 @@ export function AppointmentDetailsModal({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(
-                  typeof window !== 'undefined' 
-                    ? `${window.location.origin}/reservas/${currentTenant?.id || ''}`
-                    : `https://saascore.app/reservas/${currentTenant?.id || ''}`
+                  `${typeof window !== 'undefined' ? window.location.origin : 'https://saascore-erp.vercel.app'}/reservas/${(currentTenant?.metadata as any)?.slug || currentTenant?.id || ''}`
                 )}`}
                 alt="QR de Reserva de Clase"
                 className="w-48 h-48 mx-auto object-contain rounded-xl"
@@ -1063,9 +1061,8 @@ export function AppointmentDetailsModal({
               <button
                 type="button"
                 onClick={async () => {
-                  const shareUrl = typeof window !== 'undefined' 
-                    ? `${window.location.origin}/reservas/${currentTenant?.id || ''}`
-                    : `https://saascore.app/reservas/${currentTenant?.id || ''}`;
+                  const tenantSlugOrId = (currentTenant?.metadata as any)?.slug || currentTenant?.id || '';
+                  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://saascore-erp.vercel.app'}/reservas/${tenantSlugOrId}`;
                   const startD = new Date(appointment.start_time);
                   const fDate = startD.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' });
                   const fTime = startD.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -1112,9 +1109,8 @@ export function AppointmentDetailsModal({
               <button
                 type="button"
                 onClick={async () => {
-                  const shareUrl = typeof window !== 'undefined' 
-                    ? `${window.location.origin}/reservas/${currentTenant?.id || ''}`
-                    : `https://saascore.app/reservas/${currentTenant?.id || ''}`;
+                  const tenantSlugOrId = (currentTenant?.metadata as any)?.slug || currentTenant?.id || '';
+                  const shareUrl = `${typeof window !== 'undefined' ? window.location.origin : 'https://saascore-erp.vercel.app'}/reservas/${tenantSlugOrId}`;
                   try {
                     await navigator.clipboard.writeText(shareUrl);
                     setCopiedText(true);
