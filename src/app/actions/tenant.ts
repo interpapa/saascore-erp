@@ -701,7 +701,7 @@ function sanitizeTenantPayload(tenant: any) {
 export async function getUserTenant(userEmail: string, userId?: string) {
   try {
     const db = supabaseAdmin;
-    const cleanEmail = (userEmail || '').trim();
+    const cleanEmail = (userEmail || '').trim().toLowerCase();
 
     if (!cleanEmail) {
       return { success: false, tenant: null, role: null };
@@ -719,13 +719,50 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     const userTenants = userTenantsRes.data;
     const utError = userTenantsRes.error;
 
-    if (utError || !userTenants || userTenants.length === 0) {
+    if (utError) {
+      console.error('[getUserTenant DB Error]:', utError);
+      return { 
+        success: false, 
+        error: 'Error de comunicación con la base de datos: ' + (utError.message || 'Error desconocido'), 
+        tenant: null, 
+        role: null 
+      };
+    }
+
+    if (!userTenants || userTenants.length === 0) {
+      // Fallback 1: Buscar si el usuario es dueño directo en la tabla tenants por metadata->owner_email
+      const { data: ownerTenant } = await db
+        .from('tenants')
+        .select('*')
+        .ilike('metadata->>owner_email', cleanEmail)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (ownerTenant) {
+        // Auto-reparar la membresía en user_tenants para blindaje futuro
+        try {
+          await db.from('user_tenants').insert([{
+            user_email: cleanEmail,
+            tenant_id: ownerTenant.id,
+            role: 'owner',
+          }]);
+        } catch {}
+
+        return {
+          success: true,
+          tenant: sanitizeTenantPayload(ownerTenant),
+          role: 'owner' as UserRole,
+        };
+      }
+
       if (isSuperAdmin) {
-        // Fallback defensivo: conectar a la empresa principal si es superadmin
+        // Fallback defensivo: conectar a la empresa principal si es superadmin (rendo corp en producción)
         const { data: primaryTenant } = await db
           .from('tenants')
           .select('*')
-          .eq('id', '31ec279c-4216-48e1-905c-fbf4ea398e04')
+          .in('id', ['45b6404f-3469-4c42-99c1-85416a411f4f', '31ec279c-4216-48e1-905c-fbf4ea398e04'])
+          .limit(1)
           .maybeSingle();
 
         if (primaryTenant) {
@@ -749,7 +786,7 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     // 1. Si es Superadmin y tiene asignada la empresa matriz 'rendo CORP', respetarla
     // 2. Si el usuario es 'owner' (dueño de su negocio), PRIORIZAR SIEMPRE la empresa donde es dueño
     // 3. De lo contrario, usar la membresía más reciente
-    const membership = (isSuperAdmin && userTenants.find(m => m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
+    const membership = (isSuperAdmin && userTenants.find(m => m.tenant_id === '45b6404f-3469-4c42-99c1-85416a411f4f' || m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
       || userTenants.find(m => m.role === 'owner')
       || userTenants[0];
 

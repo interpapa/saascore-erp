@@ -38,37 +38,16 @@ function getJwtRef(token?: string): string | null {
 }
 
 export function getResolvedSupabaseUrl(): string {
-  // 1. Detección en navegador (cliente)
-  if (typeof window !== 'undefined') {
-    const host = window.location.hostname;
-    // Si corre en localhost o 127.0.0.1, usar entorno de Desarrollo
-    if (host === 'localhost' || host === '127.0.0.1') {
-      return DEV_SUPABASE_URL;
-    }
-    // En Vercel o dominio web público, SIEMPRE usar Producción
-    return PROD_SUPABASE_URL;
-  }
-
-  // 2. Detección en servidor / Server Actions
-  // Si está desplegado en Vercel, SIEMPRE usar Producción
-  if (process.env.VERCEL === '1' || process.env.VERCEL_ENV === 'production' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'production') {
-    return PROD_SUPABASE_URL;
-  }
-
-  // En local/desarrollo server-side, respetar la variable de .env.local si apunta a DEV
+  // Respetar variable explícita de entorno si apunta a un proyecto Supabase válido
   const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (envUrl && envUrl.includes('pfgfsnoblxasiixeveue')) {
-    return DEV_SUPABASE_URL;
-  }
   if (envUrl && envUrl.includes('nurbajgedeltcvgljsmg')) {
     return PROD_SUPABASE_URL;
   }
-
-  // Fallback en desarrollo local
-  if (process.env.NODE_ENV === 'development') {
+  if (envUrl && envUrl.includes('pfgfsnoblxasiixeveue')) {
     return DEV_SUPABASE_URL;
   }
 
+  // Por gobernanza (AGENTS.md): Base de datos unificada de Producción donde residen los datos reales
   return PROD_SUPABASE_URL;
 }
 

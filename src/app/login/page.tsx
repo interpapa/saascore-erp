@@ -90,6 +90,8 @@ export default function LoginPage() {
       let tenantMetadata: any = {};
       let userRole: any = isSuper ? 'superadmin' : 'owner';
 
+      let tenantFetchError: string | null = null;
+
       try {
         const result = await getUserTenant(cleanEmail, signInData.user?.id);
         if (result?.success && result.tenant) {
@@ -98,9 +100,20 @@ export default function LoginPage() {
           tenantModules = result.tenant.active_modules || DEFAULT_ENABLED_MODULES;
           tenantMetadata = result.tenant.metadata || {};
           if (result.role) userRole = result.role;
+        } else if (result && !result.success) {
+          tenantFetchError = result.error || 'Error al conectar con la base de datos de tu empresa.';
         }
-      } catch (tErr) {
+      } catch (tErr: any) {
         console.warn('[LoginPage] Error consultando empresa del usuario:', tErr);
+        tenantFetchError = (tErr as Error)?.message || 'Fallo de comunicación con el servidor al cargar la empresa.';
+      }
+
+      // Si hubo un error técnico de conexión, NO asumir que el usuario es nuevo ni enviarlo a Onboarding
+      if (tenantFetchError) {
+        setError(tenantFetchError);
+        setIsLoading(false);
+        setStatusMessage(null);
+        return;
       }
 
       if (tenantId && tenantName) {
