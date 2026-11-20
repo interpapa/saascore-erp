@@ -12,6 +12,14 @@ import { getResolvedSupabaseUrl, getResolvedAnonKey } from '@/lib/supabaseConfig
 import { cookies } from 'next/headers';
 import { normalizeHexColor } from '@/lib/theme/colorUtils';
 
+export const DEFAULT_FISCAL_SETTINGS = {
+  taxes_enabled: false,
+  region: 'exento_salud',
+  tax_rate: 0,
+  enable_igtf: false,
+  igtf_rate: 3,
+};
+
 async function verifySuperAdminActor(
   callerOrActor?: ActionActor | string | null,
   token?: string
@@ -110,6 +118,8 @@ export async function createTenantAdminAction(
         plan,
         created_by_admin: actorEmail,
         active_modules: initialModules,
+        fiscal_settings: DEFAULT_FISCAL_SETTINGS,
+        tax_rate: 0,
       }
     };
 
@@ -130,6 +140,8 @@ export async function createTenantAdminAction(
           currency: 'USD',
           symbol: '$',
           country_code: 'VE',
+          fiscal_settings: DEFAULT_FISCAL_SETTINGS,
+          tax_rate: 0,
         }
       };
       const retry = await db
@@ -213,6 +225,8 @@ export async function createTenant(userId: string, userEmail: string, businessNa
         created_at: new Date().toISOString(),
         plan: 'pro',
         active_modules: DEFAULT_ENABLED_MODULES,
+        fiscal_settings: DEFAULT_FISCAL_SETTINGS,
+        tax_rate: 0,
       }
     };
 
@@ -233,6 +247,8 @@ export async function createTenant(userId: string, userEmail: string, businessNa
           symbol: '$',
           country_code: 'VE',
           active_modules: DEFAULT_ENABLED_MODULES,
+          fiscal_settings: DEFAULT_FISCAL_SETTINGS,
+          tax_rate: 0,
         }
       };
       const retry = await db
@@ -339,13 +355,7 @@ export async function updateTenantSettings(
       // Si el actor no es Superadmin, se preserva inmutable la configuración fiscal establecida centralmente.
       const isSuperadmin = actor.role === 'superadmin' || (actor.email && isSuperAdminEmail(actor.email));
       if (!isSuperadmin) {
-        (updatePayload.metadata as Record<string, unknown>).fiscal_settings = existingMetadata.fiscal_settings || {
-          taxes_enabled: false,
-          region: 'exento_salud',
-          tax_rate: 0,
-          enable_igtf: false,
-          igtf_rate: 3,
-        };
+        (updatePayload.metadata as Record<string, unknown>).fiscal_settings = existingMetadata.fiscal_settings || DEFAULT_FISCAL_SETTINGS;
         (updatePayload.metadata as Record<string, unknown>).tax_rate = existingMetadata.tax_rate ?? 0;
       }
     }
@@ -569,6 +579,8 @@ export async function getAllTenants(callerOrActor?: ActionActor | string | null,
               plan: 'pro',
               owner_email: cleanEmail,
               auto_provisioned: true,
+              fiscal_settings: DEFAULT_FISCAL_SETTINGS,
+              tax_rate: 0,
             }
           }]).select().single();
 
@@ -674,6 +686,8 @@ function sanitizeTenantPayload(tenant: any) {
     booking_settings: rawMeta.booking_settings,
     public_theme: rawMeta.public_theme,
     integraciones: rawMeta.integraciones,
+    fiscal_settings: rawMeta.fiscal_settings || DEFAULT_FISCAL_SETTINGS,
+    tax_rate: rawMeta.fiscal_settings?.taxes_enabled ? (rawMeta.tax_rate ?? rawMeta.fiscal_settings.tax_rate ?? 0) : 0,
   };
 
   return {
