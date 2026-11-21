@@ -820,15 +820,32 @@ export default function BookingClient({
     if (selectedBarber && selectedBarber.id !== 'any' && selectedBarber.metadata?.working_hours && dayOfWeekStr) {
       return selectedBarber.metadata.working_hours[dayOfWeekStr] || [];
     }
+    if (selectedBarber?.id === 'any' && filteredEmployees.length > 0 && dayOfWeekStr) {
+      const allShifts: { start: string; end: string }[] = [];
+      filteredEmployees.forEach(emp => {
+        const wh = emp.metadata?.working_hours;
+        if (wh && wh[dayOfWeekStr] && Array.isArray(wh[dayOfWeekStr])) {
+          wh[dayOfWeekStr].forEach((s: any) => {
+            if (s?.start && s?.end) {
+              allShifts.push({ start: s.start, end: s.end });
+            }
+          });
+        }
+      });
+      if (allShifts.length > 0) {
+        return allShifts;
+      }
+    }
     return undefined;
-  }, [selectedBarber, dayOfWeekStr]);
+  }, [selectedBarber, filteredEmployees, dayOfWeekStr]);
 
   const hasDoctorCustomSchedule = Boolean(
-    selectedBarber && 
-    selectedBarber.id !== 'any' && 
-    selectedBarber.metadata?.working_hours &&
-    typeof selectedBarber.metadata.working_hours === 'object' &&
-    Object.keys(selectedBarber.metadata.working_hours).length > 0
+    (selectedBarber && 
+      selectedBarber.id !== 'any' && 
+      selectedBarber.metadata?.working_hours &&
+      typeof selectedBarber.metadata.working_hours === 'object' &&
+      Object.keys(selectedBarber.metadata.working_hours).length > 0) ||
+    (selectedBarber?.id === 'any' && shifts && shifts.length > 0)
   );
 
   const slotInterval = selectedService?.durationMinutes || settings.intervalMinutes;
@@ -926,6 +943,13 @@ export default function BookingClient({
       if (timeoutTimer) clearTimeout(timeoutTimer);
     };
   }, [selectedBarber, selectedDate, tenant.id, clientTzOffset, selectedService?.name]);
+
+  // Si la hora seleccionada deja de estar disponible (por ejemplo al refrescar turnos ocupados), deseleccionarla
+  useEffect(() => {
+    if (selectedTime && !isSlotAvailable(selectedTime, slotInterval, bookedTimes, selectedDate)) {
+      setSelectedTime(null);
+    }
+  }, [bookedTimes, selectedTime, slotInterval, selectedDate]);
 
   const handleServiceSelect = (service: { name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean }) => {
     setSelectedService(service);
@@ -1737,14 +1761,16 @@ export default function BookingClient({
                         return (
                           <button
                             key={i}
-                            disabled={!isAvailable}
+                            disabled={isLoadingTimes || !isAvailable}
                             onClick={() => setSelectedTime(time.value24)}
                             className={`py-2.5 sm:py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center ${
-                              !isAvailable 
-                                ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
-                                : isSelected 
-                                  ? 'shadow-md scale-105'
-                                  : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300 shadow-sm'
+                              isLoadingTimes
+                                ? 'bg-slate-50 border-slate-100 text-slate-300 animate-pulse cursor-wait'
+                                : !isAvailable 
+                                  ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
+                                  : isSelected 
+                                    ? 'shadow-md scale-105'
+                                    : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300 shadow-sm'
                             }`}
                             style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
                           >

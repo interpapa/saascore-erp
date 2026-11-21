@@ -106,6 +106,28 @@ export async function processBookingAction(formData: unknown) {
     const duration = cleanData.durationMinutes || 60;
     const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
 
+    // Validación de Jornada Laboral (Working Hours)
+    const dParts = cleanData.date.split('-');
+    const dDate = new Date(Number(dParts[0]), Number(dParts[1]) - 1, Number(dParts[2]));
+    const dayKeys = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDayKey = dayKeys[dDate.getDay()] || 'monday';
+
+    const checkDoctorWorking = (empMetadata: any, timeStr: string, durMins: number = 30) => {
+      const wh = empMetadata?.working_hours;
+      if (!wh || typeof wh !== 'object' || Object.keys(wh).length === 0) return true;
+      const shifts = wh[currentDayKey] || [];
+      if (!Array.isArray(shifts) || shifts.length === 0) return false;
+      const [h, m] = timeStr.split(':').map(Number);
+      const startSlot = (h || 0) * 60 + (m || 0);
+      const endSlot = startSlot + durMins;
+      return shifts.some((s: any) => {
+        if (!s?.start || !s?.end) return false;
+        const [sH, sM] = s.start.split(':').map(Number);
+        const [eH, eM] = s.end.split(':').map(Number);
+        return startSlot >= (sH * 60 + sM) && endSlot <= (eH * 60 + eM);
+      });
+    };
+
     // 1. Unificación y Creación de Contacto del Alumno (Estilo Odoo res.partner)
     let entityClientId: string | null = null;
     try {
@@ -184,7 +206,11 @@ export async function processBookingAction(formData: unknown) {
             })
             .map(a => a.employee_id)
         );
-        const availableEmployees = employees.filter(emp => !busyIds.has(emp.id) && emp.metadata?.bookable !== false);
+        const availableEmployees = employees.filter(emp => 
+          !busyIds.has(emp.id) && 
+          emp.metadata?.bookable !== false &&
+          checkDoctorWorking(emp.metadata, cleanData.time, duration)
+        );
 
         if (availableEmployees.length > 0) {
           let candidatePool = availableEmployees;
@@ -198,12 +224,26 @@ export async function processBookingAction(formData: unknown) {
           finalBarberId = chosenEmp.id;
           finalBarberName = chosenEmp.name;
         } else {
-          return { success: false, error: 'Todos los profesionales están ocupados en este horario exacto. Por favor elige otra hora.' };
+          return { success: false, error: 'No hay profesionales en turno o están ocupados en este horario exacto. Por favor elige otra hora.' };
         }
       } else {
         return { success: false, error: 'No hay profesionales disponibles en este momento.' };
       }
     } else {
+      // 0. Validar jornada laboral del profesional solicitado
+      const { data: requestedStaff } = await supabaseAdmin
+        .from('entities')
+        .select('id, name, metadata')
+        .eq('id', finalBarberId)
+        .maybeSingle();
+
+      if (requestedStaff?.metadata && !checkDoctorWorking(requestedStaff.metadata, cleanData.time, duration)) {
+        return {
+          success: false,
+          error: `El profesional "${requestedStaff.name || 'seleccionado'}" no atiende en ese horario. Por favor selecciona una hora dentro de su jornada de atención.`
+        };
+      }
+
       // Prevención de colisión y Soporte de Clases Grupales Compartidas (Multi-Alumno)
       const { data: overlapping } = await supabaseAdmin
         .from('appointments')
@@ -669,7 +709,45 @@ export async function getBookedTimesAction(
       }
 
     } else {
-      // Lógica para un solo empleado / coach
+      // Lógica para un solo empleado / médico
+      const { data: singleStaff } = await supabaseAdmin
+        .from('entities')
+        .select('id, name, metadata')
+        .eq('id', employeeId)
+        .maybeSingle();
+
+      const wh = singleStaff?.metadata?.working_hours;
+      const parts = date.split('-');
+      const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const mappingDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayKey = mappingDays[dObj.getDay()] || 'monday';
+
+      const isWorkingAtTime = (hh: string, mm: string) => {
+        if (wh && typeof wh === 'object' && Object.keys(wh).length > 0) {
+          const shifts = wh[dayKey] || [];
+          if (!Array.isArray(shifts) || shifts.length === 0) return false;
+          const slotMins = Number(hh) * 60 + Number(mm);
+          return shifts.some((s: any) => {
+            if (!s?.start || !s?.end) return false;
+            const [sH, sM] = s.start.split(':').map(Number);
+            const [eH, eM] = s.end.split(':').map(Number);
+            return slotMins >= (sH * 60 + sM) && slotMins < (eH * 60 + eM);
+          });
+        }
+        return true;
+      };
+
+      // Si tiene turnos configurados, bloquear cualquier horario fuera de su jornada
+      if (wh && typeof wh === 'object' && Object.keys(wh).length > 0) {
+        for (let m = 6 * 60; m <= 22 * 60; m += 15) {
+          const hh = Math.floor(m / 60).toString().padStart(2, '0');
+          const mm = (m % 60).toString().padStart(2, '0');
+          if (!isWorkingAtTime(hh, mm)) {
+            bookedTimesSet.add(`${hh}:${mm}`);
+          }
+        }
+      }
+
       (appointments || []).forEach((r: any) => {
          let current = new Date(r.start_time).getTime();
          const rawEnd = new Date(r.end_time || (current + 45 * 60000)).getTime();
