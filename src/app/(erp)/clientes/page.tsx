@@ -87,9 +87,21 @@ export default function ClientesPage() {
 
   const hasHydrated = useERPStore(s => s.hasHydrated);
 
+  const effectiveActor = actor || (session?.userEmail ? {
+    email: session.userEmail,
+    role: session.role || 'owner',
+    token: session.token,
+  } : null);
+
   const fetchClients = useCallback(async () => {
-    if (!currentTenant?.id || !actor) {
-      if (hasHydrated && !currentTenant?.id) {
+    const activeActor = actor || (session?.userEmail ? {
+      email: session.userEmail,
+      role: session.role || 'owner',
+      token: session.token,
+    } : null);
+
+    if (!currentTenant?.id || !activeActor) {
+      if (hasHydrated) {
         setIsLoading(false);
       }
       return;
@@ -97,8 +109,8 @@ export default function ClientesPage() {
     try {
       setIsLoading(true);
       const [entitiesRes, schemaRes] = await Promise.allSettled([
-        getEntitiesAction(currentTenant.id, 'customer', 150, actor),
-        getTenantEntitySchemaAction(currentTenant.id, actor),
+        getEntitiesAction(currentTenant.id, 'customer', 200, activeActor),
+        getTenantEntitySchemaAction(currentTenant.id, activeActor),
       ]);
 
       if (entitiesRes.status === 'fulfilled' && entitiesRes.value.success && entitiesRes.value.entities) {
@@ -116,7 +128,7 @@ export default function ClientesPage() {
             .eq('type', 'customer')
             .is('deleted_at', null)
             .order('created_at', { ascending: false })
-            .limit(150);
+            .limit(200);
 
           if (directEntities && directEntities.length > 0) {
             setClients(prev => {
@@ -136,13 +148,14 @@ export default function ClientesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id, actor, hasHydrated]);
+  }, [currentTenant?.id, actor, session?.userEmail, session?.token, session?.role, hasHydrated]);
 
   const loadAuditLogs = useCallback(async () => {
-    if (!currentTenant?.id || !actor) return;
+    const activeActor = effectiveActor;
+    if (!currentTenant?.id || !activeActor) return;
     try {
       setIsLoadingAudit(true);
-      const res = await getAuditLogsAction(currentTenant.id, 'entity', 40, actor);
+      const res = await getAuditLogsAction(currentTenant.id, 'entity', 40, activeActor);
       if (res.success) {
         setAuditLogs(res.logs);
       }
@@ -151,7 +164,7 @@ export default function ClientesPage() {
     } finally {
       setIsLoadingAudit(false);
     }
-  }, [currentTenant?.id, actor]);
+  }, [currentTenant?.id, effectiveActor]);
 
   useEffect(() => {
     fetchClients();
@@ -282,7 +295,8 @@ export default function ClientesPage() {
   };
 
   const handleDeleteClient = async (id: string) => {
-    if (!currentTenant || !actor) return;
+    const activeActor = effectiveActor;
+    if (!currentTenant || !activeActor) return;
 
     if (isTemporaryId(id) || !isValidUUID(id)) {
       setClients(prev => prev.filter(c => c.id !== id));
@@ -292,7 +306,7 @@ export default function ClientesPage() {
     }
 
     try {
-      const res = await deleteEntityAction(id, currentTenant.id, actor);
+      const res = await deleteEntityAction(id, currentTenant.id, activeActor);
       if (res.success) {
         toast({ variant: 'info', title: 'Cliente Eliminado', description: 'El contacto se removió del directorio.' });
         setClients(prev => prev.filter(c => c.id !== id));

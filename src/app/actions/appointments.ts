@@ -128,13 +128,18 @@ export async function getAppointmentsAction(
         const employee = a.employee_id ? entitiesMap[a.employee_id] : null;
         const service = a.service_id ? itemsMap[a.service_id] : null;
 
+        const rawTitle = a.title || a.metadata?.title || '';
+        const extractedPatient = typeof rawTitle === 'string' && rawTitle.includes(' - ')
+          ? rawTitle.split(' - ').slice(1).join(' - ').trim()
+          : (typeof a.notes === 'string' && a.notes.includes('Cliente: ') ? a.notes.split('Cliente: ')[1]?.split('\n')[0]?.trim() : undefined);
+
         return {
           id: a.id,
           tenant_id: a.tenant_id,
-          title: a.metadata?.title || a.notes?.split('\n')[0] || 'Cita',
+          title: a.title || a.metadata?.title || a.notes?.split('\n')[0] || 'Cita',
           description: a.description,
           client_id: a.client_id,
-          client_name: client?.name || a.client_name || a.metadata?.client_name || (a.notes?.includes('Cliente: ') ? a.notes.split('Cliente: ')[1] : undefined),
+          client_name: client?.name || a.client_name || a.metadata?.client_name || extractedPatient || 'Paciente',
           client_phone: client?.phone || a.client_phone || a.metadata?.client_phone,
           client_email: client?.email,
           service_id: a.service_id,

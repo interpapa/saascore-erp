@@ -91,6 +91,20 @@ export function DailyTimelineExpress({
     ? dayAppointments
     : dayAppointments.filter((a) => a.employee_id === selectedEmployeeId);
 
+  // Citas futuras a partir del final del día seleccionado
+  const futureAppointments = appointments
+    .filter((a) => {
+      try {
+        const d = new Date(a.start_time);
+        const ref = new Date(currentDate);
+        ref.setHours(23, 59, 59, 999);
+        return d.getTime() > ref.getTime();
+      } catch {
+        return false;
+      }
+    })
+    .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+
   return (
     <div className="space-y-4">
       {/* 1. SELECTOR DE FECHA RÁPIDO */}
@@ -200,21 +214,78 @@ export function DailyTimelineExpress({
       {/* 3. LISTA CRONOLÓGICA DE CITAS */}
       <div className="space-y-3">
         {filteredDayAppointments.length === 0 ? (
-          <div className="bg-card border border-dashed border-border rounded-2xl p-10 text-center space-y-3">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
-              <CalendarDays size={24} />
+          <div className="space-y-4">
+            <div className="bg-card border border-dashed border-border rounded-2xl p-8 text-center space-y-3">
+              <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+                <CalendarDays size={24} />
+              </div>
+              <div>
+                <p className="text-sm font-black text-foreground">
+                  {selectedEmployeeId !== 'all' ? 'Sin citas para este especialista hoy' : 'Sin citas para este día'}
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">Toca el botón (+) para agendar un turno.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onOpenCreateModal(selectedEmployeeId !== 'all' ? selectedEmployeeId : undefined)}
+                className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl shadow-xs btn-haptic"
+              >
+                + Agendar Cita
+              </button>
             </div>
-            <div>
-              <p className="text-sm font-black text-foreground">{selectedEmployeeId !== 'all' ? 'Sin citas para este especialista hoy' : 'Sin citas para este día'}</p>
-              <p className="text-xs text-slate-400 mt-0.5">Toca el botón (+) para agendar un turno.</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => onOpenCreateModal(selectedEmployeeId !== 'all' ? selectedEmployeeId : undefined)}
-              className="px-4 py-2 bg-primary text-primary-foreground text-xs font-bold rounded-xl shadow-xs btn-haptic"
-            >
-              + Agendar Cita
-            </button>
+
+            {/* Banner de Próximas Citas Agendadas */}
+            {futureAppointments.length > 0 && (
+              <div className="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800/60 text-left space-y-3 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black text-teal-800 dark:text-teal-300 uppercase tracking-wider block">
+                      Próxima Fecha con Citas
+                    </span>
+                    <span className="text-sm font-bold text-foreground capitalize">
+                      {new Date(futureAppointments[0].start_time).toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onDateChange(new Date(futureAppointments[0].start_time))}
+                    className="px-3 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs btn-haptic flex items-center gap-1"
+                  >
+                    <span>Ver Fecha ({futureAppointments.filter(a => {
+                      const d1 = new Date(a.start_time);
+                      const d2 = new Date(futureAppointments[0].start_time);
+                      return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
+                    }).length})</span>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 pt-1 border-t border-teal-200/60 dark:border-teal-800/40">
+                  <span className="text-[10px] text-muted-foreground font-black uppercase tracking-wider">
+                    {futureAppointments.length} turnos siguientes agendados:
+                  </span>
+                  {futureAppointments.slice(0, 4).map((fAppt) => (
+                    <div
+                      key={fAppt.id}
+                      onClick={() => onSelectAppointment(fAppt)}
+                      className="p-2.5 rounded-xl bg-card hover:bg-accent border border-border flex items-center justify-between text-xs cursor-pointer transition-colors shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden">
+                        <span className="font-black text-teal-600 dark:text-teal-400 shrink-0">
+                          {formatAppointmentTime(fAppt.start_time)}
+                        </span>
+                        <span className="font-semibold text-foreground truncate">
+                          {fAppt.client_name || fAppt.title}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold shrink-0 ml-2">
+                        {new Date(fAppt.start_time).toLocaleDateString('es-VE', { day: 'numeric', month: 'short' })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           filteredDayAppointments.map((appt) => {
@@ -418,6 +489,25 @@ export function DailyTimelineExpress({
               </div>
             );
           })
+        )}
+
+        {/* Acceso rápido a las siguientes citas al terminar la jornada del día */}
+        {filteredDayAppointments.length > 0 && futureAppointments.length > 0 && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => onDateChange(new Date(futureAppointments[0].start_time))}
+              className="w-full p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800/80 border border-border flex items-center justify-between text-xs transition-colors btn-haptic group"
+            >
+              <div className="flex items-center gap-2">
+                <CalendarDays size={15} className="text-teal-600 dark:text-teal-400" />
+                <span className="font-semibold text-foreground">
+                  Próximas citas: <span className="font-black capitalize">{new Date(futureAppointments[0].start_time).toLocaleDateString('es-VE', { weekday: 'short', day: 'numeric', month: 'short' })}</span> ({futureAppointments.length} turnos)
+                </span>
+              </div>
+              <ChevronRight size={14} className="text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+            </button>
+          </div>
         )}
       </div>
     </div>

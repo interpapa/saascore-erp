@@ -58,6 +58,7 @@ export default function CalendarioPage() {
 
   // Filter & Navigation States
   const [viewMode, setViewMode] = useState<'day' | 'week' | 'month' | 'agenda'>('week');
+  const [mobileView, setMobileView] = useState<'today' | 'month' | 'agenda'>('today');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [filterState, setFilterState] = useState<AppointmentFilterState>({
     status: 'all',
@@ -87,6 +88,12 @@ export default function CalendarioPage() {
 
   const actor = useActionActor();
 
+  const effectiveActor = actor || (session?.userEmail ? {
+    email: session.userEmail,
+    role: session.role || 'owner',
+    token: session.token,
+  } : null);
+
   const bookableEmployees = employees.filter(e => e.bookable);
 
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0)
@@ -107,21 +114,27 @@ export default function CalendarioPage() {
   // Fetch Data Function (Adaptativo a Módulos Habilitados)
   const fetchData = useCallback(async () => {
     if (!currentTenant) return;
+    const activeActor = actor || (session?.userEmail ? {
+      email: session.userEmail,
+      role: session.role || 'owner',
+      token: session.token,
+    } : null);
+
     // Si el actor aún no está listo (cargando token), esperar brevemente y reintentar una vez
-    if (!actor) {
+    if (!activeActor) {
       setTimeout(() => {
         const latestActor = useERPStore.getState().session;
         if (latestActor?.userEmail) fetchData();
-      }, 1500);
+      }, 500);
       return;
     }
     try {
       setIsLoading(true);
       const [apptsRes, empRes, custRes, srvRes] = await Promise.allSettled([
-        getAppointmentsAction(currentTenant.id, filterState, actor),
-        getEntitiesAction(currentTenant.id, 'employee', 100, actor),
-        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 100, actor) : Promise.resolve({ success: true, entities: [] }),
-        getItemsAction(currentTenant.id, 'service', 100, actor),
+        getAppointmentsAction(currentTenant.id, filterState, activeActor),
+        getEntitiesAction(currentTenant.id, 'employee', 100, activeActor),
+        isCRMEnabled ? getEntitiesAction(currentTenant.id, 'customer', 100, activeActor) : Promise.resolve({ success: true, entities: [] }),
+        getItemsAction(currentTenant.id, 'service', 100, activeActor),
       ]);
 
       if (apptsRes.status === 'fulfilled') {
@@ -194,7 +207,7 @@ export default function CalendarioPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id, actor, filterState, toast, isTeamEnabled, isCRMEnabled, isInventoryEnabled]);
+  }, [currentTenant?.id, actor, session?.userEmail, session?.token, session?.role, filterState, toast, isTeamEnabled, isCRMEnabled, isInventoryEnabled]);
 
   useEffect(() => {
     fetchData();
@@ -568,28 +581,110 @@ export default function CalendarioPage() {
       </div>
 
       {/* ─────────────────────────────────────────────────────────────
-          1. VISTA MÓVIL OPERATIVA (1 profesional a la vez con selector táctil)
+          1. VISTA MÓVIL OPERATIVA CON SELECTOR DE MES Y AGENDA
          ───────────────────────────────────────────────────────────── */}
-      <div className="block md:hidden">
-        <DailyTimelineExpress
-          appointments={appointments}
-          employees={bookableEmployees}
-          onSelectAppointment={handleSelectAppointment}
-          onUpdateStatus={handleUpdateStatus}
-          onOpenCreateModal={() => {
-            setSelectedDateForCreate(currentDate);
-            setCreateModalType('appointment');
-            setIsCreateModalOpen(true);
-          }}
-          currentDate={currentDate}
-          onDateChange={setCurrentDate}
-          isDentalActive={isDentalActive}
-          onOpenBlockModal={() => {
-            setSelectedDateForCreate(currentDate);
-            setCreateModalType('block');
-            setIsCreateModalOpen(true);
-          }}
-        />
+      <div className="block md:hidden space-y-4">
+        {/* Selector Táctil de Vistas para Móvil */}
+        <div className="flex items-center bg-card border border-border p-1 rounded-2xl gap-1 shadow-xs">
+          <button
+            type="button"
+            onClick={() => setMobileView('today')}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all btn-haptic ${
+              mobileView === 'today'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Hoy
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileView('month');
+              setViewMode('month');
+            }}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all btn-haptic ${
+              mobileView === 'month'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Mes ({appointments.filter(a => {
+              try {
+                const d = new Date(a.start_time);
+                return d.getMonth() === currentDate.getMonth() && d.getFullYear() === currentDate.getFullYear();
+              } catch {
+                return false;
+              }
+            }).length})
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMobileView('agenda');
+              setViewMode('agenda');
+            }}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all btn-haptic ${
+              mobileView === 'agenda'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            Agenda ({appointments.length})
+          </button>
+        </div>
+
+        {mobileView === 'today' ? (
+          <DailyTimelineExpress
+            appointments={appointments}
+            employees={bookableEmployees}
+            onSelectAppointment={handleSelectAppointment}
+            onUpdateStatus={handleUpdateStatus}
+            onOpenCreateModal={() => {
+              setSelectedDateForCreate(currentDate);
+              setCreateModalType('appointment');
+              setIsCreateModalOpen(true);
+            }}
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            isDentalActive={isDentalActive}
+            onOpenBlockModal={() => {
+              setSelectedDateForCreate(currentDate);
+              setCreateModalType('block');
+              setIsCreateModalOpen(true);
+            }}
+          />
+        ) : (
+          <div className="space-y-4">
+            <CalendarGrid
+              viewMode={mobileView}
+              currentDate={currentDate}
+              appointments={appointments}
+              employees={filterState.employee_id !== 'all' ? bookableEmployees.filter(e => e.id === filterState.employee_id) : bookableEmployees}
+              courts={useSportsCourts ? (currentTenant?.metadata?.courts as any) : undefined}
+              useCourts={useSportsCourts}
+              isLoading={isLoading}
+              onSelectAppointment={handleSelectAppointment}
+              onSelectDateSlot={handleSelectDateSlot}
+              onDrillDown={(date, mode) => {
+                setCurrentDate(date);
+                if (mode === 'day') {
+                  setMobileView('today');
+                } else {
+                  setMobileView(mode as any);
+                }
+              }}
+              onOpenCreateModal={(type = 'appointment') => {
+                setSelectedDateForCreate(null);
+                setSelectedTimeForCreate(null);
+                setSelectedCourtForCreate(null);
+                setSelectedEmployeeForCreate(filterState.employee_id !== 'all' ? (filterState.employee_id || null) : null);
+                setCreateModalType(type);
+                setIsCreateModalOpen(true);
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* ─────────────────────────────────────────────────────────────

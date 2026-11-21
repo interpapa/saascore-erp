@@ -85,7 +85,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Blindaje Superadmin: Si está en Modo Soporte (impersonando un negocio), PRESERVARLO y no revertir
         const activeImpersonation = useERPStore.getState().impersonatedTenant;
-        if (isSuper && activeImpersonation?.id) {
+        // Si la impersonación residual es la empresa genérica 'rendo corp' y el usuario tiene asignada una empresa operativa (ej. Consultorio 25), liberar para usar la operativa
+        if (activeImpersonation?.id === PRIMARY_DEFAULT_TENANT_ID && result.tenant.id !== PRIMARY_DEFAULT_TENANT_ID) {
+          useERPStore.getState().stopImpersonation();
+        } else if (isSuper && activeImpersonation?.id) {
           setCurrentTenant({
             ...activeImpersonation,
             active_modules: activeImpersonation.active_modules || DEFAULT_ENABLED_MODULES,
@@ -131,11 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa principal o impersonada
+      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa operativa o impersonada
       if (isSuper) {
         const activeImpersonation = useERPStore.getState().impersonatedTenant;
-        const targetId = activeImpersonation?.id || PRIMARY_DEFAULT_TENANT_ID;
-        const targetName = activeImpersonation?.name || 'rendo CORP';
+        const targetId = activeImpersonation?.id || '4062a8fe-f512-455c-8192-2f83c55ed732';
+        const targetName = activeImpersonation?.name || 'Consultorio 25';
         setSession({
           userEmail: cleanEmail,
           role: 'superadmin',

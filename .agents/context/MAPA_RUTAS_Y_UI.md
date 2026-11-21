@@ -66,7 +66,7 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 ### ⚙️ Clúster Operativo & Especialidades de Servicio
 | Ruta | Archivo Principal | Tamaño / Tipo | Propósito y Capacidades |
 | :--- | :--- | :--- | :--- |
-| `/calendario` | `src/app/(erp)/calendario/page.tsx` | ~28 KB | Agenda de citas y turnos, slots horarios por profesional, sincronización con clientes. |
+| `/calendario` | `src/app/(erp)/calendario/page.tsx` | ~28 KB | Agenda de citas y turnos, slots horarios por profesional, sincronización con clientes, selector táctil móvil de triple vista (Hoy, Mes, Agenda) y anticipación de próximas citas. |
 | `/whatsapp` | `src/app/(erp)/whatsapp/page.tsx` | ~25 KB | Bandeja omnicanal de mensajería vinculada a fichas de clientes y recordatorios. |
 | `/kanban` | `src/app/(erp)/kanban/page.tsx` | ~23 KB | Tablero interactivo de órdenes de trabajo, seguimiento de servicios y diagnósticos. |
 | `/barberia` | `src/app/(erp)/barberia/page.tsx` | ~36 KB | Estaciones de silla de barbero, turnos walk-in, comisiones por corte y catálogo de estilo. |
