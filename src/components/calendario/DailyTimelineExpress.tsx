@@ -22,6 +22,7 @@ import { Appointment, AppointmentStatus, Employee } from '@/types/calendario';
 import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 import { getAppointmentVisualStatus } from '@/lib/calendario/calendarColors';
 import { formatAppointmentTime, formatAppointmentTime12h } from '@/lib/calendario/calendarDateUtils';
+import { getPatientDisplayName, getDoctorDisplayName } from './CalendarGrid';
 
 interface DailyTimelineExpressProps {
   appointments: Appointment[];
@@ -275,7 +276,7 @@ export function DailyTimelineExpress({
                           {formatAppointmentTime(fAppt.start_time)}
                         </span>
                         <span className="font-semibold text-foreground truncate">
-                          {fAppt.client_name || fAppt.title}
+                          {getPatientDisplayName(fAppt)}
                         </span>
                       </div>
                       <span className="text-[10px] text-muted-foreground uppercase font-bold shrink-0 ml-2">
@@ -386,7 +387,7 @@ export function DailyTimelineExpress({
                           onClick={() => onSelectAppointment(appt)}
                           className="text-sm font-black text-foreground hover:text-teal-600 cursor-pointer transition-colors"
                         >
-                          {appt.client_name || 'Paciente sin nombre'}
+                          {getPatientDisplayName(appt)}
                         </h4>
                         {visual.isPendingPayment && (
                           <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-200 border border-amber-500/30">
@@ -394,15 +395,15 @@ export function DailyTimelineExpress({
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        {appt.service_name || appt.title || 'Consulta General'}
-                        {appt.price ? ` · $${appt.price.toFixed(2)}` : ''}
-                      </p>
-                      {appt.employee_name && (
-                        <p className="text-[11px] text-slate-400 mt-0.5">
-                          Atiende: <strong className="text-slate-600 dark:text-slate-300">{appt.employee_name}</strong>
+                      {getDoctorDisplayName(appt) && (
+                        <p className="text-xs text-indigo-700 dark:text-indigo-300 font-bold mt-0.5 flex items-center gap-1">
+                          <span>👨‍⚕️</span> Atiende: <strong className="text-indigo-900 dark:text-indigo-100">{getDoctorDisplayName(appt)}</strong>
                         </p>
                       )}
+                      <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        {appt.service_name || (appt.title?.includes(' - ') ? appt.title.split(' - ')[0]?.replace(/^Cita:\s*/i, '') : appt.description || 'Consulta General')}
+                        {appt.price ? ` · $${appt.price.toFixed(2)}` : ''}
+                      </p>
                     </div>
                   </div>
 

@@ -1062,9 +1062,14 @@ export default function BookingClient({
       }, 1500);
 
     } catch (err: any) {
-      console.error('Error Calling Server Action:', err);
+      console.error('[BookingClient] Error Calling Server Action:', err);
       setIsSubmitting(false);
-      setErrorMessage(err.message || 'Error de red o de servidor al enviar la reserva.');
+      const rawMsg = String(err?.message || '');
+      if (rawMsg.includes('Server Components render') || rawMsg.includes('digest')) {
+        setErrorMessage('La conexión con el servidor de reservas tardó más de lo esperado. Por favor verifica tus datos e intenta agendar nuevamente.');
+      } else {
+        setErrorMessage(rawMsg || 'Error de red o de servidor al enviar la reserva.');
+      }
       return;
     }
   };

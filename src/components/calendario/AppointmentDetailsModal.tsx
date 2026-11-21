@@ -478,8 +478,32 @@ export function AppointmentDetailsModal({
         {/* Content con Scroll Interno Fluido */}
         <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-5">
           {/* Main Info */}
-          <div className="bg-slate-50 dark:bg-slate-900/60 border border-border p-4 rounded-2xl space-y-3">
-            <h4 className="text-lg font-black text-foreground">{appointment.title}</h4>
+          <div className="bg-slate-50 dark:bg-slate-900/60 border border-border p-4 rounded-2xl space-y-4">
+            {/* Paciente y Doctor */}
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Paciente:</span>
+                <h4 className="text-xl font-black text-foreground">
+                  {appointment.client_name || (appointment.metadata as any)?.client_name || (appointment.title?.includes(' - ') ? appointment.title.split(' - ').pop()?.trim() : appointment.title) || 'Paciente'}
+                </h4>
+              </div>
+              <div className="bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 px-3 py-1.5 rounded-xl">
+                <span className="text-[10px] font-black uppercase text-indigo-500 block">Doctor / Especialista:</span>
+                <span className="text-xs font-black text-indigo-700 dark:text-indigo-300">
+                  👨‍⚕️ {appointment.employee_name || 'Sin Asignar'}
+                </span>
+              </div>
+            </div>
+
+            {/* Qué se va a hacer (Procedimiento / Tratamiento) */}
+            <div className="p-3.5 bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 rounded-2xl space-y-1">
+              <span className="text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <Briefcase size={14} /> Procedimiento / Tratamiento a realizar:
+              </span>
+              <p className="text-sm font-black text-emerald-950 dark:text-emerald-100">
+                {appointment.service_name || (appointment.metadata as any)?.service_name || (appointment.title?.includes(' - ') ? appointment.title.split(' - ')[0]?.replace(/^Cita:\s*/i, '').trim() : null) || appointment.description || 'Consulta / Tratamiento General'}
+              </p>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
               <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300">

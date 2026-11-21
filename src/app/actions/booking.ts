@@ -19,12 +19,12 @@ const bookingSchema = z.object({
   firstName: z.string().min(2, 'El nombre debe tener al menos 2 letras').max(50).trim(),
   lastName: z.string().max(50).trim().optional().or(z.literal('')),
   phone: z.string().max(30).trim().optional().or(z.literal('')),
-  durationMinutes: z.number().optional(),
-  timezoneOffset: z.string().regex(/^[+-]\d{2}:\d{2}$/).optional(),
-  price: z.number().optional(),
+  durationMinutes: z.union([z.number(), z.string().transform(v => Number(v) || 60)]).optional(),
+  timezoneOffset: z.string().optional(),
+  price: z.union([z.number(), z.string().transform(v => Number(v) || 0)]).optional(),
   serviceName: z.string().optional(),
   isGroupClass: z.boolean().optional(),
-  maxCapacity: z.number().optional(),
+  maxCapacity: z.union([z.number(), z.string().transform(v => Number(v) || 1)]).optional(),
 });
 
 function parseOffsetToMs(offsetStr?: string): number {
@@ -56,8 +56,13 @@ function checkRateLimit(ip: string): { allowed: boolean, remaining: number, retr
 
 export async function processBookingAction(formData: unknown) {
   try {
-    const headersList = await headers();
-    const ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || '127.0.0.1';
+    let ip = '127.0.0.1';
+    try {
+      const headersList = await headers();
+      ip = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || '127.0.0.1';
+    } catch (hErr) {
+      // Ignorar de forma segura si Next.js no provee request scope síncrono
+    }
     
     // Protección Anti-Spam activada
     const rateLimit = checkRateLimit(ip);
@@ -321,14 +326,10 @@ export async function processBookingAction(formData: unknown) {
 
     // INSERCIÓN REAL EN LA BASE DE DATOS
     let createdApptId: string = crypto.randomUUID();
-    let apptTitle: string;
-    if (isGroupClass) {
-      apptTitle = isSportsService 
-        ? `🎾 Clase Grupal (1/${maxCapacity}) - ${fullName.split(' ')[0]}`
-        : `Sesión Grupal (1/${maxCapacity}) - ${fullName.split(' ')[0]}`;
-    } else {
-      apptTitle = cleanData.serviceName ? `Cita: ${cleanData.serviceName} - ${fullName}` : `Cita Web - ${fullName}`;
-    }
+    // Título principal siempre es el nombre del paciente
+    const apptTitle = isGroupClass
+      ? (isSportsService ? `🎾 Clase Grupal (${attendees?.length || 1}/${maxCapacity}) - ${fullName}` : `Sesión Grupal (${attendees?.length || 1}/${maxCapacity}) - ${fullName}`)
+      : fullName;
 
     const { data: insertedAppt, error } = await supabaseAdmin
       .from('appointments')
@@ -338,10 +339,14 @@ export async function processBookingAction(formData: unknown) {
         client_id: entityClientId,
         employee_id: finalBarberId,
         title: apptTitle,
+        client_name: fullName,
+        service_name: cleanData.serviceName || 'Consulta General',
+        description: cleanData.serviceName ? `Procedimiento: ${cleanData.serviceName}` : 'Consulta General',
         price: cleanData.price || 0,
         metadata: { 
           client_name: fullName, 
           client_phone: cleanData.phone || undefined,
+          employee_name: finalBarberName,
           entity_id: entityClientId,
           durationMinutes: duration,
           service_name: cleanData.serviceName || undefined,
@@ -354,7 +359,7 @@ export async function processBookingAction(formData: unknown) {
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         status: 'scheduled',
-        notes: `Reserva Pública - Cliente: ${fullName}${cleanData.serviceName ? ` | Servicio: ${cleanData.serviceName}` : ''}${cleanData.phone ? ` | Tel: ${cleanData.phone}` : ''}`
+        notes: cleanData.serviceName ? `Procedimiento: ${cleanData.serviceName}${cleanData.phone ? ` | Tel: ${cleanData.phone}` : ''}` : `Reserva web${cleanData.phone ? ` | Tel: ${cleanData.phone}` : ''}`
       })
       .select('id')
       .maybeSingle();
@@ -379,7 +384,7 @@ export async function processBookingAction(formData: unknown) {
             id: createdApptId,
             tenant_id: cleanData.tenantId,
             employee_id: finalBarberId,
-            title: `Cita Web - ${fullName}`,
+            title: fullName,
             start_time: startDateTime.toISOString(),
             end_time: endDateTime.toISOString(),
             status: 'scheduled',
@@ -405,9 +410,10 @@ export async function processBookingAction(formData: unknown) {
               tax_amount: 0,
               total_amount: 0,
               metadata: {
-                title: `Cita Web - ${fullName}`,
+                title: fullName,
                 employee_id: finalBarberId,
                 employee_name: finalBarberName,
+                service_name: cleanData.serviceName,
                 issue_date: startDateTime.toISOString(),
                 due_date: endDateTime.toISOString(),
                 client_name: fullName,
@@ -419,7 +425,13 @@ export async function processBookingAction(formData: unknown) {
             console.error('[Booking Documents Fallback Error]:', docError);
             return { success: false, error: `Error DB: ${docError.message}` };
           }
-          return { success: true, message: 'Reserva procesada exitosamente.', assignedBarberName: finalBarberName };
+          return { 
+            success: true, 
+            message: 'Reserva procesada exitosamente.', 
+            assignedBarberId: finalBarberId,
+            assignedBarberName: finalBarberName,
+            appointmentId: createdApptId 
+          };
         }
       } else if (error.code === '23505' || error.message?.includes('unique_appointment_slot') || error.message?.includes('duplicate key')) {
         return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado por otro paciente. Por favor elige otro horario.' };
@@ -470,7 +482,13 @@ export async function processBookingAction(formData: unknown) {
       timestamp: new Date().toISOString(),
     });
 
-    return { success: true, message: 'Reserva procesada exitosamente.', assignedBarberName: finalBarberName };
+    return { 
+      success: true, 
+      message: 'Reserva procesada exitosamente.', 
+      assignedBarberId: finalBarberId,
+      assignedBarberName: finalBarberName,
+      appointmentId: createdApptId 
+    };
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {

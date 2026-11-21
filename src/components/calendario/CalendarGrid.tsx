@@ -71,6 +71,30 @@ function formatTime(isoString: string): string {
   return formatAppointmentTime12h(isoString);
 }
 
+export function getPatientDisplayName(appt: Appointment): string {
+  if (appt.metadata?.is_block) return `🔒 ${appt.title}`;
+  if (appt.client_name?.trim()) return appt.client_name.trim();
+  if (appt.metadata?.client_name && typeof appt.metadata.client_name === 'string' && appt.metadata.client_name.trim()) {
+    return appt.metadata.client_name.trim();
+  }
+  if (appt.title) {
+    if (appt.title.includes(' - ')) {
+      const parts = appt.title.split(' - ');
+      return parts[parts.length - 1].trim();
+    }
+    return appt.title.replace(/^Cita:\s*/i, '').trim();
+  }
+  return 'Paciente';
+}
+
+export function getDoctorDisplayName(appt: Appointment): string | null {
+  if (appt.employee_name?.trim()) return appt.employee_name.trim();
+  if (appt.metadata?.employee_name && typeof appt.metadata.employee_name === 'string' && appt.metadata.employee_name.trim()) {
+    return appt.metadata.employee_name.trim();
+  }
+  return null;
+}
+
 export function CalendarGrid({
   viewMode,
   currentDate,
@@ -284,7 +308,7 @@ export function CalendarGrid({
                              >
                                <div className="flex items-center justify-between gap-1">
                                  <span className="text-xs font-black leading-tight truncate">
-                                   {isBlock ? `🔒 ${appt.title}` : (appt.title || appt.client_name)}
+                                   {getPatientDisplayName(appt)}
                                  </span>
                                  <div className="flex items-center gap-1 shrink-0">
                                    {isFixedClass && (
@@ -436,13 +460,18 @@ export function CalendarGrid({
                               }}
                             >
                               <div className="flex items-center justify-between gap-1">
-                                <span className="text-[11px] font-black leading-tight line-clamp-2">{appt.metadata?.is_block ? `🔒 ${appt.title}` : (appt.client_name || appt.title)}</span>
+                                <span className="text-[11px] font-black leading-tight line-clamp-2">{getPatientDisplayName(appt)}</span>
                                 {visual.isPendingPayment && (
                                   <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-amber-500/25 text-amber-900 dark:text-amber-200 shrink-0">
                                     Pend.
                                   </span>
                                 )}
                               </div>
+                              {getDoctorDisplayName(appt) && !appt.metadata?.is_block && (
+                                <span className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 truncate flex items-center gap-1">
+                                  <span>👨‍⚕️</span> {getDoctorDisplayName(appt)}
+                                </span>
+                              )}
                               <div className="flex items-center gap-1 text-[10px] opacity-80 font-medium">
                                 <Clock size={10} />
                                 <span>{formatTime(appt.start_time)}</span>
@@ -626,7 +655,7 @@ export function CalendarGrid({
                                 >
                                   {appt.metadata?.is_block ? '🔒 ' : ''}
                                   {visual.isPendingPayment ? '🟡 ' : ''}
-                                  {formatTime(appt.start_time)} {appt.client_name || appt.title}
+                                  {formatTime(appt.start_time)} {getPatientDisplayName(appt)}
                                 </div>
                               );
                             })}
@@ -771,7 +800,7 @@ export function CalendarGrid({
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-black text-sm text-foreground group-hover:text-primary transition-colors">
-                              {isBlock ? `🔒 ${appt.title}` : appt.client_name || appt.title}
+                              {getPatientDisplayName(appt)}
                             </span>
                             {appt.metadata?.is_block ? (
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
