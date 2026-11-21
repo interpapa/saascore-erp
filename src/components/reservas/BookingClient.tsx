@@ -886,6 +886,46 @@ export default function BookingClient({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [debugInfo, setDebugInfo] = useState<{
+    timestamp: string;
+    errorMessage: string;
+    errorCode?: string;
+    trace?: Array<{ step: string; label: string; status: 'ok' | 'error' | 'warning' | 'skipped'; details?: string; timestamp: string }>;
+    inputSummary?: any;
+    rawError?: any;
+  } | null>(null);
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  const [hasCopiedDebug, setHasCopiedDebug] = useState(false);
+
+  const copyDebugToClipboard = () => {
+    if (!debugInfo) return;
+    const report = [
+      `=== DIAGNÓSTICO DE RESERVAS RENDO ERP ===`,
+      `Fecha/Hora: ${debugInfo.timestamp}`,
+      `Error: ${debugInfo.errorMessage}`,
+      debugInfo.errorCode ? `Código de Error: ${debugInfo.errorCode}` : '',
+      `Tenant ID: ${tenant.id}`,
+      `Organización: ${tenant.name}`,
+      `Especialista: ${selectedBarber?.name || 'No seleccionado'} (${selectedBarber?.id || 'N/A'})`,
+      `Servicio: ${selectedService?.name || 'No seleccionado'}`,
+      `Fecha Cita: ${selectedDate} ${selectedTime || 'Sin hora'}`,
+      `Cliente: ${customerFullName}`,
+      `Teléfono: ${customerPhone}`,
+      ``,
+      `--- TRAZA DE EJECUCIÓN (PASO A PASO) ---`,
+      ...(debugInfo.trace || []).map(t => `[${t.status.toUpperCase()}] ${t.step} - ${t.label}${t.details ? `: ${t.details}` : ''}`),
+      ``,
+      `--- PAYLOAD TÉCNICO ---`,
+      JSON.stringify(debugInfo.inputSummary || {}, null, 2),
+      debugInfo.rawError ? `\n--- ERROR BRUTO / STACK ---\n${typeof debugInfo.rawError === 'string' ? debugInfo.rawError : JSON.stringify(debugInfo.rawError, null, 2)}` : ''
+    ].filter(Boolean).join('\n');
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(report);
+      setHasCopiedDebug(true);
+      setTimeout(() => setHasCopiedDebug(false), 3000);
+    }
+  };
 
   const clientTzOffset = useMemo(() => {
     if (tenant.metadata?.booking_settings?.timezone_offset && /^[+-]\d{2}:\d{2}$/.test(tenant.metadata.booking_settings.timezone_offset)) {
@@ -992,56 +1032,88 @@ export default function BookingClient({
     setIsSubmitting(true);
     setErrorMessage('');
 
-    try {
-      const svcNameLower = (selectedService?.name || '').toLowerCase();
-      const isSportsSvc = svcNameLower.includes('padel') || svcNameLower.includes('pádel') || svcNameLower.includes('tenis') || hasCourts;
-      const isGroupSvc = Boolean(
-        (isSportsSvc && (svcNameLower.includes('grupal') || svcNameLower.includes('grupo'))) ||
-        (selectedTime && groupSlots[selectedTime] && Number(groupSlots[selectedTime].maxCapacity || 0) > 1)
-      );
-      const slotMaxCapacity = (selectedTime && groupSlots[selectedTime]?.maxCapacity) || (isGroupSvc ? 4 : 1);
+    const svcNameLower = (selectedService?.name || '').toLowerCase();
+    const isSportsSvc = svcNameLower.includes('padel') || svcNameLower.includes('pádel') || svcNameLower.includes('tenis') || hasCourts;
+    const isGroupSvc = Boolean(
+      (isSportsSvc && (svcNameLower.includes('grupal') || svcNameLower.includes('grupo'))) ||
+      (selectedTime && groupSlots[selectedTime] && Number(groupSlots[selectedTime].maxCapacity || 0) > 1)
+    );
+    const slotMaxCapacity = (selectedTime && groupSlots[selectedTime]?.maxCapacity) || (isGroupSvc ? 4 : 1);
 
-      // Invocación directa y optimizada de la Server Action (con prevención atómica de colisión en backend)
+    const bookingPayload = {
+      tenantId: tenant.id,
+      barberId: selectedBarber.id,
+      barberName: selectedBarber.name,
+      date: selectedDate,
+      time: selectedTime,
+      firstName: firstName,
+      lastName: lastName,
+      phone: customerPhone,
+      durationMinutes: selectedService?.durationMinutes || 60,
+      timezoneOffset: clientTzOffset,
+      price: selectedBarberPrice || selectedService?.basePrice || 0,
+      serviceName: selectedService?.name,
+      isGroupClass: isGroupSvc,
+      maxCapacity: slotMaxCapacity,
+    };
+
+    try {
+      // Invocación híbrida con doble canal: Server Action primario + Fallback REST inmediato
       let result: any = null;
       let lastErr: any = null;
 
-      // Intento primario con reintento automático único si ocurre un fallo de red transitorio
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        try {
-          result = await processBookingAction({
-            tenantId: tenant.id,
-            barberId: selectedBarber.id,
-            barberName: selectedBarber.name,
-            date: selectedDate,
-            time: selectedTime,
-            firstName: firstName,
-            lastName: lastName,
-            phone: customerPhone,
-            durationMinutes: selectedService?.durationMinutes || 60,
-            timezoneOffset: clientTzOffset,
-            price: selectedBarberPrice || selectedService?.basePrice || 0,
-            serviceName: selectedService?.name,
-            isGroupClass: isGroupSvc,
-            maxCapacity: slotMaxCapacity,
-          });
-          if (result) break;
-        } catch (callErr: any) {
-          lastErr = callErr;
-          console.warn(`[BookingClient] Intento ${attempt} fallido:`, callErr?.message);
-          if (attempt === 1) {
-            await new Promise(r => setTimeout(r, 800)); // Espera breve antes del reintento
-          }
-        }
+      // 1. Intento primario con Server Action
+      try {
+        result = await processBookingAction(bookingPayload);
+      } catch (callErr: any) {
+        lastErr = callErr;
+        console.warn('[BookingClient] Server Action interceptada o interrumpida:', callErr?.message);
       }
 
-      if (!result && lastErr) {
-        throw lastErr;
+      // 2. Si la Server Action falló con digest de Next.js o no respondió, recurrimos al endpoint REST transparente
+      if (!result || !result.success) {
+        const shouldFallbackRest = !result || Boolean(lastErr) || (result && !result.success && result.debugDetails?.errorCode === 'UNHANDLED_SERVER_ERROR');
+        if (shouldFallbackRest) {
+          try {
+            console.info('[BookingClient] Activando canal REST de contingencia /api/booking/process...');
+            const restResponse = await fetch('/api/booking/process', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(bookingPayload),
+            });
+            const restJson = await restResponse.json();
+            if (restJson) {
+              result = restJson;
+              lastErr = null;
+            }
+          } catch (restErr: any) {
+            console.error('[BookingClient] Fallback REST falló:', restErr);
+            if (!lastErr) lastErr = restErr;
+          }
+        }
       }
 
       setIsSubmitting(false);
 
       if (!result?.success) {
-        setErrorMessage(result?.error || 'No se pudo completar la reserva.');
+        const errorMsg = result?.error || lastErr?.message || 'No se pudo completar la reserva.';
+        setErrorMessage(errorMsg);
+        setDebugInfo({
+          timestamp: new Date().toLocaleTimeString(),
+          errorMessage: errorMsg,
+          errorCode: result?.debugDetails?.errorCode || (lastErr?.digest ? `NEXTJS_DIGEST_${lastErr.digest}` : 'BOOKING_FAILED'),
+          trace: result?.debugDetails?.executionTrace || (lastErr ? [
+            {
+              step: 'server_action_interrupted',
+              label: 'Interrupción en llamada con el servidor',
+              status: 'error',
+              details: String(lastErr.message || (lastErr.digest ? `Digest: ${lastErr.digest}` : 'Error de comunicación')),
+              timestamp: new Date().toISOString()
+            }
+          ] : undefined),
+          inputSummary: bookingPayload,
+          rawError: result?.debugDetails || (lastErr ? { message: lastErr.message, digest: lastErr.digest, stack: lastErr.stack } : undefined)
+        });
         return;
       }
 
@@ -1063,6 +1135,7 @@ export default function BookingClient({
         ? ((result as any).message || `¡Cupo reservado con éxito! (Cupo ${(result as any).spotNumber || 1} de ${(result as any).maxCapacity || 4})`)
         : '¡Reserva confirmada con éxito!';
       setSuccessMessage(confirmationMsg);
+      setDebugInfo(null);
       
       const routingMode = tenant.metadata?.booking_settings?.whatsappRoutingMode || 'employee_first';
       
@@ -1105,20 +1178,135 @@ export default function BookingClient({
       }, 1500);
 
     } catch (err: any) {
-      console.error('[BookingClient] Error Calling Server Action:', err);
+      console.error('[BookingClient] Error Inesperado:', err);
       setIsSubmitting(false);
       const rawMsg = String(err?.message || '');
       const digest = (err as any)?.digest ? ` (Código: ${(err as any).digest})` : '';
 
-      if (rawMsg.includes('Server Components render') || rawMsg.includes('digest')) {
-        setErrorMessage(`Interrupción en la conexión con el servidor${digest}. Por favor presiona 'Confirmar Reserva' para reintentar.`);
-      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('timeout')) {
-        setErrorMessage('Problema de conexión a internet o latencia con el servidor. Por favor verifica tu red y reintenta.');
-      } else {
-        setErrorMessage(rawMsg || 'Error de comunicación al enviar la reserva. Por favor reintenta.');
-      }
+      const errText = rawMsg.includes('Server Components render') || rawMsg.includes('digest')
+        ? `Interrupción en la conexión con el servidor${digest}. Por favor consulta el Registro Detallado abajo.`
+        : (rawMsg || 'Error inesperado al enviar la reserva.');
+
+      setErrorMessage(errText);
+      setDebugInfo({
+        timestamp: new Date().toLocaleTimeString(),
+        errorMessage: errText,
+        errorCode: (err as any)?.digest ? `DIGEST_${(err as any).digest}` : 'UNCAUGHT_ERROR',
+        trace: [
+          {
+            step: 'client_exception',
+            label: 'Excepción en cliente / Conexión interrumpida',
+            status: 'error',
+            details: rawMsg || 'Error de comunicación',
+            timestamp: new Date().toISOString()
+          }
+        ],
+        inputSummary: bookingPayload,
+        rawError: {
+          message: err?.message,
+          digest: (err as any)?.digest,
+          stack: err?.stack
+        }
+      });
       return;
     }
+  };
+
+  const renderDiagnosticPanel = () => {
+    if (!errorMessage) return null;
+    return (
+      <div className="mb-4 text-left w-full animate-in fade-in duration-150">
+        <div className="p-4 bg-red-50/95 border border-red-200 rounded-2xl shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <div className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5 font-black text-xs">
+              ✕
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-xs font-black uppercase tracking-wider text-red-800">
+                Aviso al agendar reserva
+              </h4>
+              <p className="text-xs text-red-700 mt-0.5 font-medium leading-relaxed">
+                {errorMessage}
+              </p>
+            </div>
+          </div>
+
+          {debugInfo && (
+            <div className="mt-3 pt-3 border-t border-red-200/70 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setShowDebugModal(prev => !prev)}
+                className="text-xs font-bold px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>{showDebugModal ? '▲ Ocultar Log Detallado' : '🔍 Ver Log Detallado del Error'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={copyDebugToClipboard}
+                className="text-xs font-bold px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <span>{hasCopiedDebug ? '✓ ¡Diagnóstico Copiado!' : '📋 Copiar Diagnóstico Completo'}</span>
+              </button>
+            </div>
+          )}
+
+          {showDebugModal && debugInfo && (
+            <div className="mt-3.5 p-3.5 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono shadow-inner border border-slate-800 space-y-3">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="font-bold text-slate-300">Registro Forense de Reserva</span>
+                <span className="text-[10px] text-slate-400">{debugInfo.timestamp}</span>
+              </div>
+
+              {debugInfo.errorCode && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Código de Diagnóstico:</span>
+                  <span className="px-1.5 py-0.5 bg-red-950 text-red-300 border border-red-800 rounded text-[11px] font-bold">
+                    {debugInfo.errorCode}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <span className="text-slate-400 font-bold block mb-1">Traza de pasos ejecutados:</span>
+                <div className="space-y-1.5 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 max-h-48 overflow-y-auto">
+                  {debugInfo.trace && debugInfo.trace.length > 0 ? (
+                    debugInfo.trace.map((t, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-[11px] leading-tight">
+                        <span className={`shrink-0 font-bold px-1 rounded text-[10px] ${
+                          t.status === 'ok' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                          t.status === 'error' ? 'bg-red-950 text-red-400 border border-red-800' :
+                          'bg-amber-950 text-amber-400 border border-amber-800'
+                        }`}>
+                          {t.status === 'ok' ? '✓ OK' : t.status === 'error' ? '✗ FALLO' : '! AVISO'}
+                        </span>
+                        <div className="flex-1">
+                          <span className="text-slate-200 font-medium">{t.label}</span>
+                          {t.details && <span className="text-slate-400 ml-1.5">({t.details})</span>}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-400 italic text-[11px]">No hay traza registrada para este error.</div>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-slate-400 font-bold block mb-1">Datos enviados (Payload):</span>
+                <pre className="bg-slate-950/60 p-2 rounded-lg text-[10px] text-slate-300 overflow-x-auto border border-slate-800/80">
+                  {JSON.stringify(debugInfo.inputSummary || {}, null, 2)}
+                </pre>
+              </div>
+
+              <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
+                <span>Presiona &quot;Copiar Diagnóstico Completo&quot; para compartirlo de inmediato.</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -1826,11 +2014,7 @@ export default function BookingClient({
 
                 {/* Confirmation — Desktop inline */}
                 <section className="hidden lg:block">
-                  {errorMessage && (
-                    <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm font-bold rounded-xl border border-red-100 text-center">
-                      {errorMessage}
-                    </div>
-                  )}
+                  {renderDiagnosticPanel()}
                   {successMessage && (
                     <div className="mb-4 p-3 bg-emerald-50 text-emerald-600 text-sm font-bold rounded-xl border border-emerald-100 text-center">
                       {successMessage} Redirigiendo a WhatsApp...
@@ -1849,12 +2033,8 @@ export default function BookingClient({
             </div>
 
             {/* Sticky bottom bar — Mobile only */}
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] z-20">
-              {errorMessage && (
-                <div className="mb-3 p-3 bg-red-50 text-red-600 text-xs font-bold rounded-xl border border-red-100 text-center">
-                  {errorMessage}
-                </div>
-              )}
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-slate-100 p-5 shadow-[0_-10px_40px_rgba(0,0,0,0.08)] z-20 max-h-[85vh] overflow-y-auto">
+              {renderDiagnosticPanel()}
               {successMessage && (
                 <div className="mb-3 p-3 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-xl border border-emerald-100 text-center">
                   {successMessage} Redirigiendo a WhatsApp...

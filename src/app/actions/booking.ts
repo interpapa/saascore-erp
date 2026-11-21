@@ -9,6 +9,34 @@ import { validateUserTenantAccess } from '@/lib/core/tenantSecurity';
 import { ActionActor } from './entities';
 import { normalizeHexColor } from '@/lib/theme/colorUtils';
 import { matchesEmployeeService } from '@/lib/services/serviceMatching';
+import { writeAuditLog } from '@/lib/core/auditLogger';
+
+export interface BookingTraceStep {
+  step: string;
+  label: string;
+  status: 'ok' | 'error' | 'warning' | 'skipped';
+  details?: string;
+  timestamp: string;
+}
+
+export interface BookingDebugDetails {
+  success: boolean;
+  timestamp: string;
+  durationMs: number;
+  executionTrace: BookingTraceStep[];
+  error?: string;
+  errorCode?: string;
+  inputSummary?: {
+    tenantId?: string;
+    barberId?: string;
+    barberName?: string;
+    date?: string;
+    time?: string;
+    serviceName?: string;
+    patientName?: string;
+    phoneMasked?: string;
+  };
+}
 
 const bookingSchema = z.object({
   tenantId: z.string().uuid('ID de empresa inválido'),
@@ -55,6 +83,91 @@ function checkRateLimit(ip: string): { allowed: boolean, remaining: number, retr
 }
 
 export async function processBookingAction(formData: unknown) {
+  const startTime = Date.now();
+  const trace: BookingTraceStep[] = [];
+  const addTrace = (step: string, label: string, status: 'ok' | 'error' | 'warning' | 'skipped', details?: string) => {
+    trace.push({
+      step,
+      label,
+      status,
+      details,
+      timestamp: new Date().toISOString()
+    });
+  };
+
+  addTrace('init', 'Inicio de procesamiento de reserva', 'ok', 'Recepción de payload');
+
+  const buildResponse = async (
+    success: boolean,
+    resData: {
+      message?: string;
+      error?: string;
+      errorCode?: string;
+      assignedBarberId?: string;
+      assignedBarberName?: string;
+      appointmentId?: string;
+      isGroupJoin?: boolean;
+      spotNumber?: number;
+      maxCapacity?: number;
+    },
+    cleanData?: any,
+    fullName?: string
+  ) => {
+    const durationMs = Date.now() - startTime;
+    const debugDetails: BookingDebugDetails = {
+      success,
+      timestamp: new Date().toISOString(),
+      durationMs,
+      executionTrace: trace,
+      error: resData.error,
+      errorCode: resData.errorCode,
+      inputSummary: cleanData ? {
+        tenantId: cleanData.tenantId,
+        barberId: cleanData.barberId,
+        barberName: cleanData.barberName,
+        date: cleanData.date,
+        time: cleanData.time,
+        serviceName: cleanData.serviceName,
+        patientName: fullName,
+        phoneMasked: cleanData.phone ? `***${String(cleanData.phone).slice(-4)}` : undefined
+      } : undefined
+    };
+
+    // Registro persistente en audit_logs de Supabase para trazabilidad forense
+    try {
+      await writeAuditLog({
+        tenant_id: cleanData?.tenantId || '00000000-0000-0000-0000-000000000000',
+        actor_email: cleanData?.phone ? `web:${cleanData.phone}` : 'portal_reservas',
+        actor_role: 'public_customer',
+        action: success ? 'booking.created' : 'booking.attempt_failed',
+        target_type: 'appointment',
+        target_id: resData.appointmentId,
+        metadata: {
+          enable_verbose_audit: true,
+          success,
+          durationMs,
+          error: resData.error,
+          errorCode: resData.errorCode,
+          customer: fullName,
+          service: cleanData?.serviceName,
+          doctor: resData.assignedBarberName || cleanData?.barberName,
+          date: cleanData?.date,
+          time: cleanData?.time,
+          traceCount: trace.length,
+          traceSummary: trace.map(t => `[${t.status.toUpperCase()}] ${t.step}: ${t.label}${t.details ? ` (${t.details})` : ''}`)
+        }
+      });
+    } catch (auditErr) {
+      console.warn('[processBookingAction] Registro de auditoría omitido (no bloqueante):', auditErr);
+    }
+
+    return {
+      ...resData,
+      success,
+      debugDetails
+    };
+  };
+
   try {
     let ip = '127.0.0.1';
     try {
@@ -67,12 +180,25 @@ export async function processBookingAction(formData: unknown) {
     // Protección Anti-Spam activada
     const rateLimit = checkRateLimit(ip);
     if (!rateLimit.allowed) {
-      return { success: false, error: `Demasiados intentos. Por favor espera ${rateLimit.retryAfterSecs} segundos.` };
+      addTrace('rate_limit', 'Protección Anti-Spam', 'error', `Límite superado para IP ${ip}. Reintentar en ${rateLimit.retryAfterSecs}s`);
+      return await buildResponse(false, { 
+        error: `Demasiados intentos. Por favor espera ${rateLimit.retryAfterSecs} segundos.`,
+        errorCode: 'RATE_LIMIT_EXCEEDED'
+      }, formData);
+    }
+    addTrace('rate_limit', 'Protección Anti-Spam', 'ok', `IP verificada (${ip})`);
+
+    let cleanData: z.infer<typeof bookingSchema>;
+    try {
+      cleanData = bookingSchema.parse(formData);
+      addTrace('zod_validation', 'Validación de estructura de datos', 'ok', `${cleanData.firstName} ${cleanData.lastName || ''} - ${cleanData.date} ${cleanData.time}`);
+    } catch (zodErr: any) {
+      const firstMsg = zodErr.issues?.[0]?.message || zodErr.errors?.[0]?.message || 'Datos de reserva inválidos.';
+      addTrace('zod_validation', 'Validación de estructura de datos', 'error', firstMsg);
+      return await buildResponse(false, { error: firstMsg, errorCode: 'INVALID_INPUT' }, formData);
     }
 
-    const cleanData = bookingSchema.parse(formData);
-
-    // Validación Backend de Módulo Activo (Soporta Citas, Odontología, Especialidades Médicas, Barbería y Peluquería Canina)
+    // Validación Backend de Módulo Activo
     const validBookingModules = [
       'calendario', 'odontologia', 'clinica', 'ginecologia', 'med_ginecologia',
       'cardiologia', 'med_cardiologia', 'pediatria', 'med_pediatria',
@@ -90,11 +216,13 @@ export async function processBookingAction(formData: unknown) {
       } catch {}
     }
     if (!isBookingAuthorized) {
-      return { 
-        success: false, 
-        error: 'El sistema de reservas está temporalmente inactivo o no habilitado para esta empresa.' 
-      };
+      addTrace('module_check', 'Verificación de módulos activos', 'error', `Tenant ${cleanData.tenantId} sin módulo de reservas/salud`);
+      return await buildResponse(false, { 
+        error: 'El sistema de reservas está temporalmente inactivo o no habilitado para esta empresa.',
+        errorCode: 'MODULE_DISABLED'
+      }, cleanData);
     }
+    addTrace('module_check', 'Verificación de módulos activos', 'ok', 'Módulo de citas/salud activo');
 
     const fullName = `${cleanData.firstName} ${cleanData.lastName || ''}`.trim();
     
@@ -105,6 +233,7 @@ export async function processBookingAction(formData: unknown) {
     // Usamos la duración enviada, o 60 minutos por defecto
     const duration = cleanData.durationMinutes || 60;
     const endDateTime = new Date(startDateTime.getTime() + duration * 60000);
+    addTrace('datetime_calc', 'Cálculo de ventana temporal local', 'ok', `${startDateTime.toISOString()} a ${endDateTime.toISOString()} (Duración: ${duration}m, Offset: ${tzOffset})`);
 
     // Validación de Jornada Laboral (Working Hours)
     const dParts = cleanData.date.split('-');
@@ -128,7 +257,7 @@ export async function processBookingAction(formData: unknown) {
       });
     };
 
-    // 1. Unificación y Creación de Contacto del Alumno (Estilo Odoo res.partner)
+    // 1. Unificación y Creación de Contacto del Alumno/Paciente (Estilo Odoo res.partner)
     let entityClientId: string | null = null;
     try {
       let query = supabaseAdmin
@@ -147,6 +276,7 @@ export async function processBookingAction(formData: unknown) {
 
       if (existingClient?.id) {
         entityClientId = existingClient.id;
+        addTrace('customer_entity', 'Búsqueda de ficha de paciente', 'ok', `Ficha existente vinculada (ID: ${entityClientId})`);
       } else {
         const { data: newClient } = await supabaseAdmin
           .from('entities')
@@ -163,9 +293,13 @@ export async function processBookingAction(formData: unknown) {
 
         if (newClient?.id) {
           entityClientId = newClient.id;
+          addTrace('customer_entity', 'Creación de ficha de paciente', 'ok', `Nueva ficha creada en entities (ID: ${entityClientId})`);
+        } else {
+          addTrace('customer_entity', 'Creación de ficha de paciente', 'warning', 'No retornó ID nuevo');
         }
       }
-    } catch (e) {
+    } catch (e: any) {
+      addTrace('customer_entity', 'Aviso en ficha de paciente', 'warning', e?.message || 'Error no bloqueante');
       console.warn('[Booking] Entity lookup/create warning (non-blocking):', e);
     }
 
@@ -223,11 +357,20 @@ export async function processBookingAction(formData: unknown) {
           const chosenEmp = candidatePool[Math.floor(Math.random() * candidatePool.length)];
           finalBarberId = chosenEmp.id;
           finalBarberName = chosenEmp.name;
+          addTrace('staff_assignment', 'Asignación automática de especialista (Modo: Cualquier Profesional)', 'ok', `Asignado a ${finalBarberName} (${finalBarberId})`);
         } else {
-          return { success: false, error: 'No hay profesionales en turno o están ocupados en este horario exacto. Por favor elige otra hora.' };
+          addTrace('staff_assignment', 'Asignación automática de especialista', 'error', 'No hay profesionales disponibles en este turno horario');
+          return await buildResponse(false, { 
+            error: 'No hay profesionales en turno o están ocupados en este horario exacto. Por favor elige otra hora.',
+            errorCode: 'NO_STAFF_AVAILABLE'
+          }, cleanData, fullName);
         }
       } else {
-        return { success: false, error: 'No hay profesionales disponibles en este momento.' };
+        addTrace('staff_assignment', 'Búsqueda de profesionales', 'error', 'No hay profesionales registrados para esta empresa');
+        return await buildResponse(false, { 
+          error: 'No hay profesionales disponibles en este momento.',
+          errorCode: 'NO_STAFF_REGISTERED'
+        }, cleanData, fullName);
       }
     } else {
       // 0. Validar jornada laboral del profesional solicitado
@@ -238,11 +381,13 @@ export async function processBookingAction(formData: unknown) {
         .maybeSingle();
 
       if (requestedStaff?.metadata && !checkDoctorWorking(requestedStaff.metadata, cleanData.time, duration)) {
-        return {
-          success: false,
-          error: `El profesional "${requestedStaff.name || 'seleccionado'}" no atiende en ese horario. Por favor selecciona una hora dentro de su jornada de atención.`
-        };
+        addTrace('working_hours', 'Jornada laboral del especialista', 'error', `El profesional "${requestedStaff.name || 'seleccionado'}" no atiende a las ${cleanData.time}`);
+        return await buildResponse(false, {
+          error: `El profesional "${requestedStaff.name || 'seleccionado'}" no atiende en ese horario. Por favor selecciona una hora dentro de su jornada de atención.`,
+          errorCode: 'STAFF_OFF_DUTY'
+        }, cleanData, fullName);
       }
+      addTrace('working_hours', 'Jornada laboral del especialista', 'ok', `Turno laboral verificado para ${requestedStaff?.name || finalBarberName}`);
 
       // Prevención de colisión y Soporte de Clases Grupales Compartidas (Multi-Alumno)
       const { data: overlapping } = await supabaseAdmin
@@ -265,10 +410,11 @@ export async function processBookingAction(formData: unknown) {
         );
 
         if (!isGroupClass) {
-          return {
-            success: false,
+          addTrace('collision_check', 'Verificación de colisión en agenda', 'error', `Turno ya ocupado por otra cita (ID: ${existingAppt.id})`);
+          return await buildResponse(false, {
             error: 'Lo sentimos, este turno ya está reservado para este profesional. Por favor elige otro horario.',
-          };
+            errorCode: 'SLOT_OCCUPIED'
+          }, cleanData, fullName);
         }
 
         const maxCapacity = Number(existingMeta.max_capacity) || 4;
@@ -286,10 +432,11 @@ export async function processBookingAction(formData: unknown) {
         }
 
         if (attendees.length >= maxCapacity) {
-          return {
-            success: false,
+          addTrace('group_class_check', 'Capacidad de sesión grupal', 'error', `Aforo lleno: ${attendees.length}/${maxCapacity}`);
+          return await buildResponse(false, {
             error: `Esta clase grupal ya está completa (${maxCapacity}/${maxCapacity} cupos ocupados). Por favor selecciona otro horario.`,
-          };
+            errorCode: 'GROUP_CLASS_FULL'
+          }, cleanData, fullName);
         }
 
         // El alumno se une a la clase grupal existente
@@ -323,6 +470,8 @@ export async function processBookingAction(formData: unknown) {
           })
           .eq('id', existingAppt.id);
 
+        addTrace('group_class_check', 'Unión a clase grupal', 'ok', `Cupo registrado (${attendees.length}/${maxCapacity})`);
+
         await eventBus.emit('appointment.booked', {
           appointmentId: existingAppt.id,
           tenantId: cleanData.tenantId,
@@ -335,15 +484,15 @@ export async function processBookingAction(formData: unknown) {
           timestamp: new Date().toISOString(),
         });
 
-        return {
-          success: true,
+        return await buildResponse(true, {
           message: `¡Cupo reservado con éxito! (Cupo ${attendees.length} de ${maxCapacity})`,
           assignedBarberName: finalBarberName,
           isGroupJoin: true,
           spotNumber: attendees.length,
           maxCapacity
-        };
+        }, cleanData, fullName);
       }
+      addTrace('collision_check', 'Verificación de colisión en agenda', 'ok', 'Turno libre');
     }
 
     // Obtener color asignado al profesional para la agenda
@@ -421,6 +570,7 @@ export async function processBookingAction(formData: unknown) {
 
     if (error) {
       console.error('[Booking Primary Error]:', error);
+      addTrace('db_insert', 'Fallo primario de inserción en appointments', 'warning', error.message);
       
       // Si el error es por columnas faltantes (metadata, notes, etc.), intentar solo con columnas básicas
       const isMissingCol = error.code === '42703' || 
@@ -447,6 +597,7 @@ export async function processBookingAction(formData: unknown) {
         
         if (fallbackError) {
           console.error('[Booking Fallback Error]:', fallbackError);
+          addTrace('db_fallback', 'Fallo de inserción básica en appointments', 'warning', fallbackError.message);
           
           // Si aún falla, intentar con la tabla documents como último recurso
           const { error: docError } = await supabaseAdmin
@@ -474,21 +625,36 @@ export async function processBookingAction(formData: unknown) {
           
           if (docError) {
             console.error('[Booking Documents Fallback Error]:', docError);
-            return { success: false, error: `Error DB: ${docError.message}` };
+            addTrace('db_fallback_docs', 'Fallo en tabla documents de respaldo', 'error', docError.message);
+            return await buildResponse(false, { 
+              error: `Error DB: ${docError.message}`,
+              errorCode: 'DB_INSERT_FAILED'
+            }, cleanData, fullName);
           }
-          return { 
-            success: true, 
+          addTrace('db_fallback_docs', 'Cita registrada en tabla documents como work_order', 'ok');
+          return await buildResponse(true, { 
             message: 'Reserva procesada exitosamente.', 
             assignedBarberId: finalBarberId,
             assignedBarberName: finalBarberName,
             appointmentId: createdApptId 
-          };
+          }, cleanData, fullName);
         }
+        addTrace('db_fallback', 'Cita registrada con columnas básicas en appointments', 'ok');
       } else if (error.code === '23505' || error.message?.includes('unique_appointment_slot') || error.message?.includes('duplicate key')) {
-        return { success: false, error: 'Lo sentimos, este turno acaba de ser ocupado por otro paciente. Por favor elige otro horario.' };
+        addTrace('db_insert', 'Conflicto de clave única', 'error', error.message);
+        return await buildResponse(false, { 
+          error: 'Lo sentimos, este turno acaba de ser ocupado por otro paciente. Por favor elige otro horario.',
+          errorCode: 'UNIQUE_SLOT_CONFLICT'
+        }, cleanData, fullName);
       } else {
-        return { success: false, error: `Error DB: ${error.message}` };
+        addTrace('db_insert', 'Error general de PostgreSQL', 'error', error.message);
+        return await buildResponse(false, { 
+          error: `Error DB: ${error.message}`,
+          errorCode: 'DB_POSTGRES_ERROR'
+        }, cleanData, fullName);
       }
+    } else {
+      addTrace('db_insert', 'Cita insertada exitosamente en tabla appointments', 'ok', `ID: ${createdApptId}`);
     }
 
     // Blindaje Concurrente Nivel 2: Comprobación post-inserción inmediata contra condiciones de carrera
@@ -509,12 +675,14 @@ export async function processBookingAction(formData: unknown) {
           if (firstWinner.id !== createdApptId) {
             console.warn(`[Anti-Collision] Carrera interceptada para cita ${createdApptId}. Ganador: ${firstWinner.id}. Revirtiendo.`);
             await supabaseAdmin.from('appointments').delete().eq('id', createdApptId);
-            return {
-              success: false,
-              error: 'Lo sentimos, este turno acaba de ser reservado por otro paciente en este instante. Por favor selecciona otro horario.'
-            };
+            addTrace('anti_collision', 'Carrera concurrente detectada y revertida', 'error', `Turno ganado por ${firstWinner.id}`);
+            return await buildResponse(false, {
+              error: 'Lo sentimos, este turno acaba de ser reservado por otro paciente en este instante. Por favor selecciona otro horario.',
+              errorCode: 'RACE_CONDITION_LOST'
+            }, cleanData, fullName);
           }
         }
+        addTrace('anti_collision', 'Blindaje concurrente anti-colisión', 'ok', 'Sin colisión de milisegundos');
       } catch (checkErr) {
         console.warn('[Anti-Collision] Verificación post-inserción no bloqueante:', checkErr);
       }
@@ -532,26 +700,28 @@ export async function processBookingAction(formData: unknown) {
       durationMinutes: duration,
       timestamp: new Date().toISOString(),
     });
+    addTrace('domain_event', 'Emisión de evento appointment.booked', 'ok');
 
-    return { 
-      success: true, 
+    return await buildResponse(true, { 
       message: 'Reserva procesada exitosamente.', 
       assignedBarberId: finalBarberId,
       assignedBarberName: finalBarberName,
       appointmentId: createdApptId 
-    };
+    }, cleanData, fullName);
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       const firstMsg = error.issues?.[0]?.message || error.errors?.[0]?.message || 'Datos de reserva inválidos.';
-      return { success: false, error: firstMsg };
+      addTrace('zod_validation', 'Validación Zod fallida', 'error', firstMsg);
+      return await buildResponse(false, { error: firstMsg, errorCode: 'ZOD_VALIDATION_ERROR' }, formData);
     }
     const realMsg = error?.message || String(error);
     console.error('[Server Error in processBookingAction]:', realMsg);
-    return { 
-      success: false, 
-      error: `Error en el servidor de reservas: ${realMsg || 'No se pudo completar la operación en la base de datos.'}` 
-    };
+    addTrace('unhandled_exception', 'Excepción no controlada en el servidor', 'error', realMsg);
+    return await buildResponse(false, { 
+      error: `Error en el servidor de reservas: ${realMsg || 'No se pudo completar la operación en la base de datos.'}`,
+      errorCode: 'UNHANDLED_SERVER_ERROR'
+    }, formData);
   }
 }
 
