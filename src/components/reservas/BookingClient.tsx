@@ -888,12 +888,13 @@ export default function BookingClient({
       }
       setIsLoadingTimes(true);
       try {
-        // Timeout defensivo de 3.5 segundos para garantizar que jamás se quede la UI en (Cargando...)
-        const timeoutPromise = new Promise<{ success: false, bookedTimes: [], groupSlots: {} }>((resolve) =>
-          setTimeout(() => resolve({ success: false, bookedTimes: [], groupSlots: {} }), 3500)
+        const result = await getBookedTimesAction(
+          tenant.id, 
+          selectedBarber.id, 
+          selectedDate, 
+          clientTzOffset, 
+          selectedService?.name
         );
-        const actionPromise = getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
-        const result = await Promise.race([actionPromise, timeoutPromise]);
         
         if (!isCancelled && result && result.success) {
           setBookedTimes(result.bookedTimes || []);
@@ -911,7 +912,7 @@ export default function BookingClient({
     return () => {
       isCancelled = true;
     };
-  }, [selectedBarber, selectedDate, tenant.id, clientTzOffset]);
+  }, [selectedBarber, selectedDate, tenant.id, clientTzOffset, selectedService?.name]);
 
   const handleServiceSelect = (service: { name: string, durationMinutes: number, priceText?: string, basePrice?: number, isCustomPrice?: boolean }) => {
     setSelectedService(service);
@@ -955,7 +956,13 @@ export default function BookingClient({
     setErrorMessage('');
 
     try {
-      const preCheck = await getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
+      const preCheck = await getBookedTimesAction(
+        tenant.id, 
+        selectedBarber.id, 
+        selectedDate, 
+        clientTzOffset,
+        selectedService?.name
+      );
       if (preCheck.success && Array.isArray(preCheck.bookedTimes) && preCheck.bookedTimes.includes(selectedTime)) {
         setIsSubmitting(false);
         setBookedTimes(preCheck.bookedTimes);

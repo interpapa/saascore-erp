@@ -482,7 +482,13 @@ export async function processBookingAction(formData: unknown) {
 }
 
 // NUEVA FUNCIÓN PARA LEER HORAS OCUPADAS (SERVER ACTION)
-export async function getBookedTimesAction(tenantId: string, employeeId: string, date: string, timezoneOffset?: string) {
+export async function getBookedTimesAction(
+  tenantId: string, 
+  employeeId: string, 
+  date: string, 
+  timezoneOffset?: string,
+  serviceName?: string
+) {
   try {
     if (!tenantId || !date || typeof date !== 'string') {
       return { success: false, bookedTimes: [], groupSlots: {} };
@@ -522,16 +528,47 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
       // Si es "Cualquiera", debemos contar cuántos empleados reservables activos hay en la empresa.
       const { data: staffEntities } = await supabaseAdmin
         .from('entities')
-        .select('id, metadata')
+        .select('id, name, metadata, role')
         .eq('tenant_id', tenantId)
         .in('type', ['employee', 'doctor', 'staff'])
         .neq('status', 'inactive')
         .is('deleted_at', null);
         
       const bookableStaff = (staffEntities || []).filter(e => (e.metadata as any)?.bookable !== false);
-      const totalStaff = Math.max(1, bookableStaff.length);
-      const allStaffIds = new Set(bookableStaff.map(s => s.id));
       
+      // Filtrar profesionales compatibles si se especificó el servicio
+      let eligibleStaff = bookableStaff;
+      if (serviceName && typeof serviceName === 'string' && serviceName.trim()) {
+        const matchedStaff = bookableStaff.filter(emp => matchesEmployeeService(emp, serviceName));
+        if (matchedStaff.length > 0) {
+          eligibleStaff = matchedStaff;
+        }
+      }
+
+      const allStaffIds = new Set(eligibleStaff.map(s => s.id));
+      
+      // Determinar día de la semana para comprobar jornadas laborales de cada médico
+      const parts = date.split('-');
+      const dObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      const mappingDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+      const dayKey = mappingDays[dObj.getDay()] || 'monday';
+
+      const isEmpWorkingAtTime = (emp: any, hh: string, mm: string) => {
+        const wh = emp.metadata?.working_hours;
+        if (wh && typeof wh === 'object' && Object.keys(wh).length > 0) {
+          const shifts = wh[dayKey] || [];
+          if (!Array.isArray(shifts) || shifts.length === 0) return false;
+          const slotMins = Number(hh) * 60 + Number(mm);
+          return shifts.some((s: any) => {
+            if (!s?.start || !s?.end) return false;
+            const [sH, sM] = s.start.split(':').map(Number);
+            const [eH, eM] = s.end.split(':').map(Number);
+            return slotMins >= (sH * 60 + sM) && slotMins < (eH * 60 + eM);
+          });
+        }
+        return true;
+      };
+
       // Mapeamos cada slot de tiempo al conteo de empleados ocupados
       const timeSlotOccupancy = new Map<string, Set<string>>();
 
@@ -579,9 +616,17 @@ export async function getBookedTimesAction(tenantId: string, employeeId: string,
         }
       });
 
-      // Solo bloqueamos la hora si el número de empleados ocupados es MAYOR O IGUAL al total del staff reservable
-      for (const [timeKey, busyEmployees] of Array.from(timeSlotOccupancy.entries())) {
-        if (busyEmployees.size >= totalStaff) {
+      // Bloquear cualquier horario donde todos los profesionales en turno estén ocupados o no haya nadie en turno
+      for (let m = 6 * 60; m <= 22 * 60; m += 15) {
+        const hh = Math.floor(m / 60).toString().padStart(2, '0');
+        const mm = (m % 60).toString().padStart(2, '0');
+        const timeKey = `${hh}:${mm}`;
+
+        const workingStaff = eligibleStaff.filter(emp => isEmpWorkingAtTime(emp, hh, mm));
+        const busyStaff = timeSlotOccupancy.get(timeKey) || new Set<string>();
+
+        // Si ningún colaborador elegible atiende en este horario, o todos los que atienden están ocupados
+        if (workingStaff.length === 0 || busyStaff.size >= workingStaff.length) {
           bookedTimesSet.add(timeKey);
         }
       }
