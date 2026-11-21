@@ -386,12 +386,14 @@ export default function BookingClient({
   tenant, 
   employees, 
   catalogServices = [],
-  theme 
+  theme,
+  initialBookedTimes = []
 }: { 
   tenant: Tenant; 
   employees: Employee[]; 
   catalogServices?: any[];
   theme?: { bgColor: string; btnColor: string };
+  initialBookedTimes?: string[];
 }) {
   const defaultTheme = { bgColor: "#f8fafc", btnColor: "#0B3B24" };
   const appliedBg = normalizeHexColor(theme?.bgColor, defaultTheme.bgColor);
@@ -861,7 +863,7 @@ export default function BookingClient({
   }, [settings.startHour, settings.endHour, slotInterval, shifts, hasDoctorCustomSchedule]);
   
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const [bookedTimes, setBookedTimes] = useState<string[]>([]);
+  const [bookedTimes, setBookedTimes] = useState<string[]>(Array.isArray(initialBookedTimes) ? initialBookedTimes : []);
   const [groupSlots, setGroupSlots] = useState<Record<string, { spotsTaken: number; maxCapacity: number; remainingSpots: number }>>({});
   const [isLoadingTimes, setIsLoadingTimes] = useState(false);
   
@@ -956,13 +958,37 @@ export default function BookingClient({
       }, 10000);
 
       try {
-        const result = await getBookedTimesAction(
-          tenant.id, 
-          selectedBarber.id, 
-          selectedDate, 
-          clientTzOffset, 
-          selectedService?.name
-        );
+        let result: any = null;
+
+        // 1. Canal primario: Endpoint REST de alta fidelidad (evita bloqueos de Server Actions en useEffect)
+        try {
+          const qs = new URLSearchParams({
+            tenantId: tenant.id,
+            employeeId: selectedBarber.id,
+            date: selectedDate,
+            timezoneOffset: clientTzOffset,
+            serviceName: selectedService?.name || '',
+          });
+          const restResp = await fetch(`/api/booking/times?${qs.toString()}`, {
+            cache: 'no-store'
+          });
+          if (restResp.ok) {
+            result = await restResp.json();
+          }
+        } catch (fetchErr) {
+          console.warn('[BookingClient] REST /api/booking/times fetch falló, recurriendo a Server Action:', fetchErr);
+        }
+
+        // 2. Canal de contingencia: Server Action directa
+        if (!result || !result.success) {
+          result = await getBookedTimesAction(
+            tenant.id, 
+            selectedBarber.id, 
+            selectedDate, 
+            clientTzOffset, 
+            selectedService?.name
+          );
+        }
         
         if (!isCancelled && result && result.success) {
           setBookedTimes(result.bookedTimes || []);
@@ -1000,6 +1026,8 @@ export default function BookingClient({
 
   const handleBarberSelect = (barber: Employee) => {
     setSelectedBarber(barber);
+    setSelectedTime(null);
+    setIsLoadingTimes(true);
     if (barber.id !== 'any' && selectedService) {
       const bSvcs = barber.metadata?.services as any[];
       const bSvc = bSvcs?.find(s => s.name?.trim().toLowerCase() === selectedService.name?.toLowerCase());
@@ -1861,7 +1889,11 @@ export default function BookingClient({
                       return (
                         <button
                           key={i}
-                          onClick={() => { setSelectedDate(d.fullDate); setSelectedTime(null); }}
+                          onClick={() => { 
+                            setSelectedDate(d.fullDate); 
+                            setSelectedTime(null); 
+                            setIsLoadingTimes(true);
+                          }}
                           className={`shrink-0 w-[4.5rem] h-20 rounded-2xl flex flex-col items-center justify-center transition-all border-2 ${
                             isSelected 
                               ? 'shadow-md scale-105' 
@@ -1951,19 +1983,25 @@ export default function BookingClient({
                             key={i}
                             disabled={isLoadingTimes || !isAvailable}
                             onClick={() => setSelectedTime(time.value24)}
-                            className={`py-2.5 sm:py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center ${
+                            title={!isAvailable ? 'Horario no disponible / turno ya ocupado' : undefined}
+                            className={`py-2.5 sm:py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center relative ${
                               isLoadingTimes
                                 ? 'bg-slate-50 border-slate-100 text-slate-300 animate-pulse cursor-wait'
                                 : !isAvailable 
-                                  ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
+                                  ? 'bg-slate-100/90 border-slate-200 text-slate-400 cursor-not-allowed opacity-60' 
                                   : isSelected 
                                     ? 'shadow-md scale-105'
                                     : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300 shadow-sm'
                             }`}
                             style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
                           >
-                            <span>{time.label12}</span>
-                            {groupSlot && Number(groupSlot.maxCapacity || 0) > 1 && groupSlot.remainingSpots > 0 && (
+                            <span className={!isAvailable ? 'line-through text-slate-400' : ''}>{time.label12}</span>
+                            {!isAvailable && (
+                              <span className="text-[9px] font-black uppercase tracking-tighter text-red-500 mt-0.5">
+                                Ocupado
+                              </span>
+                            )}
+                            {isAvailable && groupSlot && Number(groupSlot.maxCapacity || 0) > 1 && groupSlot.remainingSpots > 0 && (
                               <span className={`text-[9px] font-black uppercase mt-0.5 tracking-tighter ${isSelected ? 'opacity-90 text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
                                 {(hasCourts || (selectedService?.name?.toLowerCase().includes('padel') || selectedService?.name?.toLowerCase().includes('tenis'))) ? '🎾 ' : '👥 '}
                                 {groupSlot.remainingSpots} cupo{groupSlot.remainingSpots > 1 ? 's' : ''}

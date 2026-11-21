@@ -87,6 +87,7 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 | `/reservas` | `src/app/reservas/page.tsx` | Dinámica / SSR | Portal selector de empresas/especialidades y redirección automática para enlaces sin slug. |
 | `/reservas/[tenantId]` | `src/app/reservas/[tenantId]/page.tsx` | Dinámica / SSR | Portal público de agendamiento de citas para pacientes/clientes. Soporta UUID de tenant o slug amigable (`consultorio-25`), selección de especialista, fecha, franja horaria y confirmación vía WhatsApp. |
 | `/api/booking/process` | `src/app/api/booking/process/route.ts` | Route Handler (REST) | Endpoint HTTP POST JSON de alta fidelidad para el procesamiento de reservas con diagnóstico técnico completo, fallback resiliente y registro estructurado en `audit_logs`. |
+| `/api/booking/times` | `src/app/api/booking/times/route.ts` | Route Handler (REST) | Endpoint HTTP GET/POST para consulta en tiempo real de horarios ocupados y cupos grupales, inmune a restricciones de Server Actions en el ciclo de vida del cliente. |
 
 ---
 
