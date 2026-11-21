@@ -14,7 +14,7 @@ Rendo ERP utiliza **Zustand** con persistencia en `localStorage` (clave: `Rendo-
 ### Estado Principal (`ERPState`):
 * **`session: SessionData | null`**:
   - `userEmail`: Correo del usuario autenticado.
-  - `role`: Rol RBAC (`'owner' | 'manager' | 'seller' | 'technician' | 'superadmin'`).
+  - `role`: Rol RBAC (`'owner' | 'admin' | 'manager' | 'seller' | 'technician' | 'superadmin'`).
   - `tenantId`: ID de la empresa activa.
   - `token`: Token de seguridad / JWT para llamadas firmadas.
   - `allowed_modules`: Módulos específicos asignados al empleado.
@@ -25,7 +25,8 @@ Rendo ERP utiliza **Zustand** con persistencia en `localStorage` (clave: `Rendo-
   - `metadata`: Configuración del tenant (fiscal, logo, dock móvil, cuentas bancarias).
 * **`hasHydrated: boolean`**: Bandera para evitar parpadeos en renderizados SSR.
 * **`impersonatedTenant` / `originalTenant`**: Para soporte de Superadmin (cambio de empresa sin perder credenciales originales). Al detener la impersonación (`stopImpersonation`), si `originalTenant` no está definido, se conserva `currentTenant` como blindaje contra reseteo involuntario a `null`.
-* **Priorización de Membresía (`getUserTenant`)**: Cuando un usuario posee múltiples asociaciones en `user_tenants` (ej. es `owner` de su propio negocio y `admin` secundario en otra empresa), el sistema prioriza inequívocamente la empresa donde ostenta el rol de `owner`.
+* **Priorización y Respeto de Empresa Preferida (`getUserTenant`)**: Si el usuario o Superadmin solicita explícitamente un `preferredTenantId` (mediante selector de empresa o contexto activo en el store persistido), el sistema respeta la empresa solicitada en lugar de forzar la empresa por defecto. Además, cuando un usuario posee múltiples asociaciones en `user_tenants` (ej. es `owner` de su propio negocio y `admin` secundario en otra empresa), el sistema prioriza inequívocamente la empresa donde ostenta el rol de `owner`.
+* **Blindaje RBAC para Rol `'admin'`**: Se sincroniza el rol `'admin'` en `src/lib/rbac.ts` con permisos totales `*` equivalentes a `'owner'`, impidiendo que usuarios con rol de administrador en BD queden sin módulos operativos o bloqueados por políticas restrictivas.
 
 ---
 

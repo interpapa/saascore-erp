@@ -784,29 +784,64 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
 
     // Prioridad de empresa para multi-asociación:
     // 0. Si se solicita un preferredTenantId específico y el usuario tiene acceso (o es SuperAdmin)
-    // 1. Si el usuario tiene una empresa activa específica (ej. Consultorio 25)
-    // 2. Si el usuario es 'owner' (dueño de su negocio), PRIORIZAR SIEMPRE la empresa donde es dueño
+    // 1. Si el usuario es 'owner' (dueño de su negocio), PRIORIZAR SIEMPRE la empresa donde es dueño
+    // 2. Si el usuario tiene una empresa activa específica (ej. Consultorio 25)
     // 3. De lo contrario, usar la membresía más reciente
+    let targetTenantId: string | null = null;
+    let targetRole: UserRole = isSuperAdmin ? 'superadmin' : 'owner';
+
     const preferredMembership = preferredTenantId ? userTenants.find(m => m.tenant_id === preferredTenantId) : null;
     const activeOperationalTenant = userTenants.find(m => m.tenant_id === '4062a8fe-f512-455c-8192-2f83c55ed732');
     const ownerMembership = userTenants.find(m => m.role === 'owner' && m.tenant_id !== '45b6404f-3469-4c42-99c1-85416a411f4f');
 
-    const membership = preferredMembership
-      || ownerMembership
-      || activeOperationalTenant
-      || (isSuperAdmin && userTenants.find(m => m.tenant_id === '45b6404f-3469-4c42-99c1-85416a411f4f' || m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
-      || userTenants.find(m => m.role === 'owner')
-      || userTenants[0];
+    if (preferredTenantId && (isSuperAdmin || preferredMembership)) {
+      targetTenantId = preferredTenantId;
+      if (preferredMembership) {
+        targetRole = (preferredMembership.role === 'superadmin' || preferredMembership.role === 'admin') 
+          ? 'owner' 
+          : (preferredMembership.role as UserRole);
+      }
+    } else {
+      const membership = ownerMembership
+        || activeOperationalTenant
+        || (isSuperAdmin && userTenants.find(m => m.tenant_id === '45b6404f-3469-4c42-99c1-85416a411f4f' || m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
+        || userTenants.find(m => m.role === 'owner')
+        || userTenants[0];
+
+      targetTenantId = membership?.tenant_id || null;
+      if (membership?.role) {
+        targetRole = (membership.role === 'superadmin' || membership.role === 'admin') 
+          ? 'owner' 
+          : (membership.role as UserRole);
+      }
+    }
+
+    if (!targetTenantId) {
+      return { success: false, tenant: null, role: null, error: 'Tenant not found' };
+    }
 
     // 2. Traer información del Tenant
     const { data: tenant, error: tenantError } = await db
       .from('tenants')
       .select('*')
-      .eq('id', membership.tenant_id)
+      .eq('id', targetTenantId)
       .single();
 
     if (tenantError || !tenant) {
       return { success: false, tenant: null, role: null, error: 'Tenant not found' };
+    }
+
+    // Auto-blindaje: Si es SuperAdmin y no tiene membresía en user_tenants para este tenant, registrarla
+    if (isSuperAdmin && !userTenants.some(m => m.tenant_id === targetTenantId)) {
+      try {
+        await db.from('user_tenants').insert([{
+          user_email: cleanEmail,
+          tenant_id: targetTenantId,
+          role: 'owner',
+        }]);
+      } catch (insertErr) {
+        console.warn('[getUserTenant] Auto-registro de membresía superadmin:', insertErr);
+      }
     }
 
     // 3. Consultar si el usuario tiene app_metadata.allowed_modules en Supabase Auth
@@ -831,7 +866,7 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
 
       const assignedRole: UserRole = isSuperAdmin
         ? 'superadmin'
-        : (membership.role === 'superadmin' ? 'owner' : (membership.role as UserRole));
+        : (targetRole === 'superadmin' ? 'owner' : targetRole);
 
       const sanitized = sanitizeTenantPayload(tenant);
 
@@ -848,7 +883,7 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
 
     const assignedRole: UserRole = isSuperAdmin
       ? 'superadmin'
-      : (membership.role === 'superadmin' ? 'owner' : (membership.role as UserRole));
+      : (targetRole === 'superadmin' ? 'owner' : targetRole);
 
     const sanitized = sanitizeTenantPayload(tenant);
 

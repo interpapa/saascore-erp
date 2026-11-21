@@ -44,7 +44,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
       let result: any = null;
       try {
-        result = await getUserTenant(cleanEmail, user.id);
+        const preferredTenantId = useERPStore.getState().impersonatedTenant?.id || useERPStore.getState().currentTenant?.id;
+        result = await getUserTenant(cleanEmail, user.id, preferredTenantId);
       } catch (saErr) {
         console.warn('[AuthProvider] Server Action getUserTenant falló, evaluando fallback:', saErr);
       }

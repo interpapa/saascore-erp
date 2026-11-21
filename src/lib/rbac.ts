@@ -2,7 +2,7 @@
 //  Rendo React: Control de Acceso Basado en Roles
 // ═══════════════════════════════════════════════════
 
-export type UserRole = 'superadmin' | 'owner' | 'manager' | 'technician' | 'seller';
+export type UserRole = 'superadmin' | 'owner' | 'admin' | 'manager' | 'technician' | 'seller';
 
 export type Permission = 'crm' | 'finanzas' | 'inventario' | 'registros' | 'equipo' | 'reportes' | 'contabilidad' | 'calendario' | 'whatsapp' | 'kanban' | 'franquicias' | 'integraciones' | 'apps' | 'config' | 'admin';
 
@@ -15,6 +15,7 @@ export interface RBACPolicy {
 export const defaultRoles: Record<UserRole, RBACPolicy> = {
   'superadmin': { role: 'superadmin', name: 'Arquitecto Rendo', permissions: '*' }, // Dios
   'owner': { role: 'owner', name: 'Dueño (Full Access)', permissions: '*' }, // Administrador del Negocio
+  'admin': { role: 'admin', name: 'Administrador (Full Access)', permissions: '*' }, // Administrador de Empresa
   'manager': {
     role: 'manager',
     name: 'Gerente',
@@ -42,6 +43,7 @@ export const PERMISSION_ALIASES: Record<string, Permission> = {
 };
 
 export const hasPermission = (userRole: UserRole, requiredPermission: string): boolean => {
+  if (userRole === 'superadmin' || userRole === 'owner' || userRole === 'admin') return true;
   const policy = defaultRoles[userRole];
   if (!policy) return false;
   if (policy.permissions === '*') return true;
