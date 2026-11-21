@@ -787,6 +787,7 @@ export default function CalendarioPage() {
         initialClientId={clientParam}
         initialLocation={selectedCourtForCreate}
         initialEmployeeId={selectedEmployeeForCreate}
+        existingAppointments={appointments}
       />
 
       {/* Appointment Details & Status Transition Modal */}

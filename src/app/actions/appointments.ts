@@ -254,13 +254,43 @@ export async function createAppointmentAction(
           .limit(1);
 
         if (overlapping && overlapping.length > 0) {
+          const oStart = formatAppointmentTime(overlapping[0].start_time);
+          const oEnd = formatAppointmentTime(overlapping[0].end_time);
           return {
             success: false,
-            error: `El profesional/coach ya tiene una actividad en ese horario ("${overlapping[0].title || 'Cita'}"). Por favor selecciona otro turno o especialista.`
+            error: `⚠️ Turno no disponible: El profesional ya tiene una cita agendada en ese horario (${oStart} a ${oEnd}: "${overlapping[0].title || 'Cita'}"). No es posible agendar dos reservas simultáneas en el mismo turno.`
           };
         }
       } catch {
         // En caso de tabla appointments no disponible, el fallback se encargará
+      }
+    }
+
+    // Prevención de colisión defensiva 2: verificar que el paciente no tenga otra cita simultánea en ese rango
+    const checkClientId = sanitizeUUID(payload.client_id) || null;
+    if (checkClientId && payload.status !== 'cancelled' && !payload.metadata?.is_slot_freed) {
+      try {
+        const { data: overlappingClient } = await supabaseAdmin
+          .from('appointments')
+          .select('id, title, start_time, end_time')
+          .eq('tenant_id', tenantId)
+          .eq('client_id', checkClientId)
+          .neq('status', 'cancelled')
+          .neq('status', 'no_show')
+          .lt('start_time', calculatedEndTime)
+          .gt('end_time', payload.start_time)
+          .limit(1);
+
+        if (overlappingClient && overlappingClient.length > 0) {
+          const cStart = formatAppointmentTime(overlappingClient[0].start_time);
+          const cEnd = formatAppointmentTime(overlappingClient[0].end_time);
+          return {
+            success: false,
+            error: `⚠️ Paciente ya citado: Este paciente ya tiene una cita activa en ese mismo horario (${cStart} a ${cEnd}: "${overlappingClient[0].title || 'Cita'}"). Selecciona otro horario.`
+          };
+        }
+      } catch {
+        // Silencioso en caso de fallback
       }
     }
 

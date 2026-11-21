@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { isTimeWithinWorkingHours } from '@/lib/calendario/calendarDateUtils';
+import { isTimeWithinWorkingHours, formatAppointmentTime } from '@/lib/calendario/calendarDateUtils';
 import { 
   X, Calendar as CalendarIcon, Clock, User, Briefcase, DollarSign, 
   FileText, Check, Lock, CalendarRange, Building, Palmtree, Coffee, 
-  Wrench, ShieldAlert, Sparkles, CheckCircle2 
+  Wrench, ShieldAlert, Sparkles, CheckCircle2, AlertTriangle
 } from 'lucide-react';
-import { CreateAppointmentInput, BlockInput, Employee, Service, AppointmentStatus, CourtResource, DEFAULT_SPORTS_COURTS } from '@/types/calendario';
+import { Appointment, CreateAppointmentInput, BlockInput, Employee, Service, AppointmentStatus, CourtResource, DEFAULT_SPORTS_COURTS } from '@/types/calendario';
 import { Entity } from '@/lib/api/entities';
 import { AGENDA_20_COLORS, DEFAULT_AGENDA_COLOR } from '@/lib/calendario/calendarColors';
 import { matchesEmployeeService } from '@/lib/services/serviceMatching';
@@ -27,6 +27,7 @@ export interface AppointmentModalProps {
   initialClientId?: string | null;
   initialLocation?: string | null;
   initialEmployeeId?: string | null;
+  existingAppointments?: Appointment[];
 }
 
 export const BLOCK_PRESETS = [
@@ -62,6 +63,7 @@ export function AppointmentModal({
   initialClientId,
   initialLocation,
   initialEmployeeId,
+  existingAppointments = [],
 }: AppointmentModalProps) {
   const [allowOutsideHours, setAllowOutsideHours] = useState(false);
   const [title, setTitle] = useState('');
@@ -90,6 +92,86 @@ export function AppointmentModal({
     if (!employeeId || !empSchedule) return null;
     return isTimeWithinWorkingHours(dateStr, timeStr, durationMinutes, empSchedule);
   }, [employeeId, empSchedule, dateStr, timeStr, durationMinutes]);
+
+  // Detección en tiempo real de colisión / solapamiento para evitar citas duplicadas
+  const scheduleConflict = useMemo(() => {
+    if (type !== 'appointment' || !dateStr || !timeStr) return null;
+    const start = new Date(`${dateStr}T${timeStr}:00`).getTime();
+    if (isNaN(start)) return null;
+    const end = start + (durationMinutes || 60) * 60000;
+
+    // 1. Conflicto por especialista / médico
+    if (employeeId) {
+      const empConflict = existingAppointments.find((a) => {
+        if (a.status === 'cancelled' || a.status === 'no_show') return false;
+        if (a.metadata?.is_slot_freed) return false;
+        if (a.employee_id !== employeeId) return false;
+        const aStart = new Date(a.start_time).getTime();
+        const aEnd = new Date(a.end_time || aStart + 45 * 60000).getTime();
+        return aStart < end && start < aEnd;
+      });
+
+      if (empConflict) {
+        const emp = employees.find((e) => e.id === employeeId);
+        const oStart = formatAppointmentTime(empConflict.start_time);
+        const oEnd = formatAppointmentTime(empConflict.end_time);
+        const patientName = empConflict.client_name || empConflict.title || 'Consulta agendada';
+        return {
+          type: 'employee',
+          message: `El profesional ${emp?.name || 'seleccionado'} ya tiene una cita agendada en ese turno (${oStart} a ${oEnd}: "${patientName}"). No es posible duplicar reservas en el mismo turno.`,
+          conflictAppt: empConflict,
+        };
+      }
+    }
+
+    // 2. Conflicto por paciente (mismo paciente a la misma hora)
+    if (clientId && clientId !== 'manual') {
+      const clientConflict = existingAppointments.find((a) => {
+        if (a.status === 'cancelled' || a.status === 'no_show') return false;
+        if (a.metadata?.is_slot_freed) return false;
+        if (a.client_id !== clientId) return false;
+        const aStart = new Date(a.start_time).getTime();
+        const aEnd = new Date(a.end_time || aStart + 45 * 60000).getTime();
+        return aStart < end && start < aEnd;
+      });
+
+      if (clientConflict) {
+        const oStart = formatAppointmentTime(clientConflict.start_time);
+        const oEnd = formatAppointmentTime(clientConflict.end_time);
+        return {
+          type: 'client',
+          message: `Este paciente ya tiene otra cita activa a esa misma hora (${oStart} a ${oEnd}: "${clientConflict.title}").`,
+          conflictAppt: clientConflict,
+        };
+      }
+    }
+
+    // 3. Conflicto por espacio físico / consultorio / cancha
+    const targetLoc = (location === 'custom' ? customLocation : location).trim().toLowerCase();
+    if (targetLoc) {
+      const locConflict = existingAppointments.find((a) => {
+        if (a.status === 'cancelled' || a.status === 'no_show') return false;
+        if (a.metadata?.is_slot_freed) return false;
+        const aLoc = (a.location || (a.metadata as any)?.court_name || (a.metadata as any)?.court_id || '').trim().toLowerCase();
+        if (aLoc !== targetLoc) return false;
+        const aStart = new Date(a.start_time).getTime();
+        const aEnd = new Date(a.end_time || aStart + 45 * 60000).getTime();
+        return aStart < end && start < aEnd;
+      });
+
+      if (locConflict) {
+        const oStart = formatAppointmentTime(locConflict.start_time);
+        const oEnd = formatAppointmentTime(locConflict.end_time);
+        return {
+          type: 'location',
+          message: `El espacio o consultorio "${location === 'custom' ? customLocation : location}" ya está ocupado en ese horario (${oStart} a ${oEnd}: "${locConflict.title}").`,
+          conflictAppt: locConflict,
+        };
+      }
+    }
+
+    return null;
+  }, [type, dateStr, timeStr, durationMinutes, employeeId, clientId, location, customLocation, existingAppointments, employees]);
 
   // Estados dedicados para Bloqueo / Mantenimiento
   const [blockMode, setBlockMode] = useState<'hours' | 'full_day' | 'multi_day'>('full_day');
@@ -314,6 +396,11 @@ export function AppointmentModal({
         if (scheduleValidation.hasScheduleConfigured && !scheduleValidation.isWithinHours && !allowOutsideHours) {
           throw new Error(`${scheduleValidation.error || 'El profesional no atiende en el horario seleccionado'}. Marca la casilla "Permitir Horario Especial / Urgencia" si deseas agendarlo de todos modos.`);
         }
+      }
+
+      // Validación estricta anti-duplicados y solapamiento de turno
+      if (type === 'appointment' && scheduleConflict && !allowOutsideHours) {
+        throw new Error(`${scheduleConflict.message} Marca la casilla de sobrecupo excepcional si se trata de una urgencia médica.`);
       }
 
       const startTimeISO = startDateTime.toISOString();
@@ -951,8 +1038,35 @@ export function AppointmentModal({
                 </div>
               </div>
 
+              {/* Alerta de Detección de Turno Ocupado / Duplicado en Tiempo Real */}
+              {scheduleConflict && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs space-y-2 animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 font-black text-amber-800 dark:text-amber-300">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                    <span>⚠️ Turno No Disponible (Horario Ocupado)</span>
+                  </div>
+                  <p className="text-amber-800 dark:text-amber-200 font-semibold leading-relaxed">
+                    {scheduleConflict.message}
+                  </p>
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300/80">
+                    Por favor selecciona otro horario o especialista para evitar citas duplicadas.
+                  </p>
+                  <div className="pt-1.5 flex items-center justify-between border-t border-amber-500/20">
+                    <label className="flex items-center gap-2 font-bold cursor-pointer text-[11px] text-amber-900 dark:text-amber-200">
+                      <input
+                        type="checkbox"
+                        checked={allowOutsideHours}
+                        onChange={(e) => setAllowOutsideHours(e.target.checked)}
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500"
+                      />
+                      <span>Permitir sobrecupo excepcional (Urgencia médica)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
               {/* Alerta interactiva si el horario seleccionado está fuera de la jornada habitual del médico */}
-              {scheduleValidation?.hasScheduleConfigured && !scheduleValidation?.isWithinHours && (
+              {scheduleValidation?.hasScheduleConfigured && !scheduleValidation?.isWithinHours && !scheduleConflict && (
                 <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 dark:text-amber-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-base">⚠️</span>
@@ -1064,23 +1178,29 @@ export function AppointmentModal({
             </button>
             <button
               type="submit"
-              disabled={isSubmitting}
-              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 shadow-sm btn-haptic disabled:opacity-50 ${
+              disabled={isSubmitting || Boolean(type === 'appointment' && scheduleConflict && !allowOutsideHours)}
+              className={`px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 shadow-sm btn-haptic disabled:opacity-50 disabled:cursor-not-allowed ${
                 type === 'block'
                   ? 'bg-rose-600 hover:bg-rose-700 text-white'
-                  : 'bg-primary hover:bg-primary/90 text-primary-foreground'
+                  : scheduleConflict && !allowOutsideHours
+                    ? 'bg-amber-600 text-white hover:bg-amber-700'
+                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
               }`}
             >
               {isSubmitting ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : type === 'block' ? (
                 <Lock size={15} />
+              ) : scheduleConflict && !allowOutsideHours ? (
+                <AlertTriangle size={15} />
               ) : (
                 <Check size={16} />
               )}
               {type === 'block' 
                 ? (blockMode === 'multi_day' ? `Bloquear ${daysCount} Día(s)` : 'Confirmar Bloqueo')
-                : 'Guardar Cita'}
+                : scheduleConflict && !allowOutsideHours
+                  ? 'Turno Ocupado (No disponible)'
+                  : 'Guardar Cita'}
             </button>
           </div>
         </form>
