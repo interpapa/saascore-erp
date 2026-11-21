@@ -8,6 +8,7 @@ import { ThemeToggle } from '@/components/theme/ThemeToggle';
 import { Breadcrumbs } from '@/components/core/Breadcrumbs';
 import { CommandPalette } from '@/components/core/CommandPalette';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
+import { TenantSwitcher } from '@/components/core/TenantSwitcher';
 
 interface NotificationItem {
   id: string;
@@ -91,6 +92,8 @@ export function FloatingHeader() {
               <Breadcrumbs />
             </Suspense>
           </div>
+
+          <TenantSwitcher />
 
           <div className="hidden md:block w-px h-6 bg-border mx-1" />
 

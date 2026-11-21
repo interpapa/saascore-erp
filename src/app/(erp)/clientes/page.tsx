@@ -28,6 +28,7 @@ import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
+import { supabase } from '@/lib/supabase';
 
 type TabType = 'clients' | 'audit';
 
@@ -104,6 +105,27 @@ export default function ClientesPage() {
           const pendingTemporaries = prev.filter(c => isTemporaryId(c.id) || !isValidUUID(c.id));
           return [...pendingTemporaries, ...(entitiesRes.value.entities as any)];
         });
+      } else {
+        // Fallback directo por cliente Supabase si Server Action no resolvió entidades
+        try {
+          const { data: directEntities } = await supabase
+            .from('entities')
+            .select('id, tenant_id, type, name, email, phone, tax_id, address, status, metadata, created_at, updated_at')
+            .eq('tenant_id', currentTenant.id)
+            .eq('type', 'customer')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(150);
+
+          if (directEntities && directEntities.length > 0) {
+            setClients(prev => {
+              const pendingTemporaries = prev.filter(c => isTemporaryId(c.id) || !isValidUUID(c.id));
+              return [...pendingTemporaries, ...(directEntities as any)];
+            });
+          }
+        } catch (e) {
+          console.warn('[ClientesPage] Fallback cliente Supabase:', e);
+        }
       }
       if (schemaRes.status === 'fulfilled' && schemaRes.value.success && schemaRes.value.schema) {
         setCustomSchema(schemaRes.value.schema);

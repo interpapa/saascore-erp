@@ -15,6 +15,7 @@ import { SkeletonCardGrid } from '@/components/ui/SkeletonCard';
 import { SkeletonTable } from '@/components/ui/SkeletonTable';
 import { UnderlineTabs } from '@/components/ui/Tabs';
 import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
+import { supabase } from '@/lib/supabase';
 
 type TabType = 'directorio' | 'nomina' | 'audit';
 
@@ -43,8 +44,27 @@ export default function EquipoPage() {
     try {
       setIsLoading(true);
       const res = await getEntitiesAction(currentTenant.id, 'employee', 50, actor);
-      if (res?.success) {
-        const mapped = ((res.entities as any[]) || []).map(e => ({
+      let entitiesList = res?.success ? res.entities : null;
+      if (!entitiesList) {
+        // Fallback directo por cliente Supabase
+        try {
+          const { data: directEmps } = await supabase
+            .from('entities')
+            .select('*')
+            .eq('tenant_id', currentTenant.id)
+            .eq('type', 'employee')
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false });
+          if (directEmps && directEmps.length > 0) {
+            entitiesList = directEmps as any;
+          }
+        } catch (cErr) {
+          console.warn('[Equipo] Fallback cliente Supabase:', cErr);
+        }
+      }
+
+      if (entitiesList) {
+        const mapped = ((entitiesList as any[]) || []).map(e => ({
           ...e,
           is_resource: Boolean(e.is_resource || e.metadata?.is_resource),
           metadata: {

@@ -36,6 +36,7 @@ import { useRouter } from 'next/navigation';
 import { useViewModeStore } from '@/store/useViewModeStore';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 import { hasPermission } from '@/lib/rbac';
+import { TenantSwitcher } from '@/components/core/TenantSwitcher';
 
 export default function LauncherPage() {
   const { signOut } = useAuth();
@@ -311,9 +312,12 @@ export default function LauncherPage() {
             </div>
             <span className="text-3xl font-black text-foreground">Rendo OS</span>
           </h1>
-          <p className="text-sm text-slate-500 font-medium mt-1 font-sans">
-            {currentTenant?.name || 'Configurando tu empresa...'}
-          </p>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+            <p className="text-sm text-slate-500 font-medium font-sans">
+              {currentTenant?.name || 'Configurando tu empresa...'}
+            </p>
+            <TenantSwitcher />
+          </div>
         </div>
         
         <div className="flex items-center gap-3">

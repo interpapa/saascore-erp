@@ -8,7 +8,7 @@ import { getUserTenant } from '@/app/actions/tenant';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 
-const PRIMARY_DEFAULT_TENANT_ID = '31ec279c-4216-48e1-905c-fbf4ea398e04';
+const PRIMARY_DEFAULT_TENANT_ID = '45b6404f-3469-4c42-99c1-85416a411f4f';
 
 interface AuthContextType {
   isLoading: boolean;
@@ -82,6 +82,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!isSuper && useERPStore.getState().impersonatedTenant) {
           useERPStore.getState().stopImpersonation();
         }
+
+        // Blindaje Superadmin: Si está en Modo Soporte (impersonando un negocio), PRESERVARLO y no revertir
+        const activeImpersonation = useERPStore.getState().impersonatedTenant;
+        if (isSuper && activeImpersonation?.id) {
+          setCurrentTenant({
+            ...activeImpersonation,
+            active_modules: activeImpersonation.active_modules || DEFAULT_ENABLED_MODULES,
+          });
+          setSession({
+            userEmail: cleanEmail,
+            role: 'superadmin',
+            tenantId: activeImpersonation.id,
+            token: accessToken
+          });
+          return;
+        }
+
         setCurrentTenant({
           id: result.tenant.id,
           name: result.tenant.name,
@@ -114,19 +131,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa principal
+      // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa principal o impersonada
       if (isSuper) {
+        const activeImpersonation = useERPStore.getState().impersonatedTenant;
+        const targetId = activeImpersonation?.id || PRIMARY_DEFAULT_TENANT_ID;
+        const targetName = activeImpersonation?.name || 'rendo CORP';
         setSession({
           userEmail: cleanEmail,
           role: 'superadmin',
-          tenantId: PRIMARY_DEFAULT_TENANT_ID,
+          tenantId: targetId,
           token: accessToken
         });
         setCurrentTenant({
-          id: PRIMARY_DEFAULT_TENANT_ID,
-          name: 'rendo CORP',
+          id: targetId,
+          name: targetName,
           blocked: false,
-          active_modules: DEFAULT_ENABLED_MODULES
+          active_modules: activeImpersonation?.active_modules || DEFAULT_ENABLED_MODULES,
+          metadata: activeImpersonation?.metadata || {}
         });
         return;
       }

@@ -11,7 +11,7 @@ import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
 import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 import { useERPStore } from '@/store/useERPStore';
 
-const PRIMARY_DEFAULT_TENANT_ID = '31ec279c-4216-48e1-905c-fbf4ea398e04';
+const PRIMARY_DEFAULT_TENANT_ID = '45b6404f-3469-4c42-99c1-85416a411f4f';
 
 export default function LoginPage() {
   const router = useRouter();

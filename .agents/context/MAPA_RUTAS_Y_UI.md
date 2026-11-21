@@ -26,6 +26,7 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 * **Función:** Navegación auxiliar en escritorio.
 * **Comportamiento:**
   - `Breadcrumbs` interactivos para saber la ruta activa.
+  - `TenantSwitcher` interactivo: selector desplegable de negocio activo para Superadmins con soporte de cambio de empresa en vivo.
   - Gatillo de `CommandPalette` (`Ctrl + K` o lupa) para búsqueda rápida global.
   - Notificaciones y selector de tema claro/oscuro.
   - Se oculta automáticamente cuando se abre cualquier modal para no interferir visualmente.

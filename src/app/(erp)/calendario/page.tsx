@@ -23,6 +23,7 @@ import {
 import { getEntitiesAction } from '@/app/actions/entities';
 import { Entity } from '@/lib/api/entities';
 import { getItemsAction } from '@/app/actions/items';
+import { supabase } from '@/lib/supabase';
 import {
   Appointment,
   AppointmentFilterState,
@@ -35,7 +36,6 @@ import {
 
 import { BookingConfigModal } from '@/components/calendario/BookingConfigModal';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
-import { supabase } from '@/lib/supabase';
 import { QrCode, Settings } from 'lucide-react';
 
 export default function CalendarioPage() {
@@ -125,10 +125,35 @@ export default function CalendarioPage() {
 
       if (apptsRes.status === 'fulfilled') {
         const res = apptsRes.value;
-        if (res.success) {
+        if (res.success && res.appointments) {
           setAppointments(res.appointments || []);
-        } else if (res.error) {
-          console.warn('[Calendario] Error recuperando citas:', res.error);
+        } else {
+          // Fallback directo vía cliente Supabase
+          try {
+            const { data: directAppts } = await supabase
+              .from('appointments')
+              .select('*')
+              .eq('tenant_id', currentTenant.id)
+              .order('start_time', { ascending: true });
+            if (directAppts && directAppts.length > 0) {
+              setAppointments(directAppts as any);
+            }
+          } catch (cErr) {
+            console.warn('[Calendario] Fallback cliente Supabase:', cErr);
+          }
+        }
+      } else {
+        try {
+          const { data: directAppts } = await supabase
+            .from('appointments')
+            .select('*')
+            .eq('tenant_id', currentTenant.id)
+            .order('start_time', { ascending: true });
+          if (directAppts && directAppts.length > 0) {
+            setAppointments(directAppts as any);
+          }
+        } catch (cErr) {
+          console.warn('[Calendario] Fallback cliente Supabase:', cErr);
         }
       }
 
