@@ -13,11 +13,15 @@ import { isValidUUID, isTemporaryId, sanitizeUUID } from '@/lib/core/uuid';
 function safeRevalidate(path: string, tenantId?: string) {
   try {
     revalidatePath(path);
-    if (tenantId) {
-      revalidatePath(`/reservas/${tenantId}`);
-    }
   } catch {
     // Graceful degradation when outside Next.js request context
+  }
+  if (tenantId) {
+    try {
+      revalidatePath(`/reservas/${tenantId}`);
+    } catch {
+      // Graceful degradation when dynamic booking path fails to revalidate
+    }
   }
 }
 import {
@@ -1422,17 +1426,25 @@ export async function deleteAppointmentAction(
       }
     }
 
-    await writeAuditLog({
-      tenant_id: tenantId,
-      actor_email: actor.email,
-      actor_role: actor.role,
-      action: 'entity.deleted',
-      target_type: 'appointment',
-      target_id: id,
-      metadata: { action: 'appointment_deleted' },
-    });
+    try {
+      await writeAuditLog({
+        tenant_id: tenantId,
+        actor_email: actor.email,
+        actor_role: actor.role,
+        action: 'entity.deleted',
+        target_type: 'appointment',
+        target_id: id,
+        metadata: { action: 'appointment_deleted' },
+      });
+    } catch (auditErr) {
+      console.warn('[deleteAppointmentAction] Audit log non-blocking error:', auditErr);
+    }
 
-    safeRevalidate('/calendario', tenantId);
+    try {
+      safeRevalidate('/calendario', tenantId);
+    } catch (revErr) {
+      console.warn('[deleteAppointmentAction] safeRevalidate non-blocking error:', revErr);
+    }
     return { success: true };
   } catch (err: any) {
     console.error('[deleteAppointmentAction Error]:', (err as Error).message);

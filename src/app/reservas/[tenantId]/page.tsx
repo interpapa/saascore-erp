@@ -1,5 +1,4 @@
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { getBookedTimesAction } from '@/app/actions/booking';
 import BookingClient from '@/components/reservas/BookingClient';
 import { normalizeHexColor } from '@/lib/theme/colorUtils';
 import { Calendar, RefreshCw, ArrowLeft, ShieldAlert } from 'lucide-react';
@@ -145,27 +144,11 @@ export default async function ReservasPublicPage({
       btnColor: normalizeHexColor(publicTheme.btnColor, "#0B3B24"),
     };
 
-    // 6. Pre-obtener turnos ocupados iniciales en SSR para evitar parpadeos
-    let initialBookedTimes: string[] = [];
-    try {
-      const tzOffset = tenant.metadata?.booking_settings?.timezone_offset || '-04:00';
-      const now = new Date();
-      const localD = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-      const todayStr = `${localD.getUTCFullYear()}-${String(localD.getUTCMonth() + 1).padStart(2, '0')}-${String(localD.getUTCDate()).padStart(2, '0')}`;
-      const prefetch = await getBookedTimesAction(tenant.id, 'any', todayStr, tzOffset);
-      if (prefetch?.success && Array.isArray(prefetch.bookedTimes)) {
-        initialBookedTimes = prefetch.bookedTimes;
-      }
-    } catch (prefetchErr) {
-      console.warn('[Reservas] Error prefetching booked times (non-blocking):', prefetchErr);
-    }
-
     // Serialización limpia para prevenir cualquier error de RSC entre Server y Client Components
     const safeTenant = JSON.parse(JSON.stringify(tenant));
     const safeEmployees = JSON.parse(JSON.stringify(employees));
     const safeCatalogServices = JSON.parse(JSON.stringify(catalogServices));
     const safeTheme = JSON.parse(JSON.stringify(theme));
-    const safeInitialBookedTimes = JSON.parse(JSON.stringify(initialBookedTimes));
 
     return (
       <BookingClient 
@@ -173,7 +156,6 @@ export default async function ReservasPublicPage({
         employees={safeEmployees} 
         catalogServices={safeCatalogServices} 
         theme={safeTheme} 
-        initialBookedTimes={safeInitialBookedTimes}
       />
     );
 

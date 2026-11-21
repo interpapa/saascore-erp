@@ -288,13 +288,14 @@ export default function CalendarioPage() {
       toast({ variant: 'error', title: 'Sin empresa activa' });
       return;
     }
-    if (!actor) {
+    const activeActor = effectiveActor || actor;
+    if (!activeActor) {
       toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado.' });
       return;
     }
 
     try {
-      const res = await createAppointmentBlockAction(currentTenant.id, input, actor);
+      const res = await createAppointmentBlockAction(currentTenant.id, input, activeActor);
       if (res.success) {
         toast({
           variant: 'success',
@@ -321,31 +322,60 @@ export default function CalendarioPage() {
 
   // Handler for Deleting / Unlocking Appointment
   const handleDeleteAppointment = async (id: string) => {
-    if (!currentTenant || !actor) return;
-    try {
-      const res = await deleteAppointmentAction(id, currentTenant.id, actor);
-      if (res.success) {
-        setAppointments((prev) => prev.filter((a) => a.id !== id));
-        setIsDetailsModalOpen(false);
-        setSelectedAppointment(null);
-        broadcastLocalChange();
-        toast({
-          variant: 'success',
-          title: 'Horario liberado',
-          description: 'El horario o cita ha sido desbloqueado y eliminado correctamente.',
-        });
-      } else {
-        toast({
-          variant: 'error',
-          title: 'Error al eliminar',
-          description: res.error || 'No se pudo eliminar el registro.',
-        });
+    const activeActor = effectiveActor || actor;
+    if (!currentTenant) return;
+
+    const performLocalCleanup = () => {
+      setAppointments((prev) => prev.filter((a) => a.id !== id));
+      setIsDetailsModalOpen(false);
+      setSelectedAppointment(null);
+      broadcastLocalChange();
+      toast({
+        variant: 'success',
+        title: 'Horario liberado',
+        description: 'El horario o cita ha sido desbloqueado y eliminado correctamente.',
+      });
+    };
+
+    let serverActionError = '';
+
+    // 1. Intento primario vía Server Action
+    if (activeActor) {
+      try {
+        const res = await deleteAppointmentAction(id, currentTenant.id, activeActor);
+        if (res.success) {
+          performLocalCleanup();
+          return;
+        } else {
+          serverActionError = res.error || 'No se pudo eliminar el registro.';
+        }
+      } catch (err: unknown) {
+        serverActionError = (err as Error).message || 'Error en comunicación con el servidor.';
       }
-    } catch (err: unknown) {
+    }
+
+    // 2. Fallback de alta resiliencia vía REST API
+    try {
+      const resp = await fetch('/api/appointments/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          tenantId: currentTenant.id,
+          actor: activeActor,
+        }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data.success) {
+        performLocalCleanup();
+        return;
+      }
+      throw new Error(data.error || serverActionError || 'Error al eliminar el registro.');
+    } catch (restErr: any) {
       toast({
         variant: 'error',
-        title: 'Error inesperado',
-        description: (err as Error).message || 'Error al eliminar el registro.',
+        title: 'Error al eliminar',
+        description: restErr?.message || serverActionError || 'No se pudo eliminar el registro.',
       });
     }
   };
@@ -386,12 +416,13 @@ export default function CalendarioPage() {
     setAppointments((prev) => [optimisticAppt, ...prev]);
 
     try {
-      if (!actor) {
+      const activeActor = effectiveActor || actor;
+      if (!activeActor) {
         setAppointments((prev) => prev.filter((a) => a.id !== optimisticId));
         toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
         return;
       }
-      const res = await createAppointmentAction(input, currentTenant.id, actor);
+      const res = await createAppointmentAction(input, currentTenant.id, activeActor);
 
       if (res.success && res.appointment) {
         // Replace temp item with real server item
@@ -438,12 +469,13 @@ export default function CalendarioPage() {
     );
 
     try {
-      if (!actor) {
+      const activeActor = effectiveActor || actor;
+      if (!activeActor) {
         setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: oldStatus } : a)));
         toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
         return;
       }
-      const res = await updateAppointmentStatusAction(id, status, currentTenant.id, actor);
+      const res = await updateAppointmentStatusAction(id, status, currentTenant.id, activeActor);
       if (!res.success) {
         throw new Error(res.error || 'Error al actualizar estado');
       }
@@ -499,13 +531,14 @@ export default function CalendarioPage() {
     setSelectedAppointment((prev) => prev?.id === id ? { ...prev, metadata: newMetadata } : prev);
 
     try {
-      if (!actor) {
+      const activeActor = effectiveActor || actor;
+      if (!activeActor) {
         setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, metadata: oldMetadata } : a)));
         setSelectedAppointment((prev) => prev?.id === id ? { ...prev, metadata: oldMetadata } : prev);
         toast({ variant: 'error', title: 'Error', description: 'Tu sesión ha expirado. Por favor, recarga la página.' });
         return;
       }
-      const res = await updateAppointmentMetadataAction(id, newMetadata, currentTenant.id, actor);
+      const res = await updateAppointmentMetadataAction(id, newMetadata, currentTenant.id, activeActor);
       if (!res.success) throw new Error(res.error || 'Error al actualizar.');
       toast({
         variant: 'success',
