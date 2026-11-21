@@ -6,6 +6,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, 
+  ArrowRight,
   Clock, 
   Calendar, 
   User, 
@@ -765,6 +766,23 @@ export default function BookingClient({
     }
   }, [dates, selectedDate]);
 
+  // Si la fecha seleccionada es hoy, pero todos los turnos del especialista ya concluyeron,
+  // auto-avanzar al primer día siguiente que sí tenga turnos en su jornada
+  useEffect(() => {
+    if (dates.length > 0 && selectedDate && selectedBarber) {
+      const todayStr = toLocalDateString(new Date());
+      if (selectedDate === todayStr && allTimes.length > 0) {
+        const hasAvailableToday = allTimes.some(t => isSlotAvailable(t.value24, slotInterval, bookedTimes, selectedDate));
+        if (!hasAvailableToday) {
+          const nextValidDay = dates.find(d => d.fullDate > todayStr);
+          if (nextValidDay) {
+            setSelectedDate(nextValidDay.fullDate);
+          }
+        }
+      }
+    }
+  }, [dates, allTimes, bookedTimes, selectedDate, selectedBarber, slotInterval]);
+
   const dayOfWeekStr = useMemo(() => {
     if (!selectedDate) return '';
     const parts = selectedDate.split('-');
@@ -842,15 +860,29 @@ export default function BookingClient({
   useEffect(() => {
     let isCancelled = false;
     async function fetchTimes() {
-      if (!selectedBarber || !selectedDate) return;
-      setIsLoadingTimes(true);
-      const result = await getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
-      if (!isCancelled && result.success) {
-        setBookedTimes(result.bookedTimes);
-        setGroupSlots((result as any).groupSlots || {});
-      }
-      if (!isCancelled) {
+      if (!selectedBarber || !selectedDate) {
         setIsLoadingTimes(false);
+        return;
+      }
+      setIsLoadingTimes(true);
+      try {
+        // Timeout defensivo de 3.5 segundos para garantizar que jamás se quede la UI en (Cargando...)
+        const timeoutPromise = new Promise<{ success: false, bookedTimes: [], groupSlots: {} }>((resolve) =>
+          setTimeout(() => resolve({ success: false, bookedTimes: [], groupSlots: {} }), 3500)
+        );
+        const actionPromise = getBookedTimesAction(tenant.id, selectedBarber.id, selectedDate, clientTzOffset);
+        const result = await Promise.race([actionPromise, timeoutPromise]);
+        
+        if (!isCancelled && result && result.success) {
+          setBookedTimes(result.bookedTimes || []);
+          setGroupSlots((result as any).groupSlots || {});
+        }
+      } catch (err) {
+        console.warn('[BookingClient] Error fetching booked times:', err);
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingTimes(false);
+        }
       }
     }
     fetchTimes();
@@ -1579,39 +1611,92 @@ export default function BookingClient({
                 {/* Time slots */}
                 <section>
                   <h3 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-4 flex items-center gap-2">
-                    <Clock size={14}/> 2. Horario {isLoadingTimes && <span className="text-emerald-500 animate-pulse text-[10px]">(Cargando...)</span>}
+                    <Clock size={14}/> 2. Horario {isLoadingTimes && <span className="text-emerald-500 animate-pulse text-[10px]">(Verificando turnos...)</span>}
                   </h3>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-                    {allTimes.map((time, i) => {
-                      const isSelected = selectedTime === time.value24;
-                      const isAvailable = isSlotAvailable(time.value24, slotInterval, bookedTimes, selectedDate);
-                      const groupSlot = groupSlots[time.value24];
-                      
-                      return (
-                        <button
-                          key={i}
-                          disabled={!isAvailable || isLoadingTimes}
-                          onClick={() => setSelectedTime(time.value24)}
-                          className={`py-2.5 sm:py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center ${
-                            !isAvailable 
-                              ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
-                              : isSelected 
-                                ? 'shadow-md scale-105'
-                                : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300 shadow-sm'
-                          }`}
-                          style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
-                        >
-                          <span>{time.label12}</span>
-                          {groupSlot && Number(groupSlot.maxCapacity || 0) > 1 && groupSlot.remainingSpots > 0 && (
-                            <span className={`text-[9px] font-black uppercase mt-0.5 tracking-tighter ${isSelected ? 'opacity-90 text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                              {(hasCourts || (selectedService?.name?.toLowerCase().includes('padel') || selectedService?.name?.toLowerCase().includes('tenis'))) ? '🎾 ' : '👥 '}
-                              {groupSlot.remainingSpots} cupo{groupSlot.remainingSpots > 1 ? 's' : ''}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  {allTimes.length === 0 ? (
+                    <div className="bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl p-5 text-center">
+                      <p className="text-amber-800 dark:text-amber-300 text-sm font-bold mb-1">
+                        El especialista no atiende en el día seleccionado
+                      </p>
+                      <p className="text-amber-700/80 dark:text-amber-400/80 text-xs mb-3">
+                        Por favor selecciona otra fecha disponible en el selector de días superior.
+                      </p>
+                      {(() => {
+                        const todayStr = toLocalDateString(new Date());
+                        const nextDay = dates.find(d => d.fullDate > selectedDate || d.fullDate > todayStr);
+                        if (!nextDay) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDate(nextDay.fullDate)}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-all shadow-sm"
+                          >
+                            <span>Ir al {nextDay.dayName} {nextDay.dayNum}</span>
+                            <ArrowRight size={13} />
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  ) : allTimes.filter(t => isSlotAvailable(t.value24, slotInterval, bookedTimes, selectedDate)).length === 0 ? (
+                    <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-5 text-center">
+                      <p className="text-slate-800 dark:text-slate-200 text-sm font-bold mb-1">
+                        {selectedDate === toLocalDateString(new Date()) 
+                          ? 'La jornada de atención para hoy ya ha finalizado o no hay turnos disponibles' 
+                          : 'No quedan turnos libres disponibles para este día'}
+                      </p>
+                      <p className="text-slate-500 text-xs mb-3">
+                        Puedes reservar para el siguiente día disponible:
+                      </p>
+                      {(() => {
+                        const todayStr = toLocalDateString(new Date());
+                        const nextDay = dates.find(d => d.fullDate > selectedDate || d.fullDate > todayStr);
+                        if (!nextDay) return null;
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDate(nextDay.fullDate)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-sm"
+                            style={{ backgroundColor: appliedBtn }}
+                          >
+                            <span>Ver turnos del {nextDay.dayName} {nextDay.dayNum}</span>
+                            <ArrowRight size={14} />
+                          </button>
+                        );
+                      })()}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                      {allTimes.map((time, i) => {
+                        const isSelected = selectedTime === time.value24;
+                        const isAvailable = isSlotAvailable(time.value24, slotInterval, bookedTimes, selectedDate);
+                        const groupSlot = groupSlots[time.value24];
+                        
+                        return (
+                          <button
+                            key={i}
+                            disabled={!isAvailable}
+                            onClick={() => setSelectedTime(time.value24)}
+                            className={`py-2.5 sm:py-3 px-2 rounded-xl text-sm font-bold border-2 transition-all flex flex-col items-center justify-center ${
+                              !isAvailable 
+                                ? 'bg-slate-100 border-transparent text-slate-300 cursor-not-allowed line-through' 
+                                : isSelected 
+                                  ? 'shadow-md scale-105'
+                                  : 'bg-white border-slate-100 text-slate-700 hover:border-slate-300 shadow-sm'
+                            }`}
+                            style={isSelected ? { backgroundColor: appliedBtn, borderColor: appliedBtn, color: btnTextColor } : {}}
+                          >
+                            <span>{time.label12}</span>
+                            {groupSlot && Number(groupSlot.maxCapacity || 0) > 1 && groupSlot.remainingSpots > 0 && (
+                              <span className={`text-[9px] font-black uppercase mt-0.5 tracking-tighter ${isSelected ? 'opacity-90 text-white' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {(hasCourts || (selectedService?.name?.toLowerCase().includes('padel') || selectedService?.name?.toLowerCase().includes('tenis'))) ? '🎾 ' : '👥 '}
+                                {groupSlot.remainingSpots} cupo{groupSlot.remainingSpots > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </section>
 
                 {/* Customer Data */}
