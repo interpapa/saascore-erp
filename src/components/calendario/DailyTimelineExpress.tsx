@@ -47,17 +47,7 @@ export function DailyTimelineExpress({
   employees = [],
 }: DailyTimelineExpressProps) {
   const router = useRouter();
-  const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<string>(() => {
-    return employees.length > 0 ? employees[0].id : 'all';
-  });
-
-  const hasInitializedEmployee = React.useRef(false);
-  React.useEffect(() => {
-    if (!hasInitializedEmployee.current && employees.length > 0) {
-      hasInitializedEmployee.current = true;
-      setSelectedEmployeeId(employees[0].id);
-    }
-  }, [employees]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = React.useState<string>('all');
 
   // Cambiar día
   const handlePrevDay = () => {

@@ -29,6 +29,7 @@ import { AuditTrailSection } from '@/components/ui/AuditTrailSection';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 import { getPrimaryWhatsAppUrl } from '@/lib/phoneUtils';
 import { supabase } from '@/lib/supabase';
+import { TenantSwitcher } from '@/components/core/TenantSwitcher';
 
 type TabType = 'clients' | 'audit';
 
@@ -383,10 +384,13 @@ export default function ClientesPage() {
   return (
     <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6 relative">
       {/* Cabecera Estandarizada */}
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">Directorio de Contactos</h1>
-          <p className="text-slate-600 dark:text-slate-400 font-medium mt-0.5 text-xs">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">Directorio de Contactos</h1>
+            <TenantSwitcher variant="inline" />
+          </div>
+          <p className="text-slate-600 dark:text-slate-400 font-medium mt-1 text-xs">
             Clientes, proveedores y cuentas por cobrar
           </p>
         </div>

@@ -698,7 +698,7 @@ function sanitizeTenantPayload(tenant: any) {
   };
 }
 
-export async function getUserTenant(userEmail: string, userId?: string) {
+export async function getUserTenant(userEmail: string, userId?: string, preferredTenantId?: string) {
   try {
     const db = supabaseAdmin;
     const cleanEmail = (userEmail || '').trim().toLowerCase();
@@ -782,11 +782,19 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       return { success: true, tenant: null, role: 'owner' as UserRole };
     }
 
-    // Prioridad estricta de empresa para multi-asociación:
-    // 1. Si es Superadmin y tiene asignada la empresa matriz 'rendo CORP', respetarla
+    // Prioridad de empresa para multi-asociación:
+    // 0. Si se solicita un preferredTenantId específico y el usuario tiene acceso (o es SuperAdmin)
+    // 1. Si el usuario tiene una empresa activa específica (ej. Consultorio 25)
     // 2. Si el usuario es 'owner' (dueño de su negocio), PRIORIZAR SIEMPRE la empresa donde es dueño
     // 3. De lo contrario, usar la membresía más reciente
-    const membership = (isSuperAdmin && userTenants.find(m => m.tenant_id === '45b6404f-3469-4c42-99c1-85416a411f4f' || m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
+    const preferredMembership = preferredTenantId ? userTenants.find(m => m.tenant_id === preferredTenantId) : null;
+    const activeOperationalTenant = userTenants.find(m => m.tenant_id === '4062a8fe-f512-455c-8192-2f83c55ed732');
+    const ownerMembership = userTenants.find(m => m.role === 'owner' && m.tenant_id !== '45b6404f-3469-4c42-99c1-85416a411f4f');
+
+    const membership = preferredMembership
+      || ownerMembership
+      || activeOperationalTenant
+      || (isSuperAdmin && userTenants.find(m => m.tenant_id === '45b6404f-3469-4c42-99c1-85416a411f4f' || m.tenant_id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
       || userTenants.find(m => m.role === 'owner')
       || userTenants[0];
 

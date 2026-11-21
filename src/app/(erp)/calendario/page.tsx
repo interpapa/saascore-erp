@@ -36,7 +36,8 @@ import {
 
 import { BookingConfigModal } from '@/components/calendario/BookingConfigModal';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
-import { QrCode, Settings } from 'lucide-react';
+import { QrCode, Settings, Calendar as CalendarHeaderIcon } from 'lucide-react';
+import { TenantSwitcher } from '@/components/core/TenantSwitcher';
 
 export default function CalendarioPage() {
   const currentTenant = useTenantResolver();
@@ -516,10 +517,13 @@ export default function CalendarioPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight">
-            Gestión de Citas y Turnos
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 font-medium text-sm">
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-3xl font-black text-foreground tracking-tight">
+              Gestión de Citas y Turnos
+            </h1>
+            <TenantSwitcher variant="inline" />
+          </div>
+          <p className="text-slate-600 dark:text-slate-400 font-medium text-sm mt-1">
             Control de agenda, personal asignado y estados de servicio
           </p>
         </div>

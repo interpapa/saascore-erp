@@ -3,22 +3,29 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useERPStore, Tenant } from '@/store/useERPStore';
 import { isSuperAdminEmail } from '@/lib/core/tenantSecurity';
-import { Building2, ChevronDown, Check, LogOut, Sparkles } from 'lucide-react';
+import { Building2, ChevronDown, Check, LogOut, Sparkles, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-export function TenantSwitcher() {
+interface TenantSwitcherProps {
+  variant?: 'header' | 'inline' | 'compact';
+  className?: string;
+}
+
+export function TenantSwitcher({ variant = 'header', className = '' }: TenantSwitcherProps) {
   const session = useERPStore(s => s.session);
   const currentTenant = useERPStore(s => s.currentTenant);
   const impersonatedTenant = useERPStore(s => s.impersonatedTenant);
   const impersonateTenant = useERPStore(s => s.impersonateTenant);
   const stopImpersonation = useERPStore(s => s.stopImpersonation);
+  const setCurrentTenant = useERPStore(s => s.setCurrentTenant);
+  const setSession = useERPStore(s => s.setSession);
 
   const [isOpen, setIsOpen] = useState(false);
   const [tenants, setTenants] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const isSuper = session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail);
+  const isSuper = isSuperAdminEmail(session?.userEmail) || session?.role === 'superadmin';
 
   // Cerrar al hacer clic fuera
   useEffect(() => {
@@ -33,19 +40,41 @@ export function TenantSwitcher() {
 
   // Cargar lista de empresas disponibles para el selector
   useEffect(() => {
-    if (!isSuper) return;
     let isMounted = true;
 
     async function loadTenants() {
+      if (!session?.userEmail) return;
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('tenants')
-          .select('id, name, status, is_active, active_modules, metadata')
-          .order('name', { ascending: true });
+        if (isSuper) {
+          // Superadmin: Cargar todas las empresas del sistema
+          const { data, error } = await supabase
+            .from('tenants')
+            .select('id, name, status, is_active, active_modules, metadata')
+            .order('name', { ascending: true });
 
-        if (!error && data && isMounted) {
-          setTenants(data);
+          if (!error && data && isMounted) {
+            setTenants(data);
+          }
+        } else {
+          // Usuario regular: Cargar empresas donde está asignado
+          const { data: utRows } = await supabase
+            .from('user_tenants')
+            .select('tenant_id, role')
+            .ilike('user_email', session.userEmail);
+
+          if (utRows && utRows.length > 0) {
+            const tenantIds = utRows.map(r => r.tenant_id);
+            const { data: userTenantsData } = await supabase
+              .from('tenants')
+              .select('id, name, status, is_active, active_modules, metadata')
+              .in('id', tenantIds)
+              .order('name', { ascending: true });
+
+            if (userTenantsData && isMounted) {
+              setTenants(userTenantsData);
+            }
+          }
         }
       } catch (err) {
         console.warn('[TenantSwitcher] Error cargando empresas:', err);
@@ -56,20 +85,43 @@ export function TenantSwitcher() {
 
     loadTenants();
     return () => { isMounted = false; };
-  }, [isSuper]);
+  }, [isSuper, session?.userEmail]);
 
-  if (!isSuper) return null;
+  // Si no es superadmin y solo tiene 1 o 0 empresas, no mostramos el selector desplegable innecesario
+  if (!isSuper && tenants.length <= 1) {
+    if (variant === 'inline' && currentTenant?.name) {
+      return (
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-border ${className}`}>
+          <Building2 size={13} className="text-primary" />
+          <span className="truncate max-w-[150px]">{currentTenant.name}</span>
+        </div>
+      );
+    }
+    return null;
+  }
 
   const handleSelectTenant = (tenant: any) => {
-    impersonateTenant({
+    const formattedTenant: Tenant = {
       id: tenant.id,
       name: tenant.name,
       blocked: tenant.status === 'suspended',
-      active_modules: tenant.active_modules,
+      active_modules: tenant.active_modules || (tenant.metadata as any)?.active_modules,
       metadata: tenant.metadata,
-    });
+    };
+
+    if (isSuper) {
+      impersonateTenant(formattedTenant);
+    } else {
+      setCurrentTenant(formattedTenant);
+      if (session) {
+        setSession({
+          ...session,
+          tenantId: tenant.id,
+        });
+      }
+    }
     setIsOpen(false);
-    // Recarga suave para garantizar que todas las suites y Server Actions refresquen datos del nuevo tenant
+    // Recarga para garantizar que todas las suites, vistas y Server Actions refresquen datos del nuevo tenant
     if (typeof window !== 'undefined') {
       window.location.reload();
     }
@@ -85,20 +137,40 @@ export function TenantSwitcher() {
 
   const displayName = currentTenant?.name || 'Seleccionar Negocio';
 
+  const isInline = variant === 'inline';
+
   return (
-    <div className="relative inline-block" ref={dropdownRef}>
+    <div className={`relative inline-block ${className}`} ref={dropdownRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border shadow-xs btn-haptic ${
-          impersonatedTenant
-            ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
-            : 'bg-card hover:bg-accent text-foreground border-border'
+        className={`flex items-center gap-2 rounded-full text-xs font-bold transition-all border shadow-xs btn-haptic ${
+          isInline
+            ? 'px-3 py-1.5 bg-card hover:bg-accent text-foreground border-border/80 hover:border-primary/50'
+            : impersonatedTenant
+              ? 'px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+              : 'px-3 py-1.5 bg-card hover:bg-accent text-foreground border-border'
         }`}
         title="Cambiar de Empresa / Negocio"
       >
-        <Building2 size={14} className={impersonatedTenant ? 'text-amber-500 animate-pulse' : 'text-primary'} />
-        <span className="max-w-[130px] truncate">{displayName}</span>
-        <ChevronDown size={13} className={`transition-transform duration-200 text-muted-foreground ${isOpen ? 'rotate-180' : ''}`} />
+        <Building2
+          size={14}
+          className={
+            impersonatedTenant
+              ? 'text-amber-500 animate-pulse'
+              : 'text-primary'
+          }
+        />
+        <span className="max-w-[140px] truncate">{displayName}</span>
+        {impersonatedTenant && (
+          <span className="text-[9px] bg-amber-500/20 text-amber-800 dark:text-amber-200 px-1.5 py-0.2 rounded-full font-black uppercase tracking-wider">
+            Soporte
+          </span>
+        )}
+        <ChevronDown
+          size={13}
+          className={`transition-transform duration-200 text-muted-foreground ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {isOpen && (
@@ -115,7 +187,8 @@ export function TenantSwitcher() {
 
           <div className="max-h-64 overflow-y-auto space-y-1">
             {isLoading ? (
-              <div className="py-6 text-center text-xs text-muted-foreground">
+              <div className="py-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                <RefreshCw size={14} className="animate-spin text-primary" />
                 Cargando empresas...
               </div>
             ) : tenants.length === 0 ? (
@@ -128,6 +201,7 @@ export function TenantSwitcher() {
                 return (
                   <button
                     key={t.id}
+                    type="button"
                     onClick={() => handleSelectTenant(t)}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-medium transition-all flex items-center justify-between group ${
                       isSelected
@@ -136,7 +210,7 @@ export function TenantSwitcher() {
                     }`}
                   >
                     <div className="truncate flex-1 pr-2">
-                      <p className="truncate">{t.name}</p>
+                      <p className="truncate font-semibold">{t.name}</p>
                       {t.metadata?.owner_email && (
                         <p className={`text-[10px] truncate ${isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}>
                           {t.metadata.owner_email}
@@ -153,11 +227,12 @@ export function TenantSwitcher() {
           {impersonatedTenant && (
             <div className="mt-2 pt-2 border-t border-border">
               <button
+                type="button"
                 onClick={handleResetToOwn}
                 className="w-full text-left px-3 py-2 rounded-xl text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors flex items-center gap-2"
               >
                 <LogOut size={13} />
-                Volver a mi empresa base (rendo corp)
+                Volver a mi empresa base
               </button>
             </div>
           )}
