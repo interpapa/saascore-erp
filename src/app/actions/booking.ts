@@ -474,9 +474,10 @@ export async function processBookingAction(formData: unknown) {
 
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return { success: false, error: (error as any).errors[0].message };
+      const firstMsg = error.issues?.[0]?.message || error.errors?.[0]?.message || 'Datos de reserva inválidos.';
+      return { success: false, error: firstMsg };
     }
-    console.error('[Server Error]:', error);
+    console.error('[Server Error in processBookingAction]:', error?.message || error);
     return { success: false, error: 'Ha ocurrido un error inesperado en el servidor.' };
   }
 }
@@ -519,7 +520,10 @@ export async function getBookedTimesAction(
     }
 
     const { data: appointments, error } = await query;
-    if (error) throw error;
+    if (error) {
+      console.error('[getBookedTimesAction Query Error]:', error.message || error);
+      return { success: false, bookedTimes: [], groupSlots: {}, error: error.message };
+    }
 
     const bookedTimesSet = new Set<string>();
     const groupSlotsInfo: Record<string, { spotsTaken: number; maxCapacity: number; remainingSpots: number }> = {};
@@ -674,9 +678,9 @@ export async function getBookedTimesAction(
       bookedTimes: Array.from(bookedTimesSet),
       groupSlots: groupSlotsInfo
     };
-  } catch (error) {
-    console.error('Error fetching booked times:', error);
-    return { success: false, bookedTimes: [] };
+  } catch (error: any) {
+    console.error('Error fetching booked times:', error?.message || error);
+    return { success: false, bookedTimes: [], groupSlots: {}, error: error?.message || 'Error al obtener horarios' };
   }
 }
 
