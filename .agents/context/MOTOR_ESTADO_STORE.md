@@ -8,6 +8,9 @@
 
 Rendo ERP utiliza **Zustand** con persistencia en `localStorage` (clave: `Rendo-erp-storage`) y rehidratación asíncrona.
 
+* **Blindaje SSR / Node 22/24:** La función `createJSONStorage` evalúa `typeof window !== 'undefined' && window.localStorage`. En el servidor (Node) devuelve un adapter dummy inerte (`getItem: () => null, setItem: () => {}, removeItem: () => {}`), previniendo caídas con `ReferenceError: localStorage is not defined` durante el renderizado de Server Components.
+* **Resolución de Tenant Dual (Server Action + Client Fallback):** Tanto `login/page.tsx` como `AuthProvider.tsx` intentan primero `getUserTenant` (Server Action saneada con `JSON.parse(JSON.stringify)` para cumplir el protocolo Flight RPC de React 19). Si la Server Action tiene latencia o falla, se ejecuta un fallback directo vía cliente Supabase consultando `user_tenants` y `tenants`, gracias a las políticas RLS añadidas en PostgreSQL.
+
 ### Estado Principal (`ERPState`):
 * **`session: SessionData | null`**:
   - `userEmail`: Correo del usuario autenticado.
