@@ -565,7 +565,7 @@ export async function getBookedTimesAction(
       // Si es "Cualquiera", debemos contar cuántos empleados reservables activos hay en la empresa.
       const { data: staffEntities } = await supabaseAdmin
         .from('entities')
-        .select('id, name, metadata, role')
+        .select('id, name, metadata')
         .eq('tenant_id', tenantId)
         .in('type', ['employee', 'doctor', 'staff'])
         .neq('status', 'inactive')
