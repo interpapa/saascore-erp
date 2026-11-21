@@ -42,9 +42,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
-      const result = await getUserTenant(cleanEmail, user.id);
+      let result: any = null;
+      try {
+        result = await getUserTenant(cleanEmail, user.id);
+      } catch (saErr) {
+        console.warn('[AuthProvider] Server Action getUserTenant falló, evaluando fallback:', saErr);
+      }
 
-      if (result.success && result.tenant) {
+      // Fallback directo por cliente Supabase si Server Action no devolvió tenant
+      if (!result?.success || !result?.tenant) {
+        try {
+          const { data: utRows } = await supabase
+            .from('user_tenants')
+            .select('tenant_id, role')
+            .ilike('user_email', cleanEmail)
+            .limit(1);
+
+          if (utRows && utRows.length > 0) {
+            const { data: tRow } = await supabase
+              .from('tenants')
+              .select('*')
+              .eq('id', utRows[0].tenant_id)
+              .maybeSingle();
+
+            if (tRow) {
+              result = {
+                success: true,
+                tenant: tRow,
+                role: utRows[0].role || 'owner',
+              };
+            }
+          }
+        } catch (clientErr) {
+          console.warn('[AuthProvider] Error en fallback de cliente Supabase:', clientErr);
+        }
+      }
+
+      if (result?.success && result.tenant) {
         if (!isSuper && useERPStore.getState().impersonatedTenant) {
           useERPStore.getState().stopImpersonation();
         }

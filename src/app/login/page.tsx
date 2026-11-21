@@ -120,13 +120,49 @@ export default function LoginPage() {
           tenantFetchError = result.error || 'Error al conectar con la base de datos de tu empresa.';
         }
       } catch (tErr: any) {
-        console.warn('[LoginPage] Error consultando empresa del usuario:', tErr);
+        console.warn('[LoginPage] Error consultando empresa del usuario via Server Action:', tErr);
         tenantFetchError = (tErr as Error)?.message || 'Fallo de comunicación con el servidor al cargar la empresa.';
       }
 
-      // Si hubo un error técnico de conexión, NO asumir que el usuario es nuevo ni enviarlo a Onboarding
-      if (tenantFetchError) {
-        setError(tenantFetchError);
+      // Fallback de alta resiliencia: Si Server Action no resolvió tenant, consultar directamente vía cliente Supabase
+      if (!tenantId) {
+        try {
+          const { data: utRows } = await supabase
+            .from('user_tenants')
+            .select('tenant_id, role')
+            .ilike('user_email', cleanEmail)
+            .limit(1);
+
+          if (utRows && utRows.length > 0) {
+            const clientTenantId = utRows[0].tenant_id;
+            const clientRole = utRows[0].role;
+            const { data: tRow } = await supabase
+              .from('tenants')
+              .select('*')
+              .eq('id', clientTenantId)
+              .maybeSingle();
+
+            if (tRow) {
+              tenantId = tRow.id;
+              tenantName = tRow.name;
+              tenantModules = tRow.active_modules || (tRow.metadata as any)?.active_modules || DEFAULT_ENABLED_MODULES;
+              tenantMetadata = tRow.metadata || {};
+              userRole = clientRole || 'owner';
+              tenantFetchError = null; // Resuelto exitosamente por cliente!
+            }
+          }
+        } catch (clientErr) {
+          console.warn('[LoginPage] Error en fallback de cliente Supabase:', clientErr);
+        }
+      }
+
+      // Si hubo un error técnico de conexión y no se resolvió la empresa, sanitizar mensaje amigable
+      if (tenantFetchError && !tenantId) {
+        const isServerComponentError = tenantFetchError.toLowerCase().includes('server components') || tenantFetchError.toLowerCase().includes('digest');
+        const displayError = isServerComponentError
+          ? 'Error de conexión temporal con el servicio de base de datos. Por favor reintenta en unos instantes.'
+          : tenantFetchError;
+        setError(displayError);
         setIsLoading(false);
         setStatusMessage(null);
         return;

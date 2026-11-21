@@ -73,7 +73,16 @@ export const useERPStore = create<ERPState>()(
     }),
     {
       name: 'Rendo-erp-storage',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => {
+        if (typeof window !== 'undefined' && window.localStorage) {
+          return window.localStorage;
+        }
+        return {
+          getItem: () => null,
+          setItem: () => {},
+          removeItem: () => {},
+        };
+      }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
         if (state?.session && isSessionExpired(state.session)) {

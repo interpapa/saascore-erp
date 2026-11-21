@@ -9,7 +9,6 @@ import { UserRole } from '@/lib/rbac';
 import { validateUserTenantAccess, isSuperAdminEmail, isSuperAdminAuthUser, SUPERADMIN_EMAILS } from '@/lib/core/tenantSecurity';
 import { DEFAULT_ENABLED_MODULES } from '@/lib/core/kernel/moduleRegistry';
 import { getResolvedSupabaseUrl, getResolvedAnonKey } from '@/lib/supabaseConfig';
-import { cookies } from 'next/headers';
 import { normalizeHexColor } from '@/lib/theme/colorUtils';
 
 export const DEFAULT_FISCAL_SETTINGS = {
@@ -47,6 +46,7 @@ async function verifySuperAdminActor(
   // 2. Si no hay token en el actor, intentar recuperar sesión desde cookies de Next.js
   if (!authToken) {
     try {
+      const { cookies } = await import('next/headers');
       const cookieStore = await cookies();
       const allCookies = cookieStore.getAll();
       const authCookie = allCookies.find(c => c.name.includes('-auth-token'));
@@ -684,9 +684,9 @@ function sanitizeTenantPayload(tenant: any) {
     symbol: rawMeta.symbol || tenant.symbol || '$',
     exchange_rate: rawMeta.exchange_rate || 850.0,
     active_modules: modulesList,
-    booking_settings: rawMeta.booking_settings,
-    public_theme: rawMeta.public_theme,
-    integraciones: rawMeta.integraciones,
+    booking_settings: rawMeta.booking_settings ?? {},
+    public_theme: rawMeta.public_theme ?? {},
+    integraciones: rawMeta.integraciones ?? {},
     fiscal_settings: rawMeta.fiscal_settings || DEFAULT_FISCAL_SETTINGS,
     tax_rate: rawMeta.fiscal_settings?.taxes_enabled ? (rawMeta.tax_rate ?? rawMeta.fiscal_settings.tax_rate ?? 0) : 0,
   };
@@ -805,13 +805,12 @@ export async function getUserTenant(userEmail: string, userId?: string) {
     try {
       let authUser: any = null;
       if (userId) {
-        const { data: byIdData } = await db.auth.admin.getUserById(userId);
-        authUser = byIdData?.user || null;
+        try {
+          const { data: byIdData } = await db.auth.admin.getUserById(userId);
+          authUser = byIdData?.user || null;
+        } catch {}
       }
-      if (!authUser) {
-        const { data: listData } = await db.auth.admin.listUsers({ perPage: 1000 });
-        authUser = listData?.users?.find((u: any) => u.email?.toLowerCase() === cleanEmail.toLowerCase()) || null;
-      }
+
       const allowedModules = authUser?.app_metadata?.allowed_modules || authUser?.user_metadata?.allowed_modules;
       const operationalPermissions = authUser?.app_metadata?.operational_permissions || authUser?.user_metadata?.operational_permissions || [];
       if (Array.isArray(allowedModules) && allowedModules.length > 0) {
@@ -826,13 +825,15 @@ export async function getUserTenant(userEmail: string, userId?: string) {
         ? 'superadmin'
         : (membership.role === 'superadmin' ? 'owner' : (membership.role as UserRole));
 
-      return {
+      const sanitized = sanitizeTenantPayload(tenant);
+
+      return JSON.parse(JSON.stringify({
         success: true,
-        tenant: sanitizeTenantPayload(tenant),
+        tenant: sanitized,
         role: assignedRole,
-        allowedModules: Array.isArray(allowedModules) ? allowedModules : undefined,
+        allowedModules: Array.isArray(allowedModules) ? allowedModules : null,
         operationalPermissions: Array.isArray(operationalPermissions) ? operationalPermissions : [],
-      };
+      }));
     } catch {
       // Continuar con active_modules del tenant si falla la consulta de Auth
     }
@@ -841,13 +842,23 @@ export async function getUserTenant(userEmail: string, userId?: string) {
       ? 'superadmin'
       : (membership.role === 'superadmin' ? 'owner' : (membership.role as UserRole));
 
-    return {
+    const sanitized = sanitizeTenantPayload(tenant);
+
+    return JSON.parse(JSON.stringify({
       success: true,
-      tenant: sanitizeTenantPayload(tenant),
+      tenant: sanitized,
       role: assignedRole,
-    };
+      allowedModules: null,
+      operationalPermissions: [],
+    }));
   } catch (error: any) {
-    return { success: false, tenant: null, role: null, error: error.message };
+    console.error('[getUserTenant Exception]:', error);
+    return JSON.parse(JSON.stringify({ 
+      success: false, 
+      tenant: null, 
+      role: null, 
+      error: error?.message || 'Error al obtener empresa' 
+    }));
   }
 }
 
