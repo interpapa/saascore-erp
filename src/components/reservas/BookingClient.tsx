@@ -881,12 +881,23 @@ export default function BookingClient({
 
   useEffect(() => {
     let isCancelled = false;
+    let timeoutTimer: NodeJS.Timeout | null = null;
+
     async function fetchTimes() {
       if (!selectedBarber || !selectedDate) {
         setIsLoadingTimes(false);
         return;
       }
       setIsLoadingTimes(true);
+      
+      // Timeout de seguridad a 10s para nunca congelar la interfaz si la red es lenta
+      timeoutTimer = setTimeout(() => {
+        if (!isCancelled) {
+          setIsLoadingTimes(false);
+          console.warn('[BookingClient] Fetch times timeout superado, desbloqueando interfaz.');
+        }
+      }, 10000);
+
       try {
         const result = await getBookedTimesAction(
           tenant.id, 
@@ -903,6 +914,7 @@ export default function BookingClient({
       } catch (err) {
         console.warn('[BookingClient] Error fetching booked times:', err);
       } finally {
+        if (timeoutTimer) clearTimeout(timeoutTimer);
         if (!isCancelled) {
           setIsLoadingTimes(false);
         }
@@ -911,6 +923,7 @@ export default function BookingClient({
     fetchTimes();
     return () => {
       isCancelled = true;
+      if (timeoutTimer) clearTimeout(timeoutTimer);
     };
   }, [selectedBarber, selectedDate, tenant.id, clientTzOffset, selectedService?.name]);
 
@@ -956,20 +969,6 @@ export default function BookingClient({
     setErrorMessage('');
 
     try {
-      const preCheck = await getBookedTimesAction(
-        tenant.id, 
-        selectedBarber.id, 
-        selectedDate, 
-        clientTzOffset,
-        selectedService?.name
-      );
-      if (preCheck.success && Array.isArray(preCheck.bookedTimes) && preCheck.bookedTimes.includes(selectedTime)) {
-        setIsSubmitting(false);
-        setBookedTimes(preCheck.bookedTimes);
-        setErrorMessage('Lo sentimos, este turno acaba de ser reservado por otro paciente. Por favor selecciona otro horario.');
-        return;
-      }
-
       const svcNameLower = (selectedService?.name || '').toLowerCase();
       const isSportsSvc = svcNameLower.includes('padel') || svcNameLower.includes('pádel') || svcNameLower.includes('tenis') || hasCourts;
       const isGroupSvc = Boolean(
@@ -978,27 +977,47 @@ export default function BookingClient({
       );
       const slotMaxCapacity = (selectedTime && groupSlots[selectedTime]?.maxCapacity) || (isGroupSvc ? 4 : 1);
 
-      const result = await processBookingAction({
-        tenantId: tenant.id,
-        barberId: selectedBarber.id,
-        barberName: selectedBarber.name,
-        date: selectedDate,
-        time: selectedTime,
-        firstName: firstName,
-        lastName: lastName,
-        phone: customerPhone,
-        durationMinutes: selectedService?.durationMinutes || 60,
-        timezoneOffset: clientTzOffset,
-        price: selectedBarberPrice || selectedService?.basePrice || 0,
-        serviceName: selectedService?.name,
-        isGroupClass: isGroupSvc,
-        maxCapacity: slotMaxCapacity,
-      });
+      // Invocación directa y optimizada de la Server Action (con prevención atómica de colisión en backend)
+      let result: any = null;
+      let lastErr: any = null;
+
+      // Intento primario con reintento automático único si ocurre un fallo de red transitorio
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          result = await processBookingAction({
+            tenantId: tenant.id,
+            barberId: selectedBarber.id,
+            barberName: selectedBarber.name,
+            date: selectedDate,
+            time: selectedTime,
+            firstName: firstName,
+            lastName: lastName,
+            phone: customerPhone,
+            durationMinutes: selectedService?.durationMinutes || 60,
+            timezoneOffset: clientTzOffset,
+            price: selectedBarberPrice || selectedService?.basePrice || 0,
+            serviceName: selectedService?.name,
+            isGroupClass: isGroupSvc,
+            maxCapacity: slotMaxCapacity,
+          });
+          if (result) break;
+        } catch (callErr: any) {
+          lastErr = callErr;
+          console.warn(`[BookingClient] Intento ${attempt} fallido:`, callErr?.message);
+          if (attempt === 1) {
+            await new Promise(r => setTimeout(r, 800)); // Espera breve antes del reintento
+          }
+        }
+      }
+
+      if (!result && lastErr) {
+        throw lastErr;
+      }
 
       setIsSubmitting(false);
 
       if (!result?.success) {
-        setErrorMessage(result?.error || 'Ocurrió un error inesperado');
+        setErrorMessage(result?.error || 'No se pudo completar la reserva.');
         return;
       }
 
@@ -1065,10 +1084,14 @@ export default function BookingClient({
       console.error('[BookingClient] Error Calling Server Action:', err);
       setIsSubmitting(false);
       const rawMsg = String(err?.message || '');
+      const digest = (err as any)?.digest ? ` (Código: ${(err as any).digest})` : '';
+
       if (rawMsg.includes('Server Components render') || rawMsg.includes('digest')) {
-        setErrorMessage('La conexión con el servidor de reservas tardó más de lo esperado. Por favor verifica tus datos e intenta agendar nuevamente.');
+        setErrorMessage(`Interrupción en la conexión con el servidor${digest}. Por favor presiona 'Confirmar Reserva' para reintentar.`);
+      } else if (rawMsg.includes('Failed to fetch') || rawMsg.includes('NetworkError') || rawMsg.includes('timeout')) {
+        setErrorMessage('Problema de conexión a internet o latencia con el servidor. Por favor verifica tu red y reintenta.');
       } else {
-        setErrorMessage(rawMsg || 'Error de red o de servidor al enviar la reserva.');
+        setErrorMessage(rawMsg || 'Error de comunicación al enviar la reserva. Por favor reintenta.');
       }
       return;
     }

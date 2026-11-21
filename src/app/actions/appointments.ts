@@ -52,11 +52,19 @@ function isMissingColumnError(error: any): boolean {
 }
 
 async function assertCalendarOrDentalEnabled(tenantId: string) {
-  const calCheck = await assertModuleEnabled(tenantId, 'calendario');
-  if (calCheck.authorized) return { authorized: true };
-  const dentalCheck = await assertModuleEnabled(tenantId, 'odontologia');
-  if (dentalCheck.authorized) return { authorized: true };
-  return { authorized: false, error: 'El módulo de citas/odontología está desactivado.' };
+  const allowedServiceModules = [
+    'calendario', 'odontologia', 'clinica', 'ginecologia', 'med_ginecologia',
+    'cardiologia', 'med_cardiologia', 'pediatria', 'med_pediatria',
+    'dermatologia', 'med_dermatologia', 'traumatologia', 'med_traumatologia',
+    'oftalmologia', 'med_oftalmologia', 'barberia', 'grooming'
+  ];
+  for (const mod of allowedServiceModules) {
+    try {
+      const check = await assertModuleEnabled(tenantId, mod as any);
+      if (check.authorized) return { authorized: true };
+    } catch {}
+  }
+  return { authorized: false, error: 'El módulo de citas y agenda no está habilitado para esta empresa.' };
 }
 
 /**

@@ -72,17 +72,28 @@ export async function processBookingAction(formData: unknown) {
 
     const cleanData = bookingSchema.parse(formData);
 
-    // Validación Backend de Módulo Activo (Estilo Odoo 17 - Compatible con Citas, Odontología y Clínica)
-    const moduleCheck = await assertModuleEnabled(cleanData.tenantId, 'calendario');
-    if (!moduleCheck.authorized) {
-      const dentalCheck = await assertModuleEnabled(cleanData.tenantId, 'odontologia');
-      const clinicCheck = await assertModuleEnabled(cleanData.tenantId, 'clinica');
-      if (!dentalCheck.authorized && !clinicCheck.authorized) {
-        return { 
-          success: false, 
-          error: moduleCheck.error || 'El sistema de reservas está temporalmente inactivo para esta empresa.' 
-        };
-      }
+    // Validación Backend de Módulo Activo (Soporta Citas, Odontología, Especialidades Médicas, Barbería y Peluquería Canina)
+    const validBookingModules = [
+      'calendario', 'odontologia', 'clinica', 'ginecologia', 'med_ginecologia',
+      'cardiologia', 'med_cardiologia', 'pediatria', 'med_pediatria',
+      'dermatologia', 'med_dermatologia', 'traumatologia', 'med_traumatologia',
+      'oftalmologia', 'med_oftalmologia', 'barberia', 'grooming'
+    ];
+    let isBookingAuthorized = false;
+    for (const mod of validBookingModules) {
+      try {
+        const check = await assertModuleEnabled(cleanData.tenantId, mod as any);
+        if (check.authorized) {
+          isBookingAuthorized = true;
+          break;
+        }
+      } catch {}
+    }
+    if (!isBookingAuthorized) {
+      return { 
+        success: false, 
+        error: 'El sistema de reservas está temporalmente inactivo o no habilitado para esta empresa.' 
+      };
     }
 
     const fullName = `${cleanData.firstName} ${cleanData.lastName || ''}`.trim();
@@ -328,7 +339,7 @@ export async function processBookingAction(formData: unknown) {
     let createdApptId: string = crypto.randomUUID();
     // Título principal siempre es el nombre del paciente
     const apptTitle = isGroupClass
-      ? (isSportsService ? `🎾 Clase Grupal (${attendees?.length || 1}/${maxCapacity}) - ${fullName}` : `Sesión Grupal (${attendees?.length || 1}/${maxCapacity}) - ${fullName}`)
+      ? (isSportsService ? `🎾 Clase Grupal (${initialAttendees?.length || 1}/${maxCapacity}) - ${fullName}` : `Sesión Grupal (${initialAttendees?.length || 1}/${maxCapacity}) - ${fullName}`)
       : fullName;
 
     const { data: insertedAppt, error } = await supabaseAdmin
@@ -495,8 +506,12 @@ export async function processBookingAction(formData: unknown) {
       const firstMsg = error.issues?.[0]?.message || error.errors?.[0]?.message || 'Datos de reserva inválidos.';
       return { success: false, error: firstMsg };
     }
-    console.error('[Server Error in processBookingAction]:', error?.message || error);
-    return { success: false, error: 'Ha ocurrido un error inesperado en el servidor.' };
+    const realMsg = error?.message || String(error);
+    console.error('[Server Error in processBookingAction]:', realMsg);
+    return { 
+      success: false, 
+      error: `Error en el servidor de reservas: ${realMsg || 'No se pudo completar la operación en la base de datos.'}` 
+    };
   }
 }
 
