@@ -3,7 +3,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ArrowLeft, 
   ArrowRight,
@@ -214,9 +214,14 @@ const toLocalDateString = (d: Date): string => {
 const isSlotAvailable = (
   time24: string, 
   durationMinutes: number = 30, 
-  booked: string[],
+  booked: string[] = [],
   selectedDateStr?: string
 ): boolean => {
+  if (!time24 || typeof time24 !== 'string' || !time24.includes(':')) {
+    return false;
+  }
+  const safeBooked = Array.isArray(booked) ? booked : [];
+
   if (selectedDateStr) {
     const now = new Date();
     const todayStr = toLocalDateString(now);
@@ -225,7 +230,7 @@ const isSlotAvailable = (
     }
     if (selectedDateStr === todayStr) {
       const [h, m] = time24.split(':').map(Number);
-      const slotMins = h * 60 + m;
+      const slotMins = (h || 0) * 60 + (m || 0);
       const currentMins = now.getHours() * 60 + now.getMinutes();
       if (slotMins <= currentMins + 5) {
         return false;
@@ -234,14 +239,15 @@ const isSlotAvailable = (
   }
 
   const [h, m] = time24.split(':').map(Number);
-  const startMins = h * 60 + m;
-  const segments = Math.max(1, Math.ceil(durationMinutes / 15));
+  const startMins = (h || 0) * 60 + (m || 0);
+  const safeDuration = Number(durationMinutes) > 0 ? Number(durationMinutes) : 30;
+  const segments = Math.max(1, Math.ceil(safeDuration / 15));
   for (let s = 0; s < segments; s++) {
     const currentMins = startMins + s * 15;
     const curH = Math.floor(currentMins / 60).toString().padStart(2, '0');
     const curM = (currentMins % 60).toString().padStart(2, '0');
     const key = `${curH}:${curM}`;
-    if (booked.includes(key)) {
+    if (safeBooked.includes(key)) {
       return false;
     }
   }
@@ -412,24 +418,27 @@ export default function BookingClient({
     tenant.metadata.sports_courts.length > 0
   );
 
-  const settings = {
-    openDays: tenant.metadata?.booking_settings?.openDays || [1, 2, 3, 4, 5, 6],
-    startHour: tenant.metadata?.booking_settings?.startHour || '09:00',
-    endHour: tenant.metadata?.booking_settings?.endHour || '18:00',
-    intervalMinutes: tenant.metadata?.booking_settings?.intervalMinutes || 30,
-    maxDaysInAdvance: tenant.metadata?.booking_settings?.maxDaysInAdvance || 14,
-    whatsappNumber: rawConfiguredPhone,
-    resourceName: tenant.metadata?.booking_settings?.resourceName || 'Profesional',
-    whatsappMessageTemplate: tenant.metadata?.booking_settings?.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{profesional}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.',
-    showPrices: tenant.metadata?.booking_settings?.showPricesOnBookingPage !== false,
-    noPriceLabel: tenant.metadata?.booking_settings?.noPriceLabel || 'A convenir',
-    logoUrl: tenant.metadata?.booking_settings?.logoUrl 
-      || tenant.metadata?.public_theme?.logoUrl
-      || (tenant.metadata as any)?.logo_url 
-      || '',
-    headerTitle: tenant.metadata?.booking_settings?.headerTitle || tenant.name,
-    headerSubtitle: tenant.metadata?.booking_settings?.headerSubtitle || '¿Qué necesitas hoy? Selecciona el servicio.',
-  };
+  const settings = useMemo(() => {
+    const bs = tenant?.metadata?.booking_settings;
+    return {
+      openDays: Array.isArray(bs?.openDays) ? bs.openDays : [1, 2, 3, 4, 5, 6],
+      startHour: bs?.startHour || '09:00',
+      endHour: bs?.endHour || '18:00',
+      intervalMinutes: Number(bs?.intervalMinutes) || 30,
+      maxDaysInAdvance: Number(bs?.maxDaysInAdvance) || 14,
+      whatsappNumber: rawConfiguredPhone,
+      resourceName: bs?.resourceName || 'Profesional',
+      whatsappMessageTemplate: bs?.whatsappMessageTemplate || '¡Hola! Quiero confirmar mi reserva con {{profesional}} para el día {{fecha}} a las {{hora}}. Mi nombre es {{cliente}}.',
+      showPrices: bs?.showPricesOnBookingPage !== false,
+      noPriceLabel: bs?.noPriceLabel || 'A convenir',
+      logoUrl: bs?.logoUrl 
+        || tenant?.metadata?.public_theme?.logoUrl
+        || (tenant?.metadata as any)?.logo_url 
+        || '',
+      headerTitle: bs?.headerTitle || tenant?.name || 'Reservas Online',
+      headerSubtitle: bs?.headerSubtitle || '¿Qué necesitas hoy? Selecciona el servicio.',
+    };
+  }, [tenant?.metadata, tenant?.name, rawConfiguredPhone]);
 
   const resourceName = settings.resourceName;
 
@@ -759,29 +768,42 @@ export default function BookingClient({
   }, [employees, selectedBarber, settings.maxDaysInAdvance, settings.openDays]);
   
   const [selectedDate, setSelectedDate] = useState(dates.length > 0 ? dates[0].fullDate : '');
+  const autoShiftedBarberRef = useRef<string | null>(null);
   
   useEffect(() => {
-    if (dates.length > 0 && !dates.find(d => d.fullDate === selectedDate)) {
+    if (dates.length > 0 && !dates.some(d => d.fullDate === selectedDate)) {
       setSelectedDate(dates[0].fullDate);
     }
   }, [dates, selectedDate]);
 
-  // Si la fecha seleccionada es hoy, pero todos los turnos del especialista ya concluyeron,
-  // auto-avanzar al primer día siguiente que sí tenga turnos en su jornada
+  // Si se selecciona un profesional y la fecha inicial es hoy pero sus horarios de hoy ya finalizaron,
+  // avanzar UNA SOLA VEZ al primer día hábil siguiente con turnos (blindado con ref para evitar bucles de render)
   useEffect(() => {
-    if (dates.length > 0 && selectedDate && selectedBarber) {
+    if (selectedBarber && dates.length > 0 && autoShiftedBarberRef.current !== selectedBarber.id) {
+      autoShiftedBarberRef.current = selectedBarber.id;
       const todayStr = toLocalDateString(new Date());
-      if (selectedDate === todayStr && allTimes.length > 0) {
-        const hasAvailableToday = allTimes.some(t => isSlotAvailable(t.value24, slotInterval, bookedTimes, selectedDate));
-        if (!hasAvailableToday) {
-          const nextValidDay = dates.find(d => d.fullDate > todayStr);
-          if (nextValidDay) {
-            setSelectedDate(nextValidDay.fullDate);
+      if (selectedDate === todayStr) {
+        const d = new Date();
+        const mappingDays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+        const todayDayKey = mappingDays[d.getDay()];
+        const shiftsToday = (selectedBarber.metadata?.working_hours && todayDayKey) 
+          ? selectedBarber.metadata.working_hours[todayDayKey] || []
+          : [];
+        const currentMins = d.getHours() * 60 + d.getMinutes();
+        const hasFutureShifts = Array.isArray(shiftsToday) && shiftsToday.some((s: any) => {
+          if (!s?.end) return false;
+          const [endH, endM] = s.end.split(':').map(Number);
+          return ((endH || 0) * 60 + (endM || 0)) > (currentMins + 15);
+        });
+        if (!hasFutureShifts) {
+          const nextDay = dates.find(item => item.fullDate > todayStr);
+          if (nextDay) {
+            setSelectedDate(nextDay.fullDate);
           }
         }
       }
     }
-  }, [dates, allTimes, bookedTimes, selectedDate, selectedBarber, slotInterval]);
+  }, [selectedBarber, dates, selectedDate]);
 
   const dayOfWeekStr = useMemo(() => {
     if (!selectedDate) return '';
@@ -1623,12 +1645,15 @@ export default function BookingClient({
                       </p>
                       {(() => {
                         const todayStr = toLocalDateString(new Date());
-                        const nextDay = dates.find(d => d.fullDate > selectedDate || d.fullDate > todayStr);
+                        const nextDay = Array.isArray(dates) ? dates.find(d => d?.fullDate && (d.fullDate > selectedDate || d.fullDate > todayStr)) : null;
                         if (!nextDay) return null;
                         return (
                           <button
                             type="button"
-                            onClick={() => setSelectedDate(nextDay.fullDate)}
+                            onClick={() => {
+                              setSelectedDate(nextDay.fullDate);
+                              setSelectedTime(null);
+                            }}
                             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-all shadow-sm"
                           >
                             <span>Ir al {nextDay.dayName} {nextDay.dayNum}</span>
@@ -1649,12 +1674,15 @@ export default function BookingClient({
                       </p>
                       {(() => {
                         const todayStr = toLocalDateString(new Date());
-                        const nextDay = dates.find(d => d.fullDate > selectedDate || d.fullDate > todayStr);
+                        const nextDay = Array.isArray(dates) ? dates.find(d => d?.fullDate && (d.fullDate > selectedDate || d.fullDate > todayStr)) : null;
                         if (!nextDay) return null;
                         return (
                           <button
                             type="button"
-                            onClick={() => setSelectedDate(nextDay.fullDate)}
+                            onClick={() => {
+                              setSelectedDate(nextDay.fullDate);
+                              setSelectedTime(null);
+                            }}
                             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all shadow-sm"
                             style={{ backgroundColor: appliedBtn }}
                           >
