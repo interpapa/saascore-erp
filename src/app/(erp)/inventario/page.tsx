@@ -44,6 +44,7 @@ import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
 import { syncDentalCatalogToInventoryAction } from '@/lib/dental/dentalInventorySync';
 import { useViewModeStore } from '@/store/useViewModeStore';
 import { InventarioExpress } from '@/components/inventario/InventarioExpress';
+import { supabase } from '@/lib/supabase';
 
 type TabType = 'items' | 'services' | 'reorder' | 'audit';
 
@@ -181,7 +182,13 @@ export default function InventarioPage() {
       setIsLoading(false);
       return;
     }
-    if (!actor) {
+    const effectiveActor = actor || (session?.userEmail ? {
+      email: session.userEmail,
+      role: session.role || 'owner',
+      token: session.token,
+    } : null);
+
+    if (!effectiveActor) {
       setTimeout(() => {
         const latestSession = useERPStore.getState().session;
         if (latestSession?.userEmail) fetchItems();
@@ -191,8 +198,8 @@ export default function InventarioPage() {
     try {
       setIsLoading(true);
       // Ampliado a 250 items para soportar inventarios empresariales
-      const res = await getItemsAction(activeTenant.id, undefined, 250, actor);
-      if (res.success && res.items) {
+      const res = await getItemsAction(activeTenant.id, undefined, 250, effectiveActor);
+      if (res.success && res.items && res.items.length > 0) {
         setItems((prev) => {
           const serverNames = new Set((res.items as any[]).map((i) => (i.name || '').trim().toLowerCase()));
           const pendingTemporaries = prev.filter(
@@ -208,13 +215,30 @@ export default function InventarioPage() {
           }
           return unified;
         });
+      } else {
+        // Fallback directo por cliente Supabase si Server Action no devolvió items
+        try {
+          const { data: directItems } = await supabase
+            .from('items')
+            .select('id, tenant_id, type, sku, name, description, category, base_price, cost, stock, is_active, metadata, created_at')
+            .eq('tenant_id', activeTenant.id)
+            .is('deleted_at', null)
+            .order('created_at', { ascending: false })
+            .limit(250);
+
+          if (directItems && directItems.length > 0) {
+            setItems(directItems as any);
+          }
+        } catch (directErr) {
+          console.warn('[InventarioPage] Fallback cliente Supabase:', directErr);
+        }
       }
     } catch (error) {
       console.error('Error cargando inventario:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [activeTenant?.id, actor]);
+  }, [activeTenant?.id, actor, session?.userEmail, session?.token, session?.role]);
 
   const loadAuditLogs = useCallback(async () => {
     if (!activeTenant?.id || !actor) return;

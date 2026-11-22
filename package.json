@@ -9,6 +9,7 @@
     "lint": "eslint . --fix",
     "test:qa": "npx --yes --offline tsx --env-file=.env.local src/__tests__/synthetic_full_qa.ts",
     "test:runner": "npx --yes --offline tsx --env-file=.env.local src/__tests__/runner.ts",
+    "diagnose": "npx --yes --offline tsx --env-file=.env.local scripts/diagnose_tenant.ts",
     "deploy": "npx vercel --prod --yes"
   },
   "engines": {
