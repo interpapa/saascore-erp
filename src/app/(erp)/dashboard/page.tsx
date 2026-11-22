@@ -270,7 +270,12 @@ export default function LauncherPage() {
 
     if (!isTenantActive) return false;
 
-    // 2. Si el usuario tiene lista manual de módulos permitidos (desde Rendo Hub), respetarla estrictamente
+    // 2. Si el usuario es Superadmin o Dueño (owner), tiene visibilidad total de los módulos activos de la empresa
+    if (isSuper || isOwner) {
+      return true;
+    }
+
+    // 3. Si el colaborador tiene lista manual de módulos permitidos (desde Rendo Hub / perfil), respetarla estrictamente
     if (userAllowed) {
       if (app.id === 'clinica') {
         return userAllowed.includes('clinica');
@@ -280,17 +285,11 @@ export default function LauncherPage() {
         return userAllowed.includes(app.id) || userAllowed.includes(companion);
       }
 
-
-
-
-
-
-
       return userAllowed.includes(app.id);
     }
 
-    // 3. Si no tiene lista manual, pero es empleado (manager, technician, seller), aplicar RBAC
-    if (!isSuper && !isOwner && session?.role) {
+    // 4. Si no tiene lista manual, pero es empleado (manager, technician, seller), aplicar RBAC estándar
+    if (session?.role) {
       return hasPermission(session.role, app.id);
     }
 

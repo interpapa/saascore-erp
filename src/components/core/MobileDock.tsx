@@ -151,7 +151,12 @@ export function MobileDock() {
 
       if (!isActive) return false;
 
-      // Regla de permisos de usuario (asignación explícita o RBAC)
+      // Dueños y Superadmins ven todos los módulos activos del negocio
+      if (isSuper || isOwner) {
+        return true;
+      }
+
+      // Regla de permisos de usuario para colaboradores (asignación explícita o RBAC)
       if (userAllowed) {
         if (item.id === 'clinica') {
           return userAllowed.includes('clinica');

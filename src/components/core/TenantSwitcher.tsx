@@ -109,9 +109,13 @@ export function TenantSwitcher({ variant = 'header', className = '' }: TenantSwi
       metadata: tenant.metadata,
     };
 
-    if (isSuper) {
+    const isOwnBusiness = tenant.metadata?.owner_email && session?.userEmail && 
+      tenant.metadata.owner_email.toLowerCase() === session.userEmail.toLowerCase();
+
+    if (isSuper && !isOwnBusiness) {
       impersonateTenant(formattedTenant);
     } else {
+      stopImpersonation();
       setCurrentTenant(formattedTenant);
       if (session) {
         setSession({

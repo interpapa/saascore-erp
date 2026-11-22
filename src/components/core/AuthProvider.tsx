@@ -84,21 +84,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           useERPStore.getState().stopImpersonation();
         }
 
-        // Blindaje Superadmin: Si está en Modo Soporte (impersonando un negocio), PRESERVARLO y no revertir
+        // Blindaje Superadmin: Si está en Modo Soporte (impersonando un negocio ajeno), PRESERVARLO y no revertir
         const activeImpersonation = useERPStore.getState().impersonatedTenant;
-        // Si la impersonación residual es la empresa genérica 'rendo corp' y el usuario tiene asignada una empresa operativa (ej. Consultorio 25), liberar para usar la operativa
-        if (activeImpersonation?.id === PRIMARY_DEFAULT_TENANT_ID && result.tenant.id !== PRIMARY_DEFAULT_TENANT_ID) {
+        // Si la impersonación apunta al mismo tenant que es su empresa base, o a rendo corp residual, liberar
+        if (activeImpersonation?.id === result.tenant.id || (activeImpersonation?.id === PRIMARY_DEFAULT_TENANT_ID && result.tenant.id !== PRIMARY_DEFAULT_TENANT_ID)) {
           useERPStore.getState().stopImpersonation();
         } else if (isSuper && activeImpersonation?.id) {
           setCurrentTenant({
             ...activeImpersonation,
-            active_modules: activeImpersonation.active_modules || DEFAULT_ENABLED_MODULES,
+            active_modules: activeImpersonation.active_modules || (activeImpersonation.metadata as any)?.active_modules || DEFAULT_ENABLED_MODULES,
           });
           setSession({
             userEmail: cleanEmail,
             role: 'superadmin',
             tenantId: activeImpersonation.id,
-            token: accessToken
+            token: accessToken,
+            allowed_modules: undefined,
+            operational_permissions: undefined,
           });
           return;
         }
@@ -114,7 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userEmail: cleanEmail,
           role: isSuper ? 'superadmin' : (result.role === 'superadmin' ? 'owner' : ((result.role as any) || 'owner')),
           tenantId: result.tenant.id,
-          token: accessToken
+          token: accessToken,
+          allowed_modules: result.allowedModules || undefined,
+          operational_permissions: result.operationalPermissions || undefined,
         });
         return;
       }
@@ -138,8 +142,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Si getUserTenant no devolvió tenant pero es Superadmin verificado en whitelist, conectarlo a la empresa operativa o impersonada
       if (isSuper) {
         const activeImpersonation = useERPStore.getState().impersonatedTenant;
-        const targetId = activeImpersonation?.id || '4062a8fe-f512-455c-8192-2f83c55ed732';
-        const targetName = activeImpersonation?.name || 'Consultorio 25';
+        const existingTenant = useERPStore.getState().currentTenant;
+        const targetId = activeImpersonation?.id || existingTenant?.id || PRIMARY_DEFAULT_TENANT_ID;
+        const targetName = activeImpersonation?.name || existingTenant?.name || 'Rendo Corp';
         setSession({
           userEmail: cleanEmail,
           role: 'superadmin',
@@ -150,8 +155,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: targetId,
           name: targetName,
           blocked: false,
-          active_modules: activeImpersonation?.active_modules || DEFAULT_ENABLED_MODULES,
-          metadata: activeImpersonation?.metadata || {}
+          active_modules: activeImpersonation?.active_modules || existingTenant?.active_modules || DEFAULT_ENABLED_MODULES,
+          metadata: activeImpersonation?.metadata || existingTenant?.metadata || {}
         });
         return;
       }

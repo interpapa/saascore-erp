@@ -106,6 +106,9 @@ export default function ERPLayout({
 
     if (!isTenantActive) {
       isModuleDisabled = true;
+    } else if (isSuper || isOwner) {
+      // Dueños y Superadmins tienen acceso completo a todos los módulos activos del negocio
+      isModuleDisabled = false;
     } else if (userAllowed) {
       // B. Si el usuario tiene asignación manual de módulos desde Rendo Hub
       const isUserAllowed = targetModule === 'clinica'

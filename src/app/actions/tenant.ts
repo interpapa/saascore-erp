@@ -856,17 +856,17 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
 
       const allowedModules = authUser?.app_metadata?.allowed_modules || authUser?.user_metadata?.allowed_modules;
       const operationalPermissions = authUser?.app_metadata?.operational_permissions || authUser?.user_metadata?.operational_permissions || [];
-      if (Array.isArray(allowedModules) && allowedModules.length > 0) {
-        const normalizedAllowed = allowedModules.filter((m: string) => m !== 'catalogo');
-        tenant.active_modules = normalizedAllowed;
-        if (tenant.metadata && typeof tenant.metadata === 'object') {
-          (tenant.metadata as Record<string, unknown>).active_modules = normalizedAllowed;
-        }
-      }
 
       const assignedRole: UserRole = isSuperAdmin
         ? 'superadmin'
         : (targetRole === 'superadmin' ? 'owner' : targetRole);
+
+      // CRÍTICO: Los módulos del tenant (tenant.active_modules) nunca deben ser sobreescritos ni mutilados
+      // por los allowedModules de un usuario individual. Si el usuario es superadmin u owner, tiene acceso total
+      // a todos los módulos contratados y activos de la empresa sin restricciones de empleado.
+      const sanitizedAllowedModules = (assignedRole === 'superadmin' || assignedRole === 'owner')
+        ? null
+        : (Array.isArray(allowedModules) ? allowedModules.filter((m: string) => m !== 'catalogo') : null);
 
       const sanitized = sanitizeTenantPayload(tenant);
 
@@ -874,7 +874,7 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
         success: true,
         tenant: sanitized,
         role: assignedRole,
-        allowedModules: Array.isArray(allowedModules) ? allowedModules : null,
+        allowedModules: sanitizedAllowedModules,
         operationalPermissions: Array.isArray(operationalPermissions) ? operationalPermissions : [],
       }));
     } catch {
