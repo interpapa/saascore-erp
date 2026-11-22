@@ -794,7 +794,14 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
     const activeOperationalTenant = userTenants.find(m => m.tenant_id === '4062a8fe-f512-455c-8192-2f83c55ed732');
     const ownerMembership = userTenants.find(m => m.role === 'owner' && m.tenant_id !== '45b6404f-3469-4c42-99c1-85416a411f4f');
 
-    if (preferredTenantId && (isSuperAdmin || preferredMembership)) {
+    // Blindaje de Empresa Propia: Si el usuario es dueño de su propio negocio (ownerMembership),
+    // NUNCA debe ser desviado a 'rendo corp' por un preferredTenantId residual en el almacenamiento local.
+    const isPreferredRendoCorp = preferredTenantId === '45b6404f-3469-4c42-99c1-85416a411f4f' || preferredTenantId === '31ec279c-4216-48e1-905c-fbf4ea398e04';
+
+    if (ownerMembership && isPreferredRendoCorp) {
+      targetTenantId = ownerMembership.tenant_id;
+      targetRole = 'owner';
+    } else if (preferredTenantId && (isSuperAdmin || preferredMembership)) {
       targetTenantId = preferredTenantId;
       if (preferredMembership) {
         targetRole = (preferredMembership.role === 'superadmin' || preferredMembership.role === 'admin') 
@@ -831,8 +838,9 @@ export async function getUserTenant(userEmail: string, userId?: string, preferre
       return { success: false, tenant: null, role: null, error: 'Tenant not found' };
     }
 
-    // Auto-blindaje: Si es SuperAdmin y no tiene membresía en user_tenants para este tenant, registrarla
-    if (isSuperAdmin && !userTenants.some(m => m.tenant_id === targetTenantId)) {
+    // Auto-blindaje: Si es SuperAdmin y no tiene NINGUNA empresa asociada en user_tenants, registrarla
+    // para evitar dejarlo huérfano. NUNCA auto-insertar si ya tiene negocio propio o si es 'rendo corp'.
+    if (isSuperAdmin && userTenants.length === 0 && targetTenantId !== '45b6404f-3469-4c42-99c1-85416a411f4f') {
       try {
         await db.from('user_tenants').insert([{
           user_email: cleanEmail,

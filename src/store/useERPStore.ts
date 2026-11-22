@@ -99,6 +99,10 @@ export const useERPStore = create<ERPState>()(
               state.stopImpersonation();
             }
           }
+          // Purgar impersonación residual de la plantilla demo rendo corp
+          if (state.impersonatedTenant?.id === '45b6404f-3469-4c42-99c1-85416a411f4f' || state.impersonatedTenant?.id === '31ec279c-4216-48e1-905c-fbf4ea398e04') {
+            state.stopImpersonation();
+          }
         }
       },
     }
