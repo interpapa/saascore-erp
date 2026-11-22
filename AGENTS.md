@@ -32,12 +32,13 @@ Para operar con rigor técnico absoluto y evitar errores de suposición o inform
 - **PROHIBIDO ASUMIR:** Ningún agente puede afirmar que algo "no funciona", "falta" o "está listo" sin haber leído el archivo específico (`read_file`), revisado el componente real y comprobado el flujo de usuario.
 - **Doble Verificación:** Todo cambio debe superar tanto las 19 suites lógicas (`npm run test:runner`) como la compilación limpia de Next.js (`npm run build`).
 
-## 2. Los 5 Especialistas Nucleares en `.agents/agents/`
+## 2. Los 6 Especialistas Nucleares en `.agents/agents/`
 1. **`lead-frontend-ux`:** Rutas, navegación táctil móvil vs PC, componentes y formularios.
 2. **`lead-backend-db`:** Server Actions, transacciones atómicas PostgreSQL/Supabase, RLS Anti-IDOR y esquema aditivo.
 3. **`especialista-dominio-salud-negocio`:** Rigor clínico (FDI, CIE-10), financiero (NIIF, partida doble) y fiscal (SENIAT).
 4. **`auditor-qa-forense`:** Inspección forense de código línea por línea, detección de cables sueltos e integración intermodular.
 5. **`sre-performance-architect`:** Latencia p50/p95, saturación de conexiones en Supabase, telemetría APM y despliegues Zero-Downtime.
+6. **`sales-b2b-strategist`:** Pricing psicológico, superación de objeciones duras en LATAM (aversión al pago mensual), ofertas anuales de alta liquidez y contención de crisis con clientes.
 
 ## 3. Protocolo de Consejo Directivo 360° (Soporte al Solo-Founder)
 Como Rendo ERP es liderado por una sola persona, los agentes deben actuar como un **Comité Directivo Consultivo**. Ante cualquier nuevo módulo, requerimiento o rediseño, el agente DEBE evaluar y contrastar el problema desde 5 perspectivas antes de actuar:
