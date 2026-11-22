@@ -49,6 +49,7 @@ import {
   Eye
 } from 'lucide-react';
 import { useERPStore } from '@/store/useERPStore';
+import { supabase } from '@/lib/supabase';
 import { useActionActor } from '@/hooks/useActionActor';
 import { useToast } from '@/components/core/ToastProvider';
 import { useViewModeStore } from '@/store/useViewModeStore';
@@ -412,9 +413,29 @@ export default function GinecologiaPage() {
         getAppointmentsAction(currentTenant.id, undefined, activeActor),
       ]);
 
-      if (patientsRes.status === 'fulfilled' && patientsRes.value.success && patientsRes.value.entities) {
-        setPatients(patientsRes.value.entities);
+      let loadedPatients: any[] = [];
+      if (patientsRes.status === 'fulfilled' && patientsRes.value.success && Array.isArray(patientsRes.value.entities) && patientsRes.value.entities.length > 0) {
+        loadedPatients = patientsRes.value.entities;
+      } else {
+        // Fallback directo a Supabase de alta resiliencia
+        try {
+          const { data: directEntities } = await supabase
+            .from('entities')
+            .select('id, tenant_id, type, name, email, phone, tax_id, address, status, metadata, created_at, updated_at')
+            .eq('tenant_id', currentTenant.id)
+            .in('type', ['customer', 'patient'])
+            .is('deleted_at', null)
+            .order('name', { ascending: true })
+            .limit(300);
+
+          if (directEntities && directEntities.length > 0) {
+            loadedPatients = directEntities;
+          }
+        } catch (e) {
+          console.warn('[Ginecologia] Fallback directo de entidades:', e);
+        }
       }
+      setPatients(loadedPatients);
 
       let fetchedEmployees: any[] = [];
       if (employeesRes.status === 'fulfilled' && employeesRes.value.success && employeesRes.value.entities) {
@@ -493,6 +514,37 @@ export default function GinecologiaPage() {
   useEffect(() => {
     loadInitialData();
   }, [loadInitialData]);
+
+  // Búsqueda reactiva en el servidor si se escribe en el buscador
+  useEffect(() => {
+    const q = patientSearchQuery.trim();
+    if (q.length >= 2 && currentTenant?.id) {
+      const timer = setTimeout(async () => {
+        try {
+          const { data: serverMatches } = await supabase
+            .from('entities')
+            .select('id, tenant_id, type, name, email, phone, tax_id, address, status, metadata, created_at, updated_at')
+            .eq('tenant_id', currentTenant.id)
+            .in('type', ['customer', 'patient'])
+            .is('deleted_at', null)
+            .or(`name.ilike.%${q}%,tax_id.ilike.%${q}%,phone.ilike.%${q}%`)
+            .limit(30);
+
+          if (serverMatches && serverMatches.length > 0) {
+            setPatients(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const newItems = serverMatches.filter(m => !existingIds.has(m.id));
+              if (newItems.length === 0) return prev;
+              return [...prev, ...newItems];
+            });
+          }
+        } catch (err) {
+          console.warn('[Ginecologia] Error en búsqueda reactiva:', err);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [patientSearchQuery, currentTenant?.id]);
 
   // Selección automática por URL
   useEffect(() => {
@@ -588,8 +640,14 @@ export default function GinecologiaPage() {
 
   // Crear paciente rápida
   const handleCreateFastPatient = async () => {
-    if (!newPatientName.trim() || !currentTenant?.id || !actor) {
-      toast({ variant: 'error', title: 'Error', description: 'El nombre es obligatorio.' });
+    const activeActor = actor || (session?.userEmail ? {
+      email: session.userEmail,
+      role: session.role || 'owner',
+      token: session.token,
+    } : null);
+
+    if (!newPatientName.trim() || !currentTenant?.id || !activeActor) {
+      toast({ variant: 'error', title: 'Error', description: 'El nombre es obligatorio y la sesión debe estar activa.' });
       return;
     }
     setIsSubmittingPatient(true);
@@ -614,7 +672,7 @@ export default function GinecologiaPage() {
           },
         },
         currentTenant.id,
-        actor
+        activeActor
       );
 
       if (res.success && res.entity) {
@@ -912,62 +970,122 @@ export default function GinecologiaPage() {
 
           {/* Buscador Universal Prominente */}
           <div className="bg-card border border-border/80 rounded-3xl p-6 shadow-sm space-y-4">
-            <h2 className="text-sm font-black uppercase tracking-wider text-slate-500 flex items-center gap-2">
-              <Search size={16} className="text-pink-500" /> Buscar Paciente para Iniciar Atención
-            </h2>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h2 className="text-sm font-black uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                <Search size={16} className="text-pink-500" /> Buscar Paciente para Iniciar Atención
+              </h2>
+              {!isLoadingPatients && patients.length > 0 && (
+                <span className="text-xs font-bold text-slate-400">
+                  {patientSearchQuery.trim() ? `${filteredPatients.length} coincidencia(s)` : `${patients.length} pacientes en directorio`}
+                </span>
+              )}
+            </div>
+
             <div className="relative">
               <input
                 type="text"
                 value={patientSearchQuery}
                 onChange={(e) => setPatientSearchQuery(e.target.value)}
                 placeholder="Escribe el nombre, cédula o teléfono de la paciente..."
-                className="w-full text-base font-bold p-4 pl-12 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-border outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all"
+                className="w-full text-base font-bold p-4 pl-12 pr-10 rounded-2xl bg-slate-50 dark:bg-slate-900/50 border border-border outline-none focus:border-pink-500 focus:ring-4 focus:ring-pink-500/10 transition-all placeholder:font-normal placeholder:text-slate-400"
               />
               <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              {patientSearchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setPatientSearchQuery('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  title="Limpiar búsqueda"
+                >
+                  <X size={16} />
+                </button>
+              )}
             </div>
 
             {/* Resultados de Búsqueda o Pacientes Recientes */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2">
-              {filteredPatients.slice(0, 9).map((p) => {
-                const isGestante = p.metadata?.extended_obstetrics?.isPregnant ?? p.metadata?.gineco_profile?.gestas > 0;
-                return (
-                  <div
-                    key={p.id}
-                    onClick={() => setSelectedPatientId(p.id)}
-                    className="p-4 rounded-2xl bg-card border border-border/80 hover:border-pink-500/50 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-black text-foreground group-hover:text-pink-600 transition-colors truncate">
-                          {p.name}
-                        </span>
-                        {isGestante ? (
-                          <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-600 text-[10px] font-black uppercase">
-                            🤰 Gestante
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase">
-                            Ginecología
-                          </span>
-                        )}
+            {isLoadingPatients ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-400">
+                <div className="w-6 h-6 border-2 border-pink-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs font-bold">Cargando directorio de pacientes...</p>
+              </div>
+            ) : filteredPatients.length === 0 ? (
+              <div className="py-10 px-4 text-center rounded-2xl bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-border flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-pink-500/10 text-pink-500 flex items-center justify-center">
+                  <UserPlus size={22} />
+                </div>
+                <div className="space-y-1 max-w-sm">
+                  <p className="text-sm font-black text-foreground">
+                    {patientSearchQuery.trim()
+                      ? `No se encontró a "${patientSearchQuery}"`
+                      : 'No hay pacientes registradas en el directorio'}
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    {patientSearchQuery.trim()
+                      ? 'Verifica que la cédula o nombre estén bien escritos o registra a la paciente de inmediato.'
+                      : 'Puedes crear una ficha rápida para tu primera paciente y comenzar su historia gineco-obstétrica.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (patientSearchQuery.trim()) {
+                      setNewPatientName(patientSearchQuery.trim());
+                    }
+                    setIsNewPatientModalOpen(true);
+                  }}
+                  className="mt-1 px-4 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white text-xs font-black shadow-md shadow-pink-500/20 transition-all flex items-center gap-2 btn-haptic cursor-pointer"
+                >
+                  <UserPlus size={15} />
+                  <span>
+                    {patientSearchQuery.trim() ? `+ Registrar a "${patientSearchQuery.trim()}"` : '+ Nueva Paciente Rápida'}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="max-h-[500px] overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                  {filteredPatients.slice(0, 30).map((p) => {
+                    const isGestante = p.metadata?.extended_obstetrics?.isPregnant ?? p.metadata?.gineco_profile?.gestas > 0;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => setSelectedPatientId(p.id)}
+                        className="p-4 rounded-2xl bg-card border border-border/80 hover:border-pink-500/50 hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-black text-foreground group-hover:text-pink-600 transition-colors truncate">
+                              {p.name}
+                            </span>
+                            {isGestante ? (
+                              <span className="px-2 py-0.5 rounded-full bg-pink-500/10 text-pink-600 text-[10px] font-black uppercase shrink-0">
+                                🤰 Gestante
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase shrink-0">
+                                Ginecología
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-mono mt-1">
+                            C.I: {p.tax_id || (p.metadata as any)?.cedula || 'S/C'} {p.phone ? `· Tel: ${p.phone}` : ''}
+                          </p>
+                          {p.metadata?.allergies && (
+                            <p className="text-[10px] font-bold text-red-500 mt-1 truncate">
+                              Alergia: {p.metadata.allergies}
+                            </p>
+                          )}
+                        </div>
+                        <div className="mt-3 pt-2 border-t border-border/50 flex items-center justify-between text-xs font-bold text-pink-600">
+                          <span>Abrir Expediente</span>
+                          <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                        </div>
                       </div>
-                      <p className="text-[11px] text-slate-500 font-mono mt-1">
-                        C.I: {p.tax_id || 'S/C'} {p.phone ? `· Tel: ${p.phone}` : ''}
-                      </p>
-                      {p.metadata?.allergies && (
-                        <p className="text-[10px] font-bold text-red-500 mt-1">
-                          Alergia: {p.metadata.allergies}
-                        </p>
-                      )}
-                    </div>
-                    <div className="mt-3 pt-2 border-t border-border/50 flex items-center justify-between text-xs font-bold text-pink-600">
-                      <span>Abrir Expediente</span>
-                      <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Citas del Día / Sala de Espera */}

@@ -40,6 +40,7 @@ import {
   freeAppointmentSlotAction
 } from '@/app/actions/appointments';
 import { isModuleActive } from '@/lib/core/kernel/moduleRegistry';
+import { useToast } from '@/components/core/ToastProvider';
 
 export interface AppointmentDetailsModalProps {
   isOpen: boolean;
@@ -126,7 +127,22 @@ export function AppointmentDetailsModal({
   onDeleteAppointment,
 }: AppointmentDetailsModalProps) {
   const [isUpdating, setIsUpdating] = useState(false);
+  const { toast } = useToast();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [nativeConfirm, setNativeConfirm] = useState<{
+    isOpen: boolean;
+    type: 'delete' | 'free_slot';
+    title: string;
+    description: string;
+    confirmBtnText: string;
+    badgeText?: string;
+  }>({
+    isOpen: false,
+    type: 'delete',
+    title: '',
+    description: '',
+    confirmBtnText: 'Liberar Turno',
+  });
   const [selectedClientToAdd, setSelectedClientToAdd] = useState('');
   const [reassigningAttendeeId, setReassigningAttendeeId] = useState<string | null>(null);
   const [newClientForReassign, setNewClientForReassign] = useState<string>('');
@@ -162,22 +178,79 @@ export function AppointmentDetailsModal({
     }
   }, [appointment]);
 
-  const handleDelete = async () => {
+  const promptDeleteConfirmation = () => {
     if (!appointment || !onDeleteAppointment) return;
     const isBlock = appointment.metadata?.is_block === true;
-    const confirmMsg = isBlock
-      ? '¿Estás seguro de que deseas desbloquear y liberar este horario en la agenda?'
-      : '¿Estás seguro de que deseas eliminar esta cita y liberar el turno?';
-    if (!window.confirm(confirmMsg)) return;
+    setNativeConfirm({
+      isOpen: true,
+      type: 'delete',
+      title: isBlock ? '¿Desbloquear Horario de Agenda?' : '¿Eliminar Cita y Liberar Turno?',
+      description: isBlock
+        ? 'Este horario volverá a estar disponible inmediatamente para recibir citas internas y reservas desde el portal público.'
+        : `Se cancelará la reserva de ${appointment.client_name || 'este cliente'} fijada para las ${formatAppointmentTime(appointment.start_time)}. El turno quedará libre inmediatamente.`,
+      confirmBtnText: isBlock ? 'Sí, Desbloquear Horario' : 'Sí, Liberar y Eliminar',
+      badgeText: isBlock ? 'Desbloqueo' : 'Liberar Turno',
+    });
+  };
 
-    try {
-      setIsDeleting(true);
-      await onDeleteAppointment(appointment.id);
-      onClose();
-    } catch (err: any) {
-      alert(err.message || 'Error al eliminar el registro.');
-    } finally {
-      setIsDeleting(false);
+  const promptFreeSlotConfirmation = () => {
+    if (!appointment) return;
+    setNativeConfirm({
+      isOpen: true,
+      type: 'free_slot',
+      title: hasCourts ? '¿Liberar Cancha para esta fecha?' : '¿Liberar Turno Fijo en Agenda?',
+      description: hasCourts
+        ? 'El espacio de cancha quedará disponible inmediatamente para agendar otra clase particular o alquiler libre.'
+        : 'El horario quedará disponible en la agenda para que otro paciente o cliente pueda ser atendido en esta fecha.',
+      confirmBtnText: hasCourts ? 'Sí, Liberar Cancha' : 'Sí, Liberar Turno Fijo',
+      badgeText: hasCourts ? 'Ceder Cancha' : 'Ceder Turno',
+    });
+  };
+
+  const handleExecuteNativeConfirm = async () => {
+    if (nativeConfirm.type === 'delete') {
+      if (!appointment || !onDeleteAppointment) return;
+      try {
+        setIsDeleting(true);
+        await onDeleteAppointment(appointment.id);
+        setNativeConfirm(prev => ({ ...prev, isOpen: false }));
+        onClose();
+        toast({
+          variant: 'success',
+          title: 'Horario liberado',
+          description: 'El turno ha sido liberado exitosamente en la agenda.',
+        });
+      } catch (err: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Error al liberar turno',
+          description: err.message || 'No se pudo completar la operación.',
+        });
+      } finally {
+        setIsDeleting(false);
+      }
+    } else if (nativeConfirm.type === 'free_slot') {
+      if (!currentTenant?.id || !actor || !appointment) return;
+      try {
+        setIsUpdating(true);
+        await freeAppointmentSlotAction(appointment.id, currentTenant.id, 'Liberada por aviso de inasistencia', actor);
+        await onUpdateStatus(appointment.id, 'cancelled');
+        setNativeConfirm(prev => ({ ...prev, isOpen: false }));
+        onClose();
+        toast({
+          variant: 'success',
+          title: hasCourts ? 'Cancha liberada' : 'Turno liberado',
+          description: 'El espacio ha quedado disponible para nuevas reservas.',
+        });
+      } catch (e: any) {
+        toast({
+          variant: 'destructive',
+          title: hasCourts ? 'Error al liberar cancha' : 'Error al liberar turno',
+          description: e?.message || 'Error al procesar la liberación.',
+        });
+      } finally {
+        setIsUpdating(false);
+      }
     }
   };
 
@@ -260,10 +333,10 @@ export function AppointmentDetailsModal({
         }
         setSelectedClientToAdd('');
       } else {
-        alert(res.error || 'No se pudo agregar participante.');
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'No se pudo agregar participante.' });
       }
     } catch (err: any) {
-      alert(err.message || 'Error al agregar participante');
+      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Error al agregar participante' });
     } finally {
       setIsUpdating(false);
     }
@@ -307,10 +380,10 @@ export function AppointmentDetailsModal({
         setReassigningAttendeeId(null);
         setNewClientForReassign('');
       } else {
-        alert(res.error || 'No se pudo reasignar el cupo.');
+        toast({ variant: 'destructive', title: 'Error', description: res.error || 'No se pudo reasignar el cupo.' });
       }
     } catch (err: any) {
-      alert(err.message || 'Error al reasignar participante.');
+      toast({ variant: 'destructive', title: 'Error', description: err.message || 'Error al reasignar participante.' });
     } finally {
       setIsUpdating(false);
     }
@@ -425,7 +498,7 @@ export function AppointmentDetailsModal({
                 <button
                   type="button"
                   disabled={isDeleting}
-                  onClick={handleDelete}
+                  onClick={promptDeleteConfirmation}
                   className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-xs btn-haptic disabled:opacity-50 cursor-pointer"
                 >
                   {isDeleting ? (
@@ -907,25 +980,10 @@ export function AppointmentDetailsModal({
               {/* Botón Liberar Cancha (Ceder Turno para esta fecha) */}
               {appointment.status !== 'cancelled' && (
                 <button
+                  type="button"
                   disabled={isUpdating}
-                  onClick={async () => {
-                    const confirmMsg = hasCourts
-                      ? '¿Deseas liberar esta cancha para esta fecha? El espacio quedará disponible para agendar otra clase particular o alquiler libre.'
-                      : '¿Deseas liberar este turno fijo para esta fecha? El horario quedará disponible para agendar otra cita.';
-                    const ok = window.confirm(confirmMsg);
-                    if (!ok || !currentTenant?.id || !actor) return;
-                    try {
-                      setIsUpdating(true);
-                      await freeAppointmentSlotAction(appointment.id, currentTenant.id, 'Liberada por aviso de inasistencia', actor);
-                      await onUpdateStatus(appointment.id, 'cancelled');
-                      onClose();
-                    } catch (e: any) {
-                      alert(e?.message || (hasCourts ? 'Error al liberar cancha' : 'Error al liberar turno'));
-                    } finally {
-                      setIsUpdating(false);
-                    }
-                  }}
-                  className="px-3 py-2 rounded-xl text-xs font-black border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1 shadow-2xs"
+                  onClick={promptFreeSlotConfirmation}
+                  className="px-3 py-2 rounded-xl text-xs font-black border border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300 hover:bg-amber-500/20 transition-all flex items-center justify-center gap-1.5 col-span-2 sm:col-span-1 shadow-2xs btn-haptic cursor-pointer"
                   title={hasCourts ? "Libera la pista inmediatamente para alquiler o particular" : "Libera el turno para otra reserva"}
                 >
                   {hasCourts ? '🎾 Liberar Cancha (Ceder Turno)' : '🔓 Liberar Turno Fijo'}
@@ -1026,7 +1084,7 @@ export function AppointmentDetailsModal({
               <button
                 type="button"
                 disabled={isDeleting}
-                onClick={handleDelete}
+                onClick={promptDeleteConfirmation}
                 className="px-3 py-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors flex items-center gap-1.5 cursor-pointer"
                 title="Eliminar cita y liberar horario"
               >
@@ -1144,6 +1202,65 @@ export function AppointmentDetailsModal({
                 className="w-full py-2 px-4 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5"
               >
                 <Copy size={14} /> Copiar Solo el Link Directo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* DIÁLOGO NATIVO DE CONFIRMACIÓN EN LA APP */}
+      {nativeConfirm.isOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div 
+            className="w-full max-w-md bg-card border border-border rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-150 relative text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20 flex items-center justify-center shrink-0 shadow-xs">
+                <Trash2 size={22} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base font-black text-foreground">
+                    {nativeConfirm.title}
+                  </h3>
+                </div>
+                {nativeConfirm.badgeText && (
+                  <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                    {nativeConfirm.badgeText}
+                  </span>
+                )}
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
+                  {nativeConfirm.description}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/60">
+              <button
+                type="button"
+                disabled={isDeleting || isUpdating}
+                onClick={() => setNativeConfirm(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2.5 rounded-xl border border-border text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors btn-haptic disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting || isUpdating}
+                onClick={handleExecuteNativeConfirm}
+                className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-md shadow-rose-600/20 transition-all flex items-center gap-2 btn-haptic disabled:opacity-50 cursor-pointer"
+              >
+                {(isDeleting || isUpdating) ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Liberando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Unlock size={14} />
+                    <span>{nativeConfirm.confirmBtnText}</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
