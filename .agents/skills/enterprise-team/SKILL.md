@@ -1,23 +1,24 @@
 ---
 name: enterprise-team
-description: Protocolo corporativo de orquestación multi-agente para proyectos de software. Coordina 5 Squads especializados (Estrategia, Salud & Negocio, Ingeniería, Seguridad & Calidad, Crecimiento, Partners & Academia) inspirados en SAP y Odoo con compuerta de dos vías, rebote autónomo y optimización radical de tokens.
+description: Protocolo corporativo de orquestación multi-agente para proyectos de software. Coordina 6 Squads especializados (Estrategia, Salud & Negocio, Ingeniería, Seguridad & Calidad, Crecimiento/Partners, y Confiabilidad SRE & Telemetría) inspirados en SAP, Datadog y Odoo con compuerta de dos vías, telemetría activa y optimización radical de tokens.
 ---
 
-# 🏢 Protocolo Corporativo: Enjambre Multi-Agente Rendo ERP (Estándar SAP & Odoo)
+# 🏢 Protocolo Corporativo: Enjambre Multi-Agente Rendo ERP (Estándar SAP, Odoo & Datadog)
 
 Este protocolo estandariza la operación del software bajo el estándar de gobernanza de **SAP, Odoo, Stripe y Salesforce**, adaptado para ejecución autónoma mediante Antigravity.
 
 ---
 
-## 1. La Matriz de los 5 Squads Corporativos
+## 1. La Matriz de los 6 Squads Corporativos
 
 | Squad | Misión | Miembros Clave | Regla de Código |
 | :--- | :--- | :--- | :--- |
 | **Squad 1: Estrategia & Dirección** | Visión de alto nivel, Gap Analysis ("Configuración antes que Personalización") y marco legal. | `ceo-orchestrator`, `cpo-product`, `consultor-funcional-erp`, `abogado-saas` | Define el alcance y requerimientos PRD. |
 | **Squad 2: Salud & Negocio** | Fichas Técnicas clínicas, protocolos médicos, reglas contables NIIF y localización fiscal. | `director-medico`, `especialista-odontologia`, `auditor-contable-niif`, `localizador-fiscal-latam` | **PROHIBIDO tocar código.** Entregan solo especificaciones. |
 | **Squad 3: Ingeniería & Migraciones** | Implementación ágil, transacciones ACID y migraciones aditivas de BD sin downtime. | `lead-backend`, `lead-frontend`, `upgrade-migration-bot` | Escriben código con contexto quirúrgico. |
-| **Squad 4: Seguridad & Calidad** | Compuerta de calidad, blindaje Anti-IDOR y pruebas 100% verdes. | `ciberseguridad-zerotrust`, `qa-tester`, `integrador-intermodular` | **Poder de veto absoluto.** Nada pasa sin 17/17 tests. |
+| **Squad 4: Seguridad & Calidad** | Compuerta de calidad, blindaje Anti-IDOR y pruebas 100% verdes. | `ciberseguridad-zerotrust`, `qa-tester`, `integrador-intermodular` | **Poder de veto absoluto.** Nada pasa sin 18/18 tests. |
 | **Squad 5: Crecimiento, Partners & Academia** | Adquisición, red de revendedores (RevShare), soporte y manuales interactivos de 1 página. | `partner-ecosystem-lead`, `academia-onboarding-lms`, `growth-copywriter`, `customer-success` | Genera documentación, manuales y modelos de alianzas. |
+| **Squad 6: Confiabilidad SRE & Telemetría** | Monitoreo APM, latencia de base de datos Supabase/PostgreSQL, tiempos p50/p95, prevención de caídas y autopsia de incidentes. | `sre-performance-architect` | Instrumenta telemetría (`measureTelemetry`) y health checks. |
 
 ---
 
