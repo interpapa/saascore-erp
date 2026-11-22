@@ -40,57 +40,85 @@ export async function createEntityAction(
   input: CreateEntityInput,
   tenantId: string,
   actor: ActionActor
-) {
+): Promise<{ success: boolean; entity?: any; error?: string; errorCode?: string; dbDiagnostic?: any }> {
   try {
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+      console.warn('[createEntityAction] Acceso denegado:', { actorEmail: actor?.email, tenantId, error: securityCheck.error });
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', errorCode: 'SECURITY_CHECK_FAILED' };
     }
 
     if (!tenantId || !input.name) {
-      throw new Error('Empresa y Nombre son campos requeridos.');
+      return { success: false, error: 'Empresa y Nombre son campos requeridos.', errorCode: 'VALIDATION_FAILED' };
     }
+
+    const insertRecord = {
+      tenant_id: tenantId,
+      type: input.type,
+      name: input.name.trim(),
+      email: input.email ? input.email.trim() : null,
+      phone: input.phone ? input.phone.trim() : null,
+      tax_id: input.tax_id || null,
+      address: input.address || null,
+      status: input.status || 'active',
+      metadata: input.metadata || {},
+    };
 
     const { data: newEntity, error } = await supabaseAdmin
       .from('entities')
-      .insert([
-        {
-          tenant_id: tenantId,
-          type: input.type,
-          name: input.name,
-          email: input.email || null,
-          phone: input.phone || null,
-          tax_id: input.tax_id || null,
-          address: input.address || null,
-          status: input.status || 'active',
-          metadata: input.metadata || {},
-        },
-      ])
+      .insert([insertRecord])
       .select()
       .single();
 
-    if (error) throw new Error('Error al guardar en la base de datos: ' + error.message);
+    if (error) {
+      console.error('[createEntityAction DB Error]:', {
+        tenantId,
+        type: input.type,
+        name: input.name,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return {
+        success: false,
+        error: 'Error al guardar en la base de datos: ' + error.message,
+        errorCode: error.code || 'DB_INSERT_ERROR',
+        dbDiagnostic: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        },
+      };
+    }
 
-    // Audit Log
-    await writeAuditLog({
-      tenant_id: tenantId,
-      actor_email: actor.email,
-      actor_role: actor.role,
-      action: 'entity.updated',
-      target_type: 'entity',
-      target_id: newEntity.id,
-      metadata: { action: 'created', type: input.type, name: input.name },
-    });
+    // Audit Log no-bloqueante
+    try {
+      await writeAuditLog({
+        tenant_id: tenantId,
+        actor_email: actor.email,
+        actor_role: actor.role,
+        action: 'entity.updated',
+        target_type: 'entity',
+        target_id: newEntity.id,
+        metadata: { action: 'created', type: input.type, name: input.name },
+      });
+    } catch (auditErr) {
+      console.warn('[createEntityAction] Audit log warning (non-blocking):', auditErr);
+    }
 
-    safeRevalidate('/clientes');
-    safeRevalidate('/compras');
-    safeRevalidate('/equipo');
-    safeRevalidate('/franquicias');
+    try {
+      safeRevalidate('/clientes');
+      safeRevalidate('/compras');
+      safeRevalidate('/equipo');
+      safeRevalidate('/franquicias');
+    } catch {}
 
     return { success: true, entity: newEntity };
   } catch (err: any) {
-    console.error('[createEntityAction Error]:', (err as Error).message);
-    return { success: false, error: (err as Error).message };
+    console.error('[createEntityAction Exception]:', err?.message, err?.stack);
+    return { success: false, error: (err as Error).message, errorCode: 'UNHANDLED_EXCEPTION' };
   }
 }
 
@@ -99,9 +127,9 @@ export async function updateEntityAction(
   updates: Partial<CreateEntityInput>,
   tenantId: string,
   actor: ActionActor
-) {
+): Promise<{ success: boolean; entity?: any; error?: string; errorCode?: string; dbDiagnostic?: any; localOnly?: boolean }> {
   try {
-    if (!id) throw new Error('ID requerido.');
+    if (!id) return { success: false, error: 'ID requerido.', errorCode: 'MISSING_ID' };
 
     // Blindaje defensivo contra IDs temporales
     if (!isValidUUID(id) || isTemporaryId(id)) {
@@ -115,11 +143,11 @@ export async function updateEntityAction(
       .maybeSingle();
 
     const targetTenantId = existingEntity?.tenant_id || tenantId;
-    if (!targetTenantId) throw new Error('Empresa requerida.');
+    if (!targetTenantId) return { success: false, error: 'Empresa requerida.', errorCode: 'MISSING_TENANT' };
 
     const securityCheck = await validateUserTenantAccess(actor, targetTenantId);
     if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.' };
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', errorCode: 'SECURITY_CHECK_FAILED' };
     }
 
     const { data: updatedEntity, error } = await supabaseAdmin
@@ -130,27 +158,52 @@ export async function updateEntityAction(
       .select()
       .single();
 
-    if (error) throw new Error('Error al actualizar entidad: ' + error.message);
+    if (error) {
+      console.error('[updateEntityAction DB Error]:', {
+        id,
+        tenantId: targetTenantId,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
+      return {
+        success: false,
+        error: 'Error al actualizar entidad: ' + error.message,
+        errorCode: error.code || 'DB_UPDATE_ERROR',
+        dbDiagnostic: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        },
+      };
+    }
 
-    await writeAuditLog({
-      tenant_id: targetTenantId,
-      actor_email: actor.email,
-      actor_role: actor.role,
-      action: 'entity.updated',
-      target_type: 'entity',
-      target_id: id,
-      metadata: { action: 'updated', updates },
-    });
+    try {
+      await writeAuditLog({
+        tenant_id: targetTenantId,
+        actor_email: actor.email,
+        actor_role: actor.role,
+        action: 'entity.updated',
+        target_type: 'entity',
+        target_id: id,
+        metadata: { action: 'updated', updates },
+      });
+    } catch (auditErr) {
+      console.warn('[updateEntityAction] Audit log warning:', auditErr);
+    }
 
-    safeRevalidate('/clientes');
-    safeRevalidate('/compras');
-    safeRevalidate('/equipo');
-    safeRevalidate('/franquicias');
+    try {
+      safeRevalidate('/clientes');
+      safeRevalidate('/compras');
+      safeRevalidate('/equipo');
+      safeRevalidate('/franquicias');
+    } catch {}
 
     return { success: true, entity: updatedEntity };
   } catch (err: any) {
-    console.error('[updateEntityAction Error]:', (err as Error).message);
-    return { success: false, error: (err as Error).message };
+    console.error('[updateEntityAction Exception]:', err?.message);
+    return { success: false, error: (err as Error).message, errorCode: 'UNHANDLED_EXCEPTION' };
   }
 }
 
@@ -221,19 +274,25 @@ export async function deleteEntityAction(
   }
 }
 
-export async function getEntitiesAction(tenantId: string, type: EntityType | undefined, limit: number = 50, actor: ActionActor) {
+export async function getEntitiesAction(
+  tenantId: string,
+  type: EntityType | undefined,
+  limit: number = 50,
+  actor: ActionActor
+): Promise<{ success: boolean; entities: any[]; error?: string; errorCode?: string; dbDiagnostic?: any }> {
   try {
     if (!tenantId) return { success: true, entities: [] };
-    if (!actor) return { success: false, error: 'Actor requerido para validación de seguridad.', entities: [] };
+    if (!actor) return { success: false, error: 'Actor requerido para validación de seguridad.', errorCode: 'MISSING_ACTOR', entities: [] };
 
     const securityCheck = await validateUserTenantAccess(actor, tenantId);
     if (!securityCheck.authorized) {
-      return { success: false, error: securityCheck.error || 'Acceso denegado.', entities: [] };
+      console.warn('[getEntitiesAction] Acceso denegado:', { actorEmail: actor?.email, tenantId, error: securityCheck.error });
+      return { success: false, error: securityCheck.error || 'Acceso denegado.', errorCode: 'SECURITY_CHECK_FAILED', entities: [] };
     }
 
     let query = supabaseAdmin
       .from('entities')
-      .select('id, tenant_id, type, name, email, phone, tax_id, address, status, metadata, created_at, updated_at')
+      .select('id, tenant_id, type, name, email, phone, tax_id, address, status, metadata, created_at, updated_at, deleted_at')
       .eq('tenant_id', tenantId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
@@ -245,12 +304,33 @@ export async function getEntitiesAction(tenantId: string, type: EntityType | und
 
     const { data: entities, error } = await query;
 
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error('[getEntitiesAction DB Error]:', {
+        tenantId,
+        type,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return {
+        success: false,
+        error: `Error de base de datos al obtener entidades: ${error.message}`,
+        errorCode: error.code || 'DB_QUERY_FAILED',
+        dbDiagnostic: {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+        },
+        entities: [],
+      };
+    }
 
     return { success: true, entities: entities || [] };
   } catch (err: any) {
-    console.error('[getEntitiesAction Error]:', (err as Error).message);
-    return { success: false, error: (err as Error).message, entities: [] };
+    console.error('[getEntitiesAction Exception]:', err?.message);
+    return { success: false, error: (err as Error).message, errorCode: 'UNHANDLED_EXCEPTION', entities: [] };
   }
 }
 

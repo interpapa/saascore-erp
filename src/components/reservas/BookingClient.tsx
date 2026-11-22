@@ -1242,93 +1242,126 @@ export default function BookingClient({
 
   const renderDiagnosticPanel = () => {
     if (!errorMessage) return null;
+
+    const isSlotOccupied = debugInfo?.errorCode === 'SLOT_OCCUPIED' || errorMessage.toLowerCase().includes('ya está reservado') || errorMessage.toLowerCase().includes('ocupado');
+
     return (
-      <div className="mb-4 text-left w-full animate-in fade-in duration-150">
-        <div className="p-4 bg-red-50/95 border border-red-200 rounded-2xl shadow-xs">
-          <div className="flex items-start gap-2.5">
-            <div className="w-5 h-5 rounded-full bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5 font-black text-xs">
-              ✕
+      <div className="mb-4 text-left w-full animate-in fade-in duration-200">
+        {/* Tarjeta Amigable para el Público General */}
+        <div className={`p-4 rounded-2xl shadow-xs border ${
+          isSlotOccupied
+            ? 'bg-amber-50/90 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/40 text-amber-900 dark:text-amber-200'
+            : 'bg-rose-50/90 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/40 text-rose-900 dark:text-rose-200'
+        }`}>
+          <div className="flex items-start gap-3">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-bold text-base shadow-2xs ${
+              isSlotOccupied
+                ? 'bg-amber-500 text-white'
+                : 'bg-rose-500 text-white'
+            }`}>
+              {isSlotOccupied ? '⏰' : '⚠️'}
             </div>
             <div className="flex-1 min-w-0">
-              <h4 className="text-xs font-black uppercase tracking-wider text-red-800">
-                Aviso al agendar reserva
+              <h4 className="text-sm font-black tracking-tight mb-0.5">
+                {isSlotOccupied ? 'Horario no disponible' : 'No pudimos confirmar tu turno'}
               </h4>
-              <p className="text-xs text-red-700 mt-0.5 font-medium leading-relaxed">
-                {errorMessage}
+              <p className="text-xs opacity-90 leading-relaxed">
+                {isSlotOccupied
+                  ? 'Lo sentimos, este turno ya ha sido reservado. Por favor, selecciona otro horario o fecha disponible para tu atención.'
+                  : errorMessage}
               </p>
+
+              {isSlotOccupied && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedTime(null);
+                      setErrorMessage(null);
+                      setIsLoadingTimes(true);
+                      fetchTimes();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white shadow-xs transition-all active:scale-95 cursor-pointer"
+                    style={{ backgroundColor: appliedBtn }}
+                  >
+                    <span>Elegir otro horario disponible</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Enlace Discreto para Soporte Técnico / Administradores */}
           {debugInfo && (
-            <div className="mt-3 pt-3 border-t border-red-200/70 flex flex-wrap gap-2">
+            <div className="mt-3 pt-2.5 border-t border-black/5 dark:border-white/5 flex items-center justify-between flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setShowDebugModal(prev => !prev)}
-                className="text-xs font-bold px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 underline underline-offset-2 transition-colors cursor-pointer"
               >
-                <span>{showDebugModal ? '▲ Ocultar Log Detallado' : '🔍 Ver Log Detallado del Error'}</span>
+                {showDebugModal ? 'Ocultar detalles técnicos' : '¿Eres del equipo? Ver detalles técnicos del error'}
               </button>
 
-              <button
-                type="button"
-                onClick={copyDebugToClipboard}
-                className="text-xs font-bold px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
-              >
-                <span>{hasCopiedDebug ? '✓ ¡Diagnóstico Copiado!' : '📋 Copiar Diagnóstico Completo'}</span>
-              </button>
+              {showDebugModal && (
+                <button
+                  type="button"
+                  onClick={copyDebugToClipboard}
+                  className="text-[11px] font-bold px-2.5 py-1 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded-lg shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <span>{hasCopiedDebug ? '✓ Copiado' : '📋 Copiar Reporte Técnico'}</span>
+                </button>
+              )}
             </div>
           )}
 
+          {/* Sección Técnica Desplegable */}
           {showDebugModal && debugInfo && (
-            <div className="mt-3.5 p-3.5 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono shadow-inner border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="font-bold text-slate-300">Registro Forense de Reserva</span>
+            <div className="mt-3 p-3 bg-slate-900 text-slate-100 rounded-xl text-[11px] font-mono shadow-inner border border-slate-800 space-y-2.5 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                <span className="font-bold text-slate-300">Diagnóstico Interno de Reserva</span>
                 <span className="text-[10px] text-slate-400">{debugInfo.timestamp}</span>
               </div>
 
               {debugInfo.errorCode && (
                 <div className="flex items-center gap-2">
-                  <span className="text-slate-400">Código de Diagnóstico:</span>
-                  <span className="px-1.5 py-0.5 bg-red-950 text-red-300 border border-red-800 rounded text-[11px] font-bold">
+                  <span className="text-slate-400">Código:</span>
+                  <span className="px-1.5 py-0.5 bg-red-950 text-red-300 border border-red-800 rounded font-bold">
                     {debugInfo.errorCode}
                   </span>
                 </div>
               )}
 
               <div>
-                <span className="text-slate-400 font-bold block mb-1">Traza de pasos ejecutados:</span>
-                <div className="space-y-1.5 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 max-h-48 overflow-y-auto">
+                <span className="text-slate-400 font-bold block mb-1">Traza de ejecución:</span>
+                <div className="space-y-1 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 max-h-36 overflow-y-auto">
                   {debugInfo.trace && debugInfo.trace.length > 0 ? (
                     debugInfo.trace.map((t, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-[11px] leading-tight">
-                        <span className={`shrink-0 font-bold px-1 rounded text-[10px] ${
+                      <div key={idx} className="flex items-start gap-1.5 text-[10px] leading-tight">
+                        <span className={`shrink-0 font-bold px-1 rounded text-[9px] ${
                           t.status === 'ok' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
                           t.status === 'error' ? 'bg-red-950 text-red-400 border border-red-800' :
                           'bg-amber-950 text-amber-400 border border-amber-800'
                         }`}>
-                          {t.status === 'ok' ? '✓ OK' : t.status === 'error' ? '✗ FALLO' : '! AVISO'}
+                          {t.status === 'ok' ? '✓' : t.status === 'error' ? '✗' : '!'}
                         </span>
                         <div className="flex-1">
                           <span className="text-slate-200 font-medium">{t.label}</span>
-                          {t.details && <span className="text-slate-400 ml-1.5">({t.details})</span>}
+                          {t.details && <span className="text-slate-400 ml-1">({t.details})</span>}
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-slate-400 italic text-[11px]">No hay traza registrada para este error.</div>
+                    <div className="text-slate-400 italic text-[10px]">Sin traza disponible.</div>
                   )}
                 </div>
               </div>
 
               <div>
-                <span className="text-slate-400 font-bold block mb-1">Datos enviados (Payload):</span>
-                <pre className="bg-slate-950/60 p-2 rounded-lg text-[10px] text-slate-300 overflow-x-auto border border-slate-800/80">
+                <span className="text-slate-400 font-bold block mb-1">Payload:</span>
+                <pre className="bg-slate-950/60 p-1.5 rounded-lg text-[9px] text-slate-300 overflow-x-auto border border-slate-800/80 max-h-24">
                   {JSON.stringify(debugInfo.inputSummary || {}, null, 2)}
                 </pre>
-              </div>
-
-              <div className="pt-2 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
-                <span>Presiona &quot;Copiar Diagnóstico Completo&quot; para compartirlo de inmediato.</span>
               </div>
             </div>
           )}

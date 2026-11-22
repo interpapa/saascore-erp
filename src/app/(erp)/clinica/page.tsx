@@ -343,12 +343,24 @@ export default function ClinicaMultiEspecialidadPage() {
         }
       }
 
+      let empList: any[] = [];
       if (
         empRes.status === 'fulfilled' &&
         empRes.value?.success &&
         Array.isArray(empRes.value.entities)
       ) {
-        const empList = empRes.value.entities;
+        empList = empRes.value.entities;
+      } else {
+        try {
+          const restResp = await fetch(`/api/employees?tenantId=${tenantId}&actorEmail=${encodeURIComponent(effectiveActor?.email || '')}&limit=100`, { cache: 'no-store' });
+          const restData = await restResp.json().catch(() => ({}));
+          if (restData.success && Array.isArray(restData.employees)) {
+            empList = restData.employees;
+          }
+        } catch {}
+      }
+
+      if (empList.length > 0) {
         setDoctors(empList);
         if (empList.length > 0) {
           setSelectedDoctorId((prev) => prev || empList[0].id);

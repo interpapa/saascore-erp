@@ -395,22 +395,44 @@ export default function GinecologiaPage() {
 
   // Carga inicial
   const loadInitialData = useCallback(async () => {
-    if (!currentTenant?.id || !actor) return;
+    const currentSession = useERPStore.getState().session;
+    const activeActor = actor || (currentSession?.userEmail ? {
+      email: currentSession.userEmail,
+      role: currentSession.role || 'owner',
+      token: currentSession.token,
+    } : null);
+
+    if (!currentTenant?.id || !activeActor) return;
     setIsLoadingPatients(true);
     try {
       const [patientsRes, employeesRes, itemsRes, apptRes] = await Promise.allSettled([
-        getEntitiesAction(currentTenant.id, 'customer', 200, actor),
-        getEntitiesAction(currentTenant.id, 'employee', 100, actor),
-        getItemsAction(currentTenant.id, undefined, 200, actor),
-        getAppointmentsAction(currentTenant.id, undefined, actor),
+        getEntitiesAction(currentTenant.id, 'customer', 200, activeActor),
+        getEntitiesAction(currentTenant.id, 'employee', 100, activeActor),
+        getItemsAction(currentTenant.id, undefined, 200, activeActor),
+        getAppointmentsAction(currentTenant.id, undefined, activeActor),
       ]);
 
       if (patientsRes.status === 'fulfilled' && patientsRes.value.success && patientsRes.value.entities) {
         setPatients(patientsRes.value.entities);
       }
 
+      let fetchedEmployees: any[] = [];
       if (employeesRes.status === 'fulfilled' && employeesRes.value.success && employeesRes.value.entities) {
-        const medicalDocs = employeesRes.value.entities.filter((e: any) => {
+        fetchedEmployees = employeesRes.value.entities;
+      } else {
+        // Fallback REST para colaboradores
+        try {
+          const restResp = await fetch(`/api/employees?tenantId=${currentTenant.id}&actorEmail=${encodeURIComponent(activeActor.email)}&limit=100`, { cache: 'no-store' });
+          const restData = await restResp.json().catch(() => ({}));
+          if (restData.success && Array.isArray(restData.employees)) {
+            fetchedEmployees = restData.employees;
+          }
+        } catch {}
+      }
+
+      let employeeServices: any[] = [];
+      if (fetchedEmployees.length > 0) {
+        const medicalDocs = fetchedEmployees.filter((e: any) => {
           const m = e.metadata || {};
           return (
             m.is_doctor ||
@@ -419,17 +441,14 @@ export default function GinecologiaPage() {
             (Array.isArray(m.modules) && (m.modules.includes('ginecologia') || m.modules.includes('clinica')))
           );
         });
-        const finalDocs = medicalDocs.length > 0 ? medicalDocs : employeesRes.value.entities;
+        const finalDocs = medicalDocs.length > 0 ? medicalDocs : fetchedEmployees;
         setDoctors(finalDocs);
         if (finalDocs.length > 0 && !selectedDoctorId) {
           setSelectedDoctorId(finalDocs[0].id);
         }
-      }
 
-      // Extraer servicios configurados en los colaboradores/médicos en Citas/Equipo
-      const employeeServices: any[] = [];
-      if (employeesRes.status === 'fulfilled' && employeesRes.value.success && employeesRes.value.entities) {
-        employeesRes.value.entities.forEach((emp: any) => {
+        // Extraer servicios configurados en los colaboradores/médicos en Citas/Equipo
+        fetchedEmployees.forEach((emp: any) => {
           const svcs = emp.metadata?.services;
           if (Array.isArray(svcs)) {
             svcs.forEach((s: any) => {
@@ -439,16 +458,16 @@ export default function GinecologiaPage() {
                   name: s.name.trim(),
                   base_price: s.price !== undefined && s.price !== null ? Number(s.price) : 50,
                   metadata: {
-                    specialty: 'ginecologia',
-                    source_module: 'ginecologia',
-                    category: 'procedimientos',
+                    price_display: s.priceDisplay || 'visible',
                     duration_minutes: s.durationMinutes || 45,
+                    module: 'ginecologia',
                   },
                 });
               }
             });
           }
         });
+        setDoctorServices(employeeServices);
       }
 
       const rawItems = itemsRes.status === 'fulfilled' && itemsRes.value.success && itemsRes.value.items ? itemsRes.value.items : [];

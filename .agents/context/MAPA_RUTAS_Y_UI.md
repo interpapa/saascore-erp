@@ -89,6 +89,7 @@ Existen **3 mecanismos reales de navegación** en el sistema:
 | `/api/booking/process` | `src/app/api/booking/process/route.ts` | Route Handler (REST) | Endpoint HTTP POST JSON de alta fidelidad para el procesamiento de reservas con diagnóstico técnico completo, fallback resiliente y registro estructurado en `audit_logs`. |
 | `/api/booking/times` | `src/app/api/booking/times/route.ts` | Route Handler (REST) | Endpoint HTTP GET/POST para consulta en tiempo real de horarios ocupados y cupos grupales, inmune a restricciones de Server Actions en el ciclo de vida del cliente. |
 | `/api/appointments/delete` | `src/app/api/appointments/delete/route.ts` | Route Handler (REST) | Endpoint HTTP POST/DELETE para cancelación/liberación atómica de citas y desbloqueo de horarios con auditoría, operando como fallback ultra-resiliente contra fallos de render o digests de Server Components. |
+| `/api/employees` | `src/app/api/employees/route.ts` | Route Handler (REST) | Endpoint HTTP GET/POST para consulta, creación, edición y eliminación de colaboradores con diagnóstico forense paso a paso y códigos de error PostgreSQL. |
 
 ---
 

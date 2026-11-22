@@ -171,14 +171,27 @@ export default function CalendarioPage() {
         }
       }
 
-      if (empRes.status === 'fulfilled' && empRes.value.success) {
-        const mappedEmps: Employee[] = (empRes.value.entities || []).map((e: any) => ({
+      let employeeEntities: any[] = [];
+      if (empRes.status === 'fulfilled' && empRes.value.success && Array.isArray(empRes.value.entities)) {
+        employeeEntities = empRes.value.entities;
+      } else {
+        try {
+          const restResp = await fetch(`/api/employees?tenantId=${currentTenant.id}&actorEmail=${encodeURIComponent(activeActor?.email || '')}&limit=100`, { cache: 'no-store' });
+          const restData = await restResp.json().catch(() => ({}));
+          if (restData.success && Array.isArray(restData.employees)) {
+            employeeEntities = restData.employees;
+          }
+        } catch {}
+      }
+
+      if (employeeEntities.length > 0) {
+        const mappedEmps: Employee[] = employeeEntities.map((e: any) => ({
           id: e.id,
           tenant_id: e.tenant_id,
           name: e.name,
           email: e.email,
           phone: e.phone,
-          role: e.metadata?.role || 'Empleado',
+          role: e.metadata?.role || e.metadata?.role_title || 'Empleado',
           is_active: e.status === 'active',
           bookable: e.metadata?.bookable !== false,
           metadata: e.metadata,

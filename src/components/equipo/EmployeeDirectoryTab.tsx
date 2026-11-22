@@ -49,11 +49,14 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
   const actor = useActionActor();
   const currentTenant = useTenantResolver();
   const session = useERPStore((s) => s.session);
-  const effectiveActor: ActionActor = actor || { 
-    email: session?.userEmail || 'admin@rendorp.com', 
-    role: (session?.role as any) || 'admin',
+  const effectiveActor: ActionActor = actor || (session?.userEmail ? { 
+    email: session.userEmail, 
+    role: (session?.role as any) || 'owner',
     token: session?.token
-  };
+  } : {
+    email: 'admin@rendo.com',
+    role: 'owner',
+  });
 
   const tenantModules: string[] = (currentTenant?.active_modules && currentTenant.active_modules.length > 0)
     ? currentTenant.active_modules
@@ -760,14 +763,21 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
       };
 
       let res: any;
-      if (editingId) {
-        res = await updateEntityAction(editingId, payload, tenantId, effectiveActor);
-      } else {
-        res = await createEntityAction(
-          { type: 'employee', ...payload },
-          tenantId,
-          effectiveActor
-        );
+      let primaryError = '';
+
+      // 1. Intento primario vía Server Action
+      try {
+        if (editingId) {
+          res = await updateEntityAction(editingId, payload, tenantId, effectiveActor);
+        } else {
+          res = await createEntityAction(
+            { type: 'employee', ...payload },
+            tenantId,
+            effectiveActor
+          );
+        }
+      } catch (saErr: any) {
+        primaryError = saErr?.message || 'Fallo en Server Action';
       }
 
       if (res && res.success) {
@@ -775,8 +785,35 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
         setSaveError(null);
         setIsModalOpen(false);
         onRefresh();
-      } else {
-        const errorMsg = res?.error || 'No se pudo guardar.';
+        return;
+      }
+
+      // 2. Fallback de alta resiliencia vía Endpoint REST (/api/employees)
+      try {
+        const restResp = await fetch('/api/employees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: editingId ? 'update' : 'create',
+            tenantId,
+            entityId: editingId,
+            payload,
+            actor: effectiveActor,
+          }),
+        });
+        const restData = await restResp.json().catch(() => ({}));
+        if (restResp.ok && restData.success) {
+          toast({ variant: 'success', title: 'Éxito', description: `Colaborador guardado correctamente.` });
+          setSaveError(null);
+          setIsModalOpen(false);
+          onRefresh();
+          return;
+        }
+        const errorMsg = restData?.error || res?.error || primaryError || 'No se pudo guardar el colaborador.';
+        setSaveError(errorMsg);
+        toast({ variant: 'error', title: 'Error de Base de Datos', description: errorMsg });
+      } catch (restErr: any) {
+        const errorMsg = restErr?.message || res?.error || primaryError || 'No se pudo guardar el colaborador.';
         setSaveError(errorMsg);
         toast({ variant: 'error', title: 'Error al guardar', description: errorMsg });
       }
@@ -797,8 +834,12 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
     }
     setIsDeleting(true);
     try {
-      const res = await deleteEntityAction(editingId, tenantId, effectiveActor);
-      if (res.success) {
+      let res: any;
+      try {
+        res = await deleteEntityAction(editingId, tenantId, effectiveActor);
+      } catch {}
+
+      if (res && res.success) {
         toast({
           variant: 'success',
           title: 'Colaborador Eliminado',
@@ -807,13 +848,38 @@ export function EmployeeDirectoryTab({ employees, tenantId, onRefresh }: Employe
         setIsDeleteConfirmOpen(false);
         setIsModalOpen(false);
         onRefresh();
-      } else {
-        toast({
-          variant: 'error',
-          title: 'Error al eliminar',
-          description: res.error || 'No se pudo eliminar el colaborador.',
-        });
+        return;
       }
+
+      // Fallback REST para delete
+      const restResp = await fetch('/api/employees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'delete',
+          tenantId,
+          entityId: editingId,
+          actor: effectiveActor,
+        }),
+      });
+      const restData = await restResp.json().catch(() => ({}));
+      if (restResp.ok && restData.success) {
+        toast({
+          variant: 'success',
+          title: 'Colaborador Eliminado',
+          description: 'El colaborador fue retirado del equipo.',
+        });
+        setIsDeleteConfirmOpen(false);
+        setIsModalOpen(false);
+        onRefresh();
+        return;
+      }
+
+      toast({
+        variant: 'error',
+        title: 'Error al eliminar',
+        description: restData?.error || res?.error || 'No se pudo eliminar el colaborador.',
+      });
     } catch (err: unknown) {
       toast({
         variant: 'error',

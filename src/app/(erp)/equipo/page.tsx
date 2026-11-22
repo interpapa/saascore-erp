@@ -19,83 +19,166 @@ import { supabase } from '@/lib/supabase';
 
 type TabType = 'directorio' | 'nomina' | 'audit';
 
+interface EmployeeDiagnostic {
+  timestamp: string;
+  tenantId: string;
+  tenantName: string;
+  actorEmail?: string;
+  actorRole?: string;
+  error: string;
+  errorCode?: string;
+  dbDiagnostic?: any;
+  trace?: Array<{ step: string; label: string; status: string; details?: string; timestamp: string }>;
+  rawResponse?: any;
+}
+
 export default function EquipoPage() {
   const currentTenant = useTenantResolver();
   const actor = useActionActor();
+  const session = useERPStore(s => s.session);
   const { toast } = useToast();
   const [employees, setEmployees] = useState<Entity[]>([]);
   const [auditLogs, setAuditLogs] = useState<unknown[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingAudit, setIsLoadingAudit] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('directorio');
+  const [diagnosticInfo, setDiagnosticInfo] = useState<EmployeeDiagnostic | null>(null);
+  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
+  const [hasCopiedDiagnostic, setHasCopiedDiagnostic] = useState(false);
 
-  const fetchEmployees = useCallback(async (retryCount = 0) => {
-    if (!currentTenant?.id) return;
-    if (!actor) {
-      // Reintentar cuando el actor de sesión termine de inicializarse
-      setTimeout(() => {
-        const latestSession = useERPStore.getState().session;
-        if (latestSession?.userEmail) {
-          fetchEmployees(retryCount);
-        }
-      }, 1000);
-      return;
+  const copyDiagnosticToClipboard = () => {
+    if (!diagnosticInfo) return;
+    const report = [
+      `=== DIAGNÓSTICO DE COLABORADORES RENDO ERP ===`,
+      `Fecha/Hora: ${diagnosticInfo.timestamp}`,
+      `Error: ${diagnosticInfo.error}`,
+      diagnosticInfo.errorCode ? `Código de Error: ${diagnosticInfo.errorCode}` : '',
+      `Tenant ID: ${diagnosticInfo.tenantId}`,
+      `Organización: ${diagnosticInfo.tenantName}`,
+      `Actor: ${diagnosticInfo.actorEmail || 'No identificado'} (${diagnosticInfo.actorRole || 'N/A'})`,
+      ``,
+      `--- TRAZA DE EJECUCIÓN (PASO A PASO) ---`,
+      ...(diagnosticInfo.trace || []).map(t => `[${t.status.toUpperCase()}] ${t.step} - ${t.label}${t.details ? `: ${t.details}` : ''}`),
+      ``,
+      `--- DIAGNÓSTICO DE BASE DE DATOS (POSTGRESQL) ---`,
+      JSON.stringify(diagnosticInfo.dbDiagnostic || {}, null, 2),
+      ``,
+      `--- RESPUESTA BRUTA ---`,
+      JSON.stringify(diagnosticInfo.rawResponse || {}, null, 2),
+    ].filter(Boolean).join('\n');
+
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(report);
+      setHasCopiedDiagnostic(true);
+      setTimeout(() => setHasCopiedDiagnostic(false), 3000);
     }
+  };
+
+  const fetchEmployees = useCallback(async () => {
+    if (!currentTenant?.id) return;
+    
+    // Obtener actor en caliente evitando closures estancadas
+    const currentSession = useERPStore.getState().session;
+    const activeActor = actor || (currentSession?.userEmail ? {
+      email: currentSession.userEmail,
+      role: currentSession.role || 'owner',
+      token: currentSession.token,
+    } : null);
+
+    setIsLoading(true);
+    let trace: any[] = [];
+    let dbDiag: any = null;
+    let primaryError = '';
+    let primaryCode = '';
+
     try {
-      setIsLoading(true);
-      const res = await getEntitiesAction(currentTenant.id, 'employee', 50, actor);
-      let entitiesList = res?.success ? res.entities : null;
-      if (!entitiesList) {
-        // Fallback directo por cliente Supabase
+      // 1. Intento primario: Server Action
+      if (activeActor) {
         try {
-          const { data: directEmps } = await supabase
-            .from('entities')
-            .select('*')
-            .eq('tenant_id', currentTenant.id)
-            .eq('type', 'employee')
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false });
-          if (directEmps && directEmps.length > 0) {
-            entitiesList = directEmps as any;
+          const res = await getEntitiesAction(currentTenant.id, 'employee', 100, activeActor);
+          if (res?.success && Array.isArray(res.entities)) {
+            const mapped = res.entities.map(e => ({
+              ...e,
+              is_resource: Boolean((e as any).is_resource || e.metadata?.is_resource),
+              metadata: {
+                ...e.metadata,
+                is_resource: Boolean((e as any).is_resource || e.metadata?.is_resource),
+                resource_type: e.metadata?.resource_type || (Boolean((e as any).is_resource || e.metadata?.is_resource) ? 'space' : 'human')
+              }
+            }));
+            setEmployees(mapped);
+            setDiagnosticInfo(null);
+            setIsLoading(false);
+            return;
+          } else {
+            primaryError = res?.error || 'No se pudieron recuperar los colaboradores vía Server Action.';
+            primaryCode = res?.errorCode || 'SERVER_ACTION_FAILED';
+            dbDiag = res?.dbDiagnostic;
           }
-        } catch (cErr) {
-          console.warn('[Equipo] Fallback cliente Supabase:', cErr);
+        } catch (saErr: any) {
+          primaryError = saErr?.message || 'Error en Server Action';
         }
       }
 
-      if (entitiesList) {
-        const mapped = ((entitiesList as any[]) || []).map(e => ({
-          ...e,
-          is_resource: Boolean(e.is_resource || e.metadata?.is_resource),
-          metadata: {
-            ...e.metadata,
-            is_resource: Boolean(e.is_resource || e.metadata?.is_resource),
-            resource_type: e.metadata?.resource_type || (Boolean(e.is_resource || e.metadata?.is_resource) ? 'space' : 'human')
-          }
-        }));
-        setEmployees(mapped);
-      } else if (res?.error) {
-        console.warn('[Equipo] Advertencia cargando colaboradores:', res.error);
-        if (retryCount === 0) {
-          setTimeout(() => fetchEmployees(1), 1500);
+      // 2. Intento secundario: Endpoint REST resiliente con diagnóstico paso a paso
+      try {
+        const qs = new URLSearchParams({
+          tenantId: currentTenant.id,
+          actorEmail: activeActor?.email || '',
+          limit: '100',
+        });
+        const restResp = await fetch(`/api/employees?${qs.toString()}`, { cache: 'no-store' });
+        const restData = await restResp.json().catch(() => ({}));
+        
+        trace = restData.trace || [];
+        if (restResp.ok && restData.success && Array.isArray(restData.employees)) {
+          setEmployees(restData.employees);
+          setDiagnosticInfo(null);
+          setIsLoading(false);
           return;
         }
+
+        // Si el endpoint REST reporta error de base de datos
+        const errMessage = restData.error || primaryError || 'Error al obtener colaboradores de la base de datos.';
+        const errCode = restData.errorCode || primaryCode || 'DB_FETCH_ERROR';
+        dbDiag = restData.dbDiagnostic || dbDiag;
+
+        setDiagnosticInfo({
+          timestamp: new Date().toISOString(),
+          tenantId: currentTenant.id,
+          tenantName: currentTenant.name || 'Empresa actual',
+          actorEmail: activeActor?.email,
+          actorRole: activeActor?.role,
+          error: errMessage,
+          errorCode: errCode,
+          dbDiagnostic: dbDiag,
+          trace,
+          rawResponse: restData,
+        });
+
+        toast({
+          variant: 'error',
+          title: 'Error de Base de Datos en Colaboradores',
+          description: errMessage,
+        });
+      } catch (restErr: any) {
+        console.error('[Equipo] Fallback REST falló:', restErr);
+        setDiagnosticInfo({
+          timestamp: new Date().toISOString(),
+          tenantId: currentTenant.id,
+          tenantName: currentTenant.name || 'Empresa actual',
+          actorEmail: activeActor?.email,
+          actorRole: activeActor?.role,
+          error: restErr?.message || primaryError || 'Error de conexión con la base de datos',
+          errorCode: 'CONNECTION_FAILURE',
+          dbDiagnostic: dbDiag,
+          trace,
+        });
       }
-    } catch (err) {
-      console.warn('[Equipo] Error cargando empleados (reintentando...):', err);
-      if (retryCount === 0) {
-        setTimeout(() => fetchEmployees(1), 1500);
-        return;
-      }
-      toast({
-        variant: 'error',
-        title: 'Error al cargar equipo',
-        description: 'No se pudieron cargar los colaboradores. Por favor, recarga la página.',
-      });
     } finally {
       setIsLoading(false);
     }
-  }, [currentTenant?.id, actor, toast]);
+  }, [currentTenant?.id, currentTenant?.name, actor, toast]);
 
   const loadAuditLogs = useCallback(async () => {
     if (!currentTenant?.id || !actor) return;
@@ -169,6 +252,95 @@ export default function EquipoPage() {
         activeTab={activeTab}
         onChange={(id) => setActiveTab(id as TabType)}
       />
+
+      {/* Panel de Diagnóstico Forense de Colaboradores */}
+      {diagnosticInfo && (
+        <div className="p-4 bg-rose-50/90 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800/40 rounded-2xl shadow-xs text-left animate-in fade-in duration-200">
+          <div className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 font-bold text-base shadow-2xs">
+              ⚠️
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="text-sm font-black text-rose-900 dark:text-rose-200 tracking-tight">
+                Aviso de Base de Datos al procesar Colaboradores
+              </h4>
+              <p className="text-xs text-rose-800 dark:text-rose-300 mt-0.5 leading-relaxed">
+                {diagnosticInfo.error}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 pt-2.5 border-t border-rose-200/60 dark:border-rose-800/40 flex items-center justify-between flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDiagnosticModal(prev => !prev)}
+              className="text-xs font-bold px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              {showDiagnosticModal ? '▲ Ocultar Log Detallado' : '🔍 Ver Log Detallado del Error'}
+            </button>
+
+            <button
+              type="button"
+              onClick={copyDiagnosticToClipboard}
+              className="text-xs font-bold px-3 py-1.5 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-1.5 shadow-2xs cursor-pointer"
+            >
+              <span>{hasCopiedDiagnostic ? '✓ ¡Diagnóstico Copiado!' : '📋 Copiar Diagnóstico Completo'}</span>
+            </button>
+          </div>
+
+          {showDiagnosticModal && (
+            <div className="mt-3.5 p-3.5 bg-slate-900 text-slate-100 rounded-xl text-xs font-mono shadow-inner border border-slate-800 space-y-3 animate-in fade-in duration-150">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="font-bold text-slate-300">Diagnóstico de Base de Datos (PostgreSQL / Supabase)</span>
+                <span className="text-[10px] text-slate-400">{diagnosticInfo.timestamp}</span>
+              </div>
+
+              {diagnosticInfo.errorCode && (
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400">Código de Error:</span>
+                  <span className="px-1.5 py-0.5 bg-rose-950 text-rose-300 border border-rose-800 rounded font-bold">
+                    {diagnosticInfo.errorCode}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <span className="text-slate-400 font-bold block mb-1">Traza de pasos:</span>
+                <div className="space-y-1 bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80 max-h-40 overflow-y-auto">
+                  {diagnosticInfo.trace && diagnosticInfo.trace.length > 0 ? (
+                    diagnosticInfo.trace.map((t, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-[11px] leading-tight">
+                        <span className={`shrink-0 font-bold px-1 rounded text-[9px] ${
+                          t.status === 'ok' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' :
+                          t.status === 'error' ? 'bg-red-950 text-red-400 border border-red-800' :
+                          'bg-amber-950 text-amber-400 border border-amber-800'
+                        }`}>
+                          {t.status === 'ok' ? '✓' : t.status === 'error' ? '✗' : '!'}
+                        </span>
+                        <div className="flex-1">
+                          <span className="text-slate-200 font-medium">{t.label}</span>
+                          {t.details && <span className="text-slate-400 ml-1">({t.details})</span>}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-400 italic text-[11px]">No hay traza registrada.</div>
+                  )}
+                </div>
+              </div>
+
+              {diagnosticInfo.dbDiagnostic && (
+                <div>
+                  <span className="text-slate-400 font-bold block mb-1">Detalle del motor de Base de Datos:</span>
+                  <pre className="bg-slate-950/60 p-2 rounded-lg text-[10px] text-slate-300 overflow-x-auto border border-slate-800/80">
+                    {JSON.stringify(diagnosticInfo.dbDiagnostic, null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Contenido Modular */}
       {isLoading ? (
