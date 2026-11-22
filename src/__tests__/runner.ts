@@ -21,6 +21,7 @@ import { runSyntheticQAFullSuite } from './synthetic_full_qa';
 import { runConcurrencyAndIdempotencyTests } from './concurrency_race_qa';
 import { runFuzzingHostileDataTests } from './fuzzing_data_qa';
 import { runFacturacionDigitalSENIAT2026Tests } from './18_facturacion_digital_seniat2026.test';
+import { runAPMTelemetriaSRETests } from './19_apm_telemetria_sre.test';
 
 async function main() {
   console.log('====================================================');
@@ -47,6 +48,7 @@ async function main() {
     { name: '16. Concurrencia, Carrera e Idempotencia en Ráfaga', fn: runConcurrencyAndIdempotencyTests },
     { name: '17. Fuzzing Hostil & Resiliencia de Datos Extremos', fn: runFuzzingHostileDataTests },
     { name: '18. Facturación Digital SENIAT Providencia SNAT/2026/00093', fn: runFacturacionDigitalSENIAT2026Tests },
+    { name: '19. APM Telemetría, Latencia & Confiabilidad SRE', fn: runAPMTelemetriaSRETests },
   ];
 
   let passed = 0;

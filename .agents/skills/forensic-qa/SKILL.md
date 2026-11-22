@@ -18,7 +18,7 @@ Esta habilidad dicta el protocolo de verificación forense que todo cambio de c�
 
 ---
 
-## 2. Las 17 Suites Maestras de Pruebas (`npm run test:runner`)
+## 2. Las 19 Suites Maestras de Pruebas (`npm run test:runner`)
 
 El proyecto cuenta con un runner centralizado (`src/__tests__/runner.ts`) que evalúa en menos de 1 segundo:
 1. `01_seguridad.test.ts`: Whitelist de Superadmin, RBAC y bypass legítimo.
@@ -38,6 +38,8 @@ El proyecto cuenta con un runner centralizado (`src/__tests__/runner.ts`) que ev
 15. `QA Sintético Intermodular`: Flujo cruzado Citas ➔ Clínica ➔ Kardex ➔ POS ➔ NIIF.
 16. `QA Concurrencia e Idempotencia`: Protección contra 5 clics simultáneos y carrera por última unidad de stock.
 17. `QA Fuzzing Hostil`: Resiliencia ante inyecciones SQL, textos de 5,000 caracteres y ataques Anti-IDOR.
+18. `18_facturacion_digital_seniat2026.test.ts`: Providencia Administrativa SNAT/2026/00093, QR telemático y retenciones.
+19. `19_apm_telemetria_sre.test.ts`: Medición de latencia APM (FAST, NORMAL, SLOW), captura limpia de errores y métricas p95.
 
 ---
 
