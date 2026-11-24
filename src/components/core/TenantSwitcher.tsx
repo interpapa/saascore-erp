@@ -25,7 +25,7 @@ export function TenantSwitcher({ variant = 'header', className = '' }: TenantSwi
   const [isLoading, setIsLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const isSuper = isSuperAdminEmail(session?.userEmail) || session?.role === 'superadmin';
+  const isSuper = isSuperAdminEmail(session?.userEmail);
 
   // Cerrar al hacer clic fuera
   useEffect(() => {

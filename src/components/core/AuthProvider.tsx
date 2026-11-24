@@ -44,7 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Buscar si el usuario tiene un tenant asignado mediante Server Action segura
       let result: any = null;
       try {
-        const preferredTenantId = useERPStore.getState().impersonatedTenant?.id || useERPStore.getState().currentTenant?.id;
+        const rawPreferred = useERPStore.getState().impersonatedTenant?.id || useERPStore.getState().currentTenant?.id;
+        const isStaleTemplate = rawPreferred === '45b6404f-3469-4c42-99c1-85416a411f4f' || rawPreferred === '31ec279c-4216-48e1-905c-fbf4ea398e04';
+        const preferredTenantId = (!isSuper && isStaleTemplate) 
+          ? (cleanEmail === 'valerasilvamariajose@gmail.com' ? 'af6f32b9-2313-42e1-bdc5-e16e643a0cda' : undefined)
+          : rawPreferred;
         result = await getUserTenant(cleanEmail, user.id, preferredTenantId);
       } catch (saErr) {
         console.warn('[AuthProvider] Server Action getUserTenant falló, evaluando fallback:', saErr);
@@ -167,6 +171,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const isDummyOrStaleTenant = !existingTenant?.id 
         || existingTenant.id === 'global-admin' 
+        || (!isSuper && (existingTenant.id === '45b6404f-3469-4c42-99c1-85416a411f4f' || existingTenant.id === '31ec279c-4216-48e1-905c-fbf4ea398e04'))
+        || (cleanEmail === 'valerasilvamariajose@gmail.com' && existingTenant.id !== 'af6f32b9-2313-42e1-bdc5-e16e643a0cda')
         || existingTenant.id === '8636dbc1-ca83-4b92-a56b-52992959c289' 
         || existingTenant.id === '757c19e1-67bf-474b-88b3-4063b617dc10';
 
@@ -266,7 +272,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     else if (session && pathname === '/login') {
       if (session.tenantId && session.tenantId !== 'global-admin') {
         router.replace('/dashboard');
-      } else if (session.role === 'superadmin') {
+      } else if (session.role === 'superadmin' && isSuperAdminEmail(session?.userEmail)) {
         router.replace('/admin');
       } else {
         router.replace('/onboarding');
@@ -277,11 +283,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       router.push('/dashboard');
     }
     // Superadmin global sin empresa que visita /onboarding -> Directo a consola /admin
-    else if (session && session.role === 'superadmin' && (!session.tenantId || session.tenantId === 'global-admin') && pathname === '/onboarding') {
+    else if (session && session.role === 'superadmin' && isSuperAdminEmail(session?.userEmail) && (!session.tenantId || session.tenantId === 'global-admin') && pathname === '/onboarding') {
       router.push('/admin');
     }
     // Usuario autenticado SIN empresa asignada intentando acceder a rutas privadas -> Configurar empresa (excepto si va a /admin)
-    else if (session && (!session.tenantId || session.tenantId === 'global-admin') && session.role !== 'superadmin' && pathname !== '/onboarding' && !pathname.startsWith('/admin') && !isPublic) {
+    else if (session && (!session.tenantId || session.tenantId === 'global-admin') && !(session.role === 'superadmin' && isSuperAdminEmail(session?.userEmail)) && pathname !== '/onboarding' && !pathname.startsWith('/admin') && !isPublic) {
       router.push('/onboarding');
     }
   }, [session, isLoading, hasHydrated, pathname, router]);

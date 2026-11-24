@@ -215,7 +215,12 @@ export default function InventarioPage() {
           }
           return unified;
         });
+      } else if (res.success && res.items && res.items.length === 0) {
+        setItems([]);
       } else {
+        if (!res.success) {
+          console.warn('[InventarioPage] Aviso al cargar inventario:', res.error);
+        }
         // Fallback directo por cliente Supabase si Server Action no devolvió items
         try {
           const { data: directItems } = await supabase

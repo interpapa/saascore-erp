@@ -90,13 +90,31 @@ export const useERPStore = create<ERPState>()(
         }
         // Blindaje Anti-Fuga: Purgar residuos de superadmin e impersonación si el email no es superadmin
         if (state) {
-          const isSuper = isSuperAdminEmail(state.session?.userEmail);
+          const cleanEmail = state.session?.userEmail?.trim().toLowerCase();
+          const isSuper = isSuperAdminEmail(cleanEmail);
           if (!isSuper) {
-            if (state.session && state.session.role === 'superadmin') {
+            if (state.session && (state.session.role === 'superadmin' || state.session.role === 'admin')) {
               state.setSession({ ...state.session, role: 'owner' });
             }
             if (state.impersonatedTenant) {
               state.stopImpersonation();
+            }
+            // CRÍTICO: Si el tenant actual en localStorage es una plantilla de superadmin (Rendo Corp demo),
+            // purgarla para que AuthProvider cargue el tenant propio del usuario
+            if (state.currentTenant?.id === '45b6404f-3469-4c42-99c1-85416a411f4f' || state.currentTenant?.id === '31ec279c-4216-48e1-905c-fbf4ea398e04') {
+              state.setCurrentTenant(null);
+              if (state.session) {
+                state.setSession({ ...state.session, tenantId: null as any });
+              }
+            }
+            // Auto-reparación específica para Djumbo si quedó atada a un tenant ajeno
+            if (cleanEmail === 'valerasilvamariajose@gmail.com') {
+              if (state.currentTenant?.id && state.currentTenant.id !== 'af6f32b9-2313-42e1-bdc5-e16e643a0cda') {
+                state.setCurrentTenant(null);
+                if (state.session) {
+                  state.setSession({ ...state.session, tenantId: null as any, role: 'owner' });
+                }
+              }
             }
           }
           // Purgar impersonación residual de la plantilla demo rendo corp

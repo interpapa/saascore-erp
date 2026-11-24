@@ -51,19 +51,34 @@ export default function ERPLayout({
   const pathname = usePathname();
   const router = useRouter();
   const currentTenant = useERPStore(s => s.currentTenant);
+  const setCurrentTenant = useERPStore(s => s.setCurrentTenant);
   const session = useERPStore(s => s.session);
+  const setSession = useERPStore(s => s.setSession);
   const impersonatedTenant = useERPStore(s => s.impersonatedTenant);
   const stopImpersonation = useERPStore(s => s.stopImpersonation);
 
   const isSuper = session?.role === 'superadmin' && isSuperAdminEmail(session?.userEmail);
   const isOwner = session?.role === 'owner';
 
-  // Blindaje Anti-Fuga: si un cliente común tiene datos residuales de impersonación en su storage, purgar de inmediato
+  // Blindaje Anti-Fuga: si un cliente común tiene datos residuales de impersonación o tenant ajeno, purgar de inmediato
   useEffect(() => {
-    if (!isSuper && impersonatedTenant) {
-      stopImpersonation();
+    if (!isSuper) {
+      if (impersonatedTenant) {
+        stopImpersonation();
+      }
+      const isStaleTemplate = currentTenant?.id === '45b6404f-3469-4c42-99c1-85416a411f4f' || currentTenant?.id === '31ec279c-4216-48e1-905c-fbf4ea398e04';
+      const cleanEmail = session?.userEmail?.trim().toLowerCase();
+      const isDjumboWrongTenant = cleanEmail === 'valerasilvamariajose@gmail.com' && currentTenant?.id && currentTenant.id !== 'af6f32b9-2313-42e1-bdc5-e16e643a0cda';
+
+      if (isStaleTemplate || isDjumboWrongTenant) {
+        console.warn('[ERPLayout] Purgando tenant inconsistente para usuario regular:', currentTenant?.id);
+        setCurrentTenant(null);
+        if (session) {
+          setSession({ ...session, tenantId: null as any, role: 'owner' });
+        }
+      }
     }
-  }, [isSuper, impersonatedTenant, stopImpersonation]);
+  }, [isSuper, impersonatedTenant, stopImpersonation, currentTenant?.id, session, setCurrentTenant, setSession]);
 
   // 1. Módulos activos del tenant
   const tenantModules = (currentTenant?.active_modules && currentTenant.active_modules.length > 0) 
