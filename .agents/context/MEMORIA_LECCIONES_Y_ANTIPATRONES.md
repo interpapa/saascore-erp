@@ -54,6 +54,15 @@
   - La membresía de tipo `owner` (dueño de negocio propio) **siempre prevalece** sobre cualquier membresía secundaria de invitado o soporte.
   - Al detectar inconsistencias, se purga la caché residual y se fuerza la selección de su empresa titular.
 
+### 2.4 "Envenenamiento de Rol y Caché Local (Incidente Djumbo)"
+* **Fecha / Incidente:** 2026-11-24 - La dueña de Djumbo no veía sus productos ni clientes y reportaba que su cuenta parecía de "Admin" con acceso a otras empresas.
+* **Planteamiento Inicial Erróneo:** Pensar que la base de datos tenía duplicados o que el catálogo de inventario tenía un fallo de filtrado en el cliente.
+* **Causa Raíz Real:** Su correo estuvo temporalmente en `DEFAULT_SUPERADMINS`. El navegador persistió `role: 'superadmin'` y `currentTenant: Rendo Corp (demo)` en `Rendo-erp-storage` (localStorage). `TenantSwitcher.tsx` tenía `isSuper = isSuperAdminEmail(...) || session?.role === 'superadmin'`. Al leer el rol obsoleto de la caché, la UI le abría el conmutador de empresas global y la dejaba varada en la empresa demo Rendo Corp, que no tiene sus productos ni sus clientes.
+* **Regla Inmutable:**
+  1. **Tolerancia Cero a Roles No Validados:** Jamás evaluar `session.role === 'superadmin'` sin cruzarlo obligatoriamente con `isSuperAdminEmail(session.userEmail)`.
+  2. **Auto-Saneamiento en Rehidratación:** En `useERPStore` (`onRehydrateStorage`), todo usuario que no esté en whitelist debe purgar cualquier residuo de `superadmin` o `admin`, limpiar `impersonatedTenant` y expulsar tenants demo (`Rendo Corp`).
+  3. **Pre-Flight Canary Prober:** Ejecutar `npm run test:preflight` antes de desplegar para comprobar que la resolución de tenants en vivo responde con su tenant y rol legítimos.
+
 ---
 
 ## 📱 CATEGORÍA 3: ERRORES DE EXPERIENCIA DE USUARIO (UX & CLÍNICA)

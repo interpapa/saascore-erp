@@ -46,8 +46,10 @@ El proyecto cuenta con un runner centralizado (`src/__tests__/runner.ts`) que ev
 ## 3. Checklist Pre-Commit Inquebrantable
 
 Antes de crear un commit en `main`:
-- [ ] ¿Se ejecutó `npm run test:runner` y pasaron las 17 suites?
+- [ ] ¿Se ejecutó `npm run test:runner` y pasaron las 19 suites maestras en < 1s?
+- [ ] ¿Se ejecutó `npm run test:preflight` (Pre-Flight Canary Audit) validando Supabase vivo, Anti-IDOR y esquemas reales?
 - [ ] ¿Se ejecutó `npm run build` y compilaron las 44 páginas de Next.js sin errores de TypeScript?
-- [ ] ¿El cambio en base de datos es 100% aditivo (cero `DROP/RENAME COLUMN`)?
-- [ ] ¿Toda Server Action tiene `validateUserTenantAccess(tenantId, actor)`?
+- [ ] ¿El cambio en base de datos es 100% aditivo (cero `DROP/RENAME COLUMN`) siguiendo el patrón Expand & Contract de Stripe?
+- [ ] ¿Toda Server Action tiene `validateUserTenantAccess(actor, tenantId)`?
+- [ ] ¿Se protegió el estado contra envenenamiento de `localStorage` validando `isSuperAdminEmail`?
 - [ ] ¿Se actualizó el archivo correspondiente en `.agents/context/` si se tocó una ruta, tabla o store?
